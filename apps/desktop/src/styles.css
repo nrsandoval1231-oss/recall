@@ -23,3 +23,9 @@ button:disabled { opacity: .4; cursor: default; }
 .center { text-align: center; margin-top: 20vh; }
 @media (max-width: 800px) { .viewer-body { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+.ask { margin: 16px 0 24px; } .ask-form { display: flex; gap: 8px; } .ask-form input { flex: 1; min-height: 48px; font-size: 17px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; }
+.answer { margin-top: 12px; padding: 14px 16px; background: var(--surface); border-radius: 12px; } .answer[data-status="unavailable"], .answer[data-status="insufficient_evidence"] { background: var(--paper); border: 1px dashed var(--border); }
+.cite { min-height: 28px; padding: 0 8px; font-size: 13px; border-radius: 8px; vertical-align: baseline; }
+.sources { list-style: none; padding: 0; display: grid; gap: 6px; }
+.memory h4 { margin: 16px 0 4px; } .transcription { white-space: pre-wrap; font-family: inherit; background: var(--surface); padding: 10px; border-radius: 8px; max-height: 40vh; overflow: auto; }
+.settings { max-width: 640px; } .switch { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-size: 17px; }

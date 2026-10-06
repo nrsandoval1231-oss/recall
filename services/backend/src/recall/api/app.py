@@ -21,7 +21,9 @@ from ..config import Settings, get_settings
 from ..db.database import Database
 from ..domain.captures import CaptureService
 from ..domain.manifest import find_schema_path, load_schema, validate_manifest
+from ..domain.memories import MemoryService
 from ..errors import ApiError, payload_too_large, unauthenticated, unsupported_media, validation
+from ..ingestion.provider import Provider
 from ..storage import ObjectStore
 from ..storage.factory import build_object_store
 from .auth import Principal, TokenVerifier
@@ -63,6 +65,7 @@ def create_app(
     verifier: TokenVerifier | None = None,
     store: ObjectStore | None = None,
     database: Database | None = None,
+    provider: Provider | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     schema = load_schema(str(find_schema_path(settings)))
@@ -70,6 +73,17 @@ def create_app(
     object_store = store or build_object_store(settings)
     token_verifier = verifier or TokenVerifier.from_settings(settings)
     service = CaptureService(db, object_store, settings)
+    if provider is None and settings.ai_configured:
+        from ..ingestion.anthropic_provider import AnthropicProvider
+
+        assert settings.ai_api_key and settings.ai_model_id
+        provider = AnthropicProvider(
+            api_key=settings.ai_api_key,
+            model_id=settings.ai_model_id,
+            effort=settings.ai_effort,
+            refusal_fallback=settings.ai_refusal_fallback,
+        )
+    memories = MemoryService(db, settings, provider)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -252,6 +266,40 @@ def create_app(
                 "Cache-Control": "private, no-store",
             },
         )
+
+    # ------------------------------------------------------------------ RCL-002
+    @app.get("/v1/settings/ai")
+    def get_ai_settings(who: Auth) -> JSONResponse:
+        return _json(memories.get_ai_settings(who.user_id))
+
+    @app.put("/v1/settings/ai")
+    def put_ai_settings(who: Auth, body: Annotated[Any, Body()]) -> JSONResponse:
+        return _json(memories.put_ai_settings(who.user_id, body))
+
+    @app.post("/v1/captures/{capture_id}/retry-processing")
+    def post_retry_processing(who: Auth, capture_id: uuid.UUID, key: IdemKey) -> JSONResponse:
+        # Naturally idempotent on job state: repeating the request never queues a second job.
+        return _json(memories.retry_processing(who.user_id, capture_id, key))
+
+    @app.get("/v1/memories")
+    def list_memories(
+        who: Auth, limit: Annotated[int, Query(ge=1, le=100)] = 25, cursor: str | None = None
+    ) -> JSONResponse:
+        return _json(memories.list_memories(who.user_id, limit, cursor))
+
+    @app.get("/v1/memories/{memory_id}")
+    def get_memory(who: Auth, memory_id: uuid.UUID) -> JSONResponse:
+        return _json(memories.get_memory(who.user_id, memory_id))
+
+    @app.get("/v1/search")
+    def get_search(
+        who: Auth, q: Annotated[str, Query(max_length=1000)], limit: Annotated[int, Query(ge=1, le=50)] = 20
+    ) -> JSONResponse:
+        return _json(memories.search(who.user_id, q, limit))
+
+    @app.post("/v1/ask")
+    def post_ask(who: Auth, body: Annotated[Any, Body()]) -> JSONResponse:
+        return _json(memories.ask(who.user_id, body))
 
     return app
 

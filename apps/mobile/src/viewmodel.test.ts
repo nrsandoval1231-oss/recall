@@ -11,7 +11,7 @@ const local = (id: string, over: Partial<LocalCapture["sync"]> = {}, hint: strin
 });
 const remote = (id: string, client: string, status: ServerCapture["status"], at: string): ServerCapture => ({
   capture_id: id, client_capture_id: client, status, source_kind: "photo_document", captured_at: at, timezone: "UTC", context_hint: null,
-  created_at: at, stored_at: null, version: 1, memory_id: null, pages: [],
+  created_at: at, stored_at: null, version: 1, memory_id: null, processing: null, pages: [],
 });
 
 describe("recent captures view model", () => {
@@ -34,6 +34,22 @@ describe("recent captures view model", () => {
     const rows = mergeRecent([local("a", { phase: "finalized" })], [remote("srv1", "a", "stored", "2026-10-06T10:00:00Z"), remote("srv2", "other", "stored", "2026-10-07T10:00:00Z")], () => false);
     expect(rows.map((r) => r.key)).toEqual(["srv2", "a"]);
     expect(rows[0]?.status).toBe("uploaded");
+  });
+
+  it("after upload, the server's reading state is shown (never 'Ready' before it is)", () => {
+    const up = local("a", { phase: "finalized" });
+    const reading = { ...remote("srv", "a", "processing", "2026-10-06T10:00:00Z"), processing: { state: "running" as const, attempts: 1, max_attempts: 3, blocked_reason: null, last_error_code: null, retry_available: false } };
+    expect(mergeRecent([up], [reading], () => false)[0]?.statusLabel).toBe("Reading…");
+    const done = { ...remote("srv", "a", "needs_review", "2026-10-06T10:00:00Z"), memory_id: "mem-1" };
+    const row = mergeRecent([up], [done], () => false)[0];
+    expect(row?.statusLabel).toBe("Ready · check details");
+    expect(row?.memoryId).toBe("mem-1");
+    const failed = { ...remote("srv", "a", "failed", "2026-10-06T10:00:00Z"), processing: { state: "failed" as const, attempts: 3, max_attempts: 3, blocked_reason: null, last_error_code: "X", retry_available: true } };
+    const failedRow = mergeRecent([up], [failed], () => false)[0];
+    expect(failedRow?.statusLabel).toMatch(/original is safe/);
+    expect(failedRow?.processingRetryAvailable).toBe(true);
+    // a local capture not yet uploaded ignores any server data
+    expect(mergeRecent([local("a")], [done], () => false)[0]?.statusLabel).toBe("Saved on this device");
   });
 
   it("an incomplete capture from another device is not shown as uploaded", () => {

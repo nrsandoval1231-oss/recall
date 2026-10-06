@@ -1,5 +1,11 @@
 import { ApiError, NetworkError } from "./errors";
 import type {
+  AiSettings,
+  AskResponse,
+  MemoryDetail,
+  MemorySummary,
+  ProcessingView,
+  SearchResult,
   CaptureList,
   CaptureManifest,
   Device,
@@ -123,6 +129,38 @@ export class RecallApiClient {
       mediaType: response.headers.get("content-type") ?? "application/octet-stream",
       serverSha256: response.headers.get("x-recall-source-sha256"),
     };
+  }
+
+  getAiSettings(): Promise<AiSettings> {
+    return this.json("GET", "/v1/settings/ai");
+  }
+
+  setAiEnabled(enabled: boolean, expectedVersion?: number): Promise<AiSettings> {
+    return this.json("PUT", "/v1/settings/ai", { json: { enabled, ...(expectedVersion === undefined ? {} : { expected_version: expectedVersion }) } });
+  }
+
+  retryProcessing(captureId: string, idempotencyKey: string): Promise<{ capture_id: string; processing: ProcessingView | null }> {
+    return this.json("POST", `/v1/captures/${captureId}/retry-processing`, { headers: { "Idempotency-Key": idempotencyKey } });
+  }
+
+  listMemories(params: { limit?: number; cursor?: string | null } = {}): Promise<{ items: MemorySummary[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.cursor) query.set("cursor", params.cursor);
+    const qs = query.toString();
+    return this.json("GET", `/v1/memories${qs ? `?${qs}` : ""}`);
+  }
+
+  getMemory(memoryId: string): Promise<MemoryDetail> {
+    return this.json("GET", `/v1/memories/${memoryId}`);
+  }
+
+  search(q: string, limit = 20): Promise<{ query: string; results: SearchResult[] }> {
+    return this.json("GET", `/v1/search?${new URLSearchParams({ q, limit: String(limit) }).toString()}`);
+  }
+
+  ask(question: string): Promise<AskResponse> {
+    return this.json("POST", "/v1/ask", { json: { question } });
   }
 
   sourceRequest(sourceId: string): { url: string } {

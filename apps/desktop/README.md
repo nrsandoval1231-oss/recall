@@ -5,3 +5,5 @@ RCL-001 scope only: email-code sign-in, recent captures with the shared status w
 Native boundary (`src-tauri`): three credential-store commands (`secret_get/set/remove`, fixed service name, validated keys, bounded values) backed by the OS credential store. No fs/shell/http plugins; the WebView has no filesystem access. The auth session is chunked to fit Windows Credential Manager limits.
 
 Only a Linux `cargo check/test` and a Vite build were run; the Windows build/installer is **not verified** (ACCEPTANCE gate G4). Setup/run: [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+
+**RCL-002 additions:** Ask bar on Recent (citations open the exact cited page); the viewer shows the labelled machine reading for the current page, unclear items, suggested actions ("suggestions only"), and validation notes beside the hash-verified original; Settings has the opt-in AI-reading switch; failed readings offer a retry.

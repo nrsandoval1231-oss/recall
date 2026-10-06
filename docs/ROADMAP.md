@@ -18,6 +18,8 @@ Exit: capture/retry/isolation tests plus real iPhone -> cloud -> installed Windo
 
 ## RCL-002 — First useful recall
 
+Status: **implemented with synthetic/fake-provider evidence; live-provider quality on real handwriting OPEN** (see ACCEPTANCE "RCL-002 evidence").
+
 Objective: one source becomes one supported answer with original evidence.
 
 Add durable worker, evaluated multimodal configuration, structured interpretation, source memory, validation, keyword retrieval, minimal Ask UI, citation checks, and bounded retry.

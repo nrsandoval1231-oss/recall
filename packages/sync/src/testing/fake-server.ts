@@ -26,6 +26,8 @@ export class FakeServer implements SyncApi, FileUploader {
   onPut?: (n: number, rel: string) => void | Promise<void>;
   /** Server-side tamper hook for hash-mismatch tests. */
   corruptOnReceive = false;
+  /** What a stored capture reports (RCL-002 can move it on to processing/ready/... after finalize). */
+  storedStatus: "stored" | "processing" | "ready" | "needs_review" | "failed" = "stored";
   private next = 0;
   private ids = new Map<string, string>();
 
@@ -46,10 +48,10 @@ export class FakeServer implements SyncApi, FileUploader {
   }
   private view(c: Cap): ServerCapture {
     return {
-      capture_id: c.id, client_capture_id: c.manifest.client_capture_id, status: c.stored ? "stored" : "awaiting_upload",
+      capture_id: c.id, client_capture_id: c.manifest.client_capture_id, status: c.stored ? this.storedStatus : "awaiting_upload",
       source_kind: c.manifest.source_kind, captured_at: c.manifest.captured_at, timezone: c.manifest.timezone,
       context_hint: c.manifest.context_hint, created_at: "2026-10-06T00:00:00Z", stored_at: c.stored ? "2026-10-06T00:00:01Z" : null,
-      version: c.stored ? 2 : 1, memory_id: null,
+      version: c.stored ? 2 : 1, memory_id: null, processing: null,
       pages: c.pages.map((p) => ({
         source_id: p.source_id, client_page_id: p.m.client_page_id, ordinal: p.m.ordinal, media_type: p.m.media_type,
         byte_size: p.m.byte_size, declared_sha256: p.m.sha256, server_sha256: p.received,

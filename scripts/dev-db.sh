@@ -20,12 +20,17 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "PG_SUPER_PASSWORD=$(openssl rand -hex 16)"
     echo "PG_OWNER_PASSWORD=$(openssl rand -hex 16)"
     echo "PG_API_PASSWORD=$(openssl rand -hex 16)"
+    echo "PG_WORKER_PASSWORD=$(openssl rand -hex 16)"
     echo "RECALL_SIGNING_SECRET=$(openssl rand -hex 32)"
   } > "$ENV_FILE"
   chmod 600 "$ENV_FILE"
 fi
 # shellcheck disable=SC1090
 source "$ENV_FILE"
+if [ -z "${PG_WORKER_PASSWORD:-}" ]; then  # env file from before RCL-002
+  PG_WORKER_PASSWORD=$(openssl rand -hex 16)
+  echo "PG_WORKER_PASSWORD=$PG_WORKER_PASSWORD" >> "$ENV_FILE"
+fi
 
 if ! docker ps -a --format '{{.Names}}' | grep -qx "$NAME"; then
   docker run -d --name "$NAME" -e POSTGRES_PASSWORD="$PG_SUPER_PASSWORD" -p "127.0.0.1:$PORT:5432" postgres:16 >/dev/null
@@ -42,6 +47,9 @@ do \$\$ begin
   if not exists (select 1 from pg_roles where rolname='recall_api') then
     create role recall_api login nosuperuser nobypassrls password '$PG_API_PASSWORD';
   end if;
+  if not exists (select 1 from pg_roles where rolname='recall_worker_login') then
+    create role recall_worker_login login nosuperuser nobypassrls password '$PG_WORKER_PASSWORD';
+  end if;
 end \$\$;
 SQL
 docker exec "$NAME" psql -U postgres -tc "select 1 from pg_database where datname='recall'" | grep -q 1 \
@@ -51,6 +59,7 @@ psql_su -d recall -c "grant all on schema public to recall_owner"
 export RECALL_MIGRATION_DATABASE_URL="postgresql://recall_owner:$PG_OWNER_PASSWORD@127.0.0.1:$PORT/recall"
 (cd services/backend && uv run python -m recall.db.migrate)
 psql_su -d recall -c "grant recall_app to recall_api"
+psql_su -d recall -c "grant recall_worker to recall_worker_login"
 
 cat <<MSG
 
@@ -59,6 +68,7 @@ Local database ready. For the backend, in services/backend:
   export DATABASE_URL=postgresql://recall_api:$PG_API_PASSWORD@127.0.0.1:$PORT/recall
   export RECALL_MIGRATION_DATABASE_URL=$RECALL_MIGRATION_DATABASE_URL
   export RECALL_SIGNING_SECRET=$RECALL_SIGNING_SECRET
+  export RECALL_WORKER_DATABASE_URL=postgresql://recall_worker_login:$PG_WORKER_PASSWORD@127.0.0.1:$PORT/recall
   # plus RECALL_AUTH_ISSUER and RECALL_AUTH_JWKS_URL (or RECALL_AUTH_JWT_SECRET) from your Supabase project
 
 (values also saved in $ENV_FILE, which is git-ignored)

@@ -5,17 +5,20 @@ import type { RecentRow } from "../viewmodel";
 import { Button, StatusPill, text } from "../ui/kit";
 import { Pressable } from "react-native";
 
-export function HomeScreen({ rows, refreshing, onRefresh, onScan, onOpen, onRetry, onSignOut, banner }: {
-  rows: RecentRow[]; refreshing: boolean; onRefresh: () => void; onScan: () => void; onOpen: (row: RecentRow) => void; onRetry: (row: RecentRow) => void; onSignOut: () => void; banner: string | null;
+export function HomeScreen({ rows, refreshing, onRefresh, onScan, onOpen, onRetry, onSettings, onAsk, banner }: {
+  rows: RecentRow[]; refreshing: boolean; onRefresh: () => void; onScan: () => void; onOpen: (row: RecentRow) => void; onRetry: (row: RecentRow) => void; onSettings: () => void; onAsk: () => void; banner: string | null;
 }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={text.title} accessibilityRole="header">{copy.appName}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={copy.signOut} onPress={onSignOut} hitSlop={12} style={{ minHeight: 48, justifyContent: "center" }}>
-          <Text style={text.muted}>{copy.signOut}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={copy.settings} onPress={onSettings} hitSlop={12} style={{ minHeight: 48, justifyContent: "center" }}>
+          <Text style={text.muted}>{copy.settings}</Text>
         </Pressable>
       </View>
+      <Pressable accessibilityRole="search" accessibilityLabel={copy.askPlaceholder} onPress={onAsk} style={styles.ask}>
+        <Text style={[text.body, { color: color.inkMuted }]}>{copy.askPlaceholder}</Text>
+      </Pressable>
       <Text style={[text.body, { marginBottom: space.lg }]}>{copy.tagline}</Text>
       <Button label={copy.scan} onPress={onScan} hint="Photograph or import pages" style={{ minHeight: 72 }} />
       {banner && <Text accessibilityRole="alert" style={[text.muted, { marginTop: space.md }]}>{banner}</Text>}
@@ -46,5 +49,6 @@ export function HomeScreen({ rows, refreshing, onRefresh, onScan, onOpen, onRetr
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.paper, paddingHorizontal: space.md },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: space.sm },
+  ask: { minHeight: 56, borderWidth: 1, borderColor: color.border, borderRadius: radius.md, paddingHorizontal: space.md, justifyContent: "center", marginBottom: space.md },
   row: { flexDirection: "row", alignItems: "center", backgroundColor: color.surface, borderRadius: radius.md, padding: space.md, minHeight: 72 },
 });

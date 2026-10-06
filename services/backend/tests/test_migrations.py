@@ -13,7 +13,20 @@ from conftest import PgCluster, make_database
 from recall.db.database import Database
 from recall.db.migrate import DEFAULT_DIR, MigrationError, migrate
 
-TABLES = ["workspaces", "workspace_members", "devices", "captures", "source_objects", "idempotency_records"]
+TABLES = [
+    "workspaces",
+    "workspace_members",
+    "devices",
+    "captures",
+    "source_objects",
+    "idempotency_records",
+    "ai_consents",
+    "processing_jobs",
+    "memories",
+    "memory_revisions",
+    "search_chunks",
+    "ai_usage",
+]
 
 
 @pytest.fixture
@@ -24,12 +37,13 @@ def fresh(pg_cluster: PgCluster) -> tuple[str, str, str]:
 
 def test_empty_database_migrates_and_reruns_as_noop(fresh: tuple[str, str, str]) -> None:
     owner, _, _ = fresh
-    assert migrate(owner) == ["0001_trusted_capture.sql"]
+    assert migrate(owner) == ["0001_trusted_capture.sql", "0002_first_useful_recall.sql"]
     assert migrate(owner) == []
     assert migrate(owner, check_only=True) == []
     with psycopg.connect(owner) as conn:
-        assert [r[0] for r in conn.execute("select version from schema_migrations").fetchall()] == [
-            "0001_trusted_capture.sql"
+        assert [r[0] for r in conn.execute("select version from schema_migrations order by version").fetchall()] == [
+            "0001_trusted_capture.sql",
+            "0002_first_useful_recall.sql",
         ]
 
 
@@ -50,8 +64,8 @@ def test_future_migration_applies_on_top_of_existing_schema(fresh: tuple[str, st
     work = tmp_path / "m"
     shutil.copytree(DEFAULT_DIR, work)
     migrate(owner, work)
-    (work / "0002_example.sql").write_text("alter table devices add column note text;")
-    assert migrate(owner, work) == ["0002_example.sql"]
+    (work / "0099_example.sql").write_text("alter table devices add column note text;")
+    assert migrate(owner, work) == ["0099_example.sql"]
 
 
 def test_failed_migration_rolls_back_completely(fresh: tuple[str, str, str], tmp_path: Path) -> None:
@@ -134,7 +148,7 @@ def test_database_refuses_to_store_an_unverified_capture(fresh: tuple[str, str, 
             ("b" * 64, ids["src"]),
         )
         conn.execute("update captures set status='stored', stored_at=now() where id=%s", (ids["cap"],))
-        with pytest.raises(psycopg.errors.RestrictViolation):  # cannot regress
+        with pytest.raises((psycopg.errors.RestrictViolation, psycopg.errors.CheckViolation)):  # cannot regress
             conn.execute("update captures set status='awaiting_upload', stored_at=null where id=%s", (ids["cap"],))
 
 

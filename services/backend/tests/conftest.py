@@ -109,6 +109,8 @@ def make_database(cluster: PgCluster, *, apply_migrations: bool = True) -> tuple
             conn.execute("create role recall_owner login createdb createrole")
         if conn.execute("select 1 from pg_roles where rolname='recall_api'").fetchone() is None:
             conn.execute("create role recall_api login nosuperuser nobypassrls")
+        if conn.execute("select 1 from pg_roles where rolname='recall_worker_login'").fetchone() is None:
+            conn.execute("create role recall_worker_login login nosuperuser nobypassrls")
     with psycopg.connect(cluster.dsn(name), autocommit=True) as conn:
         conn.execute(f'alter database "{name}" owner to recall_owner')
         conn.execute("grant all on schema public to recall_owner")
@@ -117,6 +119,7 @@ def make_database(cluster: PgCluster, *, apply_migrations: bool = True) -> tuple
         migrate(owner_dsn)
         with psycopg.connect(cluster.dsn(name), autocommit=True) as conn:
             conn.execute("grant recall_app to recall_api")
+            conn.execute("grant recall_worker to recall_worker_login")
     return owner_dsn, cluster.dsn(name, "recall_api")
 
 
@@ -142,8 +145,18 @@ def make_token(key: ec.EllipticCurvePrivateKey, user_id: uuid.UUID, **overrides:
 class Env:
     """One migrated database + app + private storage, shared by a test module."""
 
-    def __init__(self, cluster: PgCluster, key: ec.EllipticCurvePrivateKey, tmp: Path, store_dir: Path | None = None):
+    def __init__(
+        self,
+        cluster: PgCluster,
+        key: ec.EllipticCurvePrivateKey,
+        tmp: Path,
+        store_dir: Path | None = None,
+        *,
+        overrides: dict[str, object] | None = None,
+        provider: object | None = None,
+    ):
         self.owner_dsn, self.app_dsn = make_database(cluster)
+        self.worker_dsn = self.owner_dsn.replace("recall_owner@", "recall_worker_login@")
         self.admin_dsn = self.owner_dsn.replace("recall_owner@", "postgres@")  # superuser: bypasses RLS, for assertions
         self.key = key
         self.store_dir = store_dir or tmp / "objects"
@@ -156,12 +169,20 @@ class Env:
             signing_secret=SIGNING_SECRET,
             local_storage_dir=self.store_dir,
             capture_schema_path=REPO_ROOT / "packages/contracts/capture.schema.json",
+            **(overrides or {}),  # type: ignore[arg-type]
         )
+        self.provider = provider
         self.store = LocalObjectStore(self.store_dir)
         self.db = Database(self.app_dsn)
         self.db.open()
         verifier = TokenVerifier(StaticKeyResolver(key.public_key(), ["ES256"]), ISSUER, AUDIENCE)
-        self.app = create_app(self.settings, verifier=verifier, store=self.store, database=self.db)
+        self.app = create_app(
+            self.settings,
+            verifier=verifier,
+            store=self.store,
+            database=self.db,
+            provider=provider,  # type: ignore[arg-type]
+        )
         self.client = TestClient(self.app)
         self.client.__enter__()
 

@@ -20,6 +20,21 @@ describe("design tokens", () => {
     }
   });
 
+  it("maps every server state to an honest status (never 'ready' before reading finishes)", async () => {
+    const { serverStatusKey } = await import("./index");
+    expect(serverStatusKey("awaiting_upload", null)).toBe("incomplete");
+    expect(serverStatusKey("stored", null)).toBe("uploaded");
+    expect(serverStatusKey("stored", { state: "queued" })).toBe("queued");
+    expect(serverStatusKey("stored", { state: "cancelled" })).toBe("paused");
+    expect(serverStatusKey("stored", { state: "queued", blocked_reason: "budget_exhausted" })).toBe("paused");
+    expect(serverStatusKey("processing", { state: "retrying", blocked_reason: "budget_exhausted" })).toBe("paused");
+    expect(serverStatusKey("processing", { state: "running" })).toBe("processing");
+    expect(serverStatusKey("ready", { state: "succeeded" })).toBe("ready");
+    expect(serverStatusKey("needs_review", null)).toBe("needs_review");
+    expect(serverStatusKey("failed", { state: "failed" })).toBe("processing_failed");
+    expect(statusPresentation.processing_failed.label).toMatch(/original is safe/);
+  });
+
   it("uses the contract's honest terminology", () => {
     expect(statusPresentation.saved_locally.label).toBe("Saved on this device");
     expect(statusPresentation.uploading.label).toBe("Uploading");

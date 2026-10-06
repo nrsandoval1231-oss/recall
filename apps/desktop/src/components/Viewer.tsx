@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { copy, statusPresentation } from "@recall/design-tokens";
+import { copy } from "@recall/design-tokens";
 import { sha256Hex, type RecallApiClient, type ServerCapture } from "@recall/api-client";
-import { formatBytes, serverStatusKey, type IntegrityState } from "../viewmodel";
+import { formatBytes, statusOf, type IntegrityState } from "../viewmodel";
+import { MemoryPanel } from "./MemoryPanel";
 
 interface Loaded { url: string; integrity: IntegrityState; bytes: ArrayBuffer; mediaType: string }
 
@@ -9,15 +10,21 @@ interface Loaded { url: string; integrity: IntegrityState; bytes: ArrayBuffer; m
  * Shows the exact original for each page. Every page is downloaded through the authenticated API and its
  * SHA-256 is computed locally and compared with the server-verified hash. "Verified" is only ever shown after that check.
  */
-export function Viewer({ api, capture, onClose }: { api: Pick<RecallApiClient, "fetchSource">; capture: ServerCapture; onClose: () => void }) {
-  const [index, setIndex] = useState(0);
+export function Viewer({ api, capture, onClose, initialSourceId }: {
+  api: Pick<RecallApiClient, "fetchSource" | "getMemory" | "retryProcessing">;
+  capture: ServerCapture;
+  onClose: () => void;
+  initialSourceId?: string | null;
+}) {
+  const [index, setIndex] = useState(() => Math.max(0, capture.pages.findIndex((p) => p.source_id === initialSourceId)));
+  const [retryNote, setRetryNote] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Record<string, Loaded>>({});
   const [error, setError] = useState<string | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
   const urls = useRef<string[]>([]);
   const root = useRef<HTMLDivElement>(null);
   const page = capture.pages[index];
-  const stored = capture.status === "stored";
+  const stored = capture.status !== "awaiting_upload"; // originals stay viewable in every later state
 
   useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
   useEffect(() => root.current?.focus(), []);
@@ -47,7 +54,15 @@ export function Viewer({ api, capture, onClose }: { api: Pick<RecallApiClient, "
 
   const go = useCallback((delta: number) => setIndex((i) => Math.min(capture.pages.length - 1, Math.max(0, i + delta))), [capture.pages.length]);
   const current = page ? loaded[page.source_id] : undefined;
-  const status = statusPresentation[serverStatusKey(capture.status)];
+  const status = statusOf(capture);
+  const retry = async () => {
+    try {
+      await api.retryProcessing(capture.capture_id, `retry-${capture.capture_id}-${capture.processing?.attempts ?? 0}`);
+      setRetryNote("Queued to be read again.");
+    } catch {
+      setRetryNote("Couldn't queue a retry right now.");
+    }
+  };
 
   return (
     <div ref={root} tabIndex={-1} className="viewer" role="dialog" aria-label="Original pages"
@@ -57,6 +72,9 @@ export function Viewer({ api, capture, onClose }: { api: Pick<RecallApiClient, "
         <h2>{capture.context_hint ?? copy.untitled}</h2>
         <span className={`pill ${status.tone}`}>{status.glyph} {status.label}</span>
       </div>
+      {capture.processing?.retry_available && (
+        <p className="note">{status.detail} <button onClick={() => void retry()}>Try reading again</button> {retryNote}</p>
+      )}
       {!stored && <p role="status" className="note">This capture's upload isn't complete, so its originals can't be shown yet. {status.detail}</p>}
       {error && <p role="alert" className="error">{error}</p>}
       <div className="viewer-body">
@@ -85,6 +103,7 @@ export function Viewer({ api, capture, onClose }: { api: Pick<RecallApiClient, "
               {page.original_filename && (<><dt>Filename</dt><dd>{page.original_filename}</dd></>)}
               <dt>Source ID</dt><dd className="mono">{page.source_id}</dd>
             </dl>
+            {capture.memory_id && <MemoryPanel api={api} memoryId={capture.memory_id} pageId={page.source_id} />}
             {current && (
               <a className="button" href={current.url} download={`recall-${capture.capture_id.slice(0, 8)}-page-${page.ordinal}.${page.media_type.split("/")[1]}`}>Save exact copy</a>
             )}
