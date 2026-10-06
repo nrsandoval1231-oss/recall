@@ -13,14 +13,14 @@ Tauri desktop ----------------+--> authenticated Memory API
   +-- downloaded originals    |        |                        |
   +-- safe Markdown exporter  |        v                        v
                               |   Cloud Postgres         AI provider
-Future Claude adapter --------+   + pgvector              (bounded calls)
+Future adapters --------------+   + pgvector              (bounded calls)
                                   |
                                   +-- private source-object metadata
                                                 |
                                          private object storage
 ```
 
-Solid implementation scope is mobile, desktop, API, worker, database, storage, cache, and export. The Claude adapter is future work and must not be a dependency of the first build.
+Solid implementation scope is mobile, desktop, API, worker, database, storage, cache, and export. Assistant/connectors are future adapters and must not be dependencies of the first build.
 
 Postgres records the current accepted interpretation and its history, not objective truth. Object storage holds original evidence. AI and indexes are replaceable derived machinery. SQLite is a synchronized working copy plus local pending operations. Markdown is a portable projection, not a peer database.
 
@@ -52,7 +52,7 @@ One Python package contains bounded modules:
 - `exports`: server export snapshots and portable manifests; desktop owns actual local filesystem writes.
 - `db`: persistence, transactions, migrations, and database security context.
 
-The API and worker reuse these modules. Do not split them into separately deployed microservices. The worker has no reason to run on Paul's computer.
+The API and worker reuse these modules. Do not split them into separately deployed microservices. The worker has no reason to run on an end user's computer.
 
 ## 4. Capture write path
 
@@ -103,12 +103,20 @@ The desktop is the local bridge; there is no separate always-on service in V1. I
 
 ## 9. Alternatives intentionally rejected
 
-**Canonical local Postgres:** makes phone capture and cloud integrations depend on a specific desktop or a second synchronization system. Local Postgres remains appropriate for developer tests, not Paul's canonical memory.
+**Canonical local Postgres:** makes phone capture and cloud integrations depend on a specific desktop or a second synchronization system. Local Postgres remains appropriate for developer tests, not canonical user memory.
 
 **Markdown as the application database:** makes concurrency, correction precedence, tenant authorization, and offline reconciliation depend on file parsing and filesystem races. Markdown remains the escape hatch.
 
 **Separate graph/vector/queue services:** create operating overhead before workload evidence warrants it. Relational entity links, pgvector, and a jobs table are sufficient starting boundaries.
 
-## 10. Rollout boundary
+## 10. Universal product boundary
+
+Core services operate only on universal captures, sources, memories, entities, relationships, statements, actions, and temporal/provenance records. Domain-specific experiences are projections/adapters. Do not fork storage or retrieval into separate schemas for maintenance, sales, education, travel, or other verticals.
+
+Obsidian is an optional export adapter. No core capture, Ask, correction, sync, or retrieval path may depend on Obsidian being installed or configured.
+
+The architecture must allow later source adapters (voice, screenshots, files, links, connected apps) to enter through the same trusted source-memory boundary and later assistant surfaces to access memory through the same authenticated API/tool contract.
+
+## 11. Rollout boundary
 
 Start with an authenticated capture through both client shells. Then add one useful source-backed answer. Finish correction, offline, export, isolation, restore, and real-device evidence before calling the full pilot ready. Paid provisioning and a public launch are separate owner-authorized actions.
