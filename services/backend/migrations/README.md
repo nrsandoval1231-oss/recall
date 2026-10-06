@@ -1,7 +1,1 @@
-# Application migrations
-
-No migrations exist yet. Introduce an ordered tested migration history when RCL-001 initializes the actual backend.
-
-Own application tables, constraints, indexes, and required database policy here. Use workspace-scoped foreign keys, unique retry invariants, and version checks. Test empty-database creation and upgrades before production use. Never silently run destructive migrations against live data.
-
-Platform auth/storage provisioning belongs in `infra/supabase`, not a second application-schema history. Later packets add only their required schema.
+Application migrations (ordered, checksummed SQL; owner role only). `0001_trusted_capture.sql` creates workspaces, membership, devices, captures, source objects and idempotency records with forced RLS and integrity triggers. Add a new numbered file for every schema change; never edit an applied file. `python -m recall.db.migrate [--check]`. Platform auth/storage setup lives in `infra/supabase`.

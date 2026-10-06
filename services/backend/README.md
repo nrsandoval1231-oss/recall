@@ -1,9 +1,13 @@
 # Recall backend
 
-Planned FastAPI API and durable worker from one Python package. No server or worker runs yet.
+One FastAPI package (`src/recall`). RCL-001 implements the trusted-capture API; there is no worker, AI, or retrieval yet.
 
-Initialize only the modules and dependencies needed by the active packet. API handles authenticated transport; domain owns deterministic policy; ingestion proposes/validates derived memory; retrieval assembles authorized evidence; sync handles feed/commands; exports handles portable snapshots; db handles persistence.
+| Module | Role |
+| --- | --- |
+| `api` | transport: auth (JWT validation), request IDs, error envelope, routes (`api/app.py`) |
+| `domain` | commands and policy: manifest validation, content validation, idempotency, upload capabilities, finalization (`domain/captures.py`) |
+| `db` | pool + per-request security context, migration runner, provisioning CLI |
+| `storage` | private object-store port with local (dev/test) and Supabase adapters; write-once keys |
+| `ingestion`, `retrieval`, `sync`, `exports` | reserved for later packets |
 
-The application migration history belongs here. Supabase platform setup must not duplicate it. Use a least-privilege request role and explicit tenant context; do not assume a privileged connection is protected by RLS.
-
-RCL-001 ends at verified original storage. RCL-002 introduces the durable worker and AI. No in-request fire-and-forget processing, provider secrets in clients, or local-PC dependency for cloud capture.
+Run, migrate, and test: [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md). Contract: [docs/API-CONTRACT.md](../../docs/API-CONTRACT.md). The API connects as a non-owner role and refuses to start otherwise.

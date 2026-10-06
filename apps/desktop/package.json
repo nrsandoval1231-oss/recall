@@ -1,0 +1,30 @@
+{
+  "name": "@recall/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@recall/api-client": "*",
+    "@recall/design-tokens": "*",
+    "@tauri-apps/api": "^2.12.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14",
+    "@types/react": "~19.2.2",
+    "@types/react-dom": "~19.2.2",
+    "@vitejs/plugin-react": "^5",
+    "jsdom": "^26",
+    "vite": "^7"
+  }
+}

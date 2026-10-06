@@ -1,7 +1,5 @@
 # Backend tests
 
-No runtime tests exist yet. Add unit and integration coverage with the first executable packet.
+Real PostgreSQL (a throwaway cluster started by `conftest.py` via `initdb`; tests skip with a message if the server binaries are missing), real RLS with a non-owner API role, a private temp object store, and a locally generated token-signing key (the only simulated part: the identity provider). Synthetic images only.
 
-Start with capture manifest/content validation, idempotency replay/conflicts, original hash verification, upload finalization, and cross-workspace source access. Use real local Postgres and controlled private-object test storage for integration behavior; mocks do not establish RLS/storage correctness.
-
-Later cover worker leases, uncertainty/identity policy, user-correction precedence, retrieval evidence, sync ordering, deletion, and export snapshots. Refer to `docs/ACCEPTANCE.md` for release scenarios.
+`test_capture` (A01/A04), `test_idempotency` (A03), `test_isolation` (A12), `test_failures` (A04/A05, restarts), `test_auth`, `test_migrations` (migration and DB-invariant checks), `test_objectstore`, `test_contract`, `test_e2e_clients` (real uvicorn + TypeScript clients, needs `npm install`).

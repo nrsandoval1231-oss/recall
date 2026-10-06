@@ -84,3 +84,49 @@ Paul's two-week pilot proves usefulness for one demanding user, not universal pr
 Universal readiness requires separate evidence that the memory model and retrieval behavior work across multiple domains without adding domain-specific core schema or prompt hacks.
 
 The goal is not high note count. The goal is trustworthy recovery from imperfect human recollection.
+
+## RCL-001 evidence (Trusted Capture)
+
+Candidate: branch `rcl-001-trusted-capture` (exact SHA in the PR description). Environment: Linux x86_64 sandbox, Python 3.13, Node 22, PostgreSQL 16 (throwaway local cluster per test run), Rust stable. **Everything below marked PASS is synthetic/automated evidence on that environment; none of it is installed-client, signed-build, live-provider, or private-user acceptance.**
+
+### Automated results
+
+| Suite | Result |
+| --- | --- |
+| Backend `pytest` (real PostgreSQL 16, real RLS, local object store) | 88 passed, 0 failed, 0 skipped |
+| Backend `ruff check`, `ruff format --check`, `mypy --strict` | clean |
+| `packages/sync` vitest (durable save, crash sweep, recovery, upload engine) | 29 passed |
+| `packages/api-client` vitest | 12 passed |
+| `packages/design-tokens` vitest (WCAG AA contrast, status vocabulary) | 3 passed |
+| `apps/mobile` vitest (view model, config) | 5 passed |
+| `apps/desktop` vitest + jsdom (empty state, statuses, hash verification, keyboard paging) | 8 passed |
+| Desktop Rust `cargo test --lib` (credential-key validation) / `cargo check` | 3 passed / clean (Linux only) |
+| `eslint .`, `tsc` for every workspace and `tests/e2e` | clean |
+| `vite build` (desktop), `expo export --platform ios` (mobile JS bundle) | succeeded |
+| Migration validation: empty DB, rerun no-op, `--check`, checksum tamper, upgrade, failed-migration rollback | in backend suite |
+| E2E: real uvicorn + PG + TypeScript sync engine/API client, interrupted upload + relaunch | passed |
+
+### Scenario map
+
+| ID | Scenario | Status | Evidence / limit |
+| --- | --- | --- | --- |
+| A01 | Ordered capture, exact originals | PASS (synthetic) | `test_capture.py`, e2e: local = server = cloud-on-disk = desktop-fetched SHA-256 for 3 ordered pages. Real-photo/iPhone/Windows run is **OPEN (G1)** |
+| A02 | Force-close/reopen keeps local capture | PASS (logic, node:fs adapter) | `local-store.test.ts`: crash injected at *every* file operation of Save; acknowledged saves never lost, partial saves never visible. The Expo file adapter on a real device is **OPEN (G3)** |
+| A03 | Retries/idempotency | PASS | `test_idempotency.py` (duplicate create/finalize, mismatched payload, lost acks, retry after upload/finalize, concurrent identical requests), `syncer.test.ts` |
+| A04 | Corrupt/oversized/unsupported | PASS | `test_capture.py`, `test_failures.py`; nothing is stored for rejected bytes |
+| A05 | Offline / permission denied | PARTIAL | Offline and signed-out upload behaviour PASS (`syncer.test.ts`). Camera/photo permission-denied UI is implemented but **not exercised** (needs device) |
+| A12 | Cross-workspace access incl. source bytes | PASS | `test_isolation.py` (two workspaces; list, fetch, source, finalize, authorizations, upload tokens, ID inference, header/body workspace injection, raw SQL as the API role) |
+| A06–A11, A13–A24 | Interpretation, AI, sync feed, export, delete, restore… | Not in scope | RCL-002+; not implemented, not claimed |
+
+### Remaining live gates (OPEN, not simulated)
+
+- **G1 — Real device end-to-end.** Photograph real pages on a physical iPhone, Save, interrupt/retry, view the verified original in an *installed* Windows build, compare hashes (procedure: `docs/DEVELOPMENT.md`). Needs: Apple developer signing, a Windows machine, a live API.
+- **G2 — Live Supabase.** Real Auth (email OTP, signups restricted, JWKS/issuer values), private Storage bucket, `SupabaseObjectStore` against the real service (currently only a stub HTTP transport), non-owner DB role on the managed Postgres, RLS verified there. Needs an authorized, provisioned project.
+- **G3 — Native adapters on device.** `ExpoFiles`, `ExpoFileUploader` (assumes non-2xx upload responses are returned, per the SDK 57 type docs), SecureStore chunking, `expo-camera`/`expo-image-picker` behaviour (HEIC from the picker, camera JPEG), and Tauri keyring on Windows Credential Manager.
+- **G4 — Desktop installer.** Only the Linux Rust check ran; no Windows build, NSIS installer, WebView2 behaviour (e.g. HEIC preview, CORS origin `http://tauri.localhost`) or code signing was exercised.
+- **G5 — Performance.** Local Save p95 < 1 s was not measured on a device.
+
+### Known limitations
+
+Upload spool files live in the OS temp dir and are not swept after a hard kill; Pillow decode memory is bounded only by the pixel limit and there is no upload concurrency cap. The mobile manifest write is not fsynced (device-only risk; unreadable manifests are reported, not deleted, and not auto-rebuilt). 
+Local originals are kept after upload (no cleanup yet). Draft pages exist only in memory until Save. Upload goes through the API (25 MiB/page) rather than directly to storage. No quotas/rate limits, deletion, backup/restore, or telemetry. Mobile/desktop icons are tool-generated placeholders, not an approved brand. Server list ordering is by server creation time and can skip a late-committing capture during a paginated walk. HEIC/HEIF are signature-checked but not decoded server-side. Multi-picture (MPO) camera JPEGs are accepted. `expo-doctor` could not complete two network-dependent checks in the sandbox (19/21 passed).

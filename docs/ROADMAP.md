@@ -8,6 +8,8 @@ Universal product thesis, trust model, contracts, repository boundaries, synthet
 
 ## RCL-001 — Trusted capture
 
+Status: **implemented; automated evidence recorded; live iPhone → Windows acceptance OPEN** (see ACCEPTANCE "RCL-001 evidence").
+
 Objective: any pilot user can save a photographed source safely and see the same original on desktop.
 
 Build minimal mobile/desktop shells, authentication, workspace/device identity, ordered durable drafts, private uploads, server hash verification, idempotent finalization, recent captures, original viewing.

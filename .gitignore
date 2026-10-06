@@ -42,3 +42,11 @@ Thumbs.db
 # Runtime manifests and media are never application fixtures by default
 *.local
 *.tmp
+
+# Tauri generated schemas/build output
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/Cargo.lock.bak
+
+# Local dev storage/state
+.recall-storage/
+.env.local-dev

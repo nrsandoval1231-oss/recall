@@ -1,7 +1,10 @@
-# Shared client sync protocol
+# Client capture engine (`@recall/sync`)
 
-Reserved for transport-independent pending-operation states, replay/idempotency behavior, cursor handling, and conflict response types. No sync implementation exists yet.
+Transport- and platform-independent logic for RCL-001's local-first capture, with ports for files and file upload (`src/ports.ts`):
 
-Use app-specific SQLite/filesystem adapters. Server authorization, commit ordering, and domain mutation rules stay in the backend. Do not create a general sync framework or a second canonical state store.
+- `draft.ts` — in-memory ordered pages (add/remove/reorder/retake, max 10). Not durable.
+- `local-store.ts` — **durable Save**: copy into app-private storage → re-read and hash → ordered manifest → one atomic directory rename (the commit point). `recover()` reconciles after a crash/force-close without deleting acknowledged data.
+- `syncer.ts` — resumable, idempotent create → upload only missing pages → finalize. "Uploaded" requires the server-computed SHA-256 of every page to equal the device's hash. Refuses to upload changed local bytes or another account's captures. Never deletes local originals.
+- `testing/` — node:fs adapter, fake server with failure injection, crash injector. Test-only; never bundled into apps.
 
-Implement when RCL-004 needs it; mobile durable drafts in RCL-001 can remain a small native adapter rather than prebuilding full offline replication.
+RCL-004 will extend this with the change feed and outbox; nothing of that exists yet.

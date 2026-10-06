@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimal: window/event basics only. No fs, shell, http, dialog, or opener plugins are installed. The only app commands are secret_get/secret_set/secret_remove.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
