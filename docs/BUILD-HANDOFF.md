@@ -4,7 +4,7 @@ This is the bounded first-packet brief. The written foundation still needs owner
 
 ## Mission
 
-Make a real photographed note safely available from phone to cloud to desktop. Do not implement the LLM, semantic search, Claude/MCP, voice, entity inference, a landing page, or a full dashboard in this packet.
+Make a real photographed source safely available from phone to cloud to desktop. This packet proves Recall's universal trusted-source boundary; it must contain no consulting, maintenance, mining, or other domain assumptions. Do not implement the LLM, semantic search, Claude/MCP, voice, entity inference, a landing page, or a full dashboard in this packet.
 
 Read [PRD](PRD.md), [ARCHITECTURE](ARCHITECTURE.md), [API-CONTRACT](API-CONTRACT.md), [DATA-MODEL](DATA-MODEL.md), [SECURITY-AND-OPERATIONS](SECURITY-AND-OPERATIONS.md), and [ACCEPTANCE](ACCEPTANCE.md) before coding. Follow the root [AGENTS](../AGENTS.md).
 
@@ -23,7 +23,7 @@ Read [PRD](PRD.md), [ARCHITECTURE](ARCHITECTURE.md), [API-CONTRACT](API-CONTRACT
 
 A temporary camera URI is not a durable saved capture. A client-supplied hash is not server verification. A successful upload callback is not a complete verified capture. A private URL is not authorization. A single-account demo is not workspace isolation.
 
-Do not expose Supabase service-role/database-owner credentials to clients. Do not upload Paul's real notes into GitHub, logs, or public test artifacts. Do not hardcode a fake transcript or an optimistic processing status to make a demo look complete.
+Do not expose Supabase service-role/database-owner credentials to clients. Do not upload any user's real notes, personal data, customer data, or private sources into GitHub, logs, or public test artifacts. Do not hardcode a fake transcript or an optimistic processing status to make a demo look complete.
 
 ## Test-first acceptance targets
 
