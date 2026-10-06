@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "capture_id": "30000000-0000-4000-8000-000000000001",
+  "input_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "summary": "The page reports Unit 4 running hot, questions a coolant leak, and notes filter needs. The shutdown timing and the identity of Sam remain unresolved.",
+  "summary_evidence": [
+    {"page_id": "40000000-0000-4000-8000-000000000001", "quote": "Unit 4 running hot again"},
+    {"page_id": "40000000-0000-4000-8000-000000000001", "quote": "coolant leak?"},
+    {"page_id": "40000000-0000-4000-8000-000000000001", "quote": "need filters"},
+    {"page_id": "40000000-0000-4000-8000-000000000001", "quote": "Sam - engines"},
+    {"page_id": "40000000-0000-4000-8000-000000000001", "quote": "shutdown Sat?"}
+  ],
+  "pages": [
+    {
+      "page_id": "40000000-0000-4000-8000-000000000001",
+      "ordinal": 1,
+      "transcription": "Example Ranch\nUnit 4 running hot again\ncoolant leak?\nSam - engines\nshutdown Sat?\nneed filters",
+      "legibility": "clear"
+    }
+  ],
+  "mentions": [
+    {"local_id": "m1", "kind": "organization", "raw_text": "Example Ranch", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "Example Ranch"}]},
+    {"local_id": "m2", "kind": "asset", "raw_text": "Unit 4", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "Unit 4"}]},
+    {"local_id": "m3", "kind": "person", "raw_text": "Sam", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "Sam - engines"}]}
+  ],
+  "claims": [
+    {"local_id": "c1", "subject_mention_id": "m2", "predicate": "reported_condition", "text": "Unit 4 is reportedly running hot again.", "value_text": "running hot again", "epistemic_state": "reported", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "Unit 4 running hot again"}]},
+    {"local_id": "c2", "subject_mention_id": "m2", "predicate": "suspected_cause", "text": "A coolant leak is questioned, not confirmed.", "value_text": "coolant leak?", "epistemic_state": "uncertain", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "coolant leak?"}]}
+  ],
+  "action_suggestions": [
+    {"local_id": "a1", "text": "Follow up on filter needs.", "assignee_mention_id": null, "due_text": null, "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "need filters"}]}
+  ],
+  "uncertainties": [
+    {"kind": "identity", "description": "Sam's full identity is unresolved; do not invent a surname or link to an arbitrary candidate.", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "Sam - engines"}]},
+    {"kind": "date", "description": "The event date is unknown and the shutdown itself is tentative. Do not resolve Sat from the photograph timestamp.", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "shutdown Sat?"}]},
+    {"kind": "other", "description": "The coolant leak is only a suspicion.", "evidence": [{"page_id": "40000000-0000-4000-8000-000000000001", "quote": "coolant leak?"}]}
+  ]
+}

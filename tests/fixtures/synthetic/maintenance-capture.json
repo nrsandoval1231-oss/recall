@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "client_capture_id": "10000000-0000-4000-8000-000000000001",
+  "device_id": "10000000-0000-4000-8000-000000000002",
+  "captured_at": "2026-10-06T14:00:00-05:00",
+  "timezone": "America/Chicago",
+  "source_kind": "handwritten_note",
+  "context_hint": "Synthetic contract example only",
+  "pages": [
+    {
+      "client_page_id": "20000000-0000-4000-8000-000000000001",
+      "ordinal": 1,
+      "media_type": "image/jpeg",
+      "byte_size": 2048,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "original_filename": "synthetic-example-not-an-actual-photo.jpg"
+    }
+  ]
+}
