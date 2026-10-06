@@ -8,8 +8,8 @@ import json
 import anthropic
 import httpx2
 import pytest
-from conftest import REPO_ROOT
 
+from conftest import REPO_ROOT
 from recall.ingestion.anthropic_provider import FALLBACK_BETA, AnthropicProvider, provider_schema
 from recall.ingestion.provider import AnswerRequest, InterpretRequest, PageImage, ProviderError
 from recall.retrieval.ask import ANSWER_SCHEMA
