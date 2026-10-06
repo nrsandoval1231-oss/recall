@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Recall",
+    "slug": "recall",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.example.recall.dev",
+      "infoPlist": { "ITSAppUsesNonExemptEncryption": false }
+    },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "Recall uses the camera so you can photograph pages you don't want to lose.", "microphonePermission": false, "recordAudioAndroid": false }],
+      ["expo-image-picker", { "photosPermission": "Recall reads only the photos you choose to add as pages.", "cameraPermission": false, "microphonePermission": false }],
+      "expo-secure-store"
+    ]
+  }
+}
