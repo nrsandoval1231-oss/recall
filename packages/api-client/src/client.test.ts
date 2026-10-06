@@ -69,6 +69,20 @@ describe("RecallApiClient", () => {
     expect(bodies).toEqual([undefined, JSON.stringify({ source_ids: ["s1"] })]);
   });
 
+  it("RCL-002 calls hit the documented routes", async () => {
+    const calls: string[] = [];
+    const c = client(async (url, init) => {
+      calls.push(`${(init as RequestInit).method} ${String(url).replace("http://api.test", "")}`);
+      return new Response(JSON.stringify({}));
+    });
+    await c.ask("where is the key?");
+    await c.search("solar guy", 5);
+    await c.getMemory("m1");
+    await c.setAiEnabled(true, 2);
+    await c.retryProcessing("cap1", "retry-key-1234");
+    expect(calls).toEqual(["POST /v1/ask", "GET /v1/search?q=solar+guy&limit=5", "GET /v1/memories/m1", "PUT /v1/settings/ai", "POST /v1/captures/cap1/retry-processing"]);
+  });
+
   it("resolves relative upload URLs against the base", () => {
     expect(client(fetch).resolve("/v1/uploads/abc")).toBe("http://api.test/v1/uploads/abc");
   });

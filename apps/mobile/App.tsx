@@ -10,9 +10,11 @@ import { SignInScreen } from "./src/screens/SignInScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { CaptureScreen } from "./src/screens/CaptureScreen";
 import { DetailScreen } from "./src/screens/DetailScreen";
+import { AskScreen } from "./src/screens/AskScreen";
+import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { text } from "./src/ui/kit";
 
-type Route = { name: "home" } | { name: "capture" } | { name: "detail"; row: RecentRow };
+type Route = { name: "home" } | { name: "capture" } | { name: "detail"; row: RecentRow; sourceId?: string | null } | { name: "ask" } | { name: "settings" };
 
 export default function App() {
   const loaded = useMemo(() => loadConfig(), []);
@@ -88,7 +90,22 @@ function Main({ services }: { services: Services }) {
   }, [services, rebuild, refresh]);
 
   if (route.name === "capture") return <CaptureScreen services={services} onCancel={() => setRoute({ name: "home" })} onDone={() => { setRoute({ name: "home" }); void rebuild(); }} />;
-  if (route.name === "detail") return <DetailScreen services={services} row={route.row} onBack={() => setRoute({ name: "home" })} />;
+  if (route.name === "detail") return <DetailScreen services={services} row={route.row} initialSourceId={route.sourceId} onBack={() => setRoute({ name: "home" })} />;
+  if (route.name === "settings") return <SettingsScreen services={services} onBack={() => setRoute({ name: "home" })} onSignOut={() => void services.auth.signOut()} />;
+  if (route.name === "ask") {
+    return (
+      <AskScreen services={services} initial="" onBack={() => setRoute({ name: "home" })}
+        onOpen={(c) => {
+          const row = rows.find((r) => r.serverId === c.capture_id || (r.memoryId && r.memoryId === c.memory_id));
+          // Not in the loaded Recent list (e.g. older, or from another device): open it from the server.
+          const target: RecentRow = row ?? {
+            key: c.capture_id, localId: null, serverId: c.capture_id, title: "Source", pages: 0, capturedAt: c.captured_at,
+            status: "ready", statusLabel: "", statusDetail: "", retryable: false, memoryId: c.memory_id, processingRetryAvailable: false,
+          };
+          setRoute({ name: "detail", row: target, sourceId: c.source_id });
+        }} />
+    );
+  }
   return (
     <HomeScreen
       rows={rows}
@@ -98,7 +115,8 @@ function Main({ services }: { services: Services }) {
       onScan={() => setRoute({ name: "capture" })}
       onOpen={(row) => setRoute({ name: "detail", row })}
       onRetry={(row) => row.localId && void services.syncer.sync(row.localId).then(refresh)}
-      onSignOut={() => void services.auth.signOut()}
+      onSettings={() => setRoute({ name: "settings" })}
+      onAsk={() => setRoute({ name: "ask" })}
     />
   );
 }

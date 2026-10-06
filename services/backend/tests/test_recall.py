@@ -545,3 +545,19 @@ def test_invalid_capture_transitions_are_refused_by_the_database(ai: Env, fake: 
     cap = capture_with(ai, user, fake, ["no consent here"])
     with pytest.raises(psycopg.errors.CheckViolation):
         admin(ai, "update captures set status='ready' where id=%s", (cap["capture_id"],))
+
+
+def test_every_cited_original_has_a_page_number(ai: Env, fake: FakeProvider, worker: Worker) -> None:
+    """Regression: summary chunks once cited a page_id without its page number (found by a flaky e2e)."""
+    user, caps = _vague_corpus(ai, fake, worker)
+    rows = admin(
+        ai,
+        "select kind, source_id, ordinal from search_chunks c join memories m on m.id = c.memory_id "
+        "where m.capture_id = %s",
+        (caps["solar"]["capture_id"],),
+    )
+    for kind, source_id, ordinal in rows:
+        if source_id is not None:
+            assert ordinal is not None, kind
+        else:
+            assert kind == "context"  # only the user's own typed hint has no page

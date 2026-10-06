@@ -347,7 +347,8 @@ def _chunks(cap: Row, ex: dict[str, Any], source_by_page: dict[str, Row]) -> lis
         out.append(("context", None, None, cap["context_hint"], None))
     if ex["summary"]:
         first = ex["summary_evidence"][0]["page_id"] if ex["summary_evidence"] else None
-        out.append(("summary", first, None, ex["summary"], None))
+        ordinal = source_by_page[first]["ordinal"] if first else None
+        out.append(("summary", first, ordinal, ex["summary"], None))
     for page in ex["pages"]:
         if page["transcription"].strip():
             out.append(("transcription", page["page_id"], page["ordinal"], page["transcription"], None))

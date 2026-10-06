@@ -216,6 +216,17 @@ describe("upload engine", () => {
     expect(ctx.srv.captures.size).toBe(1);
   });
 
+  it("a capture the server has already moved on to reading (or read) is still confirmed Uploaded", async () => {
+    for (const later of ["processing", "ready", "needs_review", "failed"] as const) {
+      const ctx = setup();
+      ctx.srv.storedStatus = later;
+      const capture = await saved(ctx, 1);
+      ctx.srv.loseAckOnce.add("finalize"); // force the replay path, which returns the later status
+      await ctx.syncer.sync(capture.operationId);
+      expect(displayStatus(await ctx.syncer.sync(capture.operationId), false)).toBe("uploaded");
+    }
+  });
+
   it("never deletes local originals, even after Uploaded", async () => {
     const ctx = setup();
     const capture = await saved(ctx, 2);

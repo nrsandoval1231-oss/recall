@@ -52,8 +52,10 @@ export interface ServerCapture {
   created_at: string;
   stored_at: string | null;
   version: number;
-  /** Always null in RCL-001; memories arrive with RCL-002. */
+  /** Set once the capture has been interpreted into a memory (RCL-002). */
   memory_id: string | null;
+  /** null when no processing was requested (e.g. AI off). */
+  processing: ProcessingView | null;
   pages: ServerPage[];
   upload?: { authorization_endpoint: string; accepted_media_types: MediaType[]; max_page_bytes: number };
 }
@@ -71,7 +73,7 @@ export interface Me {
     max_page_bytes: number;
     max_capture_bytes: number;
   };
-  config: { ai_configured: boolean; consent_required: boolean };
+  config: { ai_configured: boolean; ai_enabled: boolean; consent_required: boolean };
 }
 
 export interface Device {
@@ -100,4 +102,104 @@ export interface CaptureList {
 export interface ExpectedPage {
   source_id: string;
   sha256: string;
+}
+
+export interface ProcessingView {
+  state: "queued" | "running" | "retrying" | "succeeded" | "failed" | "cancelled";
+  attempts: number;
+  max_attempts: number;
+  blocked_reason: "budget_exhausted" | "not_configured" | null;
+  last_error_code: string | null;
+  retry_available: boolean;
+}
+
+export interface AiSettings {
+  ai_configured: boolean;
+  provider: string | null;
+  policy_version: string;
+  enabled: boolean;
+  consent_outdated: boolean;
+  decided_at: string | null;
+  version: number;
+  explanation: string;
+}
+
+export type EpistemicState = "reported" | "uncertain" | "question" | "confirmed_by_user" | "superseded" | "retracted";
+
+export interface Evidence {
+  page_id: string;
+  quote: string;
+}
+
+export interface MemorySummary {
+  memory_id: string;
+  capture_id: string;
+  revision: number;
+  status: ServerCaptureStatus;
+  summary: string | null;
+  context_hint: string | null;
+  captured_at: string;
+  page_count: number;
+  model_id: string;
+  created_at: string;
+}
+
+export interface MemoryDetail extends MemorySummary {
+  timezone: string;
+  processor_version: string;
+  revised_at: string;
+  interpretation: {
+    summary: string | null;
+    summary_evidence: Evidence[];
+    pages: { page_id: string; ordinal: number; transcription: string; legibility: "clear" | "mixed" | "unreadable" }[];
+    mentions: { local_id: string; kind: string; raw_text: string; evidence: Evidence[] }[];
+    statements: { local_id: string; kind: string; text: string; value_text: string | null; epistemic_state: EpistemicState; temporal_text: string | null; attribution_text: string | null; evidence: Evidence[] }[];
+    action_suggestions: { local_id: string; kind: "action" | "commitment"; text: string; due_text: string | null; evidence: Evidence[] }[];
+    uncertainties: { kind: string; description: string; evidence: Evidence[] }[];
+  };
+  validation_notes: { code: string; detail: string }[];
+  labels: { transcription: string; action_suggestions: string };
+}
+
+export interface Citation {
+  citation_id: string;
+  memory_id: string;
+  memory_revision: number;
+  capture_id: string;
+  source_id: string | null;
+  page: number | null;
+  quote: string;
+  captured_at: string;
+  epistemic_state: EpistemicState | null;
+  kind: "summary" | "transcription" | "statement" | "context";
+}
+
+export interface SearchResult {
+  chunk_id: string;
+  memory_id: string;
+  memory_revision: number;
+  capture_id: string;
+  source_id: string | null;
+  page: number | null;
+  kind: Citation["kind"];
+  epistemic_state: EpistemicState | null;
+  captured_at: string;
+  excerpt: string;
+  rank: number;
+}
+
+/** The four statuses are NOT interchangeable success states; render each differently. */
+export type AskStatus = "answered" | "insufficient_evidence" | "ambiguous" | "unavailable";
+
+export interface AskResponse {
+  question: string;
+  status: AskStatus;
+  answer: string | null;
+  sentences: { text: string; citation_ids: string[] }[];
+  citations: Citation[];
+  limitations: string[];
+  sources: Citation[];
+  reason: string | null;
+  index_as_of: string | null;
+  mode: "online_grounded" | "sources_only";
 }
