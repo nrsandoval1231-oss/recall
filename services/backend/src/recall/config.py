@@ -52,6 +52,39 @@ class Settings(BaseSettings):
 
     capture_schema_path: Path | None = Field(None, validation_alias="RECALL_CAPTURE_SCHEMA_PATH")
 
+    # ---- RCL-002: AI processing. Every value must be set (and workspace consent given) before any
+    # private content is sent to a provider. Nothing here has a "convenient" default.
+    ai_provider: Literal["anthropic"] | None = Field(None, validation_alias="AI_PROVIDER")
+    ai_model_id: str | None = Field(None, validation_alias="AI_MODEL_ID")
+    ai_api_key: str | None = Field(None, validation_alias="AI_API_KEY", repr=False)
+    ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = Field("high", validation_alias="AI_EFFORT")
+    ai_refusal_fallback: bool = Field(True, validation_alias="AI_REFUSAL_FALLBACK")
+    ai_input_usd_per_mtok: float | None = Field(None, validation_alias="AI_INPUT_USD_PER_MTOK")
+    ai_output_usd_per_mtok: float | None = Field(None, validation_alias="AI_OUTPUT_USD_PER_MTOK")
+    ai_daily_budget_usd: float | None = Field(None, validation_alias="RECALL_AI_DAILY_BUDGET_USD")
+    ai_monthly_budget_usd: float | None = Field(None, validation_alias="RECALL_AI_MONTHLY_BUDGET_USD")
+    ai_image_max_edge: int = Field(2000, validation_alias="AI_IMAGE_MAX_EDGE")
+    max_processing_attempts: int = Field(3, validation_alias="RECALL_MAX_PROCESSING_ATTEMPTS")
+    worker_database_url: str | None = Field(None, validation_alias="RECALL_WORKER_DATABASE_URL")
+    worker_lease_seconds: int = Field(900, validation_alias="RECALL_WORKER_LEASE_SECONDS")
+
+    @property
+    def ai_configured(self) -> bool:
+        return bool(
+            self.ai_provider
+            and self.ai_model_id
+            and self.ai_api_key
+            and self.ai_input_usd_per_mtok is not None
+            and self.ai_output_usd_per_mtok is not None
+            and self.ai_daily_budget_usd is not None
+            and self.ai_monthly_budget_usd is not None
+        )
+
+    @property
+    def ai_policy_version(self) -> str:
+        """Bumped whenever what is sent to the provider, or to whom, changes; consent is per version."""
+        return f"{self.ai_provider or 'none'}-v1"
+
     @field_validator("cors_allow_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -71,6 +104,12 @@ class Settings(BaseSettings):
             raise ValueError("RECALL_AUTH_JWT_SECRET must be at least 32 characters")
         if self.storage_backend == "supabase" and not (self.supabase_url and self.supabase_service_role_key):
             raise ValueError("supabase storage needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+        if not 1 <= self.max_processing_attempts <= 10:
+            raise ValueError("RECALL_MAX_PROCESSING_ATTEMPTS must be 1-10")
+        for name in ("ai_input_usd_per_mtok", "ai_output_usd_per_mtok", "ai_daily_budget_usd", "ai_monthly_budget_usd"):
+            value = getattr(self, name)
+            if value is not None and value < 0:
+                raise ValueError(f"{name} must be >= 0")
         if self.max_pages_per_capture > 10 or self.max_page_bytes > 25 * MIB:
             raise ValueError("limits may not exceed the capture schema maxima (10 pages, 25 MiB)")
         return self

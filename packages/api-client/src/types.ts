@@ -2,7 +2,8 @@
 
 export type MediaType = "image/jpeg" | "image/png" | "image/heic" | "image/heif";
 export type SourceKind = "handwritten_note" | "photo_document";
-export type ServerCaptureStatus = "awaiting_upload" | "stored";
+/** awaiting_upload -> stored; then, only with AI consent: processing -> ready | needs_review | failed. */
+export type ServerCaptureStatus = "awaiting_upload" | "stored" | "processing" | "ready" | "needs_review" | "failed";
 export type PageUploadState = "pending" | "received" | "verified";
 export type DevicePlatform = "ios" | "android" | "windows" | "macos" | "linux" | "web";
 

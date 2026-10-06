@@ -12,6 +12,8 @@ dependencies = [
   "httpx",
   "pillow",
   "jsonschema[format]",
+  "anthropic>=1.11.0",
+  "pillow-heif>=1.8.0",
 ]
 
 [dependency-groups]

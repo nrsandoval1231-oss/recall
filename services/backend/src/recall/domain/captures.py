@@ -1,7 +1,7 @@
 """RCL-001 application commands: devices, captures, uploads, finalization, original access.
 
-State machine (server side): awaiting_upload -> stored. Nothing else exists yet; processing
-states belong to RCL-002 and are deliberately not represented.
+State machine (server side): awaiting_upload -> stored, then (RCL-002, only with consent)
+processing -> ready | needs_review | failed. Originals stay available in every state after stored.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from ..errors import (
     validation,
 )
 from ..storage import ObjectNotFound, ObjectStore, StoredObjectConflict, hash_stream
+from . import processing
 from .content import validate_content
 from .manifest import request_digest
 from .tokens import (
@@ -69,7 +70,9 @@ def _page_view(row: Row) -> dict[str, Any]:
     }
 
 
-def _capture_view(row: Row, pages: list[Row]) -> dict[str, Any]:
+def _capture_view(
+    row: Row, pages: list[Row], job: Row | None = None, memory_id: uuid.UUID | None = None
+) -> dict[str, Any]:
     def iso(value: datetime | None) -> str | None:
         return value.isoformat() if value else None
 
@@ -84,7 +87,8 @@ def _capture_view(row: Row, pages: list[Row]) -> dict[str, Any]:
         "created_at": iso(row["created_at"]),
         "stored_at": iso(row["stored_at"]),
         "version": row["version"],
-        "memory_id": None,  # RCL-002
+        "memory_id": str(memory_id) if memory_id else None,
+        "processing": processing.processing_view(job),
         "pages": [_page_view(p) for p in sorted(pages, key=lambda p: p["ordinal"])],
     }
 
@@ -112,13 +116,21 @@ class CaptureService:
             "active_workspace_id": str(rows[0]["id"]),
             "capabilities": {
                 "capture": True,
-                "ai_processing": False,  # RCL-002; never implied here
+                "ai_processing": self.settings.ai_configured,
                 "accepted_media_types": ["image/jpeg", "image/png", "image/heic", "image/heif"],
                 "max_pages_per_capture": self.settings.max_pages_per_capture,
                 "max_page_bytes": self.settings.max_page_bytes,
                 "max_capture_bytes": self.settings.max_capture_bytes,
             },
-            "config": {"ai_configured": False, "consent_required": False},
+            "config": self._ai_config(user_id),
+        }
+
+    def _ai_config(self, user_id: uuid.UUID) -> dict[str, Any]:
+        consent = self._guard(user_id, lambda tx: processing.consent_active(tx, self.settings))
+        return {
+            "ai_configured": self.settings.ai_configured,
+            "ai_enabled": bool(consent and self.settings.ai_configured),
+            "consent_required": self.settings.ai_configured and not consent,
         }
 
     def _guard(self, user_id: uuid.UUID, fn: Callable[[Tx], Any]) -> Any:
@@ -284,7 +296,8 @@ class CaptureService:
         pages = tx.all(
             "select * from source_objects where workspace_id=%s and capture_id=%s", (tx.workspace_id, capture_id)
         )
-        return _capture_view(row, pages)
+        job, memory_id = _processing_state(tx, [capture_id]).get(capture_id, (None, None))
+        return _capture_view(row, pages, job, memory_id)
 
     # ------------------------------------------------------------------ read
     def get_capture(self, user_id: uuid.UUID, capture_id: uuid.UUID) -> dict[str, Any]:
@@ -319,8 +332,11 @@ class CaptureService:
                 if more
                 else None
             )
+            state = _processing_state(tx, [r["id"] for r in rows])
             return {
-                "items": [_capture_view(r, by_capture.get(r["id"], [])) for r in rows],
+                "items": [
+                    _capture_view(r, by_capture.get(r["id"], []), *state.get(r["id"], (None, None))) for r in rows
+                ],
                 "next_cursor": next_cursor,
             }
 
@@ -471,7 +487,7 @@ class CaptureService:
                 if record["request_digest"] != digest:
                     raise idempotency_conflict()
                 return _capture_view(cap, pages), pages
-            if cap["status"] == "stored":
+            if cap["status"] != "awaiting_upload":  # stored or any later processing state
                 check_expected(pages)
                 self._record_idempotency(tx, "capture.finalize", idempotency_key, digest, capture_id)
                 return _capture_view(cap, pages), pages
@@ -522,6 +538,8 @@ class CaptureService:
                     "where workspace_id=%s and id=%s",
                     (tx.workspace_id, capture_id),
                 )
+                # Same transaction: a stored capture and its interpretation job exist together or not at all.
+                processing.enqueue_capture(tx, self.settings, capture_id)
             self._record_idempotency(tx, "capture.finalize", idempotency_key, digest, capture_id)
             return self._load_view(tx, capture_id)
 
@@ -562,7 +580,7 @@ class CaptureService:
             )
             if row is None:
                 raise not_found("Source not found.")
-            if row["capture_status"] != "stored" or row["verified_at"] is None:
+            if row["capture_status"] == "awaiting_upload" or row["verified_at"] is None:
                 raise source_unavailable()
             return row
 
@@ -570,3 +588,21 @@ class CaptureService:
         if self.store.stat(row["storage_key"]) is None:
             raise ApiError("SOURCE_UNAVAILABLE", "The stored original is missing.", 503, retryable=True)
         return row, self.store.iter_bytes(row["storage_key"])
+
+
+def _processing_state(tx: Tx, capture_ids: list[uuid.UUID]) -> dict[uuid.UUID, tuple[Row | None, uuid.UUID | None]]:
+    """Latest processing job and memory id per capture (one query each)."""
+    if not capture_ids:
+        return {}
+    jobs = tx.all(
+        "select distinct on (capture_id) * from processing_jobs where workspace_id=%s and capture_id = any(%s) "
+        "order by capture_id, created_at desc",
+        (tx.workspace_id, capture_ids),
+    )
+    memories = tx.all(
+        "select capture_id, id from memories where workspace_id=%s and capture_id = any(%s)",
+        (tx.workspace_id, capture_ids),
+    )
+    by_job = {j["capture_id"]: j for j in jobs}
+    by_memory = {m["capture_id"]: m["id"] for m in memories}
+    return {cid: (by_job.get(cid), by_memory.get(cid)) for cid in capture_ids}

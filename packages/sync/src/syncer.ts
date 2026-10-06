@@ -121,7 +121,7 @@ export class CaptureSyncer {
       capture = await this.recordServerCapture(capture, server);
 
       // 2. Upload only pages the server has not received.
-      if (server.status !== "stored") {
+      if (server.status === "awaiting_upload") {
         await this.uploadPages(capture, server, (p) => p.upload_state === "pending");
       }
 
@@ -210,7 +210,7 @@ export class CaptureSyncer {
   }
 
   private assertServerMatchesLocal(capture: LocalCapture, server: ServerCapture): void {
-    if (server.status !== "stored") throw new IntegrityError("NOT_STORED", "The server did not confirm storage.");
+    if (server.status === "awaiting_upload") throw new IntegrityError("NOT_STORED", "The server did not confirm storage."); // stored or any later processing state
     if (server.pages.length !== capture.pages.length) throw new IntegrityError("SERVER_MANIFEST_MISMATCH", "Page count differs from what was saved.");
     for (const local of capture.pages) {
       const remote = server.pages.find((p) => p.client_page_id === local.clientPageId);

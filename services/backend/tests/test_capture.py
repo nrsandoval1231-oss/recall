@@ -255,11 +255,13 @@ def test_device_registration_is_idempotent_and_conflicts_on_mismatch(env: Env) -
     )
 
 
-def test_no_processing_state_is_ever_claimed(env: Env) -> None:
-    """RCL-001 ends at 'stored': no AI, transcript, or processing fields are faked."""
+def test_no_processing_is_claimed_without_consent(env: Env) -> None:
+    """Without AI configuration + consent, a capture ends at 'stored': no job, no transcript, no memory."""
     capture = stored_capture(env.user(), [synthetic_image()])
     assert capture["status"] == "stored"
-    for forbidden in ("transcript", "summary", "processing", "ocr", "memory"):
+    assert capture["processing"] is None and capture["memory_id"] is None
+    for forbidden in ("transcript", "summary", "ocr"):
         assert forbidden not in capture
     me = env.user().req("GET", "/v1/me").json()
-    assert me["capabilities"]["ai_processing"] is False and me["config"]["ai_configured"] is False
+    assert me["capabilities"]["ai_processing"] is False
+    assert me["config"] == {"ai_configured": False, "ai_enabled": False, "consent_required": False}
