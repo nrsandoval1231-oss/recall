@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIB = 1024 * 1024
@@ -47,10 +47,22 @@ class Settings(BaseSettings):
     upload_token_ttl_seconds: int = Field(600, validation_alias="RECALL_UPLOAD_TOKEN_TTL_SECONDS")
     max_image_pixels: int = Field(120_000_000, validation_alias="RECALL_MAX_IMAGE_PIXELS")
 
+    # Browser/webview origins allowed to call the API (e.g. the Tauri desktop app). Empty = none.
+    cors_allow_origins: list[str] = Field(default_factory=list, validation_alias="RECALL_CORS_ORIGINS")
+
     capture_schema_path: Path | None = Field(None, validation_alias="RECALL_CAPTURE_SCHEMA_PATH")
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [o.strip() for o in value.split(",") if o.strip()]
+        return value
 
     @model_validator(mode="after")
     def _validate(self) -> Settings:
+        if "*" in self.cors_allow_origins:
+            raise ValueError("RECALL_CORS_ORIGINS must list explicit origins, never '*'")
         if len(self.signing_secret) < 32:
             raise ValueError("RECALL_SIGNING_SECRET must be at least 32 characters")
         if bool(self.auth_jwks_url) == bool(self.auth_jwt_secret):

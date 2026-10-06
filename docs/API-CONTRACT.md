@@ -1,6 +1,6 @@
 # Memory API — V1 contract
 
-Version: 0.1 | Proposed routes and semantics; no endpoint is implemented yet
+Version: 0.2 | RCL-001 routes are implemented (see "RCL-001 implementation details" at the end); later routes remain proposed
 
 ## Common contract
 
@@ -123,3 +123,21 @@ For exact ordering, snapshots, tombstones, and reconciliation, see [SYNC-AND-EXP
 Specify and test at least: `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `UNSUPPORTED_MEDIA`, `PAYLOAD_TOO_LARGE`, `HASH_MISMATCH`, `UPLOAD_INCOMPLETE`, `IDEMPOTENCY_CONFLICT`, `VERSION_CONFLICT`, `QUOTA_EXCEEDED`, `PROCESSING_FAILED`, `SOURCE_UNAVAILABLE`, `SNAPSHOT_REQUIRED`, and `AI_NOT_CONFIGURED`.
 
 Return stable machine codes and useful user messages. Do not encourage blind retries for authorization, unsupported input, or conflicting edits.
+
+## RCL-001 implementation details
+
+These are the exact, tested semantics of the packet-001 routes. Where they refine the proposal above, they win.
+
+**Auth.** `Authorization: Bearer <provider JWT>`. The server validates signature (JWKS asymmetric keys, or legacy HS256 secret), issuer, audience, expiry, and a UUID `sub`. Algorithms are allow-listed (no `none`, no HS/RS confusion). The workspace is derived from verified membership; no request field or header selects or grants a workspace. Each user gets one personal workspace on first authenticated request unless `RECALL_AUTO_PROVISION_WORKSPACES=false`.
+
+**Devices.** `POST /v1/devices` `{device_id, platform, name?, app_version?}` is naturally idempotent on the client-chosen `device_id` (201 first time, 200 on the same registration, 409 if the id is registered differently) and is the one creation route that does not take `Idempotency-Key`. A capture requires a device registered by the same user.
+
+**Create.** `POST /v1/captures` validates the body against `capture.schema.json` plus: contiguous unique ordinals starting at 1, unique `client_page_id`, per-page and per-batch byte limits. Schema failures map to `UNSUPPORTED_MEDIA` (415, bad `media_type`), `PAYLOAD_TOO_LARGE` (413) or `VALIDATION_ERROR` (422). `Idempotency-Key` is required (8–200 chars). The mobile client uses the capture UUID. Identical key and payload digest → replay (200, the same capture in its *current* state, not a stale snapshot); same key, different payload → 409 `IDEMPOTENCY_CONFLICT`; a different key for an already-created `client_capture_id` is a replay if the payload is identical and a conflict otherwise. The digest ignores page-array order. The 201/200 body contains the server `capture_id`, per-page `source_id` and `upload_state` (`pending|received|verified`), `declared_sha256`, `server_sha256` (null until received) and an `upload` hint. `memory_id` is always null in RCL-001.
+
+**Upload (decision: server-mediated).** `POST /v1/captures/{id}/upload-authorizations` (optional `{source_ids}`) returns, for each page not yet *verified*, `{source_id, method:"PUT", url:"/v1/uploads/<token>", expires_at, required_headers, max_bytes}`. The token is an HMAC-signed capability bound to one workspace, user, capture and source with a short TTL (default 600 s); the client must also send its bearer token. `PUT /v1/uploads/{token}` streams the body to a spool file while computing SHA-256, then checks: size equals the declared size (`UPLOAD_INCOMPLETE` / `PAYLOAD_TOO_LARGE`), SHA-256 equals the declared hash (`HASH_MISMATCH`), and the bytes really are the declared type (JPEG/PNG fully decoded under a pixel limit; HEIC/HEIF container signature) (`UNSUPPORTED_MEDIA`). Only then is the object written, write-once, to the server-assigned key `workspaces/<ws>/captures/<capture>/sources/<source>/original` and the server-computed hash recorded. Re-sending identical bytes is a harmless 200; the stored original is never overwritten (`SOURCE_CONFLICT` otherwise). Direct-to-storage signed uploads are a later optimization; this keeps one authorization path, server-side hashing before storage, and no storage credentials or bearer URLs near clients. Extra codes: `UPLOAD_AUTHORIZATION_INVALID` (403), `UPLOAD_AUTHORIZATION_EXPIRED` (403, retryable: request a new authorization).
+
+**Finalize.** `POST /v1/captures/{id}/finalize` with `Idempotency-Key` and body `{"expected_pages":[{"source_id","sha256"}...]}` listing exactly the capture's pages and the hashes the client believes were stored. The server verifies every page was received, re-reads each stored object from storage and recomputes its SHA-256 (outside any DB transaction), compares with the client's expectation, then in one transaction marks pages verified and the capture `stored`. Missing pages or lost objects → 409 `UPLOAD_INCOMPLETE` (retryable, `details.missing_source_ids`); stored bytes that no longer match → 422 `HASH_MISMATCH`. Replays (same key, or a new key after success) return the stored capture without re-effecting (`version` is bumped once). The database itself refuses `stored` unless every page is verified.
+
+**Read.** `GET /v1/captures` (opaque, workspace-bound, signed cursors; most recently *received* first) and `GET /v1/captures/{id}` return the capture view. `GET /v1/sources/{id}/content` streams the original through the authenticated API (no signed read URLs are issued) only for verified pages of a `stored` capture (else 409 `SOURCE_UNAVAILABLE`), with `Content-Type` = verified media type, `X-Recall-Source-SHA256`, `ETag`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`. Another workspace's capture or source is indistinguishable from a nonexistent one (404 `NOT_FOUND`).
+
+**Also**: `/healthz` (liveness) and `/readyz` (DB + storage) are unauthenticated and content-free. CORS is closed unless `RECALL_CORS_ORIGINS` lists explicit origins (never `*`).

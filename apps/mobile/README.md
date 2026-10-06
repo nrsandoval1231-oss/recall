@@ -1,9 +1,7 @@
-# Recall mobile
+# Recall mobile (Expo / React Native, iPhone first)
 
-Planned Expo / React Native / TypeScript application, iPhone first. No runnable app exists yet.
+RCL-001 scope only: email-code sign-in, camera + photo import, 1–10 ordered pages (reorder/remove/retake), optional hint, **Save** (durable local copy first), honest status (**Saved on this device / Uploading / Uploaded / Failed — retry available**), recent captures, original viewer with cloud-hash verification. No title/folder/tags, no AI.
 
-Own native camera/import, durable local drafts, device permissions, secure token access, mobile screens, and platform persistence. Use the shared API contract and design tokens.
+Durability logic (copy into app-private storage, hash, manifest, single atomic commit, startup recovery, resumable idempotent upload) is in `packages/sync` and tested; `src/platform/*` are thin Expo adapters (`expo-file-system`, `expo-secure-store`, `expo-crypto`). Native behaviour is **not yet verified on a device** (ACCEPTANCE gate G3). Captures are bound to the signed-in account and are never uploaded under another.
 
-RCL-001 implements only authenticated capture, honest upload state, recent captures, and original viewing. Copy temporary photo URIs into durable app-private storage before Save acknowledgement. Background upload is best effort; resume safely on launch.
-
-No Obsidian mobile dependency, broad photo-library scan, contacts permission, location tracking, voice, or Claude integration in the first packet.
+Setup/run: [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md). Placeholder icons from the Expo template are not a brand.

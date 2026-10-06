@@ -1,0 +1,18 @@
+[package]
+name = "recall-desktop"
+version = "0.1.0"
+description = "Recall desktop (RCL-001: trusted capture viewer)"
+edition = "2021"
+publish = false
+
+[lib]
+name = "recall_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+# Windows Credential Manager on Windows; kernel keyutils on Linux (dev/CI check only).
+keyring = { version = "3", default-features = false, features = ["windows-native", "linux-native"] }

@@ -1,6 +1,6 @@
 # Repository tree and ownership
 
-This is the actual starter layout. READMEs and `.gitkeep` files intentionally mark unimplemented boundaries. There are no runnable product packages yet.
+This was the starter layout. RCL-001 added runnable packages in `apps/mobile`, `apps/desktop`, `services/backend`, `packages/{api-client,design-tokens,sync}`, `tests/e2e`, `scripts/dev-db.sh`, `.github/workflows/ci.yml`, a root npm workspace, and `docs/DEVELOPMENT.md`. The backend also has a `storage/` adapter package (object-store port, local and Supabase adapters) beside the documented modules; `ingestion`, `retrieval`, `sync`, and `exports` remain reserved.
 
 ```text
 recall/

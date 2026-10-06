@@ -51,3 +51,36 @@ def test_error_envelope_shape_and_request_id(env: Env) -> None:
     }
     assert resp.headers["x-request-id"] == "trace-abcdef123"
     assert env.client.get("/no/such/route").json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_cors_is_closed_by_default_and_explicit_when_configured(env: Env) -> None:
+    from fastapi.testclient import TestClient
+
+    from recall.api.app import create_app
+    from recall.api.auth import StaticKeyResolver, TokenVerifier
+
+    preflight = {
+        "Origin": "http://tauri.localhost",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization",
+    }
+    assert "access-control-allow-origin" not in env.client.options("/v1/me", headers=preflight).headers
+    settings = env.settings.model_copy(update={"cors_allow_origins": ["http://tauri.localhost"]})
+    verifier = TokenVerifier(StaticKeyResolver(env.key.public_key(), ["ES256"]), "i", "a")
+    with TestClient(create_app(settings, verifier=verifier, store=env.store, database=env.db)) as client:
+        ok = client.options("/v1/me", headers=preflight)
+        assert ok.headers["access-control-allow-origin"] == "http://tauri.localhost"
+        evil = client.options("/v1/me", headers={**preflight, "Origin": "https://evil.example"})
+        assert "access-control-allow-origin" not in evil.headers
+    import pytest
+
+    from recall.config import Settings
+
+    with pytest.raises(ValueError, match="explicit origins"):
+        Settings(
+            database_url="x",
+            auth_issuer="i",
+            auth_jwks_url="https://x/j",
+            signing_secret="s" * 32,
+            cors_allow_origins=["*"],
+        )

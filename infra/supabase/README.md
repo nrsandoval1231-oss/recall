@@ -1,9 +1,11 @@
 # Supabase platform setup
 
-Proposed default, not a provisioned project.
+Nothing here is provisioned by this repository; creating the project is an owner-authorized, possibly paid action. Application tables have exactly one owner: `services/backend/migrations`.
 
-This boundary owns Auth configuration, private Storage buckets/policies, platform roles/settings, and verified backup/export behavior. Application table migrations have one owner: `services/backend/migrations`.
+Required for live acceptance (gate G2):
 
-Disable unused exposed database APIs or secure every exposed table with least-privilege/RLS. Never ship a service-role key to clients. Private originals require authorized serving and short-lived source URLs where used.
-
-Database backups alone do not preserve Storage object bytes. Test both parts of recovery before the pilot. Capture actual settings and provider plan evidence at deployment; do not assume security from default configuration.
+1. **Auth**: email provider with one-time codes; **disable public signups** (invite/pre-create test users). Note the issuer (`https://<ref>.supabase.co/auth/v1`) and JWKS URL (`/.well-known/jwks.json`) for `RECALL_AUTH_ISSUER` / `RECALL_AUTH_JWKS_URL`. Prefer asymmetric signing keys over the legacy HS256 secret.
+2. **Storage**: one **private** bucket (default `recall-originals-private`); no public access and no storage policies granting clients direct access — only the API's service-role key touches it.
+3. **Database**: create an owner role for migrations and a separate non-owner API login role (`nosuperuser nobypassrls`), run `python -m recall.db.migrate` as the owner, then `grant recall_app to <api role>`. Do not point the API at the `postgres`/service role. Disable the exposed Data API (PostgREST) for these tables or leave them unexposed; they have RLS but are not designed for direct client access.
+4. **Secrets**: `SUPABASE_SERVICE_ROLE_KEY` and database URLs live only in the API's secret store. Clients get the URL and the *publishable* key.
+5. Capture plan/backup/retention evidence at provisioning; Storage bytes are not covered by database backups.

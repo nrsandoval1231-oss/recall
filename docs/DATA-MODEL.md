@@ -1,6 +1,6 @@
 # Canonical data model
 
-Version: 0.2 | Logical schema, not executed migrations
+Version: 0.3 | Logical schema. RCL-001 tables are implemented in `services/backend/migrations/0001_trusted_capture.sql`; everything else is still logical
 
 ## Design goal
 
@@ -123,3 +123,14 @@ Retrieval eligibility excludes deleted, superseded-as-current, unauthorized, or 
 Mirror only needed fields: cached memories/revisions, entities/links, claims/actions, source-download inventory, local text-search index, pending operations, sync cursor, and export manifests.
 
 Tokens live in platform-protected credential storage. Cache rebuilding must not discard unacknowledged local drafts.
+
+## Implemented in RCL-001
+
+Only `workspaces`, `workspace_members`, `devices`, `captures`, `source_objects`, `idempotency_records` exist. Highlights (the migration is authoritative):
+
+- Every workspace-scoped row has `workspace_id` and composite foreign keys (`(workspace_id, capture_id)`), so a page cannot reference another workspace's capture.
+- **RLS is enabled and forced** on all six tables. Policies require both the request's selected workspace (`app.workspace_id`, set transaction-locally from verified membership) and live membership. The API role `recall_app` has no `DELETE`/`TRUNCATE` and column-limited `UPDATE`; the API refuses to start as a superuser, `BYPASSRLS` role, or table owner.
+- `captures.status` is `awaiting_upload|stored` only; a trigger refuses `stored` unless every page is verified and refuses regression. `source_objects` rows are append-only and, once received, write-once (`server_sha256`, size, key); a check constraint forces `server_sha256 = declared_sha256`.
+- `source_objects.storage_key` is server-generated and unique; client filenames are display metadata.
+- `idempotency_records` is keyed by `(workspace_id, actor_id, operation_family, idempotency_key)` and stores the request digest and resource id. `captures` is additionally unique on `(workspace_id, client_capture_id)`, so a capture UUID stays unique after any idempotency record would expire. No purge exists yet.
+- Cross-tenant blob deduplication is not implemented (and must never be added).

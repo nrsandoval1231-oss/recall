@@ -58,7 +58,7 @@ The API and worker reuse these modules. Do not split them into separately deploy
 
 1. Mobile copies each selected/camera image from its temporary URI into app-private durable storage before acknowledging local Save. Persist the ordered manifest and a client-generated UUID operation ID.
 2. The authenticated API creates or reuses a capture using workspace-scoped idempotency. It returns narrowly scoped upload authorization.
-3. Upload originals to non-overwritable keys assigned by the server. Clients do not choose arbitrary object paths. Originals are defined as the bytes received from the selected camera/import asset; record any platform conversion before intake.
+3. Upload originals to non-overwritable keys assigned by the server. Clients do not choose arbitrary object paths. (RCL-001 decision: the upload is a server-mediated `PUT` using a short-lived signed capability, so the server hashes and validates bytes *before* storing them; see API-CONTRACT "RCL-001 implementation details".) Originals are defined as the bytes received from the selected camera/import asset; record any platform conversion before intake.
 4. Server finalization checks ownership, count/order, media type, size, and server-computed SHA-256. Only then is the capture "Uploaded".
 5. In the same database transaction, create a durable processing job. The source remains viewable if AI is disabled or fails.
 6. A worker claims the job with a lease, creates separately hashed/oriented derivatives when needed, and sends only authorized necessary content to the selected provider.

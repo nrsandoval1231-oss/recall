@@ -1,5 +1,5 @@
-# Developer and operations scripts
+# Scripts
 
-Reserved for small, tested scripts once real implementation needs them: contract checks, local setup, redacted evaluation runs, export verification, and isolated restore drills.
+- `dev-db.sh up|down` — repeatable local PostgreSQL 16 (Docker) with the non-owner API role, migrations applied. Local development only; passwords are random and git-ignored.
 
-There are no executable scripts in this scaffold. Do not add commands that claim an unimplemented app starts or tests pass. Scripts that access real sources or cloud services require explicit configuration and must never print secrets or private content.
+Add scripts only for repeatable setup, verification, or deployment steps that are otherwise error-prone.

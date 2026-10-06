@@ -4,10 +4,15 @@
   "version": "0.1.0",
   "description": "Recall monorepo (RCL-001: trusted capture)",
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
-  "engines": { "node": ">=22" },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tests/e2e/tsconfig.json",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
     "check": "npm run lint && npm run typecheck && npm run test"

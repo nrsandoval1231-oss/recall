@@ -77,7 +77,7 @@ async function main() {
   let bFetch = "";
   try { await b.fetchSource(cap.pages[0]!.source_id); bFetch = "LEAK"; } catch (e) { bFetch = e instanceof ApiError ? e.code : "other"; }
 
-  console.log("E2E_RESULT " + JSON.stringify({
+  process.stdout.write("E2E_RESULT " + JSON.stringify({
     interruptedState,
     finalPhase: done.sync.phase,
     serverStatus: cap.status,
@@ -89,7 +89,7 @@ async function main() {
     bFetch,
     puts: uploader.puts,
     expectedFirst: createHash("sha256").update(photos.bytes[0]!).digest("hex"),
-  }));
+  }) + "\n");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
