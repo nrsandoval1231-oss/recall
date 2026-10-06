@@ -608,3 +608,63 @@ def test_finalize_replay_reports_the_current_processing_state(ai: Env, fake: Fak
     replay = finalize(user, created).json()  # lost-ack replay long after the capture was read
     assert replay["status"] == "ready" and replay["memory_id"] == created["memory_id"]
     assert replay["processing"]["state"] == "succeeded"
+
+
+# ------------------------------------------------------------------ Codex review regressions (PR #3)
+def test_multi_page_evidence_cites_every_supporting_page(ai: Env, fake: FakeProvider, worker: Worker) -> None:
+    user = ai.user()
+    consent(user)
+
+    def two_page_statement(data: dict) -> None:
+        p1, p2 = data["pages"][0]["page_id"], data["pages"][1]["page_id"]
+        data["statements"] = [
+            {
+                "local_id": "s1",
+                "kind": "observation",
+                "subject_mention_id": None,
+                "predicate": "notes",
+                "text": "Kestrel valve replaced",
+                "value_text": None,
+                "epistemic_state": "reported",
+                "attribution_text": None,
+                "temporal_text": None,
+                "object_mention_id": None,
+                "evidence": [{"page_id": p1, "quote": "Kestrel valve"}, {"page_id": p2, "quote": "replaced"}],
+            }
+        ]
+
+    fake.mutate = two_page_statement
+    cap = capture_with(ai, user, fake, ["Kestrel valve", "replaced"])
+    drain(worker)
+    pages = {p["source_id"]: p["ordinal"] for p in status(user, cap)["pages"]}
+    rows = admin(
+        ai,
+        "select c.source_id, c.ordinal from search_chunks c join memories m on m.id = c.memory_id "
+        "where m.capture_id = %s and c.kind = 'statement'",
+        (cap["capture_id"],),
+    )
+    assert {(str(s), o) for s, o in rows} == {(sid, o) for sid, o in pages.items()}  # one chunk per supporting page
+
+
+def test_retry_processing_replays_by_idempotency_key(ai: Env, fake: FakeProvider, worker: Worker) -> None:
+    user = ai.user()
+    consent(user)
+    fake.interpret_script = [refusal()]
+    cap = capture_with(ai, user, fake, ["retry replay"])
+    drain(worker)
+    path = f"/v1/captures/{cap['capture_id']}/retry-processing"
+    first = user.req("POST", path, headers={"Idempotency-Key": "retry-replay-0001"})
+    assert first.status_code == 200
+    drain(worker)  # the retry succeeds before the client hears back
+    replay = user.req("POST", path, headers={"Idempotency-Key": "retry-replay-0001"})
+    assert replay.status_code == 200 and replay.json()["processing"]["state"] == "succeeded"
+    other = ai.user()
+    consent(other)
+    other_cap = capture_with(ai, other, fake, ["other capture"])
+    drain(worker)
+    clash = user.req(
+        "POST",
+        f"/v1/captures/{other_cap['capture_id']}/retry-processing",
+        headers={"Idempotency-Key": "retry-replay-0001"},
+    )
+    assert clash.status_code == 404  # another workspace's capture stays invisible

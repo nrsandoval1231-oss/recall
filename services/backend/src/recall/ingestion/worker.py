@@ -345,17 +345,21 @@ def _chunks(cap: Row, ex: dict[str, Any], source_by_page: dict[str, Row]) -> lis
     out: list[tuple[str, Any, Any, str, Any]] = []
     if cap["context_hint"]:
         out.append(("context", None, None, cap["context_hint"], None))
+
+    def pages_of(evidence: list[dict[str, str]]) -> list[str]:
+        """Every distinct supporting page, in order: a claim is cited by each page that supports it."""
+        return list(dict.fromkeys(ev["page_id"] for ev in evidence))
+
     if ex["summary"]:
-        first = ex["summary_evidence"][0]["page_id"] if ex["summary_evidence"] else None
-        ordinal = source_by_page[first]["ordinal"] if first else None
-        out.append(("summary", first, ordinal, ex["summary"], None))
+        for page_id in pages_of(ex["summary_evidence"]):
+            out.append(("summary", page_id, source_by_page[page_id]["ordinal"], ex["summary"], None))
     for page in ex["pages"]:
         if page["transcription"].strip():
             out.append(("transcription", page["page_id"], page["ordinal"], page["transcription"], None))
     for s in ex["statements"]:
-        page_id = s["evidence"][0]["page_id"]
         text = s["text"] if not s["value_text"] or s["value_text"] in s["text"] else f"{s['text']} ({s['value_text']})"
-        out.append(("statement", page_id, source_by_page[page_id]["ordinal"], text, s["epistemic_state"]))
+        for page_id in pages_of(s["evidence"]):
+            out.append(("statement", page_id, source_by_page[page_id]["ordinal"], text, s["epistemic_state"]))
     return out
 
 

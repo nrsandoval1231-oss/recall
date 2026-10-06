@@ -139,7 +139,7 @@ Candidate: branch `rcl-002-first-useful-recall` (exact SHA in the PR). Same envi
 
 | Suite | Result |
 | --- | --- |
-| Backend `pytest` (real PostgreSQL 16 + RLS incl. worker role, local object store) | 138 passed, 0 failed, 0 skipped (incl. 10 adversarial validator unit tests) |
+| Backend `pytest` (real PostgreSQL 16 + RLS incl. worker role, local object store) | 140 passed, 0 failed, 0 skipped (incl. 10 adversarial validator unit tests) |
 | `ruff`, `ruff format --check`, `mypy --strict` | clean |
 | Claude adapter contract (`test_anthropic_adapter.py`, stub HTTP transport; official SDK) | request shape, structured output, effort, refusal fallback, error/stop-reason mapping |
 | E2E: real uvicorn + worker + TypeScript clients (`rcl002.e2e.ts`) | phone upload → consent → worker reads → desktop Ask → cited original byte-identical to the phone's copy; unrelated question abstains with no model call. 12 consecutive runs after a fix (see below) |
@@ -148,6 +148,8 @@ Candidate: branch `rcl-002-first-useful-recall` (exact SHA in the PR). Same envi
 | `eslint`, `tsc` all workspaces, `vite build`, `expo export --platform ios` | clean / built |
 
 The independent review found that the first validator judged claims only against their quotes: a model could quote "800 psi" from "800 psi?" and record a fact, add names/amounts/days to a summary or statement backed by a one-word quote, or stitch a name from two separate quotes. Validation now judges every claim against its full cited lines (see API-CONTRACT). It also found lifecycle gaps (a capture stranded in `processing` after consent was revoked during retry backoff; cancelled work never resuming; billed Ask failures not counted against the budget), all fixed.
+
+The PR's bot review (Codex) found two more, both fixed with tests: multi-page claims were indexed only against their first page (a citation could open a page that does not support the sentence), and the retry-processing idempotency key was validated but not recorded.
 
 A flaky E2E also exposed a real defect during this packet: summary chunks cited a page without its page number when ranking ties broke toward them. Fixed in the worker and covered by `test_every_cited_original_has_a_page_number`.
 

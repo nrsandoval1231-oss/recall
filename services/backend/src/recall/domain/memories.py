@@ -12,6 +12,8 @@ from ..ingestion.provider import Provider
 from ..retrieval import ask as ask_module
 from ..retrieval.search import search
 from . import processing
+from .captures import CaptureService
+from .manifest import request_digest
 from .tokens import TokenError, decode_cursor, encode_cursor
 
 AI_EXPLANATION = (
@@ -120,20 +122,42 @@ class MemoryService:
         return self._guard(user_id, run)  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------ processing retry
-    def retry_processing(self, user_id: uuid.UUID, capture_id: uuid.UUID) -> dict[str, Any]:
+    def retry_processing(self, user_id: uuid.UUID, capture_id: uuid.UUID, idempotency_key: str) -> dict[str, Any]:
+        digest = request_digest({"capture_id": str(capture_id)})
+
+        def current(tx: Tx) -> dict[str, Any]:
+            latest = tx.one(
+                "select * from processing_jobs where workspace_id=%s and capture_id=%s "
+                "order by created_at desc limit 1",
+                (tx.workspace_id, capture_id),
+            )
+            return {"capture_id": str(capture_id), "processing": processing.processing_view(latest)}
+
         def run(tx: Tx) -> dict[str, Any]:
             cap = tx.one(
                 "select id, status from captures where workspace_id=%s and id=%s", (tx.workspace_id, capture_id)
             )
             if cap is None:
                 raise not_found("Capture not found.")
+            record = tx.one(
+                "select request_digest from idempotency_records where workspace_id=%s and actor_id=%s "
+                "and operation_family='capture.retry_processing' and idempotency_key=%s",
+                (tx.workspace_id, tx.user_id, idempotency_key),
+            )
+            if record is not None:  # same key: report the current state of the original retry, never re-effect
+                if record["request_digest"] != digest:
+                    raise ApiError(
+                        "IDEMPOTENCY_CONFLICT", "This idempotency key was used for a different request.", 409
+                    )
+                return current(tx)
             job = tx.one(
                 "select * from processing_jobs where workspace_id=%s and capture_id=%s order by created_at desc "
                 "limit 1 for update",
                 (tx.workspace_id, capture_id),
             )
             if job is not None and job["status"] in ("queued", "leased"):
-                return {"capture_id": str(capture_id), "processing": processing.processing_view(job)}  # replay
+                CaptureService._record_idempotency(tx, "capture.retry_processing", idempotency_key, digest, capture_id)
+                return current(tx)  # already queued/running: nothing new to do
             if not processing.consent_active(tx, self.settings) or not self.settings.ai_configured:
                 raise ApiError("AI_NOT_CONFIGURED", "Turn on AI processing to read this capture.", 409)
             if job is not None and job["status"] == "succeeded":
@@ -158,12 +182,8 @@ class MemoryService:
                 )
             else:
                 processing.enqueue_capture(tx, self.settings, capture_id)
-            latest = tx.one(
-                "select * from processing_jobs where workspace_id=%s and capture_id=%s order by created_at desc "
-                "limit 1",
-                (tx.workspace_id, capture_id),
-            )
-            return {"capture_id": str(capture_id), "processing": processing.processing_view(latest)}
+            CaptureService._record_idempotency(tx, "capture.retry_processing", idempotency_key, digest, capture_id)
+            return current(tx)
 
         return self._guard(user_id, run)  # type: ignore[no-any-return]
 

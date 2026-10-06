@@ -279,7 +279,7 @@ def create_app(
     @app.post("/v1/captures/{capture_id}/retry-processing")
     def post_retry_processing(who: Auth, capture_id: uuid.UUID, key: IdemKey) -> JSONResponse:
         # Naturally idempotent on job state: repeating the request never queues a second job.
-        return _json(memories.retry_processing(who.user_id, capture_id))
+        return _json(memories.retry_processing(who.user_id, capture_id, key))
 
     @app.get("/v1/memories")
     def list_memories(

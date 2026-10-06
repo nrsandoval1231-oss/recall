@@ -54,6 +54,11 @@ begin
   return new;
 end $$;
 
+-- Retry-processing is a mutating command: its Idempotency-Key is recorded like create/finalize.
+alter table idempotency_records drop constraint idempotency_records_operation_family_check;
+alter table idempotency_records add constraint idempotency_records_operation_family_check
+  check (operation_family in ('capture.create', 'capture.finalize', 'capture.retry_processing'));
+
 -- ---------------------------------------------------------------------------
 -- Tables
 -- ---------------------------------------------------------------------------
