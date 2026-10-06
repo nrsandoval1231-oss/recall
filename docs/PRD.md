@@ -120,7 +120,7 @@ Desktop adds evidence comparison, review, drag/drop, library exploration, offlin
 V1 proves: **capture something -> retrieve it later correctly with evidence.**
 
 Included:
-- iPhone photo capture/import and typed text capture.
+- iPhone photo capture/import. Typed text enters V1.5 with the other additional capture adapters.
 - Windows desktop with matching product language and richer evidence/review.
 - Durable local draft, retry-safe upload, private originals, hashes, explicit states.
 - Structured interpretation from one evaluated multimodal configuration.
@@ -168,7 +168,7 @@ Deferred:
 
 | ID | Requirement |
 | --- | --- |
-| CAP-01 | Ordered photo capture/import plus typed text capture without filing |
+| CAP-01 | Ordered photo capture/import without filing |
 | CAP-02 | Durable local save before network acknowledgement |
 | CAP-03 | Retry-safe, idempotent cloud upload/finalization |
 | AI-01 | Structured interpretation with source references |
