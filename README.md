@@ -39,7 +39,7 @@ Photo -> durable original -> validated interpretation
       -> searchable memory -> vague question -> grounded answer + original source
 ```
 
-V1 proves trusted photo/text capture and grounded recall. Voice, screenshots/share sheet, broad document ingestion, active reminders, Claude/MCP, email/calendar, and proactive synthesis follow only after the memory loop is trustworthy.
+V1 proves trusted photo capture and grounded recall. Typed text joins voice, screenshots/share sheet, files, and links in V1.5 after the first source contract is proven. Voice, screenshots/share sheet, broad document ingestion, active reminders, Claude/MCP, email/calendar, and proactive synthesis follow only after the memory loop is trustworthy.
 
 ## Read in this order
 
