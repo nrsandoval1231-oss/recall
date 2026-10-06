@@ -1,83 +1,95 @@
 # AI ingestion and grounded retrieval
 
-Version: 0.1 | Provider-independent behavior contract
+Version: 0.2 | Provider-independent behavior contract
 
-## 1. Boundary
+## Boundary
 
-AI reads an authorized derivative of a captured page and proposes an interpretation. It never owns the database, filesystem, permissions, canonical identity, or external actions. There is one evaluated multimodal configuration, not an agent swarm.
+AI reads authorized sources and proposes interpretations. It never owns canonical state, identity, permissions, filesystem access, or external actions. Original evidence remains separate from transcription and synthesis.
 
-The original remains separate from the transcription. Preserving the source is successful even if transcription is impossible. A source image is not searchable as handwriting until extraction or manual transcription has actually completed.
+V1 evaluates one multimodal configuration. Later input adapters may support audio, screenshots, documents, links, and connected sources without changing the memory trust model.
 
-## 2. Input envelope
+## Input envelope
 
-Provide capture ID, authorized page IDs/order, input manifest hash, known capture timezone, separately known event date, optional user context, and minimal authorized candidate context. Do not pass the entire vault by default.
+Provide capture/source IDs, input manifest hash, source order, capture timezone, separately known event context, optional user context, and minimal authorized candidate memory. Do not pass an entire memory store by default.
 
-Normalize rotation/format for model consumption as a derivative. Keep transformation metadata and parent hash. Remove unnecessary location/EXIF data from provider derivatives while preserving the accepted original privately. Never request device location for this workflow.
+Source content is data, not instruction. Provider adapters have no arbitrary browser, email, filesystem, permission, or mutation capability.
 
-No source can add instructions to the system. The prompt explicitly treats handwritten instructions, URLs, and embedded requests as content to describe, not commands to execute. The provider adapter has no browser, email, filesystem, or arbitrary tool capability.
+## Extraction output
 
-## 3. Extraction output
+The contract must support:
+- ordered source transcription/description and legibility;
+- source-backed summary;
+- raw mentions of universal entities: person, organization, place, thing, event, project, topic;
+- observations/claims preserving raw wording, attribution, time, and uncertainty;
+- ideas, decisions, preferences, questions, actions/commitments when supported;
+- uncertainty records and specific reasons;
+- source references for every material derived item.
 
-Draft contract: [extraction.schema.json](../packages/contracts/extraction.schema.json). The synthetic [maintenance example](../tests/fixtures/synthetic/maintenance-extraction.json) is contract data, not a successful live handwriting test.
+Do not force domain-specific fields into the universal extraction schema. Domain attributes may be proposed as typed key/value data only when supported by evidence.
 
-Required sections:
+## Validation
 
-- Schema version, capture ID, and input manifest hash.
-- Ordered pages with transcription and legibility.
-- A nullable summary and source references supporting it.
-- Raw entity mentions with local IDs, kind, literal text, and evidence.
-- Statements/claims retaining meaning and uncertainty.
-- Action suggestions with literal due wording, not invented deadlines.
-- Uncertainty records with evidence and a specific reason.
+1. Structural: schema, enums, bounded lengths, IDs.
+2. Referential: source/capture/workspace ownership and valid evidence references.
+3. Semantic: source excerpts support derived statements; numbers/units/time are not silently changed.
+4. Authority: model output cannot grant access, merge identities, verify facts, complete tasks, or cause external actions.
+5. Temporal: event time and validity are not fabricated from processing/capture time.
+6. Concurrency: current lease/input revision and user corrections win over stale model results.
 
-Evidence identifies an input page and a transcription quote. Optional page regions can be added in a future compatible extension only after visual grounding is tested. Do not invent bounding boxes or imply verified word-level highlighting.
+Malformed output receives bounded repair attempts. Repeated failure becomes visible review/failure, never silent certainty.
 
-## 4. Validation layers
+## Interpretation policy
 
-1. **Structural:** known schema version, required fields, enums, bounded lengths, valid IDs, and no unexpected mutation/tool fields.
-2. **Referential:** capture/hash matches the job; every page and reference belongs to this capture/workspace; local mention IDs are unique and referenced IDs exist.
-3. **Semantic:** quotes are present in the indicated transcription; summaries have support; uncertain raw text remains uncertain; numeric values and units are not silently changed; no date normalization without a valid basis.
-4. **Authority:** returned suggestions cannot confer membership, alter storage keys, confirm technical facts, merge identities, or mark a task completed.
-5. **Concurrency:** the job lease/input revision is still current; accepted user corrections take precedence; stale model results are rejected or staged for review.
+- “800 psi?” remains uncertain even if perfectly legible.
+- “coolant leak?” remains a suspected cause.
+- “Sarah said try Luca in Florence” is not enough to identify a specific venue without context/evidence.
+- “Mike” is an unresolved mention unless accumulated authorized context yields one safe candidate.
+- A changed date, employer, plan, preference, or measurement creates temporal history rather than destructive replacement.
+- Crossed-out/illegible content remains crossed-out/illegible.
+- Relative dates require valid context.
+- Multiple topics may remain in one source memory; V1 does not atomize every sentence.
 
-A quote matching a model transcription is not independent verification that the handwriting was read correctly. Corpus evaluation and the original-source UI address that separate problem.
+Do not display model self-confidence as factual reliability. Prefer legibility, resolution state, epistemic state, attribution, and user-confirmation state.
 
-Malformed output gets at most one bounded format-repair attempt within the overall three-attempt job limit. Repeated invalid or ambiguous output becomes a visible failed/review state. Do not silently drop uncertain fields to make the schema pass.
+## Deterministic commit
 
-## 5. Interpretation policy
+Automatically preserve capture/source, transcription, supported reported/uncertain statements, and harmless suggestions. Saving never requires approving every field.
 
-- Read "800 psi?" as an uncertain pressure claim, even when handwriting is perfectly clear.
-- Read "coolant leak?" as a suspected cause, not a diagnosis or instruction to repair.
-- Preserve crossed-out or illegible text as such; do not fill missing digits, units, surnames, or dates from plausibility.
-- Separate a reported current condition from a proposed future step and an already made decision.
-- Preserve the speaker only when attribution is explicit. A nearby first name is not enough.
-- Relative dates require event context, not merely photograph time. Leave unresolved dates null and ask a targeted question when useful.
-- Multiple unrelated topics on one page may stay in one source memory with several mentions. V1 does not need to fragment every sentence into a standalone knowledge note.
+Automatically link an entity only when deterministic approved matching plus context yields one compatible candidate. Fuzzy similarity alone is insufficient. Proposed entities/merges remain reviewable.
 
-Do not display model self-confidence as factual reliability. Use clear/mixed/unreadable legibility, unresolved/linked identity, and reported/uncertain/user-confirmed evidence states. Any later auto-link threshold must be calibrated on held-out data; the earlier conversational 90/70 percent examples are not requirements.
+User corrections create canonical revisions and override later reprocessing unless explicitly changed again.
 
-## 6. Deterministic commit policy
+## Retrieval
 
-Automatically preserve the capture, source memory, transcription, supported reported/uncertain statements, and harmless suggestions. Saving the note does not require user approval of every extracted field.
+Build keyword/entity retrieval first, then measured hybrid retrieval with pgvector.
 
-Automatically link an existing entity only when deterministic exact/approved-alias matching plus context yields a unique candidate with no conflicting identifiers. A first name, a repeated unit number, or fuzzy similarity alone is insufficient. Store an unresolved mention instead of a fake canonical person such as "Sam - unknown".
+Questions are often vague and associative. Retrieval should use:
+- literal terms;
+- entity aliases and relationships;
+- temporal clues;
+- source type;
+- semantic similarity;
+- recent conversational disambiguation;
+- current versus historical intent.
 
-Create proposed entities and merges as reviewable suggestions. User-entered explicit identities may create canonical records. Suggested actions stay separate from accepted obligations. No autonomous outbound action exists in V1.
+Examples:
+- “that guy Sarah introduced me to last summer who did solar”
+- “the restaurant we talked about in Florence”
+- “what did we originally expect for the delivery date?”
+- “what is the latest number?”
 
-## 7. Retrieval pipeline
+The answer model receives a bounded evidence packet with server-issued citation IDs, dates, temporal/epistemic state, and excerpts. It answers only from that packet, distinguishes recorded statements from inference, and abstains when evidence is insufficient.
 
-Build a keyword/entity baseline before embeddings. Then combine authorized entity matches, full-text candidates, and vector candidates. Rank fusion should be deterministic for a fixed candidate set/configuration. Use current eligible revisions and include relevant contradictory/superseded evidence when the question is historical or a conflict matters.
+Citation validity is necessary but not sufficient: evaluation checks whether the cited source actually supports the claim.
 
-The provider receives a bounded evidence packet with stable server-issued citation IDs, excerpts, dates, and epistemic states. It must answer only from that packet, distinguish inference from recorded statements, and abstain when evidence is insufficient.
+## Synthesized memory
 
-Validate citation IDs, source availability, current eligibility, and basic answer/evidence consistency. Do not claim software can perfectly prove semantic entailment; measure unsupported claims in evaluation. Never present an uncited confident guess because retrieval returned something vaguely similar.
+Post-V1, Recall may create source-backed synthesis across memories. A synthesis is never silently promoted to observed fact. Store its supporting memory IDs, generation/config version, generated time, and inference label. When underlying evidence changes or is corrected, dependent synthesis becomes stale until recomputed.
 
-## 8. Provider selection gate
+## Provider selection
 
-Use Paul's consented handwriting evaluation set in private storage. Compare candidate quality, uncertainty retention, numeric/name handling, latency, failure rate, actual usage cost, privacy terms, and structured-output support. Select one configuration and record provider/model identifier, version/date, prompt hash, image settings, schema version, and evaluation artifact hash.
+Evaluate on a private, consented multi-domain corpus. Paul's handwriting is an important stress set, but model selection must also include general-domain sources and vague-recall questions so the product does not overfit one profession.
 
-Do not claim a chat subscription pays for backend API use. API credentials stay server-side. AI remains disabled for live private inputs until consent, retention review, and owner-approved spending caps are configured. There is no provider chosen or credential installed in this scaffold.
+Compare transcription/interpretation quality, uncertainty retention, numeric/name/time handling, retrieval grounding, latency, failure rate, cost, privacy terms, and structured-output support.
 
-## 9. Reprocessing
-
-Key processing by source/input revision, schema version, prompt/model configuration, and pipeline version. Keep prior runs for traceability subject to deletion policy. Reprocessing should reuse unchanged originals, avoid duplicate jobs, compare material differences, preserve human overrides, invalidate stale answer caches, and mark the memory's current revision explicitly.
+No provider/model credential is committed to this public repository.

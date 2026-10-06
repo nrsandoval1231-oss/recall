@@ -1,71 +1,125 @@
 # Recall V1 experience specification
 
-Version: 0.1 | Behavior and interaction requirements, not an approved visual brand
+Version: 0.2 | Behavior requirements, not final visual brand
 
 ## Intent
 
-Build one recognizable product across iPhone and Windows. Mobile prioritizes capture and retrieval; desktop adds room for context, comparison, and work. Paul must not feel that he is maintaining a database.
+Build one recognizable memory product across iPhone and Windows. Mobile prioritizes effortless capture and recall; desktop adds context, comparison, drag/drop, review, and exploration.
 
-Use calm, legible screens, generous targets, a strong Ask entry point, and restrained motion. The exact palette/typeface/logo is a later visual decision. Do not turn the first implementation into a cinematic landing page, graph visualization, or marketing-site build.
+The interface must not expose the complexity of the memory model. Users should not feel that they are maintaining a database, CRM, folder tree, graph, or taxonomy.
+
+## Core promise in the UI
+
+**Ask what you remember. Capture what you don't want to lose.**
+
+The dominant interaction is a natural-language Ask field plus simple Capture.
 
 ## Navigation
 
-Five primary screens: Today, Capture, Memory detail/Review, Ask, and Library. Settings and onboarding are utilities. Desktop may expose entity filters in a sidebar; mobile uses a compact navigation bar plus prominent capture. Do not create separate applications for clients, projects, assets, and ideas.
+Five primary surfaces: Today, Capture, Memory detail/Review, Ask, Library. Settings/onboarding are utilities.
+
+Domain-specific concepts are views/filters, not separate apps. One user may care about projects and equipment; another about classes and people; another about travel and places.
 
 ## Today
 
-Primary actions: Ask, Scan note, Import photos. Show recent captures with their actual states, a short list of accepted actions, and the count of targeted review items. Empty state: "Photograph a page to start your memory."
+Show:
+- dominant “What are you trying to remember?” Ask entry;
+- Capture;
+- recent memories;
+- accepted actions/commitments when present;
+- targeted clarification items.
 
-Suggested actions are visibly separate from accepted tasks. Do not fabricate a daily brief or infer deadlines from uncertain notes. A badge must distinguish saved-on-device from uploaded and ready.
+Do not manufacture a daily brief, urgency, or activity. Empty state should invite the first capture without asking the user to design an organization system.
 
 ## Capture
 
-Request camera access only at the moment of need and explain its purpose. If denied, offer import and a settings route rather than repeatedly prompting. Import access should use platform-limited selection rather than scanning the photo library.
+V1: camera/photo import. Typed text is deferred to V1.5 so RCL-001 has one complete, tested source contract.
 
-Show the page count, thumbnails, order, retake/remove controls, and optional context. Save acknowledges durable local storage before upload. Do not block saving on naming a project, choosing an area, resolving a person, or approving a transcript.
+Photo flow: request camera permission at need; ordered pages; retake/remove; optional one-line context; Save. Never require a title, folder, tags, entity, project, or note type.
 
-Show explicit recoverable states for offline, rejected/corrupt image, size limit, quota, and upload failure. A photograph can be saved even while the AI service is unavailable. Do not show extraction previews as though they already existed at upload time.
+Saving acknowledges durable local persistence before cloud/AI processing. Explicit states distinguish local save, upload, processing, ready, and needs review.
+
+Future capture adapters—voice, screenshots/share sheet, files, links, email/calendar—must feed the same source-memory boundary rather than inventing separate organizational systems.
 
 ## Memory detail / Review
 
-Desktop: original page and interpreted content can be side by side. Mobile: switch between interpretation and original without losing the page position. Original is always reachable from an answer or claim.
+Show the interpreted memory with its original source one action away; desktop may show both side by side.
 
-Show title, capture date, separately known event date, summary, transcript, mentions, reported/uncertain statements, and suggested actions. Unknown fields remain unknown. Use text labels, not color alone, for uncertainty.
+Expose:
+- capture/source time and separately known event time;
+- summary/transcription;
+- linked/unresolved entities;
+- observations/claims and their uncertainty;
+- ideas/decisions/preferences when supported;
+- accepted/suggested actions;
+- temporal supersession/history;
+- corrections and provenance.
 
-A review item asks one specific question: "Which Sam?", "Is this 650 or 850?", or "What date was this meeting?" Always allow "Not sure" or defer. Saving the source is not contingent on clearing the queue.
-
-Corrections preview their scope and preserve history. Changing a unit assignment affects the selected memory/claim, not every mention of that unit across the workspace unless the user explicitly chooses a broader operation later.
+Review asks one small question at a time: “Which Sam?”, “Is this 650 or 850?”, “Is this the same place?” Always allow Not sure/defer.
 
 ## Ask
 
-Show grounded answer text, evidence cards with source date/page, and any limits. Every material factual sentence should make its support discoverable. "No confirming source found" must not be rewritten to "never confirmed".
+Ask accepts human recollection, not query syntax.
 
-When multiple assets share Unit 4 or several people share a first name, ask for disambiguation or present clearly separated candidates. Do not confidently pick the most recently used identity.
+Examples:
+- “Who was that guy Sarah introduced me to last summer who did solar?”
+- “What did my professor say about mitochondrial DNA?”
+- “What was the restaurant someone recommended in Florence?”
+- “What did we originally expect?”
+- “What is the latest number?”
 
-Offline: replace online answer generation with "Search downloaded memory" and state cache coverage. Previously generated answers show their generated time and may be stale. Do not silently reuse an old answer as a new one.
+Answers show grounded text, evidence cards, source date/page, uncertainty/conflicts, and limitations. Every material factual claim makes support discoverable.
 
-## Library and entity detail
+If multiple candidates fit, Ask clarifies or presents candidates instead of confidently choosing. If evidence is absent, it says so.
 
-Search all accessible memory. Filter by source type, date, review state, person, organization, project, asset, site, or area. Client is a filter/role on an organization, not a duplicate record.
+Historical versus latest intent must affect retrieval. “What did we originally think?” must not silently return only the current state.
 
-An entity detail assembles current claims, supporting captures, relevant people/assets, and chronology from actual stored evidence. Missing fields are omitted or labeled unknown. There are no filled-in demo metrics in a live empty account.
+Offline desktop replaces fresh synthesis with clearly labeled downloaded-memory search. Cached old answers are never masqueraded as newly generated answers.
 
-Asset history reports recorded observations and source-backed service events. It does not diagnose equipment or invent work-order completion.
+## Library
+
+Library is optional exploration, not required organization.
+
+Search/browse:
+- memories;
+- people;
+- organizations;
+- places;
+- things;
+- events;
+- projects;
+- topics.
+
+The system may create contextual views from these primitives. A maintenance asset history, student course context, trip view, or customer history is a projection of universal memory.
+
+## Desktop-specific value
+
+Desktop adds:
+- larger evidence/review layouts;
+- drag/drop capture;
+- richer Library exploration;
+- offline cache/search;
+- export/integration settings;
+- optional Open in Obsidian for users who enable that adapter.
+
+Desktop and mobile share terminology, states, and design tokens without forcing identical component implementations.
 
 ## Settings/onboarding
 
-Minimum controls: sign-in/workspace, camera access, AI processing explanation/consent, source/cache retention, device sync status, managed Obsidian destination, data export/delete, and sign-out.
+Minimum controls:
+- account/workspace;
+- capture permissions;
+- AI processing explanation/consent;
+- source/cache retention;
+- device sync status;
+- export/delete;
+- optional integrations such as Obsidian;
+- sign out.
 
-Explain that cloud AI processes selected private content; this is not a local-only or end-to-end-encrypted processing model. Explain potential model/hosting costs without suggesting paid Obsidian Sync is required.
+Do not make Obsidian setup part of standard onboarding. It is an optional advanced integration.
 
-Enabling Obsidian export requires the user to choose a folder and acknowledge that generated notes are managed output, not automatically bidirectional. Never assume broad access to Documents, Desktop, or the whole filesystem.
+## Accessibility
 
-## Accessibility and interaction acceptance
+Keyboard navigation on desktop, visible focus, screen-reader labels, scalable text, adequate contrast, non-color status indicators, large capture targets, reduced-motion support.
 
-Support keyboard navigation on desktop, visible focus, screen-reader labels, scalable text, adequate contrast, and non-color status indicators. Important capture controls need large touch targets. Respect reduced-motion settings.
-
-No phone interaction while driving is part of V1 testing or marketing acceptance. Hands-free voice and driving interfaces require a separate future design and real platform support.
-
-## Shared design boundaries
-
-Share token names, spacing/typography scales, status copy, contract types, and interaction semantics. Expo native views and desktop DOM views may be separate implementations. Consistency does not require forcing both into one lowest-common-denominator component library.
+Hands-free driving interaction is not V1 and must not be implied by marketing until separately designed and validated.

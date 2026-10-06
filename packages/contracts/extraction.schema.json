@@ -1,93 +1,332 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Recall extraction proposal v1",
+  "title": "Recall universal extraction proposal v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "capture_id", "input_manifest_sha256", "summary", "summary_evidence", "pages", "mentions", "claims", "action_suggestions", "uncertainties"],
+  "required": [
+    "schema_version",
+    "capture_id",
+    "input_manifest_sha256",
+    "summary",
+    "summary_evidence",
+    "pages",
+    "mentions",
+    "statements",
+    "action_suggestions",
+    "uncertainties"
+  ],
   "properties": {
-    "schema_version": {"const": "1.0"},
-    "capture_id": {"type": "string", "format": "uuid"},
-    "input_manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "summary": {"type": ["string", "null"], "maxLength": 6000},
-    "summary_evidence": {"type": "array", "maxItems": 40, "items": {"$ref": "#/$defs/evidence"}},
-    "pages": {
-      "type": "array", "minItems": 1, "maxItems": 10,
+    "schema_version": {
+      "const": "1.1"
+    },
+    "capture_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "input_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "summary": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 6000
+    },
+    "summary_evidence": {
+      "type": "array",
+      "maxItems": 40,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["page_id", "ordinal", "transcription", "legibility"],
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "page_id",
+          "ordinal",
+          "transcription",
+          "legibility"
+        ],
         "properties": {
-          "page_id": {"type": "string", "format": "uuid"},
-          "ordinal": {"type": "integer", "minimum": 1, "maximum": 10},
-          "transcription": {"type": "string", "maxLength": 30000},
-          "legibility": {"enum": ["clear", "mixed", "unreadable"]}
+          "page_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "transcription": {
+            "type": "string",
+            "maxLength": 30000
+          },
+          "legibility": {
+            "enum": [
+              "clear",
+              "mixed",
+              "unreadable"
+            ]
+          }
         }
       }
     },
     "mentions": {
-      "type": "array", "maxItems": 100,
+      "type": "array",
+      "maxItems": 100,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["local_id", "kind", "raw_text", "evidence"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "local_id",
+          "kind",
+          "raw_text",
+          "evidence"
+        ],
         "properties": {
-          "local_id": {"type": "string", "pattern": "^m[1-9][0-9]*$"},
-          "kind": {"enum": ["person", "organization", "project", "asset", "site", "area"]},
-          "raw_text": {"type": "string", "minLength": 1, "maxLength": 500},
-          "evidence": {"$ref": "#/$defs/evidence_list"}
+          "local_id": {
+            "type": "string",
+            "pattern": "^m[1-9][0-9]*$"
+          },
+          "kind": {
+            "enum": [
+              "person",
+              "organization",
+              "place",
+              "thing",
+              "event",
+              "project",
+              "topic"
+            ]
+          },
+          "raw_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/$defs/evidence_list"
+          }
         }
       }
     },
-    "claims": {
-      "type": "array", "maxItems": 100,
+    "statements": {
+      "type": "array",
+      "maxItems": 150,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["local_id", "subject_mention_id", "predicate", "text", "value_text", "epistemic_state", "evidence"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "local_id",
+          "kind",
+          "subject_mention_id",
+          "predicate",
+          "text",
+          "value_text",
+          "epistemic_state",
+          "attribution_text",
+          "temporal_text",
+          "object_mention_id",
+          "evidence"
+        ],
         "properties": {
-          "local_id": {"type": "string", "pattern": "^c[1-9][0-9]*$"},
-          "subject_mention_id": {"type": ["string", "null"], "pattern": "^m[1-9][0-9]*$"},
-          "predicate": {"enum": ["reported_condition", "suspected_cause", "capacity", "pressure", "schedule", "other"]},
-          "text": {"type": "string", "minLength": 1, "maxLength": 2000},
-          "value_text": {"type": ["string", "null"], "maxLength": 500},
-          "epistemic_state": {"enum": ["reported", "uncertain", "question", "idea", "decision_recorded"]},
-          "evidence": {"$ref": "#/$defs/evidence_list"}
+          "local_id": {
+            "type": "string",
+            "pattern": "^s[1-9][0-9]*$"
+          },
+          "kind": {
+            "enum": [
+              "observation",
+              "claim",
+              "idea",
+              "decision",
+              "preference",
+              "question",
+              "relationship"
+            ]
+          },
+          "subject_mention_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^m[1-9][0-9]*$"
+          },
+          "predicate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "value_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "epistemic_state": {
+            "enum": [
+              "reported",
+              "uncertain",
+              "question",
+              "confirmed_by_user",
+              "superseded",
+              "retracted"
+            ]
+          },
+          "attribution_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "temporal_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "object_mention_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^m[1-9][0-9]*$"
+          },
+          "evidence": {
+            "$ref": "#/$defs/evidence_list"
+          }
         }
       }
     },
     "action_suggestions": {
-      "type": "array", "maxItems": 50,
+      "type": "array",
+      "maxItems": 50,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["local_id", "text", "assignee_mention_id", "due_text", "evidence"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "local_id",
+          "kind",
+          "text",
+          "assignee_mention_id",
+          "due_text",
+          "evidence"
+        ],
         "properties": {
-          "local_id": {"type": "string", "pattern": "^a[1-9][0-9]*$"},
-          "text": {"type": "string", "minLength": 1, "maxLength": 2000},
-          "assignee_mention_id": {"type": ["string", "null"], "pattern": "^m[1-9][0-9]*$"},
-          "due_text": {"type": ["string", "null"], "maxLength": 500},
-          "evidence": {"$ref": "#/$defs/evidence_list"}
+          "local_id": {
+            "type": "string",
+            "pattern": "^a[1-9][0-9]*$"
+          },
+          "kind": {
+            "enum": [
+              "action",
+              "commitment"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "assignee_mention_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^m[1-9][0-9]*$"
+          },
+          "due_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/$defs/evidence_list"
+          }
         }
       }
     },
     "uncertainties": {
-      "type": "array", "maxItems": 100,
+      "type": "array",
+      "maxItems": 100,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["kind", "description", "evidence"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "description",
+          "evidence"
+        ],
         "properties": {
-          "kind": {"enum": ["handwriting", "identity", "date", "number", "other"]},
-          "description": {"type": "string", "minLength": 1, "maxLength": 2000},
-          "evidence": {"$ref": "#/$defs/evidence_list"}
+          "kind": {
+            "enum": [
+              "handwriting",
+              "identity",
+              "date",
+              "number",
+              "unit",
+              "attribution",
+              "relationship",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "evidence": {
+            "$ref": "#/$defs/evidence_list"
+          }
         }
       }
     }
   },
   "$defs": {
     "evidence": {
-      "type": "object", "additionalProperties": false,
-      "required": ["page_id", "quote"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "page_id",
+        "quote"
+      ],
       "properties": {
-        "page_id": {"type": "string", "format": "uuid"},
-        "quote": {"type": "string", "minLength": 1, "maxLength": 3000}
+        "page_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3000
+        }
       }
     },
-    "evidence_list": {"type": "array", "minItems": 1, "maxItems": 10, "items": {"$ref": "#/$defs/evidence"}}
+    "evidence_list": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    }
   }
 }

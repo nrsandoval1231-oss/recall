@@ -1,170 +1,222 @@
 # Recall — Product Requirements Document
 
-Version: 0.1 | Date: 2026-10-06 | Product owner: Nick Sandoval
+Version: 0.2 | Date: 2026-10-06 | Product owner: Nick Sandoval
 
-Status: product direction and storage ownership agreed; detailed V1 baseline proposed for implementation. This document describes required behavior, not delivered functionality.
+Status: universal product vision approved; V1 is a proposed implementation baseline, not delivered functionality.
 
 ## 1. Product thesis
 
-**Your work remembers itself.**
+**Your life remembers itself.**
 
-Recall turns handwritten working notes into retrievable, connected, source-backed memory without asking the user to adopt a new note-taking discipline. The user keeps the notebook and pen. Recall handles capture, interpretation, organization, and retrieval. The user retains control over corrections, decisions, and actions.
+Recall is a universal external-memory system. It captures information in the forms people already use, organizes it automatically, preserves provenance and uncertainty, connects it across time, and lets people recover what they need using the incomplete, associative way humans actually remember.
 
-The core promise is not perfect handwriting recognition or infallible memory. It is that captured information is durably preserved, easier to find, and accompanied by enough evidence and uncertainty to be useful without being misleading.
+The user captures. Recall handles the organizational work.
 
-## 2. User and problem
+```text
+CAPTURE -> UNDERSTAND -> CONNECT -> REMEMBER -> RECALL -> ACT
+```
 
-The initial pilot is a relationship-driven consultant and generator-maintenance business operator, referred to here as Paul. He writes across notebooks, legal pads, and loose paper. His work involves companies, people, projects, sites, equipment, technical figures, promises, and ideas. He is comfortable using a desktop, but will not maintain YAML, tags, links, or a filing taxonomy on his phone.
+North-star test:
 
-Today he may remember a conversation but not which notebook contains the relevant pressure, equipment identifier, name, or promised follow-up. The failure occurs at retrieval, not necessarily at capture.
+> A user should be able to give Recall something today, forget that Recall exists, return six months later with only a vague human recollection, and successfully recover the right information with evidence.
 
-The product is industry-neutral. Consulting and equipment maintenance are test contexts, not separate applications. No customer's real notes or records belong in this public repository.
+## 2. Problem
 
-## 3. Jobs to be done
+People already create enormous amounts of memory: handwritten notes, screenshots, photos, voice memos, meeting notes, PDFs, receipts, links, documents, ideas, tasks, and conversations. The failure usually happens after capture:
 
-- After a meeting or service visit, preserve the page without typing or selecting a folder.
-- Before a call, recover a name, number, commitment, or previous discussion from a partial memory.
-- At the desk, inspect the original beside the interpretation and correct mistakes simply.
-- See relevant history around a project, person, or machine without maintaining a dashboard manually.
-- Keep usable local data and a portable archive even when connectivity or the product is unavailable.
+- Where did I put it?
+- What did it mean?
+- Who or what was it about?
+- What was I supposed to do?
+- What else does it connect to?
+- Was it confirmed or only suspected?
+- What was true then versus now?
+- Can I recover it months later from a vague recollection?
 
-## 4. Primary experience
+Traditional note tools shift organization onto the user. Recall removes that burden without destroying evidence or pretending uncertain interpretations are facts.
 
-### Capture
+## 3. Users
 
-Paul opens Recall, photographs one or several pages, checks that the photographs are usable, and taps Save. A context hint such as "the generator at Example Ranch" is optional. Filing, metadata, entity selection, and transcript approval are not required to preserve a capture.
+Recall is horizontal by design: students, consultants, salespeople, contractors, parents, mechanics, executives, travelers, entrepreneurs, researchers, and anyone who captures information they later need to recover.
 
-The app distinguishes "Saved on this device", "Uploaded", "Processing", "Ready", and "Needs a quick check". It never suggests a local-only page is already available on other devices. Unreadable handwriting does not erase or block access to the original.
+Paul Cockerham is the first design partner and private pilot, not the market definition. His mixed handwritten workflows across consulting and generator maintenance intentionally stress handwriting, people, organizations, projects, equipment, technical numbers, commitments, and cross-domain recall.
 
-### Ask
+## 4. Jobs to be done
 
-Paul asks, "What was wrong with Unit 4 last time?" Recall retrieves only authorized, relevant evidence and answers with the observation, uncertainty, date context, and links to the supporting page. A suspected coolant leak remains a suspicion. A missing confirmation is described as absent from the available sources, not as proof an event never happened.
-
-### Correct
-
-Paul opens the page and says or types a correction such as "That was Unit 3". V1 supports typed corrections. He previews the scope of the change and confirms it. The corrected interpretation is versioned, the original is unchanged, stale indexes are invalidated, and later reprocessing cannot silently restore the mistake.
-
-### Desktop
-
-The Windows app shares Recall's language and visual design. It offers more room for evidence, memory history, entity views, review, and a photo-import drop zone. Obsidian desktop remains optional. A user-selected vault receives a controlled Markdown projection; the app does not depend on Obsidian being installed or running.
+- Capture something without deciding where it belongs.
+- Recover a detail later from a vague description rather than an exact keyword.
+- Ask “what did I know then?” and “what is the latest?” without losing history.
+- Inspect the original evidence behind an answer.
+- Correct a mistaken interpretation without silently rewriting history.
+- See related people, things, projects, events, ideas, decisions, and commitments without manually maintaining links.
+- Keep a portable copy of owned memory.
 
 ## 5. Product principles
 
-1. Capture before classification; preserve the user's existing cadence.
-2. Originals are evidence. Model interpretations and user corrections are distinct records.
-3. Uncertainty survives extraction, search, summaries, and export.
-4. The LLM proposes; deterministic software authorizes, validates, and commits.
-5. One underlying memory, consistent mobile and desktop experiences.
-6. Source access is part of the answer, not an optional afterthought.
-7. Offline and sync states must be honest and recoverable.
-8. Portability and privacy are product features, not future cleanup.
+1. Capture before classification.
+2. The user should not organize the system.
+3. Originals are evidence; interpretation and correction are separate layers.
+4. Uncertainty survives extraction, retrieval, synthesis, and export.
+5. Time is first-class; supersession never silently erases history.
+6. User corrections outrank later model reprocessing.
+7. AI proposes; deterministic software commits.
+8. Source access is part of recall.
+9. Complexity stays behind the glass.
+10. Portability and privacy are product features; Obsidian is optional.
 
-## 6. V1 scope
+## 6. Memory layers
 
-V1 is a single-user private pilot with workspace isolation built into the data boundary. A second synthetic workspace is required for security tests, but shared-team workflows are not a feature.
+**Source memory:** what actually entered Recall: original photo/text first; later audio, screenshot, document, link, or authorized connected source.
 
-Included by pilot acceptance:
+**Semantic memory:** what it appears to mean: people, organizations, places, things, events, projects, topics, observations, claims, ideas, decisions, commitments, questions, and relationships.
 
-- iPhone capture/import of ordered handwritten-photo batches, local durability, retryable upload, and explicit progress.
-- Windows desktop app with matching design, photo import, memory browsing, Ask, and source inspection.
-- Private original storage, hashes, versioned extraction, and source-backed memory records.
-- One evaluated multimodal model; keyword/entity retrieval first, pgvector-based hybrid retrieval after a baseline exists.
-- Conservative entity matching, unresolved mentions, correction/review, and suggested actions.
-- Source-backed online answers with abstention when evidence is missing, ambiguous, stale, or contradictory.
-- Desktop SQLite cache/outbox, offline keyword search over cached content, and safe resynchronization.
-- Optional one-way Obsidian archive, complete export package, deletion handling, and a tested restore procedure.
-- A small Today view showing actual recent captures, accepted actions, and review items. No manufactured activity.
+**Temporal memory:** how knowledge changes. A later employer, date, plan, preference, measurement, or project state can supersede an earlier one without deleting it.
 
-Not V1:
+**Synthesized memory:** cross-memory conclusions derived from multiple sources. Synthesis is labeled as inference and traceable to support. Proactive synthesis is post-V1.
 
-- Voice recording, hands-free driving interaction, Siri/CarPlay, or voice commands.
-- Claude/MCP integration, email/calendar ingestion, autonomous research, or sending messages.
-- Native Android/macOS support, public app-store launch, teams, billing, or a general web application.
-- Proactive pattern discovery, scheduled briefs, autonomous decisions, or automatic equipment-maintenance recommendations.
-- General spreadsheet/PDF ingestion, unlimited historical notebook imports, a graph UI, inventory, invoicing, or a replacement ERP/CMMS.
-- Bidirectional Obsidian editing, local Postgres, a local generative model, or fully offline semantic Ask.
+## 7. Universal domain model
 
-These are intentional deferrals, not hidden requirements for the first capture flow.
+Core entity kinds:
+- person
+- organization
+- place
+- thing
+- event
+- project
+- topic
 
-## 7. Functional requirements
+Core memory/statement concepts:
+- capture
+- source
+- memory
+- observation
+- claim
+- idea
+- decision
+- preference
+- action
+- commitment
+- question
+- relationship
 
-| ID | Requirement | Acceptance summary |
-| --- | --- | --- |
-| CAP-01 | Camera or photo import; ordered multipage capture | Reorder/retake before Save; supported files retain original bytes |
-| CAP-02 | Durable local draft before network submission | Force-close/reopen preserves saved pages and pending operation |
-| CAP-03 | Retry-safe cloud upload and finalization | Retries do not create duplicate captures, pages, or charges from duplicate jobs |
-| CAP-04 | Usable failure states | Permissions denied, invalid media, quota, timeout, and offline states offer recovery |
-| AI-01 | Structured transcription and interpretation | Output passes schema, ownership, source-reference, and semantic checks |
-| AI-02 | Preserve uncertainty | Unknown names, numbers, units, dates, and question marks are never silently resolved |
-| AI-03 | Preserve corrections across reprocessing | New model runs cannot overwrite user-confirmed edits |
-| MEM-01 | General entities and relationships | Organizations, people, projects, assets, sites, and areas; client is an organization role |
-| MEM-02 | Versioned claims and evidence | Competing claims remain distinguishable; history remains inspectable |
-| ASK-01 | Natural-language retrieval | Answers cite eligible source pages; unsupported questions abstain |
-| ASK-02 | Open the original | The cited original is accessible on the current device or clearly marked unavailable offline |
-| REV-01 | Small targeted review queue | Unresolved fields can be deferred; no mandatory review of every page |
-| ACT-01 | Suggested versus accepted actions | AI suggestions do not become confirmed obligations or notifications automatically |
-| SYN-01 | One canonical server state | Concurrent edits use versions; stale edits cannot silently win |
-| OFF-01 | Desktop offline utility | Cached memories and originals remain browsable; local keyword search is labeled |
-| EXP-01 | Safe optional Obsidian export | Managed files only; edited files are preserved and conflicts surfaced |
-| PRIV-01 | Workspace isolation and owner control | Unauthorized access, retrieval, download, and mutation are denied |
-| OPS-01 | Recoverability and export | Restore covers database plus original objects; user export is independently readable |
+Domain concepts are projections. A generator is a thing; a client is an organization role; a field trip is an event; a vacation can be a project/event. The core schema must contain no Bitcoin-mining or generator-maintenance assumptions.
 
-## 8. Five primary screens
+## 8. Primary experience
 
-**Today:** dominant Ask entry, Scan/Import, recent captures, accepted actions, and items needing clarification.
+### Capture
+Photograph/import pages or enter text, optionally add a short context hint, and save. No folder, tags, title, project, or identity cleanup is required. The original becomes durable before AI processing.
 
-**Capture:** camera/import, page order, retake, optional context, Save, and honest local/upload status.
+### Ask
+Ask naturally: “Who was that transformer guy I met in Houston?”, “What did Professor Miller say about mitochondrial DNA?”, or “What was that restaurant Sarah recommended in Florence?” Recall retrieves authorized evidence, resolves context conservatively, answers with uncertainty intact, and exposes the source.
 
-**Memory detail / Review:** summary and source side by side on desktop; original one tap away on mobile; transcription, claims, dates, corrections, and suggested actions.
+### Correct
+Correct identity, transcription, meaning, date, or relationship. Recall previews scope, versions the correction, invalidates stale derived state, and never lets later model runs silently revert it.
 
-**Ask:** question, answer with sentence-level evidence, original-source cards, limitations, and recent conversation context. Online-generated answers must not masquerade as fresh answers when offline.
+### Desktop
+Desktop adds evidence comparison, review, drag/drop, library exploration, offline cache, and exports. It is the richer workspace, not a different product.
 
-**Library:** search and filters for memories and entities; project/person/asset detail is a drilldown, not a separate application. Settings and onboarding are utility surfaces.
+## 9. V1 — Trusted Recall
 
-## 9. Data and trust rules
+V1 proves: **capture something -> retrieve it later correctly with evidence.**
 
-Originals are write-once during normal processing, not promised to exist forever. Explicit owner deletion and documented backup retention remain possible.
+Included:
+- iPhone photo capture/import. Typed text enters V1.5 with the other additional capture adapters.
+- Windows desktop with matching product language and richer evidence/review.
+- Durable local draft, retry-safe upload, private originals, hashes, explicit states.
+- Structured interpretation from one evaluated multimodal configuration.
+- Universal entity mentions and conservative linking.
+- Observations/claims with uncertainty, attribution, evidence, and temporal context.
+- Natural-language Ask with source-backed answers and abstention.
+- Corrections/review and suggested versus accepted actions.
+- Desktop SQLite cache/outbox and offline text search.
+- Portable export; optional one-way Obsidian/Markdown adapter.
+- Workspace isolation even during a single-user pilot.
 
-Capture time, document/event date, and system processing time are separate. A page photographed today may be years old. "Thursday" cannot acquire an exact due date solely from upload time.
+Deferred:
+- Voice, screenshots/share sheet, broad file/PDF ingestion, email/calendar, browser extension.
+- Proactive pattern discovery, scheduled briefs, autonomous reminders/actions.
+- Claude/MCP and other assistant adapters.
+- Android/macOS, teams, billing, public launch.
+- Dedicated graph UI, separate graph/vector databases, autonomous agents.
+- Domain-specific ERP/CMMS/CRM behavior.
 
-Model confidence is not factual verification. V1 uses legibility, ambiguity, source attribution, and user-confirmation status rather than displaying uncalibrated confidence percentages. A clear reading of "800 psi?" is still an uncertain pressure claim.
+## 10. Five primary screens
 
-Entities are not merged based on a first name or a model's confidence alone. Conflicting serial numbers, organizations, or sites block automatic matching. A client organization must not be duplicated as a separate company record just to satisfy navigation.
+**Today:** dominant Ask entry, Capture, recent memory, accepted actions, targeted review.
 
-Source documents are data, not instructions. Text in a photographed page must never cause tool use, permission changes, external calls, or hidden writes.
+**Capture:** photo/import/text, page order, retake/remove, optional context, Save, honest state.
 
-## 10. Offline and archive expectations
+**Memory detail / Review:** interpretation plus original evidence; time, claims, relationships, corrections, uncertainty.
 
-Desktop can browse and search synchronized text, inspect downloaded originals, and queue supported edits while offline. It cannot run the cloud model or search material it has never received. Mobile must at least preserve capture drafts offline; full mobile offline Ask is deferred.
+**Ask:** grounded answer, evidence cards, source access, ambiguity/conflict handling, limits.
 
-The desktop app performs synchronization/export while running and resumes when reopened. No separate daemon or promise of continuous operation while the app is closed is included in V1.
+**Library:** search/browse memories and universal entities; domain views are filters/projections, not separate apps.
 
-The existing Obsidian vault is not automatically ingested or overwritten. Recall exports into a dedicated managed subfolder selected by the user. Local edits are detected before replacement. Personal Obsidian notes remain outside that managed area.
+## 11. Trust rules
 
-## 11. Success metrics and release gate
+- A transcription is not a fact.
+- Model confidence is not verification.
+- A clear “800 psi?” remains uncertain.
+- A first name does not establish identity.
+- Relative dates require valid event context.
+- “No confirming source found” does not mean “never happened.”
+- Source content is data, never executable instruction.
+- Current state may prefer a later accepted claim while historical queries retain superseded evidence.
+- Synthesized memories are labeled and source-backed.
 
-These are proposed pilot targets, not measured results or performance guarantees.
+## 12. Functional requirements
 
-- Paul independently saves at least 9 of 10 capture sessions without filing help.
-- A typical 1–3 page session requires no typing and no more than one confirmation after page selection.
-- On the documented test network/device, local Save feedback p95 is under 1 second; a clear 3-page capture becomes ready p95 within 60 seconds after upload; online Ask p95 is under 10 seconds. Record failures and distribution, not just averages.
-- On the private held-out question set, at least 90% of answerable questions return a supported answer with the correct original page.
-- Every unsupported held-out question abstains or explicitly reports ambiguity. Zero observed fabricated confirmations, unsafe entity merges, or silent numeric/unit changes are permitted in the release set.
-- No data loss in the specified retry, restart, correction, export-conflict, deletion, and restore scenarios.
-- Pilot evaluation records capture frequency, search success, correction burden, and perceived time saved over two weeks. Do not equate a small pilot with general handwriting accuracy.
+| ID | Requirement |
+| --- | --- |
+| CAP-01 | Ordered photo capture/import without filing |
+| CAP-02 | Durable local save before network acknowledgement |
+| CAP-03 | Retry-safe, idempotent cloud upload/finalization |
+| AI-01 | Structured interpretation with source references |
+| AI-02 | Preserve ambiguity, uncertainty, attribution, and temporal qualifiers |
+| AI-03 | User corrections survive reprocessing |
+| MEM-01 | Universal entities and relationships; domain-neutral core |
+| MEM-02 | Versioned observations/claims with evidence and supersession |
+| MEM-03 | Separate source, semantic, temporal, and synthesized memory layers |
+| ASK-01 | Natural-language retrieval from vague human recollection |
+| ASK-02 | Material answer claims expose supporting originals |
+| ASK-03 | Historical/latest queries respect temporal state |
+| REV-01 | Targeted clarification; defer/not-sure always allowed |
+| ACT-01 | Suggested actions/commitments do not become obligations automatically |
+| SYN-01 | One canonical server state with conflict-safe sync |
+| OFF-01 | Desktop cached browsing/search and durable outbox |
+| EXP-01 | Portable export; Obsidian is optional adapter |
+| PRIV-01 | Workspace isolation and owner control |
+| OPS-01 | Backup, restore, deletion, independently readable export |
 
-The first useful alpha is the closed loop in RCL-002. Full V1 pilot acceptance requires the later offline, export, privacy, and restore gates too.
+## 13. Success
 
-## 12. Constraints and assumptions
+V1 succeeds when a user can capture a real source with essentially no organizational work, return later with a vague human-plausible recollection, recover the correct memory or receive honest ambiguity/abstention, inspect the supporting original, and correct mistakes without losing history.
 
-Initial targets are iPhone and Windows; actual pilot devices must be recorded during acceptance. The user does not need paid Obsidian Sync. That does not imply Recall hosting, model calls, signing, or distribution are free.
+Pilot targets are requirements to measure:
+- at least 9/10 unassisted capture sessions succeed;
+- no typing required for a normal 1–3 page photo capture;
+- at least 90% of answerable held-out recall questions return a supported answer with the correct source;
+- deliberately unsupported questions abstain or report ambiguity;
+- fabricated confirmation, silent material number/unit changes, unsafe identity merges, or cross-workspace leaks are release blockers.
 
-Managed Supabase is the proposed infrastructure default; no project or paid plan has been provisioned. AI provider/model selection is gated by handwriting evaluation and privacy review. Actual identifiers, retention terms, prices, and native build prerequisites must be checked at implementation time.
+Evaluation includes both Paul-style difficult handwriting and general-domain cases so success cannot overfit one profession.
 
-An initial single-user workspace is sufficient. Add tenant boundaries now, but defer enterprise governance, complex roles, and team management. Branding beyond the working name Recall is not finalized; visual polish must not block a reliable capture-and-recall loop.
+## 14. Architecture constraints
 
-## 13. Dependencies and unresolved deployment decisions
+Cloud Postgres + pgvector is canonical structured state. Private object storage holds original evidence. Desktop SQLite is a rebuildable cache/outbox. Markdown/JSON/original export is the portability layer. Obsidian is one optional consumer.
 
-Owner actions required before live deployment are: authorize infrastructure and spending limits; supply provider credentials through a secret mechanism; approve processing of the private pilot corpus; choose an iOS distribution route and Windows signing/update approach; and approve the measured model/privacy configuration.
+Mobile and desktop use the same authenticated Memory API. Neither receives database-owner or AI-provider secrets. AI remains replaceable derived machinery.
 
-These do not block the repository foundation. They do block claiming production readiness or real-device/live-provider acceptance. Detailed dependencies and exit evidence belong in [ROADMAP](ROADMAP.md) and [ACCEPTANCE](ACCEPTANCE.md), not in invented implementation results.
+## 15. Product roadmap
+
+**V1 — Trusted Recall:** photo/text -> grounded retrieval.
+
+**V1.5 — Natural Capture:** voice, screenshots/share sheet, files, links.
+
+**V2 — Connected Memory:** stronger identity, relationships, temporal state, correction, cross-source context.
+
+**V3 — Active Memory:** surface commitments, related memories, and clearly labeled patterns at useful moments.
+
+**V4 — Memory Everywhere:** assistant adapters, browser, email/calendar, APIs/MCP under explicit authorization.
+
+Do not pull V3/V4 forward merely because they are exciting. Recall earns the right to become proactive only after it can remember faithfully.
