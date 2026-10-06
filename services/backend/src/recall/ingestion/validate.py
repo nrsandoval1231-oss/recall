@@ -19,6 +19,98 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 MODEL_FORBIDDEN_STATES = {"confirmed_by_user": "reported", "superseded": "uncertain", "retracted": "uncertain"}
 _DIGITS = re.compile(r"\d+(?:[.,]\d+)*")
+_WORD = re.compile(r"[\w'’-]+")
+# Capitalised tokens are treated as names/identities; these are ordinary sentence starters.
+_NAME = re.compile(r"\b[A-Z][\w'’-]+")
+_NAME_STOPWORDS = {
+    "the",
+    "a",
+    "an",
+    "this",
+    "that",
+    "these",
+    "those",
+    "it",
+    "he",
+    "she",
+    "they",
+    "we",
+    "i",
+    "you",
+    "there",
+    "notes",
+    "note",
+    "page",
+    "pages",
+    "summary",
+    "someone",
+    "something",
+    "and",
+    "or",
+    "but",
+    "if",
+    "when",
+}
+_TIME_WORDS = {
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+    "today",
+    "tomorrow",
+    "yesterday",
+    "tonight",
+    "morning",
+    "afternoon",
+    "evening",
+    "noon",
+    "midnight",
+    "week",
+    "weekend",
+    "month",
+    "year",
+    "ago",
+    "next",
+    "last",
+    "am",
+    "pm",
+}
+
+
+class _PageText:
+    """A transcription as normalized lines, to find the whole line(s) a verbatim quote comes from."""
+
+    def __init__(self, transcription: str) -> None:
+        self.lines = [ln for ln in (_norm(x) for x in transcription.splitlines()) if ln]
+        self.joined = " ".join(self.lines)
+        self.starts: list[int] = []
+        pos = 0
+        for ln in self.lines:
+            self.starts.append(pos)
+            pos += len(ln) + 1
+
+    def context(self, quote: str) -> str | None:
+        q = _norm(quote)
+        idx = self.joined.find(q) if q else -1
+        if idx < 0:
+            return None
+        end = idx + len(q)
+        return " ".join(ln for ln, st in zip(self.lines, self.starts, strict=True) if st < end and st + len(ln) > idx)
 
 
 class InvalidExtraction(Exception):
@@ -86,29 +178,63 @@ def validate_extraction(
 
     result = Validated(extraction=copy.deepcopy(data))
     ex = result.extraction
-    transcripts = {p["page_id"]: _norm(p["transcription"]) for p in ex["pages"]}
+    pages_text = {p["page_id"]: _PageText(p["transcription"]) for p in ex["pages"]}
 
     for page in ex["pages"]:
         if page["legibility"] == "unreadable":
             result.note("PAGE_UNREADABLE", f"page {page['ordinal']} could not be read")
 
     def quotes_ok(evidence: list[dict[str, str]]) -> bool:
-        return all(_norm(ev["quote"]) in transcripts[ev["page_id"]] for ev in evidence)
+        return all(pages_text[ev["page_id"]].context(ev["quote"]) is not None for ev in evidence)
 
-    def quote_text(evidence: list[dict[str, str]]) -> str:
-        return " ".join(_norm(ev["quote"]) for ev in evidence)
+    def context(evidence: list[dict[str, str]]) -> str:
+        """The full source lines the quotes come from: the unit every claim is judged against."""
+        return " ".join(pages_text[ev["page_id"]].context(ev["quote"]) or "" for ev in evidence)
 
-    # Summary must rest on verbatim evidence.
-    if ex["summary"] is not None and (not ex["summary_evidence"] or not quotes_ok(ex["summary_evidence"])):
-        result.note("SUMMARY_UNSUPPORTED", "summary dropped: its evidence is not verbatim on the page")
-        ex["summary"], ex["summary_evidence"] = None, []
+    def in_one_quote(text: str, evidence: list[dict[str, str]]) -> bool:
+        needle = _norm(text)
+        return any(needle in _norm(ev["quote"]) for ev in evidence)
+
+    def unsupported(claim: str, evidence: list[dict[str, str]], numbers_from: str | None = None) -> str | None:
+        """Why `claim` says more than its cited source lines, or None if it does not."""
+        ctx = context(evidence)
+        quotes = " ".join(_norm(ev["quote"]) for ev in evidence)
+        claimed = numbers_from if numbers_from is not None else claim
+        if not set(_DIGITS.findall(claimed)) <= set(_DIGITS.findall(quotes)):
+            return "NUMBER_NOT_IN_SOURCE"
+        words = set(_WORD.findall(ctx))
+        if any(n.casefold() not in words for n in _NAME.findall(claim) if n.casefold() not in _NAME_STOPWORDS):
+            return "NAME_NOT_IN_SOURCE"
+        if any(w not in words for w in _WORD.findall(_norm(claim)) if w in _TIME_WORDS):
+            return "TIME_NOT_IN_SOURCE"
+        return None
+
+    uncertain_spans = [(u["evidence"], u) for u in ex["uncertainties"] if quotes_ok(u["evidence"])]
+
+    def overlaps_uncertainty(evidence: list[dict[str, str]]) -> bool:
+        for ev in evidence:
+            q = _norm(ev["quote"])
+            for u_evidence, _u in uncertain_spans:
+                for uev in u_evidence:
+                    uq = _norm(uev["quote"])
+                    if uev["page_id"] == ev["page_id"] and (uq in q or q in uq):
+                        return True
+        return False
+
+    # Summary: verbatim evidence AND no name/number/time beyond its cited lines.
+    if ex["summary"] is not None:
+        reason = None if ex["summary_evidence"] and quotes_ok(ex["summary_evidence"]) else "SUMMARY_UNSUPPORTED"
+        reason = reason or unsupported(ex["summary"], ex["summary_evidence"])
+        if reason:
+            result.note(reason, "summary dropped: it says more than the cited page lines")
+            ex["summary"], ex["summary_evidence"] = None, []
 
     kept_mentions = []
     for m in ex["mentions"]:
-        if quotes_ok(m["evidence"]) and _norm(m["raw_text"]) in quote_text(m["evidence"]):
+        if quotes_ok(m["evidence"]) and in_one_quote(m["raw_text"], m["evidence"]):
             kept_mentions.append(m)
         else:
-            result.note("MENTION_UNSUPPORTED", f"mention {m['local_id']} dropped: not found verbatim in its evidence")
+            result.note("MENTION_UNSUPPORTED", f"mention {m['local_id']} dropped: not verbatim within one quote")
     ex["mentions"] = kept_mentions
     live_mentions = {m["local_id"] for m in kept_mentions}
 
@@ -118,21 +244,24 @@ def validate_extraction(
         if not quotes_ok(s["evidence"]):
             result.note("STATEMENT_UNSUPPORTED", f"statement {sid} dropped: evidence is not verbatim on the page")
             continue
-        support = quote_text(s["evidence"])
-        claimed_numbers = set(_DIGITS.findall(f"{s['text']} {s['value_text'] or ''}"))
-        if not claimed_numbers <= set(_DIGITS.findall(support)):
-            result.note("NUMBER_NOT_IN_SOURCE", f"statement {sid} dropped: it contains a number its evidence does not")
+        reason = unsupported(s["text"], s["evidence"], numbers_from=f"{s['text']} {s['value_text'] or ''}")
+        if reason:
+            result.note(reason, f"statement {sid} dropped: it says more than its cited page lines")
             continue
         if s["epistemic_state"] in MODEL_FORBIDDEN_STATES:
             new = MODEL_FORBIDDEN_STATES[s["epistemic_state"]]
             result.note("AUTHORITY_DOWNGRADED", f"statement {sid}: model may not set {s['epistemic_state']}; set {new}")
             s["epistemic_state"] = new
-        if "?" in support and s["epistemic_state"] == "reported":
-            s["epistemic_state"] = "uncertain"
-            result.note("QUESTION_MARK_KEPT", f"statement {sid}: source has '?', kept uncertain", review=False)
-        if s["temporal_text"] is not None and _norm(s["temporal_text"]) not in support:
-            result.note("TIME_NOT_IN_SOURCE", f"statement {sid}: time wording not in evidence; removed")
-            s["temporal_text"] = None
+        doubtful = "?" in context(s["evidence"]) or overlaps_uncertainty(s["evidence"])
+        if s["epistemic_state"] == "reported" and doubtful:
+            s["epistemic_state"] = "uncertain"  # a "?" anywhere on the cited line, or a recorded doubt, stays a doubt
+            result.note(
+                "QUESTION_MARK_KEPT", f"statement {sid}: source line is uncertain; kept uncertain", review=False
+            )
+        for key, code in (("temporal_text", "TIME_NOT_IN_SOURCE"), ("attribution_text", "ATTRIBUTION_NOT_IN_SOURCE")):
+            if s[key] is not None and not in_one_quote(s[key], s["evidence"]):
+                result.note(code, f"statement {sid}: {key.split('_')[0]} wording not within one quote; removed")
+                s[key] = None
         for key in ("subject_mention_id", "object_mention_id"):
             if s[key] is not None and s[key] not in live_mentions:
                 s[key] = None
@@ -144,12 +273,12 @@ def validate_extraction(
         if not quotes_ok(a["evidence"]):
             result.note("ACTION_UNSUPPORTED", f"action {a['local_id']} dropped: evidence is not verbatim")
             continue
-        support = quote_text(a["evidence"])
-        if not set(_DIGITS.findall(f"{a['text']} {a['due_text'] or ''}")) <= set(_DIGITS.findall(support)):
-            result.note("NUMBER_NOT_IN_SOURCE", f"action {a['local_id']} dropped: number not in evidence")
+        reason = unsupported(a["text"], a["evidence"], numbers_from=f"{a['text']} {a['due_text'] or ''}")
+        if reason:
+            result.note(reason, f"action {a['local_id']} dropped: it says more than its cited page lines")
             continue
-        if a["due_text"] is not None and _norm(a["due_text"]) not in support:
-            result.note("TIME_NOT_IN_SOURCE", f"action {a['local_id']}: due wording not in evidence; removed")
+        if a["due_text"] is not None and not in_one_quote(a["due_text"], a["evidence"]):
+            result.note("TIME_NOT_IN_SOURCE", f"action {a['local_id']}: due wording not within one quote; removed")
             a["due_text"] = None
         if a["assignee_mention_id"] is not None and a["assignee_mention_id"] not in live_mentions:
             a["assignee_mention_id"] = None

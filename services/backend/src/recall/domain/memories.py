@@ -89,16 +89,31 @@ class MemoryService:
                     (enabled, provider, self.settings.ai_policy_version, tx.user_id, tx.workspace_id),
                 )
             if enabled:
+                # Resume work cancelled only because consent was off, then queue never-processed captures.
+                tx.run(
+                    "update processing_jobs j set status='queued', attempts=0, not_before=now(), last_error_code=null, "
+                    "finished_at=null, updated_at=now() from captures c "
+                    "where j.workspace_id=%s and j.status='cancelled' "
+                    "and j.last_error_code='CONSENT_REVOKED' and c.id=j.capture_id and c.status='stored'",
+                    (tx.workspace_id,),
+                )
                 for cap in tx.all(
                     "select id from captures where workspace_id=%s and status='stored'", (tx.workspace_id,)
                 ):
                     processing.enqueue_capture(tx, self.settings, cap["id"])
             else:
-                tx.run(
+                cancelled = tx.all(
                     "update processing_jobs set status='cancelled', last_error_code='CONSENT_REVOKED', "
-                    "finished_at=now(), "
-                    "updated_at=now() where workspace_id=%s and status='queued'",
+                    "finished_at=now(), updated_at=now() "
+                    "where workspace_id=%s and status='queued' returning capture_id",
                     (tx.workspace_id,),
+                )
+                # A capture waiting in retry backoff is 'processing'; with nothing left to run it is just stored.
+                tx.run(
+                    "update captures set status='stored', version=version+1 "
+                    "where workspace_id=%s and status='processing' "
+                    "and id = any(%s)",
+                    (tx.workspace_id, [c["capture_id"] for c in cancelled]),
                 )
             return self._settings_view(tx)
 
@@ -295,7 +310,7 @@ class MemoryService:
                     (
                         uuid.uuid4(),
                         tx.workspace_id,
-                        result.model_id,
+                        result.model_id if result.model_id != "unknown" else (self.settings.ai_model_id or "unknown"),
                         result.input_tokens,
                         result.output_tokens,
                         processing.estimate_cost(self.settings, result.input_tokens, result.output_tokens),

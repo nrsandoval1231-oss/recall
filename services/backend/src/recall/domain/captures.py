@@ -486,11 +486,11 @@ class CaptureService:
             if record is not None:
                 if record["request_digest"] != digest:
                     raise idempotency_conflict()
-                return _capture_view(cap, pages), pages
+                return self._load_view(tx, capture_id), pages
             if cap["status"] != "awaiting_upload":  # stored or any later processing state
                 check_expected(pages)
                 self._record_idempotency(tx, "capture.finalize", idempotency_key, digest, capture_id)
-                return _capture_view(cap, pages), pages
+                return self._load_view(tx, capture_id), pages
             return None, pages
 
         done, pages = self._guard(user_id, stage)

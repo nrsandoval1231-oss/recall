@@ -35,7 +35,8 @@ export type CaptureStatusKey =
   | "processing"
   | "ready"
   | "needs_review"
-  | "processing_failed";
+  | "processing_failed"
+  | "paused";
 
 export interface StatusPresentation {
   label: string;
@@ -80,6 +81,12 @@ export const statusPresentation: Record<CaptureStatusKey, StatusPresentation> = 
     tone: "warning",
     detail: "Some parts were unclear or couldn't be confirmed against the page.",
   },
+  paused: {
+    label: "Uploaded · reading paused",
+    glyph: "‖",
+    tone: "warning",
+    detail: "The original is stored and viewable. Reading is paused (AI reading is off or the spending limit was reached).",
+  },
   processing_failed: {
     label: "Couldn't read · original is safe",
     glyph: "!",
@@ -90,6 +97,9 @@ export const statusPresentation: Record<CaptureStatusKey, StatusPresentation> = 
 
 /** Map a server capture (status + processing) to the one status the user sees. */
 export function serverStatusKey(status: string, processing: { state: string; blocked_reason?: string | null } | null): CaptureStatusKey {
+  // Say *why* nothing is happening instead of an endless "waiting" or "reading".
+  if (processing?.blocked_reason === "budget_exhausted" && (status === "stored" || status === "processing")) return "paused";
+  if (processing?.state === "cancelled" && status === "stored") return "paused";
   switch (status) {
     case "awaiting_upload":
       return "incomplete";

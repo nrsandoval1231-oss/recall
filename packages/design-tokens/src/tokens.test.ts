@@ -25,7 +25,9 @@ describe("design tokens", () => {
     expect(serverStatusKey("awaiting_upload", null)).toBe("incomplete");
     expect(serverStatusKey("stored", null)).toBe("uploaded");
     expect(serverStatusKey("stored", { state: "queued" })).toBe("queued");
-    expect(serverStatusKey("stored", { state: "cancelled" })).toBe("uploaded");
+    expect(serverStatusKey("stored", { state: "cancelled" })).toBe("paused");
+    expect(serverStatusKey("stored", { state: "queued", blocked_reason: "budget_exhausted" })).toBe("paused");
+    expect(serverStatusKey("processing", { state: "retrying", blocked_reason: "budget_exhausted" })).toBe("paused");
     expect(serverStatusKey("processing", { state: "running" })).toBe("processing");
     expect(serverStatusKey("ready", { state: "succeeded" })).toBe("ready");
     expect(serverStatusKey("needs_review", null)).toBe("needs_review");

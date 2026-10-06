@@ -139,28 +139,31 @@ Candidate: branch `rcl-002-first-useful-recall` (exact SHA in the PR). Same envi
 
 | Suite | Result |
 | --- | --- |
-| Backend `pytest` (real PostgreSQL 16 + RLS incl. worker role, local object store) | 124 passed, 0 failed, 0 skipped |
+| Backend `pytest` (real PostgreSQL 16 + RLS incl. worker role, local object store) | 138 passed, 0 failed, 0 skipped (incl. 10 adversarial validator unit tests) |
 | `ruff`, `ruff format --check`, `mypy --strict` | clean |
 | Claude adapter contract (`test_anthropic_adapter.py`, stub HTTP transport; official SDK) | request shape, structured output, effort, refusal fallback, error/stop-reason mapping |
 | E2E: real uvicorn + worker + TypeScript clients (`rcl002.e2e.ts`) | phone upload → consent → worker reads → desktop Ask → cited original byte-identical to the phone's copy; unrelated question abstains with no model call. 12 consecutive runs after a fix (see below) |
 | TypeScript vitest: api-client 13, design-tokens 4, sync 30, mobile 6, desktop 16 | all passed |
+| Independent adversarial review of bc7c2e4 | 9 findings (3 high, 3 medium, 3 low), all fixed with regression tests; the 7 validator regressions fail on bc7c2e4 and pass on the fix |
 | `eslint`, `tsc` all workspaces, `vite build`, `expo export --platform ios` | clean / built |
 
-A flaky E2E exposed a real defect during this packet: summary chunks cited a page without its page number when ranking ties broke toward them. Fixed in the worker and covered by `test_every_cited_original_has_a_page_number`.
+The independent review found that the first validator judged claims only against their quotes: a model could quote "800 psi" from "800 psi?" and record a fact, add names/amounts/days to a summary or statement backed by a one-word quote, or stitch a name from two separate quotes. Validation now judges every claim against its full cited lines (see API-CONTRACT). It also found lifecycle gaps (a capture stranded in `processing` after consent was revoked during retry backoff; cancelled work never resuming; billed Ask failures not counted against the budget), all fixed.
+
+A flaky E2E also exposed a real defect during this packet: summary chunks cited a page without its page number when ranking ties broke toward them. Fixed in the worker and covered by `test_every_cited_original_has_a_page_number`.
 
 ### Scenario map
 
 | ID | Scenario | Status | Evidence / limit |
 | --- | --- | --- | --- |
 | A06 | Clear source → supported interpretation + cited answer with the correct original | PASS (synthetic) | `test_vague_recall_finds_the_right_memory_and_original`, RCL-002 e2e. **Real-model quality OPEN (G6)** |
-| A07 | Ambiguous number / "?" / name stays uncertain | PASS (rules) | `test_memory_keeps_uncertainty…`, `test_model_cannot_add_certainty_numbers_dates_or_authority` (authority downgrade, "?" kept, invented number dropped, invented date removed, non-verbatim evidence dropped → `needs_review`). Name resolution is not attempted (RCL-003) |
+| A07 | Ambiguous number / "?" / name stays uncertain | PASS (deterministic rules, synthetic adversarial proposals) | `test_validate.py` (partial quotes cannot strip "?", recorded doubts downgrade, no invented names/amounts/days in summaries or statements, no stitched mentions/dates/attributions) + `test_model_cannot_add_certainty…`. The rules are lexical: a model paraphrase that keeps every word and number but changes meaning is not caught at runtime (evaluation, G6). Name resolution is not attempted (RCL-003) |
 | A08 | Relative dates not converted | PASS (rules) | time wording not on the page is removed; no date normalization exists |
 | A11 | Unsupported question abstains | PASS | no evidence → `insufficient_evidence` with no model call; invented citation → `ANSWER_UNVERIFIED`; empty answer rejected |
 | A12 | Cross-workspace isolation incl. memories/search/Ask/worker | PASS | `test_memories_search_and_ask_are_workspace_isolated`, `test_worker_role_is_scoped_to_the_claimed_workspace` (raw SQL as the worker role) |
 | A13 | Instructions inside a source stay inert | PASS (mechanism) | `test_instructions_inside_a_source_are_inert`: injected text is stored as content, cannot change permissions or certainty, and reaches the answer model only as delimited data. A real model's susceptibility is part of G6 |
 | A14 | Crashed/expired worker cannot commit stale results | PASS | `test_expired_lease_cannot_commit_late_and_no_duplicate_memory` (one memory, one revision) |
 | A23 | Vague associative recall | PASS (keyword baseline, synthetic) | 4-domain synthetic corpus (people/solar, travel, lecture, household). Paraphrase-only recall without shared words is expected to fail until measured hybrid retrieval (RCL-003) |
-| — | Consent / config / budget gates | PASS | consent required, consent revocation cancels, unconfigured server refuses consent, budget stops calls and answers |
+| — | Consent / config / budget gates | PASS | consent required; revocation cancels queued work and never strands a capture in `processing`; re-enabling resumes it; unconfigured server refuses consent; budget stops calls and answers; billed failures count toward the budget |
 | — | Original integrity before sending | PASS | altered original → `SOURCE_INTEGRITY`, nothing sent; model receives a metadata-free, orientation-corrected derivative (GPS EXIF removed) |
 
 ### Remaining live gates (OPEN)

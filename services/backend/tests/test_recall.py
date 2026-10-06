@@ -561,3 +561,50 @@ def test_every_cited_original_has_a_page_number(ai: Env, fake: FakeProvider, wor
             assert ordinal is not None, kind
         else:
             assert kind == "context"  # only the user's own typed hint has no page
+
+
+# ------------------------------------------------------------------ review regressions (RCL-002 review of bc7c2e4)
+def test_revoking_consent_during_retry_backoff_does_not_strand_the_capture(
+    ai: Env, fake: FakeProvider, worker: Worker
+) -> None:
+    user = ai.user()
+    consent(user)
+    fake.interpret_script = [outage()]
+    cap = capture_with(ai, user, fake, ["backoff then revoke"])
+    worker.run_once()
+    assert status(user, cap)["status"] == "processing"  # waiting in retry backoff
+    consent(user, False)
+    view = status(user, cap)
+    assert view["status"] == "stored" and view["processing"]["state"] == "cancelled"  # not "Reading..." forever
+    consent(user)  # turning it back on resumes the cancelled job
+    assert status(user, cap)["processing"]["state"] == "queued"
+    drain(worker)
+    assert status(user, cap)["status"] == "ready"
+
+
+def test_cancelled_reading_offers_retry(ai: Env, fake: FakeProvider, worker: Worker) -> None:
+    user = ai.user()
+    consent(user)
+    cap = capture_with(ai, user, fake, ["cancel then retry"])
+    consent(user, False)
+    assert status(user, cap)["processing"]["retry_available"] is True
+
+
+def test_billed_ask_failures_count_against_the_budget(ai: Env, fake: FakeProvider, worker: Worker) -> None:
+    user, _ = _vague_corpus(ai, fake, worker)
+    before = admin(ai, "select coalesce(sum(input_tokens), 0) from ai_usage where purpose='answer'")[0][0]
+    fake.answer_script = [refusal()]
+    assert user.req("POST", "/v1/ask", json={"question": "Sarah solar Dev"}).json()["status"] == "unavailable"
+    after = admin(ai, "select coalesce(sum(input_tokens), 0) from ai_usage where purpose='answer'")[0][0]
+    assert after - before == 900
+
+
+def test_finalize_replay_reports_the_current_processing_state(ai: Env, fake: FakeProvider, worker: Worker) -> None:
+    user = ai.user()
+    consent(user)
+    cap = capture_with(ai, user, fake, ["replay after reading"])
+    drain(worker)
+    created = user.req("GET", f"/v1/captures/{cap['capture_id']}").json()
+    replay = finalize(user, created).json()  # lost-ack replay long after the capture was read
+    assert replay["status"] == "ready" and replay["memory_id"] == created["memory_id"]
+    assert replay["processing"]["state"] == "succeeded"

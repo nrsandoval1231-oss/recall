@@ -120,6 +120,9 @@ def answer(
             AnswerRequest(question=question, packet=build_packet(packet_hits), schema=ANSWER_SCHEMA)
         )
     except ProviderError as err:
+        billed = None
+        if any(err.usage):  # a refusal or truncation is still billed: it must count against the budget
+            billed = ProviderResult(text="", model_id="unknown", input_tokens=err.usage[0], output_tokens=err.usage[1])
         return {
             "status": "unavailable",
             "answer": None,
@@ -127,7 +130,7 @@ def answer(
             "citations": [],
             "limitations": ["Answers are unavailable right now; showing matching sources instead."],
             "reason": err.code,
-        }, None
+        }, billed
     verified = verify_answer(result.text, packet_hits)
     if verified is None:
         return {

@@ -87,5 +87,5 @@ def processing_view(job: Row | None) -> dict[str, Any] | None:
         "max_attempts": job["max_attempts"],
         "blocked_reason": job["blocked_reason"],
         "last_error_code": job["last_error_code"],
-        "retry_available": job["status"] == "failed" and job["manual_retries"] < 3,
+        "retry_available": (job["status"] == "failed" and job["manual_retries"] < 3) or job["status"] == "cancelled",
     }
