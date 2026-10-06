@@ -189,7 +189,11 @@ def create_app(
             if not isinstance(body, dict) or set(body) - {"source_ids"}:
                 raise validation("Body may only contain source_ids.")
             try:
-                source_ids = [uuid.UUID(str(s)) for s in body.get("source_ids", [])]
+                # absent key = every pending page; an explicit list (even empty) is honoured as given
+                if "source_ids" in body:
+                    if not isinstance(body["source_ids"], list):
+                        raise ValueError
+                    source_ids = [uuid.UUID(str(s)) for s in body["source_ids"]]
             except ValueError:
                 raise validation("source_ids must be UUIDs.") from None
         return _json(service.authorize_uploads(who.user_id, capture_id, source_ids))

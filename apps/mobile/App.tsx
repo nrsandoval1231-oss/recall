@@ -48,7 +48,8 @@ function Main({ services }: { services: Services }) {
   const [route, setRoute] = useState<Route>({ name: "home" });
   const [rows, setRows] = useState<RecentRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<string | null>(null); // connectivity only
+  const [recoveryWarning, setRecoveryWarning] = useState<string | null>(null); // sticky: never cleared by a refresh
   const remote = useRef<ServerCapture[]>([]);
 
   const rebuild = useCallback(async () => {
@@ -74,7 +75,7 @@ function Main({ services }: { services: Services }) {
     (async () => {
       const report = await services.syncer.store.recover(); // after a force-close: reconcile first
       if (!alive) return;
-      if (report.damaged.length > 0 || report.unreadable.length > 0) setBanner("Some saved captures could not be read on this device. They have not been deleted.");
+      if (report.damaged.length > 0 || report.unreadable.length > 0) setRecoveryWarning("Some saved captures could not be read on this device. They have not been deleted.");
       await rebuild();
       void services.api.me().catch(() => undefined); // provisions the workspace on first sign-in
       await services.syncer.syncAllPending();
@@ -92,7 +93,7 @@ function Main({ services }: { services: Services }) {
     <HomeScreen
       rows={rows}
       refreshing={refreshing}
-      banner={banner}
+      banner={[recoveryWarning, banner].filter(Boolean).join(" ") || null}
       onRefresh={() => void refresh()}
       onScan={() => setRoute({ name: "capture" })}
       onOpen={(row) => setRoute({ name: "detail", row })}

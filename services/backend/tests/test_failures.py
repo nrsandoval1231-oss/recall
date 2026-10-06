@@ -285,3 +285,19 @@ def test_stored_capture_survives_and_upload_after_store_is_idempotent(env: Env) 
     assert auths == []
     resp = user.req("GET", f"/v1/captures/{stored['capture_id']}")
     assert resp.json()["pages"][0]["upload_state"] == "verified"
+
+
+def test_upload_authorization_body_semantics(env: Env) -> None:
+    """No body or {} means every pending page; an explicit list is honoured exactly (even empty)."""
+    user, _, created, _ = _setup(env, n=2)
+    path = f"/v1/captures/{created['capture_id']}/upload-authorizations"
+    every = {p["source_id"] for p in created["pages"]}
+    assert {a["source_id"] for a in user.req("POST", path).json()["authorizations"]} == every
+    assert {a["source_id"] for a in user.req("POST", path, json={}).json()["authorizations"]} == every
+    assert user.req("POST", path, json={"source_ids": []}).json()["authorizations"] == []
+    one = created["pages"][1]["source_id"]
+    assert [a["source_id"] for a in user.req("POST", path, json={"source_ids": [one]}).json()["authorizations"]] == [
+        one
+    ]
+    for bad in ({"source_ids": "abc"}, {"source_ids": 5}, {"source_ids": ["nope"]}, {"other": 1}):
+        assert user.req("POST", path, json=bad).status_code == 422, bad

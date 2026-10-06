@@ -94,7 +94,7 @@ export class RecallApiClient {
     const result = await this.json<{ authorizations: UploadAuthorization[] }>(
       "POST",
       `/v1/captures/${captureId}/upload-authorizations`,
-      sourceIds ? { json: { source_ids: sourceIds } } : { json: {} },
+      sourceIds ? { json: { source_ids: sourceIds } } : {},
     );
     return result.authorizations;
   }

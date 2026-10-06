@@ -58,6 +58,17 @@ describe("RecallApiClient", () => {
     expect(summarizeFailure(signedOut).retryable).toBe(true);
   });
 
+  it("authorizeUploads without ids sends no body (= every pending page), with ids sends exactly those", async () => {
+    const bodies: (string | undefined)[] = [];
+    const c = client(async (_url, init) => {
+      bodies.push((init as RequestInit).body as string | undefined);
+      return new Response(JSON.stringify({ authorizations: [] }));
+    });
+    await c.authorizeUploads("cap");
+    await c.authorizeUploads("cap", ["s1"]);
+    expect(bodies).toEqual([undefined, JSON.stringify({ source_ids: ["s1"] })]);
+  });
+
   it("resolves relative upload URLs against the base", () => {
     expect(client(fetch).resolve("/v1/uploads/abc")).toBe("http://api.test/v1/uploads/abc");
   });

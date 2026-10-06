@@ -93,10 +93,10 @@ Candidate: branch `rcl-001-trusted-capture` (exact SHA in the PR description). E
 
 | Suite | Result |
 | --- | --- |
-| Backend `pytest` (real PostgreSQL 16, real RLS, local object store) | 87 passed, 0 failed, 0 skipped |
+| Backend `pytest` (real PostgreSQL 16, real RLS, local object store) | 88 passed, 0 failed, 0 skipped |
 | Backend `ruff check`, `ruff format --check`, `mypy --strict` | clean |
 | `packages/sync` vitest (durable save, crash sweep, recovery, upload engine) | 29 passed |
-| `packages/api-client` vitest | 11 passed |
+| `packages/api-client` vitest | 12 passed |
 | `packages/design-tokens` vitest (WCAG AA contrast, status vocabulary) | 3 passed |
 | `apps/mobile` vitest (view model, config) | 5 passed |
 | `apps/desktop` vitest + jsdom (empty state, statuses, hash verification, keyboard paging) | 8 passed |
