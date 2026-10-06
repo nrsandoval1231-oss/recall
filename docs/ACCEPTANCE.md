@@ -23,13 +23,15 @@ Record exact commit, environment/device, provider/configuration, dataset version
 13. Malicious instructions inside a source remain inert content.
 14. Worker crash/expired lease cannot commit stale results.
 15. Concurrent device edits surface conflicts instead of silently losing changes.
-16. Offline desktop clearly distinguishes cached search from fresh synthesis.
-17. Export preserves local edits/conflicts and cannot escape approved paths.
-18. Delete/reconnect/retry cannot resurrect deleted evidence.
-19. Independent export/restore verifies database plus originals.
-20. Historical query returns prior state while “latest” returns current eligible state.
-21. Vague associative query can recover the right memory when evidence supports it.
-22. Real-user first run succeeds without builder assistance.
+16. Change-feed ordering, replay, cursor expiry, and snapshot-to-feed continuity produce no skipped or duplicate effective state.
+17. Offline desktop clearly distinguishes cached search from fresh synthesis.
+18. Export preserves local edits/conflicts and cannot escape approved paths.
+19. Export crash/restart, read-only, and disk-full recovery preserve managed files and manifest consistency.
+20. Delete/reconnect/retry cannot resurrect deleted evidence.
+21. Independent export/restore verifies database plus originals.
+22. Historical query returns prior state while “latest” returns current eligible state.
+23. Vague associative query can recover the right memory when evidence supports it.
+24. Real-user first run succeeds without builder assistance.
 
 ## Evaluation corpus
 
