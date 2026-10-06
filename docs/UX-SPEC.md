@@ -33,11 +33,9 @@ Do not manufacture a daily brief, urgency, or activity. Empty state should invit
 
 ## Capture
 
-V1: camera/photo import and typed text.
+V1: camera/photo import. Typed text is deferred to V1.5 so RCL-001 has one complete, tested source contract.
 
 Photo flow: request camera permission at need; ordered pages; retake/remove; optional one-line context; Save. Never require a title, folder, tags, entity, project, or note type.
-
-Text flow: one lightweight composer with optional context. The system classifies after save.
 
 Saving acknowledges durable local persistence before cloud/AI processing. Explicit states distinguish local save, upload, processing, ready, and needs review.
 
