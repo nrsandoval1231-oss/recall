@@ -130,3 +130,46 @@ Candidate: branch `rcl-001-trusted-capture` (exact SHA in the PR description). E
 
 Upload spool files live in the OS temp dir and are not swept after a hard kill; Pillow decode memory is bounded only by the pixel limit and there is no upload concurrency cap. The mobile manifest write is not fsynced (device-only risk; unreadable manifests are reported, not deleted, and not auto-rebuilt). 
 Local originals are kept after upload (no cleanup yet). Draft pages exist only in memory until Save. Upload goes through the API (25 MiB/page) rather than directly to storage. No quotas/rate limits, deletion, backup/restore, or telemetry. Mobile/desktop icons are tool-generated placeholders, not an approved brand. Server list ordering is by server creation time and can skip a late-committing capture during a paginated walk. HEIC/HEIF are signature-checked but not decoded server-side. Multi-picture (MPO) camera JPEGs are accepted. `expo-doctor` could not complete two network-dependent checks in the sandbox (19/21 passed).
+
+## RCL-002 evidence (First Useful Recall)
+
+Candidate: branch `rcl-002-first-useful-recall` (exact SHA in the PR). Same environment as RCL-001. **Every interpretation and answer below was produced by a SYNTHETIC scripted fake provider** (`services/backend/tests/fake_provider.py`). That tests Recall's own gates, jobs, validation, retrieval, and citation checks; it says nothing about how well a real model reads real handwriting. No live provider was called (no key or budget has been authorized).
+
+### Automated results
+
+| Suite | Result |
+| --- | --- |
+| Backend `pytest` (real PostgreSQL 16 + RLS incl. worker role, local object store) | 124 passed, 0 failed, 0 skipped |
+| `ruff`, `ruff format --check`, `mypy --strict` | clean |
+| Claude adapter contract (`test_anthropic_adapter.py`, stub HTTP transport; official SDK) | request shape, structured output, effort, refusal fallback, error/stop-reason mapping |
+| E2E: real uvicorn + worker + TypeScript clients (`rcl002.e2e.ts`) | phone upload → consent → worker reads → desktop Ask → cited original byte-identical to the phone's copy; unrelated question abstains with no model call. 12 consecutive runs after a fix (see below) |
+| TypeScript vitest: api-client 13, design-tokens 4, sync 30, mobile 6, desktop 16 | all passed |
+| `eslint`, `tsc` all workspaces, `vite build`, `expo export --platform ios` | clean / built |
+
+A flaky E2E exposed a real defect during this packet: summary chunks cited a page without its page number when ranking ties broke toward them. Fixed in the worker and covered by `test_every_cited_original_has_a_page_number`.
+
+### Scenario map
+
+| ID | Scenario | Status | Evidence / limit |
+| --- | --- | --- | --- |
+| A06 | Clear source → supported interpretation + cited answer with the correct original | PASS (synthetic) | `test_vague_recall_finds_the_right_memory_and_original`, RCL-002 e2e. **Real-model quality OPEN (G6)** |
+| A07 | Ambiguous number / "?" / name stays uncertain | PASS (rules) | `test_memory_keeps_uncertainty…`, `test_model_cannot_add_certainty_numbers_dates_or_authority` (authority downgrade, "?" kept, invented number dropped, invented date removed, non-verbatim evidence dropped → `needs_review`). Name resolution is not attempted (RCL-003) |
+| A08 | Relative dates not converted | PASS (rules) | time wording not on the page is removed; no date normalization exists |
+| A11 | Unsupported question abstains | PASS | no evidence → `insufficient_evidence` with no model call; invented citation → `ANSWER_UNVERIFIED`; empty answer rejected |
+| A12 | Cross-workspace isolation incl. memories/search/Ask/worker | PASS | `test_memories_search_and_ask_are_workspace_isolated`, `test_worker_role_is_scoped_to_the_claimed_workspace` (raw SQL as the worker role) |
+| A13 | Instructions inside a source stay inert | PASS (mechanism) | `test_instructions_inside_a_source_are_inert`: injected text is stored as content, cannot change permissions or certainty, and reaches the answer model only as delimited data. A real model's susceptibility is part of G6 |
+| A14 | Crashed/expired worker cannot commit stale results | PASS | `test_expired_lease_cannot_commit_late_and_no_duplicate_memory` (one memory, one revision) |
+| A23 | Vague associative recall | PASS (keyword baseline, synthetic) | 4-domain synthetic corpus (people/solar, travel, lecture, household). Paraphrase-only recall without shared words is expected to fail until measured hybrid retrieval (RCL-003) |
+| — | Consent / config / budget gates | PASS | consent required, consent revocation cancels, unconfigured server refuses consent, budget stops calls and answers |
+| — | Original integrity before sending | PASS | altered original → `SOURCE_INTEGRITY`, nothing sent; model receives a metadata-free, orientation-corrected derivative (GPS EXIF removed) |
+
+### Remaining live gates (OPEN)
+
+- **G6 — Live provider quality.** Owner-authorized key + budget, provider retention/training terms checked for the account, consented private multi-domain corpus outside the repository, held-out questions; measure per DEVELOPMENT "Live AI acceptance procedure" (critical-field accuracy, uncertainty retention, entailment of cited sentences, abstention, cost, latency). Release blockers: fabricated confirmation, silent number/unit change, cross-workspace leak.
+- **G7 — Live structured-output schema acceptance.** The schema sent to the API drops keywords outside the documented structured-output subset (the full schema is enforced locally); whether the live API accepts it, and the live refusal-fallback behaviour, are unverified.
+- **G8 — Deployment of the worker** (process supervision, the `recall_worker` login role on managed Postgres, lease length vs. real call latency).
+- G1–G5 from RCL-001 still apply (device, live Supabase, native adapters, Windows installer, latency).
+
+### Known limitations
+
+Keyword-only retrieval (no embeddings); one revision per memory (no reprocessing or corrections yet); no entity linking, review queue, or temporal supersession (RCL-003); Ask is single-turn; no runtime entailment check; no lease heartbeat (a call longer than the lease can be reclaimed and repeated — billed twice, never committed twice); HEIC decoding for derivatives relies on `pillow-heif`; usage cost is an estimate from configured prices.

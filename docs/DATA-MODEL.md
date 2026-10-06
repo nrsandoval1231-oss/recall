@@ -1,6 +1,6 @@
 # Canonical data model
 
-Version: 0.3 | Logical schema. RCL-001 tables are implemented in `services/backend/migrations/0001_trusted_capture.sql`; everything else is still logical
+Version: 0.4 | Logical schema. RCL-001 and RCL-002 tables are implemented in `services/backend/migrations/` (0001, 0002); everything else is still logical
 
 ## Design goal
 
@@ -134,3 +134,11 @@ Only `workspaces`, `workspace_members`, `devices`, `captures`, `source_objects`,
 - `source_objects.storage_key` is server-generated and unique; client filenames are display metadata.
 - `idempotency_records` is keyed by `(workspace_id, actor_id, operation_family, idempotency_key)` and stores the request digest and resource id. `captures` is additionally unique on `(workspace_id, client_capture_id)`, so a capture UUID stays unique after any idempotency record would expire. No purge exists yet.
 - Cross-tenant blob deduplication is not implemented (and must never be added).
+
+## Implemented in RCL-002
+
+`ai_consents` (per workspace, policy-versioned), `processing_jobs` (lease token/expiry, attempts, backoff, `blocked_reason`; unique on capture + input fingerprint + processor version), `memories` (one per capture, `current_revision`), `memory_revisions` (append-only; origin `model` only for now; validated `extraction` JSON, validation notes, model and processor versions), `search_chunks` (generated `tsvector`, `eligible`, per-chunk `epistemic_state`, `source_id` + page ordinal), `ai_usage` (append-only token/cost accounting). The input fingerprint is the SHA-256 of the ordered verified page hashes plus timezone and context hint.
+
+Capture status is now `awaiting_upload → stored → processing → ready | needs_review | failed`, `failed → processing`; a trigger enforces exactly these transitions. A second least-privilege role, `recall_worker`, is scoped by RLS to the workspace of the job it claimed (it is not a member of any workspace), cannot delete anything, and cannot read membership. The API role cannot write memories, revisions, or chunks. Deployment-wide spend is exposed only as two aggregate numbers via `recall_ai_spend()`.
+
+Still logical (not created): entities, aliases, mentions as rows, claims, actions, review items, change events, export jobs, embeddings.

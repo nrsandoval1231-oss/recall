@@ -46,6 +46,19 @@ Migrations are plain ordered SQL in `services/backend/migrations/`, checksummed 
 
 `RECALL_STORAGE_BACKEND=local` writes originals under `RECALL_LOCAL_STORAGE_DIR` (private dir, write-once, server-assigned keys). For Supabase set `RECALL_STORAGE_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server only), and create a **private** bucket named `RECALL_STORAGE_BUCKET`. See [infra/supabase](../infra/supabase/README.md).
 
+## AI processing (RCL-002, optional)
+
+Off unless every `AI_*`/budget variable in `.env.example` is set **and** a workspace turns it on in Settings. Calling a live provider costs money: get the owner's approval and set budgets first.
+
+```bash
+# server env (both API and worker): AI_PROVIDER=anthropic AI_MODEL_ID=claude-opus-5-5 AI_API_KEY=... \
+#   AI_INPUT_USD_PER_MTOK=... AI_OUTPUT_USD_PER_MTOK=... RECALL_AI_DAILY_BUDGET_USD=... RECALL_AI_MONTHLY_BUDGET_USD=...
+export RECALL_WORKER_DATABASE_URL=...   # login role that inherits recall_worker (scripts/dev-db.sh creates recall_worker_login)
+cd services/backend && uv run python -m recall.ingestion.worker
+```
+
+Prices must be the provider's current published prices for the configured model; they are only used to stop spending at the budget. The worker refuses to start with an owner, superuser, `BYPASSRLS`, or non-`recall_worker` role.
+
 ## Mobile (Expo, iPhone)
 
 ```bash
@@ -96,3 +109,14 @@ Preconditions: live Supabase project (signups restricted), deployed or tunneled 
 9. Record device models, OS versions, build identifiers, commit SHA, and every observed deviation in ACCEPTANCE.
 
 Report anything not performed as **OPEN**, never as passed.
+
+## Live AI acceptance procedure (RCL-002 exit gate)
+
+Preconditions: owner-approved budget and key, provider retention/training terms reviewed for the account, and a **consented private evaluation set kept outside the repository** (design-partner handwriting plus general-domain pages) with held-out questions written before any tuning.
+
+1. Turn on AI reading in Settings; confirm the explanation names the provider.
+2. Capture each evaluation set item; record status (`ready` / `needs_review` / `failed`) and per-capture cost from `ai_usage`.
+3. For each page, compare the machine reading with the original: count critical-field errors (numbers, units, names, dates) and any lost "?" or invented certainty (release blockers).
+4. Ask each held-out question; record answered/abstained, whether every material sentence is supported by the cited page (entailment), and whether the correct original is cited. Include deliberately unsupported questions; they must abstain.
+5. Revoke consent; confirm queued work stops and Ask returns `unavailable` with sources.
+6. Record model id, effort, prompt/processor version (`interpret-v1`), dataset version, and results in ACCEPTANCE. Do not tune prompts against the held-out answers.

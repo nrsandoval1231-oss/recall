@@ -18,7 +18,7 @@ Example: “What was the name of that guy Sarah introduced me to last summer who
 
 ## Current status
 
-**RCL-001 (Trusted Capture) is implemented as code and verified by automated tests; nothing is deployed and no real iPhone → Windows acceptance has been run.** AI, transcription, search, and answers (RCL-002+) do not exist.
+**RCL-001 (Trusted Capture) and RCL-002 (First Useful Recall) are implemented as code and verified by automated tests; nothing is deployed, no real iPhone → Windows acceptance has been run, and no live AI provider has been called.** RCL-002 adds opt-in AI reading of captures, keyword retrieval, and cited answers that abstain without evidence. Entities, corrections, offline cache, and export (RCL-003+) do not exist.
 
 What exists: Expo iPhone app, Tauri/React Windows app, FastAPI backend, Postgres schema with RLS, private-storage adapters, shared sync/API/token packages. See [DEVELOPMENT](docs/DEVELOPMENT.md) to run it and [ACCEPTANCE](docs/ACCEPTANCE.md) ("RCL-001 evidence") for exactly what was and was not verified.
 

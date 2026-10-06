@@ -1,6 +1,6 @@
 # Memory API — V1 contract
 
-Version: 0.2 | RCL-001 routes are implemented (see "RCL-001 implementation details" at the end); later routes remain proposed
+Version: 0.3 | RCL-001 and RCL-002 routes are implemented (see the implementation-details sections at the end); later routes remain proposed
 
 ## Common contract
 
@@ -25,6 +25,7 @@ Versioned record updates require `If-Match` with the current revision/version. A
 | `GET /captures/{id}` | Status, page manifest, failures, and resulting memory ID | 001 |
 | `GET /sources/{id}/content` | Authorized source response or short-lived signed redirect | 001 |
 | `POST /captures/{id}/retry-processing` | Explicit bounded retry after recoverable processing failure | 002 |
+| `GET /settings/ai`, `PUT /settings/ai` | Workspace AI-reading consent (settings-only capability) | 002 |
 | `GET /memories` | Filtered/searchable current memories | 002 |
 | `GET /memories/{id}` | Current revision, evidence, and relevant history | 002 |
 | `GET /search` | Source-first keyword/entity retrieval; hybrid enabled later | 002/003 |
@@ -141,3 +142,21 @@ These are the exact, tested semantics of the packet-001 routes. Where they refin
 **Read.** `GET /v1/captures` (opaque, workspace-bound, signed cursors; newest first by server creation time (a capture whose transaction commits late can appear after a client has paged past its position; refresh from the top)) and `GET /v1/captures/{id}` return the capture view. `GET /v1/sources/{id}/content` streams the original through the authenticated API (no signed read URLs are issued) only for verified pages of a `stored` capture (else 409 `SOURCE_UNAVAILABLE`), with `Content-Type` = verified media type, `X-Recall-Source-SHA256`, `ETag`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`. Another workspace's capture or source is indistinguishable from a nonexistent one (404 `NOT_FOUND`).
 
 **Also**: `/healthz` (liveness) and `/readyz` (DB + storage) are unauthenticated and content-free. CORS is closed unless `RECALL_CORS_ORIGINS` lists explicit origins (never `*`).
+
+## RCL-002 implementation details
+
+**Gates.** A capture is interpreted only when the server is fully configured (`AI_PROVIDER`, `AI_MODEL_ID`, `AI_API_KEY`, per-MTok prices, daily and monthly budgets) **and** the workspace has turned AI reading on. `GET /v1/settings/ai` returns `{ai_configured, provider, policy_version, enabled, consent_outdated, version, explanation}`; `PUT` takes `{"enabled": bool, "expected_version"?: n}` (409 `VERSION_CONFLICT` on a stale version, 409 `AI_NOT_CONFIGURED` when enabling on an unconfigured server). Consent is bound to a policy version; if what is sent or to whom changes, consent becomes `consent_outdated` and processing stops until it is given again. Enabling queues every `stored` capture of the workspace; disabling cancels queued work (a call already in flight finishes, but its result is discarded at commit if consent is gone). `/v1/me` `config` reports `ai_configured`, `ai_enabled`, `consent_required`.
+
+**Capture views** gain `processing: {state: queued|running|retrying|succeeded|failed|cancelled, attempts, max_attempts, blocked_reason: budget_exhausted|null, last_error_code, retry_available} | null` and `memory_id`. Finalize creates the job in the same transaction that stores the capture. A capture stays `stored` until a worker actually claims its job (then `processing`); it ends `ready`, `needs_review` (unreadable pages or items dropped by validation), or `failed`. Originals stay viewable in every state after `stored`.
+
+**Worker** (`python -m recall.ingestion.worker`, role inheriting `recall_worker`): claims with `FOR UPDATE SKIP LOCKED` and a lease (default 900 s), re-verifies each original's SHA-256 before anything leaves, sends only server-made derivatives (EXIF orientation applied, metadata stripped, JPEG, size-bounded), validates the proposal, and commits only if it still holds the lease and consent is still active. Retryable failures back off (30 s × attempts²) up to `RECALL_MAX_PROCESSING_ATTEMPTS`; refusals, truncation, integrity and decoding failures are terminal. Every provider call (including failed and repair calls) is recorded in `ai_usage` with an estimated cost; when the deployment's daily or monthly spend reaches its budget, no new call is made and queued jobs show `blocked_reason: budget_exhausted`.
+
+**Validation** (see AI-INGESTION): unparseable/schema-invalid/wrong capture/wrong pages/unknown ids → one repair call per attempt, then retry. Soft rules never add certainty: evidence quotes must be verbatim in that page's transcription (else the item is dropped); numbers in a statement or action must appear in its evidence (else dropped); time wording not in the evidence is removed; `confirmed_by_user` is downgraded to `reported`, `superseded`/`retracted` to `uncertain`; a `reported` statement whose evidence contains "?" becomes `uncertain`. Notes are stored with the revision and returned as `validation_notes`.
+
+**`POST /v1/captures/{id}/retry-processing`** (requires `Idempotency-Key`; naturally idempotent on job state): re-queues a `failed` job (at most 3 manual retries) or a cancelled one; returns the current `processing` view; 409 `NOT_RETRYABLE` / `AI_NOT_CONFIGURED` otherwise.
+
+**`GET /v1/memories`**, **`GET /v1/memories/{id}`**: current revision with `interpretation` (summary, pages[].transcription keyed by `page_id` = `source_id`, mentions, statements with `epistemic_state`, action *suggestions*, uncertainties), `validation_notes`, `model_id`, `processor_version`, and display `labels` ("Machine reading…", "Suggestions only…"). No write routes exist yet (corrections are RCL-003).
+
+**`GET /v1/search?q=`**: Postgres full-text (`english`) over eligible chunks of current revisions; the question's lexemes are OR-ed and ranked (`ts_rank_cd`), so vague recollections match on shared words. Results carry `memory_id`, `capture_id`, `source_id`, `page`, `kind` (`transcription|statement|summary|context`), `epistemic_state`, `excerpt`. No vectors yet.
+
+**`POST /v1/ask`** `{"question"}` (`conversation_id`, `entity_ids`, `as_of` must be null/empty in RCL-002, else 422). The server retrieves; with no matches it returns `insufficient_evidence` (`reason: NO_EVIDENCE`) **without a model call**. Otherwise it sends at most 8 excerpts as a packet with server citation ids `c1…`; the model must return sentences each citing ≥1 packet id. Any unknown id, empty answer, or schema failure → `insufficient_evidence` (`reason: ANSWER_UNVERIFIED`) with no answer text. AI off / consent missing / budget reached / provider down → `unavailable` with `reason` (`AI_NOT_CONFIGURED`, `CONSENT_REQUIRED`, `BUDGET_EXHAUSTED`, provider code) and `mode: sources_only`. Every response includes `sources` (matching excerpts with `source_id`/`page`) so the original is always one step away; `citations` are server-resolved from the packet, never from model text. Entailment (does the cited text really support the sentence?) is not checked at runtime; it is an evaluation metric.

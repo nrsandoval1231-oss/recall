@@ -1,13 +1,11 @@
 # Python package boundaries
 
-These directories are reserved, not implemented:
+- `api`: HTTP transport, auth (JWT validation), routes, error envelope.
+- `domain`: commands and policy — captures/uploads/finalize (`captures.py`), consent/budget/enqueue (`processing.py`), memories/search/Ask orchestration (`memories.py`), manifest + content validation, signed tokens.
+- `ingestion` (RCL-002): durable worker (`worker.py`, `python -m recall.ingestion.worker`), provider boundary (`provider.py`) and Claude adapter (`anthropic_provider.py`), prompts, model-input derivatives (`images.py`), deterministic validation (`validate.py`).
+- `retrieval` (RCL-002): authorized keyword search (`search.py`), grounded Ask with server-resolved citations (`ask.py`).
+- `db`: pool, per-request security context, migrations, provisioning.
+- `storage`: private object-store port (local, Supabase).
+- `sync`, `exports`: reserved (RCL-004/005).
 
-- `api`: HTTP schemas/auth/transport.
-- `domain`: deterministic commands, identity policy, versions, and correction rules.
-- `ingestion`: jobs, image derivatives, provider adapter, validation, and commit orchestration.
-- `retrieval`: authorized search, evidence selection, and grounded answers.
-- `sync`: committed change feed, snapshots, commands, and tombstones.
-- `exports`: portable snapshots/manifests, not uncontrolled local filesystem writes.
-- `db`: transactions, repositories, auth context, and persistence.
-
-Keep API and worker entrypoints thin and share domain code. Avoid circular module dependencies and unrelated abstractions before real use cases exist.
+API and worker share these modules; they run as separate processes with separate least-privilege database roles.
