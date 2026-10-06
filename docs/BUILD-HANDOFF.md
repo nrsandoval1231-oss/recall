@@ -38,3 +38,46 @@ Test creation replay with the same operation ID and with a mismatched payload. T
 Return exact commit, changed files, runnable commands, migration/setup steps, tests passed/failed/skipped, installed-client evidence, and remaining dependencies. Clearly label any mock-only, simulator-only, unsigned-build, or unprovisioned-provider limitation.
 
 Open a scoped PR rather than implementing future packets inside this one. Do not claim the full Recall app is ready because trusted capture works. RCL-002 owns transcription and the first source-backed answer.
+
+---
+
+# Packet brief — RCL-002 First Useful Recall
+
+## Vision for this packet
+
+One captured source becomes one **source memory** that can later answer a vague human question, with the original page one tap away, and that says "I don't have evidence for that" instead of guessing. RCL-002 proves the *interpret → retrieve → grounded answer* loop end to end on top of the trusted source layer from RCL-001. It does not try to be smart about identities, time, or corrections yet (RCL-003).
+
+## Outcomes
+
+1. A stored capture is interpreted by one evaluated multimodal configuration into the universal extraction envelope (`extraction.schema.json` v1.1), validated deterministically, and committed as a versioned memory with page transcriptions, summary, mentions, statements, action *suggestions*, and explicit uncertainties.
+2. A user can ask in natural language and receive either a grounded answer whose every sentence cites server-issued evidence (with the original page reachable), or an honest `insufficient_evidence` / `ambiguous` / `unavailable`.
+3. Nothing reaches a model without workspace consent, server configuration, and an owner-set budget; when any is missing, originals stay fully usable and the UI says why.
+
+## Decisions
+
+| Topic | Decision | Why |
+| --- | --- | --- |
+| Provider | Anthropic Claude via the official Python SDK, one configuration. Model from `AI_MODEL_ID` (recommended `claude-opus-5-5`, adaptive thinking, effort `high`, structured JSON output, server-side refusal fallback `"default"`). | Strong handwriting/vision + structured output; one configuration per ARCHITECTURE; no model router. Model id is configuration, never hard-coded. |
+| Gates | Processing requires (a) workspace AI consent recorded via settings, (b) provider key + model + per-MTok prices configured server-side, (c) daily and monthly USD budgets. | SECURITY "Spend and deployment gates"; consent before private content leaves. |
+| Durable work | Postgres `processing_jobs`, `FOR UPDATE SKIP LOCKED` claims, lease token checked at commit, bounded attempts with backoff, unique (capture, input fingerprint, processor version). Separate worker process and least-privilege worker DB role scoped by RLS to the claimed job's workspace. | ARCHITECTURE §5; no Redis/Celery. |
+| Model input | Server-made derivatives (EXIF-orientation applied, re-encoded JPEG, metadata stripped, bounded size) from hash-verified originals; originals untouched. | SECURITY "Original storage"; provider limits. |
+| Validation | Structural → referential → authority → semantic (verbatim evidence quotes, no new numbers, no invented time words, "?" stays uncertain) → deterministic commit. Hard failures get one repair call per attempt; soft failures drop the item, record why, and mark the capture `needs_review`. | AI-INGESTION validation + trust rules. |
+| Retrieval | Postgres full-text (`english` config) over eligible chunks of the current revision with an OR query of the question's lexemes, ranked; no pgvector yet. | ARCHITECTURE §6: keyword first, measure before vectors. |
+| Answers | Bounded evidence packet with server citation IDs; structured answer of sentences each citing ≥1 packet ID; server rejects anything else and returns sources. No evidence → abstain without a model call. | AI-INGESTION retrieval; API-CONTRACT Ask. |
+| Capture states | `stored → processing → ready | needs_review | failed`, `failed → processing` by explicit bounded retry. A queued-but-unclaimed job leaves the capture `stored` with an honest processing hint. | API-CONTRACT state machine; no optimistic status. |
+
+## In scope
+
+Migration `0002`; worker entrypoint; provider adapter; derivatives; validation/commit; `GET /v1/memories`, `GET /v1/memories/{id}`, `GET /v1/search`, `POST /v1/ask`, `POST /v1/captures/{id}/retry-processing`, `GET|PUT /v1/settings/ai`; capture views with processing state and `memory_id`; mobile + desktop: processing states, memory detail with original, minimal Ask, AI consent setting.
+
+## Out of scope (do not build)
+
+Entity resolution/linking, relationships, corrections, review queue UI, temporal supersession (RCL-003); embeddings/pgvector, offline cache (RCL-004); export/deletion (RCL-005); voice/typed text; proactive anything; multiple models.
+
+## Acceptance targets
+
+A06 clear source → supported interpretation + cited answer with the correct original; A07 ambiguous number/name/"?" stays uncertain; A11 unsupported question abstains; A12 extended to memories/search/Ask; A13 instructions inside a source stay inert; A14 crashed/expired-lease worker cannot commit stale results; A23 vague-recall questions over synthetic multi-domain notes (keyword baseline). **Live-provider quality on real handwriting is a separate, OPEN gate** until an owner-authorized key, budget, and a consented private corpus exist.
+
+## Risks
+
+Model quality on real handwriting is unmeasured; structured-output schema features accepted by the API are unverified live; keyword retrieval will miss paraphrase-only recall (expected; measured before pgvector); per-call cost on 10-page captures; lease expiry on very long calls (lease is generous, no heartbeat yet).
