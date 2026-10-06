@@ -10,7 +10,7 @@ import jwt
 from jwt import PyJWKClient
 
 from ..config import Settings
-from ..errors import unauthenticated
+from ..errors import ApiError, unauthenticated
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,10 @@ class TokenVerifier:
                 leeway=30,
             )
             user_id = uuid.UUID(str(claims["sub"]))
+        except jwt.PyJWKClientConnectionError:
+            raise ApiError(
+                "AUTH_UNAVAILABLE", "Sign-in service is unreachable; try again.", 503, retryable=True
+            ) from None
         except (jwt.PyJWTError, ValueError, KeyError):
             raise unauthenticated() from None
         email = claims.get("email")

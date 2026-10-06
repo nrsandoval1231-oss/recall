@@ -32,6 +32,12 @@ class ObjectStore(Protocol):
         Raises StoredObjectConflict if different content exists at the key.
         """
 
+    def replace_corrupt(self, key: str, source: Path, *, content_type: str) -> None:
+        """Replace an object whose stored bytes are known not to match its verified hash.
+
+        The caller must already have verified `source` against the declared SHA-256.
+        """
+
     def stat(self, key: str) -> ObjectInfo | None: ...
 
     def iter_bytes(self, key: str) -> Iterator[bytes]:

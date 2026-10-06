@@ -54,6 +54,13 @@ class SupabaseObjectStore:
         response.raise_for_status()
         raise RuntimeError(f"unexpected storage response {response.status_code}")
 
+    def replace_corrupt(self, key: str, source: Path, *, content_type: str) -> None:
+        with source.open("rb") as handle:
+            response = self._client.post(
+                self._object_path(key), content=handle, headers={"Content-Type": content_type, "x-upsert": "true"}
+            )
+        response.raise_for_status()
+
     def stat(self, key: str) -> ObjectInfo | None:
         response = self._client.head(f"/object/authenticated/{quote(self.bucket)}/{quote(key, safe='/')}")
         if response.status_code in (400, 404):

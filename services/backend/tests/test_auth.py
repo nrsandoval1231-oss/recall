@@ -165,3 +165,21 @@ def test_concurrent_first_requests_provision_exactly_one_workspace(env: Env) -> 
     assert len(set(ids)) == 1
     with psycopg.connect(env.admin_dsn) as conn:
         assert conn.execute("select count(*) from workspace_members where user_id=%s", (uid,)).fetchone()[0] == 1  # type: ignore[index]
+
+
+def test_identity_provider_outage_is_503_not_signed_out() -> None:
+    import jwt as pyjwt
+
+    from recall.errors import ApiError
+
+    class Down:
+        algorithms = ["ES256"]
+
+        def key_for(self, token: str):  # type: ignore[no-untyped-def]
+            raise pyjwt.PyJWKClientConnectionError("jwks unreachable")
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    verifier = TokenVerifier(Down(), ISSUER, AUDIENCE)  # type: ignore[arg-type]
+    with pytest.raises(ApiError) as caught:
+        verifier.verify(make_token(key, uuid.uuid4()))
+    assert caught.value.status == 503 and caught.value.retryable

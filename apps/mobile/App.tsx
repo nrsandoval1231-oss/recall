@@ -74,7 +74,7 @@ function Main({ services }: { services: Services }) {
     (async () => {
       const report = await services.syncer.store.recover(); // after a force-close: reconcile first
       if (!alive) return;
-      if (report.damaged.length > 0) setBanner("Some saved pages are damaged on this device.");
+      if (report.damaged.length > 0 || report.unreadable.length > 0) setBanner("Some saved captures could not be read on this device. They have not been deleted.");
       await rebuild();
       void services.api.me().catch(() => undefined); // provisions the workspace on first sign-in
       await services.syncer.syncAllPending();

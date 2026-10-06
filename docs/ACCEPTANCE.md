@@ -93,9 +93,9 @@ Candidate: branch `rcl-001-trusted-capture` (exact SHA in the PR description). E
 
 | Suite | Result |
 | --- | --- |
-| Backend `pytest` (real PostgreSQL 16, real RLS, local object store) | 85 passed, 0 failed, 0 skipped |
+| Backend `pytest` (real PostgreSQL 16, real RLS, local object store) | 87 passed, 0 failed, 0 skipped |
 | Backend `ruff check`, `ruff format --check`, `mypy --strict` | clean |
-| `packages/sync` vitest (durable save, crash sweep, recovery, upload engine) | 28 passed |
+| `packages/sync` vitest (durable save, crash sweep, recovery, upload engine) | 29 passed |
 | `packages/api-client` vitest | 11 passed |
 | `packages/design-tokens` vitest (WCAG AA contrast, status vocabulary) | 3 passed |
 | `apps/mobile` vitest (view model, config) | 5 passed |
@@ -128,4 +128,5 @@ Candidate: branch `rcl-001-trusted-capture` (exact SHA in the PR description). E
 
 ### Known limitations
 
-Local originals are kept after upload (no cleanup yet). Draft pages exist only in memory until Save. Upload goes through the API (25 MiB/page) rather than directly to storage. No quotas/rate limits, deletion, backup/restore, or telemetry. Mobile/desktop icons are tool-generated placeholders, not an approved brand. Server list ordering is by server receipt time. HEIC/HEIF are signature-checked but not decoded server-side. `expo-doctor` could not complete two network-dependent checks in the sandbox (19/21 passed).
+Upload spool files live in the OS temp dir and are not swept after a hard kill; Pillow decode memory is bounded only by the pixel limit and there is no upload concurrency cap. The mobile manifest write is not fsynced (device-only risk; unreadable manifests are reported, not deleted, and not auto-rebuilt). 
+Local originals are kept after upload (no cleanup yet). Draft pages exist only in memory until Save. Upload goes through the API (25 MiB/page) rather than directly to storage. No quotas/rate limits, deletion, backup/restore, or telemetry. Mobile/desktop icons are tool-generated placeholders, not an approved brand. Server list ordering is by server creation time and can skip a late-committing capture during a paginated walk. HEIC/HEIF are signature-checked but not decoded server-side. Multi-picture (MPO) camera JPEGs are accepted. `expo-doctor` could not complete two network-dependent checks in the sandbox (19/21 passed).

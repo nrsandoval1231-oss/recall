@@ -35,6 +35,7 @@ export function Viewer({ api, capture, onClose }: { api: Pick<RecallApiClient, "
           ? { kind: "unverifiable" }
           : actual === expected ? { kind: "verified", sha256: actual } : { kind: "mismatch", expected, actual };
         const url = URL.createObjectURL(new Blob([got.bytes], { type: got.mediaType }));
+        if (cancelled) return URL.revokeObjectURL(url);
         urls.current.push(url);
         if (!cancelled) setLoaded((l) => ({ ...l, [page.source_id]: { url, integrity, bytes: got.bytes, mediaType: got.mediaType } }));
       } catch {

@@ -83,7 +83,8 @@ export class CaptureSyncer {
   async syncAllPending(): Promise<void> {
     const owner = await this.deps.currentUserId();
     if (!owner) return;
-    const pending = (await this.store.list(owner)).filter((c) => c.sync.phase !== "finalized").reverse();
+    const pending = (await this.store.list(owner)).filter((c) => c.sync.phase !== "finalized" && c.sync.lastError?.retryable !== false) // permanent failures wait for a manual retry
+      .reverse();
     for (const capture of pending) await this.sync(capture.operationId);
   }
 

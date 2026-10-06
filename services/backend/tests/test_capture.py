@@ -31,6 +31,23 @@ def test_one_page_capture_end_to_end(env: Env) -> None:
     assert "no-store" in content.headers["cache-control"]
 
 
+def test_multi_picture_camera_jpeg_is_accepted(env: Env) -> None:
+    """Phone cameras write MPF/MPO JPEGs; Pillow reports format 'MPO'. They are legitimate originals."""
+    import io
+
+    from PIL import Image
+
+    frames = [Image.new("RGB", (32, 32), (200, 10, 10)), Image.new("RGB", (32, 32), (10, 10, 200))]
+    buffer = io.BytesIO()
+    frames[0].save(buffer, format="MPO", save_all=True, append_images=frames[1:])
+    data = buffer.getvalue()
+    assert data.startswith(b"\xff\xd8\xff") and Image.open(io.BytesIO(data)).format == "MPO"
+    user = env.user()
+    capture = stored_capture(user, [data])
+    got = user.req("GET", f"/v1/sources/{capture['pages'][0]['source_id']}/content")
+    assert got.content == data and got.headers["content-type"] == "image/jpeg"
+
+
 def test_multipage_order_is_preserved_even_when_uploaded_out_of_order(env: Env) -> None:
     user = env.user()
     user.register_device()

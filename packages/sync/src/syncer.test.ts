@@ -234,6 +234,17 @@ describe("upload engine", () => {
     expect(displayStatus(await ctx.syncer.store.read(second.operationId), false)).toBe("uploaded");
   });
 
+  it("syncAllPending does not hammer a permanently failed capture; a manual retry still works", async () => {
+    const ctx = setup();
+    const capture = await saved(ctx, 1);
+    ctx.srv.failOnce.set("create", () => new ApiError("UNSUPPORTED_MEDIA", "no", 415, false, null));
+    await ctx.syncer.sync(capture.operationId);
+    const before = ctx.srv.creates;
+    await ctx.syncer.syncAllPending();
+    expect(ctx.srv.creates).toBe(before);
+    expect(displayStatus(await ctx.syncer.sync(capture.operationId), false)).toBe("uploaded");
+  });
+
   it("a non-retryable server rejection is recorded, not retried forever", async () => {
     const ctx = setup();
     const capture = await saved(ctx, 1);

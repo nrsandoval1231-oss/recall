@@ -37,6 +37,9 @@ export class ExpoFiles implements LocalFiles {
 
   /** tmp file, then swap. The previous manifest is only removed after the new one is fully written. */
   async writeTextAtomic(rel: string, text: string) {
+    const stale = this.file(`${rel}.tmp`);
+    // A previous crash may have left the only complete copy in .tmp: promote it, never overwrite it.
+    if (stale.exists && !this.file(rel).exists) stale.rename(baseOf(rel));
     const tmp = this.file(`${rel}.tmp`);
     tmp.create({ overwrite: true, intermediates: true });
     tmp.write(text);

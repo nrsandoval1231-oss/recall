@@ -54,6 +54,19 @@ class LocalObjectStore:
         finally:
             tmp.unlink(missing_ok=True)
 
+    def replace_corrupt(self, key: str, source: Path, *, content_type: str) -> None:
+        final = self._path(key)
+        fd, tmp_name = tempfile.mkstemp(dir=final.parent, prefix=".incoming-")
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "wb") as out, source.open("rb") as src:
+                shutil.copyfileobj(src, out, CHUNK)
+                out.flush()
+                os.fsync(out.fileno())
+            os.replace(tmp, final)
+        finally:
+            tmp.unlink(missing_ok=True)
+
     def stat(self, key: str) -> ObjectInfo | None:
         try:
             return ObjectInfo(size=self._path(key).stat().st_size)

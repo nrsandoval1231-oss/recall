@@ -139,7 +139,7 @@ def test_storage_loss_after_upload_blocks_finalize_until_reupload(env: Env) -> N
     assert finalize(user, created).status_code == 200
 
 
-def test_storage_corruption_is_detected_not_acknowledged(env: Env) -> None:
+def test_storage_corruption_is_detected_then_healed_by_reupload(env: Env) -> None:
     user, pages, created, _ = _setup(env)
     upload_all(user, created, pages)
     victim = next(
@@ -147,12 +147,16 @@ def test_storage_corruption_is_detected_not_acknowledged(env: Env) -> None:
         for p in env.store_dir.glob(f"workspaces/*/captures/{created['capture_id']}/sources/*/original")
         if p.is_file()
     )
-    data = bytearray(victim.read_bytes())
+    good = victim.read_bytes()
+    data = bytearray(good)
     data[len(data) // 2] ^= 0xFF
     victim.write_bytes(bytes(data))
     resp = finalize(user, created)
-    assert resp.status_code == 422 and resp.json()["error"]["code"] == "HASH_MISMATCH"
+    assert resp.status_code == 409 and resp.json()["error"]["code"] == "UPLOAD_INCOMPLETE"  # never acknowledged
     assert user.req("GET", f"/v1/captures/{created['capture_id']}").json()["status"] == "awaiting_upload"
+    upload_all(user, created, pages)  # the intact local original repairs the damaged object
+    assert victim.read_bytes() == good
+    assert finalize(user, created).status_code == 200
 
 
 def test_interrupted_upload_stores_nothing_and_retry_succeeds(env: Env) -> None:

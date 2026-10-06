@@ -9,7 +9,8 @@ from PIL import Image, UnidentifiedImageError
 
 from ..errors import unsupported_media
 
-_PIL_FORMAT = {"image/jpeg": "JPEG", "image/png": "PNG"}
+# Phone cameras often write multi-picture JPEGs (MPF), which Pillow reports as "MPO".
+_PIL_FORMATS = {"image/jpeg": {"JPEG", "MPO"}, "image/png": {"PNG"}}
 # ISO-BMFF brands that identify HEIC/HEIF still images.
 _HEIF_BRANDS = {b"heic", b"heix", b"hevc", b"hevx", b"heim", b"heis", b"hevm", b"hevs", b"mif1", b"msf1"}
 
@@ -42,7 +43,7 @@ def validate_content(path: Path, declared: str, *, max_pixels: int) -> None:
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             Image.MAX_IMAGE_PIXELS = max_pixels
             with Image.open(path) as image:
-                if image.format != _PIL_FORMAT[declared]:
+                if image.format not in _PIL_FORMATS[declared]:
                     raise unsupported_media("The file content does not match its declared image type.")
                 image.load()  # full decode: catches truncated/corrupt data
     except (

@@ -413,7 +413,8 @@ class CaptureService:
         try:
             self.store.put_if_absent(target.storage_key, spool, content_type=target.media_type, sha256=sha256)
         except StoredObjectConflict:
-            raise ApiError("SOURCE_CONFLICT", "A different original is already stored for this page.", 409) from None
+            # The incoming bytes already match the declared hash, so the stored object is the corrupt one.
+            self.store.replace_corrupt(target.storage_key, spool, content_type=target.media_type)
 
         def run(tx: Tx) -> None:
             updated = tx.run(
@@ -498,10 +499,10 @@ class CaptureService:
                 lost.append(str(page["id"]))
                 continue
             if actual != page["server_sha256"] or size != page["received_byte_size"]:
-                raise hash_mismatch("Stored bytes failed verification; re-upload this page.")
+                lost.append(str(page["id"]))  # corrupt in storage: ask the client to re-send the verified bytes
         if lost:
             raise upload_incomplete(
-                "Some stored originals are missing; upload them again.", {"missing_source_ids": lost}
+                "Some stored originals are missing or damaged; upload them again.", {"missing_source_ids": lost}
             )
 
         def commit(tx: Tx) -> dict[str, Any]:
