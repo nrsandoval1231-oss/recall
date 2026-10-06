@@ -1,0 +1,44 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Private pilot data must NEVER enter this public repository
+private/
+data/
+captures/
+corpus-private/
+vault/
+exports/
+backups/
+tests/fixtures/private/
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.dump
+*.sql.gz
+
+# Tooling, build outputs and local dependencies
+node_modules/
+.expo/
+dist/
+build/
+coverage/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+target/
+.DS_Store
+Thumbs.db
+*.log
+
+# Runtime manifests and media are never application fixtures by default
+*.local
+*.tmp
