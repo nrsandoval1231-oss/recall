@@ -1,64 +1,62 @@
 # Recall
 
-**Your work remembers itself.**
+**Your life remembers itself.**
 
-Recall is a photo-first memory application for people whose work still starts on paper. Write normally, photograph the page, and later ask a plain-language question. The answer must lead back to the original evidence.
+Recall is a universal external-memory application. People already capture important information in notebooks, screenshots, photos, voice notes, files, links, meetings, and messages. Recall removes the organizational burden after capture: it preserves the source, understands what it means, connects it across time, and lets the user recover it later using the imperfect way humans actually remember.
 
-The first pilot spans consulting, generator maintenance, equipment, projects, people, and business ideas. The core is intentionally industry-neutral.
+```text
+Capture -> Understand -> Connect -> Remember -> Recall -> Act
+```
+
+The user should not need to file, tag, name, link, or maintain a taxonomy. Paul Cockerham is the first design partner and a demanding pilot because his work spans handwriting, consulting, generator maintenance, people, equipment, projects, numbers, and vague recall queries. His workflows validate the universal product; they do not define its domain model.
+
+## North-star test
+
+A user can give Recall something today, forget that Recall exists, return six months later with only a vague human recollection, and recover the right information with evidence.
+
+Example: “What was the name of that guy Sarah introduced me to last summer who did something with solar?”
 
 ## Current status
 
 **Product definition and repository scaffold only. No application is implemented or deployed.**
 
-The product direction and storage architecture were agreed before this foundation was written. The detailed contracts and acceptance criteria below are the proposed V1 implementation baseline, not evidence of working software. Directory READMEs and `.gitkeep` files reserve boundaries; they are not working modules. No cloud resources, AI subscriptions, signing certificates, or paid services have been created.
+This repository is public. Every checked-in example must remain synthetic. Never commit private notes, customer information, personal documents, credentials, exported memories, or a private evaluation corpus.
 
-This repository is public. Every example is synthetic. Never commit real notebook pages, customer information, credentials, exported vaults, database dumps, or a private evaluation corpus.
-
-## Read in this order
-
-1. [Product requirements](docs/PRD.md) — user, value proposition, V1 scope, and requirements.
-2. [Architecture](docs/ARCHITECTURE.md) — components, storage ownership, and stack decisions.
-3. [Data model](docs/DATA-MODEL.md), [API contract](docs/API-CONTRACT.md), and [AI ingestion](docs/AI-INGESTION.md).
-4. [Sync and Obsidian export](docs/SYNC-AND-EXPORT.md), [UX](docs/UX-SPEC.md), and [security/operations](docs/SECURITY-AND-OPERATIONS.md).
-5. [Acceptance](docs/ACCEPTANCE.md), [roadmap](docs/ROADMAP.md), and [first-builder handoff](docs/BUILD-HANDOFF.md).
-6. [Folder tree](docs/FOLDER-TREE.md) and [primary technical references](docs/REFERENCES.md).
-
-## The first useful loop
-
-```text
-Paper -> photo -> durable original -> validated interpretation
-      -> searchable memory -> question -> answer + original page
-```
-
-Capturing must not require filing, tagging, Markdown, or identity cleanup. Ambiguity must not prevent saving the original. An uploaded image is not automatically a searchable transcription, and a transcription is not a verified fact.
-
-## Agreed ownership
+## Product layers
 
 | Layer | Responsibility |
 | --- | --- |
-| Private object storage | Original photos and later other source files; append-only during normal operation, explicitly deletable by the owner |
-| Cloud PostgreSQL + pgvector | Canonical application records, versions, relationships, permissions, and retrieval indexes |
-| Desktop SQLite | Rebuildable local cache and durable pending operations; not a competing canonical database |
-| Obsidian/Markdown | Optional portable archive; not the app database or a requirement on mobile |
-| AI | Interprets and proposes; deterministic code validates, authorizes, and commits |
+| Original sources | Immutable evidence: photos first; later voice, screenshots, files, links, text, and other authorized inputs |
+| Cloud PostgreSQL + pgvector | Canonical memory state, temporal history, relationships, corrections, permissions, and retrieval indexes |
+| Desktop SQLite | Rebuildable offline cache and durable pending operations |
+| AI | Interpretation, extraction, retrieval synthesis, and proposals; never canonical truth |
+| Exports/integrations | Portable Markdown/JSON/originals; Obsidian is one optional adapter, not a core dependency |
 
-Mobile and desktop use the same API. Neither receives database-owner credentials or AI provider secrets. Cloud processing remains available while the desktop is off.
+## First useful loop
 
-## Proposed implementation stack
+```text
+Photo -> durable original -> validated interpretation
+      -> searchable memory -> vague question -> grounded answer + original source
+```
 
-- iPhone first: Expo / React Native / TypeScript.
-- Windows first: Tauri 2 / React / TypeScript; SQLite and scoped local export.
-- Shared: design tokens, versioned contracts, generated API types, and synchronization protocol logic. Native and DOM view components are not assumed interchangeable.
-- Backend: FastAPI with one Python domain package, an API process, and a durable worker process.
-- Infrastructure default: managed Supabase Postgres, Auth, and private Storage; provider setup and spend still require owner authorization.
-- AI: one evaluated multimodal model and one embedding model, configurable and pinned during implementation. No model router or autonomous agent framework.
+V1 proves trusted photo/text capture and grounded recall. Voice, screenshots/share sheet, broad document ingestion, active reminders, Claude/MCP, email/calendar, and proactive synthesis follow only after the memory loop is trustworthy.
 
-Exact dependency versions will be selected and locked when real packages are initialized. There are deliberately no fake runnable manifests in this scaffold.
+## Read in this order
 
-## First implementation packet
+1. [Product requirements](docs/PRD.md)
+2. [Architecture](docs/ARCHITECTURE.md)
+3. [Data model](docs/DATA-MODEL.md), [API contract](docs/API-CONTRACT.md), and [AI ingestion](docs/AI-INGESTION.md)
+4. [UX](docs/UX-SPEC.md), [sync/export](docs/SYNC-AND-EXPORT.md), and [security/operations](docs/SECURITY-AND-OPERATIONS.md)
+5. [Acceptance](docs/ACCEPTANCE.md), [roadmap](docs/ROADMAP.md), and [builder handoff](docs/BUILD-HANDOFF.md)
 
-**RCL-001 — trusted capture.** Prove an authenticated phone upload survives retries and restarts, reaches private cloud storage with a verified hash, and appears with the same original in the minimal desktop app. Do not build AI, dashboards, voice, or MCP in this packet.
+## Proposed stack
 
-**RCL-002 — first useful memory.** Add structured transcription and a source-backed answer to complete the product's first useful loop. The pilot is not accepted until the remaining offline, export, correction, security, and restore gates pass.
+- Mobile: Expo / React Native / TypeScript, iPhone first.
+- Desktop: Tauri 2 / React / TypeScript, Windows first.
+- Backend: FastAPI + durable worker.
+- Canonical state: managed PostgreSQL + pgvector.
+- Original evidence: private object storage.
+- Desktop offline state: SQLite.
+- AI: one evaluated multimodal configuration plus embeddings; no model router or autonomous agent framework in V1.
 
-See [BUILD-HANDOFF](docs/BUILD-HANDOFF.md) for the exact first-packet scope.
+The moat is not “send a photo to an LLM.” Recall must become better through trusted identity resolution, temporal history, relationships, provenance, corrections, uncertainty, retrieval, and accumulated personal context.
