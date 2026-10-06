@@ -1,67 +1,77 @@
 # Recall build roadmap
 
-Version: 0.1 | Dependency-ordered packets, not delivery-date promises
+Version: 0.2 | Dependency-ordered, not delivery-date promises
 
-## Foundation — this repository
+## Foundation
 
-Deliver PRD, technical contracts, scope boundaries, folder ownership, synthetic examples, and release criteria. No runtime, deployment, model selection, or live acceptance is claimed.
+Universal product thesis, trust model, contracts, repository boundaries, synthetic examples, and release criteria. Paul is the first design partner, not a domain boundary.
 
 ## RCL-001 — Trusted capture
 
-Objective: Paul can save a photographed page safely and see the same original on his desktop.
+Objective: any pilot user can save a photographed source safely and see the same original on desktop.
 
-Build the minimum mobile and desktop shells, established authentication, workspace/device identity, ordered local drafts, private uploads, server hash verification, idempotent finalization, recent capture listing, and original viewing. Implement only the required capture/auth/storage tables.
+Build minimal mobile/desktop shells, authentication, workspace/device identity, ordered durable drafts, private uploads, server hash verification, idempotent finalization, recent captures, original viewing, and typed text capture if it does not compromise the trusted photo path.
 
-Exit: A01–A05 plus applicable A12 isolation checks pass, including an actual iPhone upload and installed Windows view when distribution credentials/hardware are available. Explicitly separate live gates from mocks. The AI is not involved.
+Exit: capture/retry/isolation tests plus real iPhone -> cloud -> installed Windows original viewing. AI is not required.
 
-## RCL-002 — First useful memory
+## RCL-002 — First useful recall
 
-Objective: one real page becomes one supported answer with its original evidence.
+Objective: one source becomes one supported answer with original evidence.
 
-Add a durable worker, evaluated single multimodal configuration, structured transcription, source memory, schema/semantic validation, keyword retrieval, minimal Ask UI, citation checks, and bounded retry. Select the provider on a development corpus; do not tune against holdout answers.
+Add durable worker, evaluated multimodal configuration, structured interpretation, source memory, validation, keyword retrieval, minimal Ask UI, citation checks, and bounded retry.
 
-Exit: clear-page capture-to-answer works end to end; ambiguous/unreadable/unsupported cases fail safely; A06–A08, A11, A13–A14 pass for implemented scope. This is the first useful alpha, not full pilot acceptance.
+Acceptance includes vague-recall questions, not only exact keyword lookup.
 
-## RCL-003 — Connected and correctable memory
+## RCL-003 — Connected and temporal memory
 
-Objective: multiple businesses and repeated entities remain useful without false certainty.
+Objective: repeated people/things/topics across unrelated domains connect without false certainty, and changing knowledge preserves history.
 
-Add conservative entities/aliases/mentions, claims, revision history, correction precedence, review, and suggested/accepted actions. Expand keyword/entity retrieval and introduce pgvector only against an established evaluation baseline.
+Add universal entities, aliases/mentions, relationships, claims, temporal validity/supersession, correction precedence, review, suggested/accepted actions, and measured pgvector hybrid retrieval.
 
-Exit: A09–A10 and the full live retrieval/critical-field evaluation pass; accepted actions are distinct from suggestions; corrections invalidate stale indexes/answers.
+Exit includes same-name ambiguity, historical-vs-latest queries, correction reprocessing, and cross-domain generalization.
 
 ## RCL-004 — Resilient desktop
 
-Objective: a normal desktop session remains useful through lost connectivity and safe reconnection.
+Objective: normal desktop work remains useful through connectivity loss and reconnection.
 
-Add desktop SQLite cache, downloaded-original inventory, local text search, durable outbox, commit-ordered feed, conflict UX, snapshots, revocation handling, and resumed synchronization. The installed desktop uses the same design language as mobile; no parallel product or new web app.
+Add SQLite cache, downloaded-original inventory, local text search, durable outbox, ordered sync feed, conflict UX, snapshots, revocation handling, and resumed synchronization.
 
-Exit: A15–A17 pass with restart and real network interruptions. No offline generative-Ask claim. Mobile offline scope remains durable capture drafts.
+## RCL-005 — Ownership and portability
 
-## RCL-005 — Ownership and recovery
+Objective: Recall is not a data trap.
 
-Objective: Recall is not a data trap and does not damage the existing Obsidian vault.
+Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tombstones, backup/restore, and optional managed Obsidian adapter with local-edit conflict protection.
 
-Add managed Markdown export, local-edit conflicts, scoped native file access, complete Markdown/JSON/original export, delete/purge flow, controlled-cache tombstones, and database-plus-object backup/restore.
+Obsidian remains optional and must never be required for Recall correctness.
 
-Exit: A18–A21 pass, including a real local edit and an isolated restore with hash verification. Explain offline/export deletion limits.
+## RCL-006 — Private multi-domain pilot
 
-## RCL-006 — Private pilot acceptance
+Objective: prove Recall solves real memory retrieval, not merely Paul's specific note structure.
 
-Objective: prove the app helps Paul in normal work.
+Run the private Paul pilot plus general-domain acceptance fixtures/tasks spanning people, places, education, travel, household/personal logistics, ideas, and professional work. Measure capture burden, vague-recall success, correction burden, trust, latency, and cost.
 
-Finish accessibility, actual signing/install/update route, consent/retention/spend configuration, operational alerts, held-out evaluation, and unassisted onboarding. Record all real-device/provider evidence and run the two-week pilot.
+## V1.5 — Natural Capture
 
-Exit: A22 and all remaining gates pass; owner accepts usability, evidence quality, operational burden, and cost. No public launch is implied.
+Voice, screenshots/share sheet, files, and links through the same source-memory contract. Add adapters individually with privacy and reliability acceptance.
 
-## After V1, in order of demonstrated need
+## V2 — Connected Memory
 
-Voice capture and typed/voice retrieval extensions; broader documents; Claude/MCP; meeting briefs and consented connectors; then measured proactive pattern discovery. Each requires a bounded specification and actual platform capability checks.
+Improve identity resolution, temporal reasoning, relationships, cross-source context, and correction learning. Expand entity projections without adding domain-specific core schemas.
 
-Claude attachment access is a feasibility gate, not an assumed API: prove how the connector receives original image bytes, identifies the user/workspace, and handles approval before advertising "photograph in Claude and save".
+## V3 — Active Memory
 
-Do not build teams, billing, a graph UI, generic agents, inventory, ERP, or a separate vector database before the pilot provides a concrete reason.
+Surface accepted commitments, useful related memories, stale/conflicting information, and clearly labeled cross-memory patterns at appropriate moments.
 
-## Dependencies
+No autonomous external action. Proactivity must be measured for usefulness and annoyance.
 
-Owner authorizes infrastructure/spending, private-data processing, and native distribution. Builder verifies current compatible versions, commits lockfiles when runnable projects exist, and records hardware/provider limitations. The absence of these resources is not permission to mark simulated acceptance as real.
+## V4 — Memory Everywhere
+
+Claude/ChatGPT-style assistant adapters, browser, email/calendar and other authorized connectors, public API/MCP, additional platforms.
+
+Each adapter uses the same authorization, provenance, and memory contracts.
+
+## Explicit non-goals until justified
+
+Teams, billing, generic agents, graph UI, ERP/CRM/CMMS replacement, separate vector/graph database, domain-specific schema forks, or broad autonomous workflows.
+
+The product earns complexity by first proving faithful memory.
