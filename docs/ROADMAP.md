@@ -10,7 +10,7 @@ Universal product thesis, trust model, contracts, repository boundaries, synthet
 
 Objective: any pilot user can save a photographed source safely and see the same original on desktop.
 
-Build minimal mobile/desktop shells, authentication, workspace/device identity, ordered durable drafts, private uploads, server hash verification, idempotent finalization, recent captures, original viewing, and typed text capture if it does not compromise the trusted photo path.
+Build minimal mobile/desktop shells, authentication, workspace/device identity, ordered durable drafts, private uploads, server hash verification, idempotent finalization, recent captures, original viewing.
 
 Exit: capture/retry/isolation tests plus real iPhone -> cloud -> installed Windows original viewing. AI is not required.
 
