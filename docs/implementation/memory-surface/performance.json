@@ -1,0 +1,10 @@
+{
+  "measuredAt": "2026-10-07T16:51:05.118Z",
+  "environment": "Headless system Chromium, 1440×1000, Vite development fixture; local automation, not device or production latency",
+  "frames": 112,
+  "frameP50Ms": 16.700000000000273,
+  "frameP95Ms": 66.70000000000005,
+  "longestFrameMs": 83.29999999999995,
+  "longTaskCount": 1,
+  "longestTaskMs": 53
+}

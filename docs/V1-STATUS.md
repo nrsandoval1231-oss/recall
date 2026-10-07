@@ -4,6 +4,10 @@ This is the implementation ledger for the V1 build from accepted baseline `92b4c
 
 ## What works
 
+### Canonical browser Memory Surface, October 7
+
+The first canonical browser slice implements sparse Home, Ask reconstruction, reversible memory/person focus, verified physical evidence, evidence-backed historical focus, scoped human correction and durable Capture in a warm glass/physical material system. It builds on PR #7 and the accepted browser contracts; PR #6 remains unmerged. Native adapters keep their existing offline/export/delete behavior. Development-only synthetic originals and screenshot evidence are isolated from production builds. See [implementation evidence and open gaps](implementation/memory-surface/README.md); this is not completion of the full canonical vision.
+
 ### Active browser pilot, October 6
 
 The user selected a Cloudflare web app after native email sign-in failures. `apps/web` implements browser email-link callbacks, encrypted server session cookies, durable scoped photo drafts, retry-safe uploads, recent captures, Ask, and hash-verified cited originals. Root verification: 125 client tests passed, including 20 web tests; root lint/typecheck and web production build passed. Actual Wrangler runtime returned 200 for the app/callback with CSP and same-origin resource policy; private unauthenticated routes returned 401/no-store; foreign-origin login POST returned 403; arbitrary proxy routes returned 404. No email was sent by these probes.

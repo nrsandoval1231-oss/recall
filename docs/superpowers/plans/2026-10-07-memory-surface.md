@@ -29,3 +29,7 @@
 - Correction committed during Back: restore composition, invalidate stale answer/data.
 - Hundreds of relationships or very long text: bounded visible context with sequential access, no truncated evidence.
 - HEIC originals: preserve source identity; unsupported browser decoding must have a verified download fallback.
+
+## Execution evidence
+
+Browser slice delivered through all six tasks. See [rendered states, verification and explicit implementation gaps](../../implementation/memory-surface/README.md). Canonical product documents are unchanged. Native migration, full exit choreography, broader source formats, historical entity projection and physical-device/corpus acceptance remain open.
