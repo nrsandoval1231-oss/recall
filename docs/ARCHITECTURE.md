@@ -1,5 +1,14 @@
 # Recall architecture
 
+## V1 implementation update
+
+Migrations 0003–0006 extend the accepted capture/worker architecture. Canonical entities, mentions, relationships, claims and append-only claim revisions remain relational PostgreSQL records. User overrides take precedence when rebuilding interpretations and search projections. Retrieval combines authorized keyword, alias/entity and optional pgvector lanes; configuration/revision/hash checks exclude incompatible or stale vectors.
+
+Desktop Rust owns scoped SQLite, FTS, downloaded-original inventory, outbox and cursor persistence. Provider calls remain outside database transactions. Pilot transactions use a per-workspace advisory lock for coherent mutations/snapshots. Backup takes an exclusive global maintenance gate; API, worker and purge operations take its shared form before accessing mutable state. This intentionally favors consistency over maximum pilot throughput.
+
+See [V1-STATUS](V1-STATUS.md) for verification boundaries; proposed future capabilities below are not all implemented.
+
+
 Version: 0.1 | 2026-10-06 | Proposed implementation baseline
 
 ## 1. Ownership and topology

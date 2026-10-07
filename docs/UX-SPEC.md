@@ -1,5 +1,14 @@
 # Recall V1 experience specification
 
+## V1 implemented product surfaces
+
+Today keeps Ask prominent and capture readily available. Mobile Ask displays answered/ambiguous/insufficient-evidence/unavailable states and opens cited originals through Detail. Desktop provides Ask, Library, Review, Memory with original evidence/history, correction controls, conservative identity confirmation and explicit merge/split preview.
+
+Offline desktop uses cached search and originals available on that device, with an explicit local-search message. Supported corrections/actions are durable before network acknowledgment; conflicts remain visible. Authorization denial clears controlled cache and never falls back to cached originals. Settings exposes portable ZIP export, safe selected-root Markdown export and owner deletion preview/confirmation. Processing states remain tied to actual saved/uploaded/worker state.
+
+Browser/component tests and bundles are distinct from physical iPhone and installed Windows acceptance; both live device gates remain OPEN. See [V1-STATUS](V1-STATUS.md).
+
+
 Version: 0.2 | Behavior requirements, not final visual brand
 
 ## Intent

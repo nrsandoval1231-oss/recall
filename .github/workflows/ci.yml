@@ -6,6 +6,13 @@ on:
 permissions:
   contents: read
 jobs:
+  backend-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f services/backend/Dockerfile -t recall-backend:ci .
+      - name: Import packaged backend as the restricted runtime user
+        run: docker run --rm recall-backend:ci python -c "import recall.api.app; import recall.ingestion.worker; import recall.db.backup"
   backend:
     runs-on: ubuntu-latest
     steps:
@@ -49,7 +56,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev librsvg2-dev libxdo-dev libssl-dev pkg-config
       - run: npm ci
       - working-directory: apps/desktop/src-tauri
-        run: cargo test --lib && cargo check
+        run: cargo test --lib -- --nocapture && cargo check
   windows-native:
     runs-on: windows-latest
     steps:
@@ -58,6 +65,6 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - working-directory: apps/desktop/src-tauri
-        run: cargo test --lib
+        run: cargo test --lib -- --nocapture
       - working-directory: apps/desktop/src-tauri
         run: cargo check

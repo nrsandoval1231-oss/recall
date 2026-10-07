@@ -1,0 +1,35 @@
+# Production-shaped runtime for an owner-provisioned Supabase pilot.
+# API/worker credentials are separate; table-owner credentials never enter these containers.
+services:
+  api:
+    image: recall-backend:local
+    build:
+      context: ..
+      dockerfile: services/backend/Dockerfile
+    env_file: api.env
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      # Two bounded 512 MiB portable exports can coexist; provision host RAM accordingly.
+      - /tmp:size=1152m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  worker:
+    image: recall-backend:local
+    command: [python, -m, recall.ingestion.worker]
+    env_file: worker.env
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]

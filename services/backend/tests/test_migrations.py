@@ -26,6 +26,25 @@ TABLES = [
     "memory_revisions",
     "search_chunks",
     "ai_usage",
+    "entities",
+    "entity_aliases",
+    "mentions",
+    "entity_links",
+    "claims",
+    "claim_revisions",
+    "actions",
+    "memory_overrides",
+    "change_events",
+    "identity_operations",
+]
+
+MIGRATIONS = [
+    "0001_trusted_capture.sql",
+    "0002_first_useful_recall.sql",
+    "0003_trusted_memory_projection.sql",
+    "0004_resilient_sync.sql",
+    "0005_hybrid_retrieval.sql",
+    "0006_portability.sql",
 ]
 
 
@@ -37,14 +56,28 @@ def fresh(pg_cluster: PgCluster) -> tuple[str, str, str]:
 
 def test_empty_database_migrates_and_reruns_as_noop(fresh: tuple[str, str, str]) -> None:
     owner, _, _ = fresh
-    assert migrate(owner) == ["0001_trusted_capture.sql", "0002_first_useful_recall.sql"]
+    assert migrate(owner) == MIGRATIONS
     assert migrate(owner) == []
     assert migrate(owner, check_only=True) == []
     with psycopg.connect(owner) as conn:
-        assert [r[0] for r in conn.execute("select version from schema_migrations order by version").fetchall()] == [
-            "0001_trusted_capture.sql",
-            "0002_first_useful_recall.sql",
-        ]
+        assert [
+            r[0] for r in conn.execute("select version from schema_migrations order by version").fetchall()
+        ] == MIGRATIONS
+
+
+def test_upgrade_from_accepted_rcl002_keeps_existing_original_rows(fresh: tuple[str, str, str], tmp_path: Path) -> None:
+    owner, _, admin = fresh
+    baseline = tmp_path / "baseline"
+    baseline.mkdir()
+    for name in MIGRATIONS[:2]:
+        shutil.copyfile(DEFAULT_DIR / name, baseline / name)
+    assert migrate(owner, baseline) == MIGRATIONS[:2]
+    with psycopg.connect(admin) as conn:
+        ids = _seed(conn)
+        before = conn.execute("select to_jsonb(s) from source_objects s where id=%s", (ids["src"],)).fetchone()
+    assert migrate(owner) == MIGRATIONS[2:]
+    with psycopg.connect(admin) as conn:
+        assert conn.execute("select to_jsonb(s) from source_objects s where id=%s", (ids["src"],)).fetchone() == before
 
 
 def test_check_mode_flags_pending_and_tampered_migrations(fresh: tuple[str, str, str], tmp_path: Path) -> None:
@@ -120,6 +153,7 @@ def test_api_role_least_privilege_check(pg_cluster: PgCluster) -> None:
 
 def _seed(conn: psycopg.Connection) -> dict[str, uuid.UUID]:  # type: ignore[type-arg]
     user, ws, cap, src, dev = (uuid.uuid4() for _ in range(5))
+    conn.execute("select set_config('app.workspace_id', %s, false)", (str(ws),))
     conn.execute("insert into workspaces (id,name,created_by) values (%s,'W',%s)", (ws, user))
     conn.execute("insert into devices (workspace_id,id,user_id,platform) values (%s,%s,%s,'ios')", (ws, dev, user))
     conn.execute(

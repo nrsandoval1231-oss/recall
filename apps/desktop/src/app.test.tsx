@@ -3,10 +3,11 @@ import { webcrypto, createHash } from "node:crypto";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { AiSettings, AskResponse, MemoryDetail, ServerCapture } from "@recall/api-client";
+import { ApiError, type AiSettings, type AskResponse, type MemoryDetail, type ServerCapture } from "@recall/api-client";
+import type { NativeCache } from "./platform/native-cache";
 import { App, type DesktopServices } from "./App";
 import { readConfig } from "./config";
-import { Viewer } from "./components/Viewer";
+import { Viewer, shouldUseLocalSourceFallback } from "./components/Viewer";
 import { Settings } from "./components/Settings";
 
 beforeAll(() => {
@@ -133,6 +134,10 @@ function askResponse(over: Partial<AskResponse>): AskResponse {
 }
 
 describe("RCL-002 desktop", () => {
+  it("never falls back to a cached original after authorization denial", () => {
+    expect(shouldUseLocalSourceFallback(new ApiError("FORBIDDEN", "denied", 403, false, null))).toBe(false);
+    expect(shouldUseLocalSourceFallback(new Error("offline"))).toBe(true);
+  });
   it("shows processing states in the shared words", async () => {
     const items = [
       capture({ capture_id: "a", status: "processing", context_hint: "A", processing: { state: "running", attempts: 1, max_attempts: 3, blocked_reason: null, last_error_code: null, retry_available: false } }),
@@ -182,6 +187,44 @@ describe("RCL-002 desktop", () => {
     expect(screen.getByText(/Suggestions only/)).toBeTruthy();
     expect(screen.getByText(/1 thing\(s\) Recall couldn't confirm/)).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId("integrity").textContent).toMatch(/Verified/)); // original still verified
+  });
+
+  it("establishing cache scope does not cause a refresh loop", async () => {
+    const s = services([capture()]);
+    s.api.me = vi.fn(async () => ({ user_id: "user", active_workspace_id: "workspace", workspaces: [{}] })) as unknown as DesktopServices["api"]["me"];
+    render(<App services={s} />);
+    expect(await screen.findByText("Standup notes")).toBeTruthy();
+    await waitFor(() => expect(s.api.listCaptures).toHaveBeenCalledTimes(1));
+    expect(s.api.me).toHaveBeenCalledTimes(1);
+  });
+
+  it("known revocation clears readable cache and signs out instead of showing offline records", async () => {
+    const s = services([capture()]);
+    const me = vi.fn().mockResolvedValueOnce({ user_id: "user", active_workspace_id: "workspace", workspaces: [{}] })
+      .mockRejectedValue(new ApiError("FORBIDDEN", "No membership", 403, false, null));
+    s.api.me = me;
+    const clear = vi.fn(async () => undefined);
+    const cachedRecords = vi.fn(async () => []);
+    s.cache = { available: true, sync: vi.fn(async () => undefined), push: vi.fn(async () => ({ conflicts: [], applied: 0 })), clear, cachedRecords } as unknown as NativeCache;
+    render(<App services={s} />);
+    expect(await screen.findByText("Standup notes")).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(s.auth.signOut).toHaveBeenCalled());
+    expect(clear).toHaveBeenCalledWith({ user_id: "user", workspace_id: "workspace" }, false);
+    expect(cachedRecords).not.toHaveBeenCalled();
+    expect(screen.queryByText("Standup notes")).toBeNull();
+  });
+
+  it("keeps reported claims visible and offers a guarded correction", async () => {
+    const user = userEvent.setup();
+    const canonical = { ...memory(), claims: [{ claim_id: "e3048aa0-b7fc-4b73-a464-71a8e628005a", memory_id: "mem-1", text: "Ship 3 builds", kind: "observation", epistemic_state: "reported" as const, temporal_text: null, evidence: [], version: 1 }] };
+    const s = services([], undefined, { getMemory: vi.fn(async () => canonical), correctMemory: vi.fn(async () => canonical) });
+    render(<Viewer api={s.api} capture={capture({ memory_id: "mem-1", status: "needs_review" })} onClose={() => undefined} />);
+    expect((await screen.findAllByText("Ship 3 builds")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("reported").length).toBeGreaterThan(0);
+    await user.click(screen.getAllByRole("button", { name: "Correct" })[0]!);
+    await user.click(screen.getByRole("button", { name: "Save correction" }));
+    expect(s.api.correctMemory).toHaveBeenCalledWith("mem-1", expect.objectContaining({ target: "claim", claim_id: "e3048aa0-b7fc-4b73-a464-71a8e628005a" }), expect.stringMatching(/^[a-f0-9-]{36}$/), 1);
   });
 
   it("offers a retry for a failed reading", async () => {

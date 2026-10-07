@@ -1,5 +1,14 @@
 # Developer setup and real-device acceptance (RCL-001)
 
+## V1 deployment, recovery and acceptance
+
+Apply all checksummed migrations with the owner connection; enable pgvector as administrator first. API and worker connections must be least privilege and cannot own tables or bypass RLS. Fill `infra/api.env.example` and `infra/worker.env.example` into ignored private `.env` files. `docker compose -f infra/pilot.compose.yml up --build` runs API and worker against external Supabase. Bind is local-only by default; place HTTPS/authenticated ingress in front of it. No external infrastructure is provisioned by these templates.
+
+For offline acceptance: installed Windows sign-in → sync → open/hash-check original → correct → disconnect → restart → local search/original → supported correction → reconnect → confirm outbox acknowledgment or visible version conflict. Delete on another client and resync; controlled originals must disappear. Export to a disposable selected root, edit a generated Markdown file, re-export and confirm conflict preservation. Run the backup/restore tests and perform a trusted operator restore into fresh staging before using recovery in production.
+
+Linux and Windows CI run native Rust tests; local Windows builds require MSVC/SDK and WebView2. Tests create real isolated PostgreSQL clusters; Windows requires PostgreSQL binaries on PATH. pgvector-specific tests skip honestly where unavailable and must pass in Linux CI. See [V1-STATUS](V1-STATUS.md) for current recorded evidence.
+
+
 Instructions only. Product scope lives in [PRD](PRD.md); evidence lives in [ACCEPTANCE](ACCEPTANCE.md) ("RCL-001 evidence").
 
 ## Prerequisites

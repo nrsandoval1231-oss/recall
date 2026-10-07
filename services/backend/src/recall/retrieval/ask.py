@@ -49,6 +49,11 @@ UNVERIFIED = "The answer could not be verified against your sources, so here are
 def build_packet(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
     packet = []
     for i, hit in enumerate(hits[:PACKET_SIZE], start=1):
+        history_fields: dict[str, Any] = {
+            key: hit[key]
+            for key in ("recorded_at", "valid_from", "valid_to", "supersedes_claim_id", "history_status")
+            if key in hit
+        }
         packet.append(
             {
                 "citation_id": f"c{i}",
@@ -57,13 +62,14 @@ def build_packet(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "captured_at": hit["captured_at"][:10],
                 "epistemic_state": hit["epistemic_state"],
                 "text": hit["text"][:EXCERPT_CHARS],
+                **history_fields,
             }
         )
     return packet
 
 
 def _citation(hit: dict[str, Any], citation_id: str) -> dict[str, Any]:
-    return {
+    citation = {
         "citation_id": citation_id,
         "memory_id": hit["memory_id"],
         "memory_revision": hit["memory_revision"],
@@ -75,6 +81,10 @@ def _citation(hit: dict[str, Any], citation_id: str) -> dict[str, Any]:
         "epistemic_state": hit["epistemic_state"],
         "kind": hit["kind"],
     }
+    for key in ("recorded_at", "valid_from", "valid_to", "supersedes_claim_id", "history_status"):
+        if key in hit:
+            citation[key] = hit[key]
+    return citation
 
 
 def sources_of(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:

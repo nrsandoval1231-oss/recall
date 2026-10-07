@@ -1,5 +1,16 @@
 # Canonical data model
 
+## V1 implemented schema
+
+0003 adds `entities`, `entity_aliases`, evidence-keyed `mentions`, `entity_links`, `claims`, append-only `claim_revisions`, `actions`, `memory_overrides`, and `identity_operations`. Kinds are person, organization, place, thing, event, project and topic. Name matching creates candidates, never accepted identity. Explicit merge/split records actor and moved mention IDs.
+
+Canonical claim identity hashes the source evidence, normalized kind/predicate and subject/object mention evidence keys. Model-local IDs and generated prose are not identity. Two distinct predicates can share a quote without sharing a correction. Duplicate structural identities are ambiguous: processing requires review and excludes their canonical claim/search/relationship projection rather than silently collapsing them. This conservative rule lacks finer handwritten span coordinates and can withhold otherwise useful same-line claims.
+
+0004 adds workspace sync clocks/floors and identifier-only `change_events`; deleted resource identifiers hydrate as tombstones. 0005 adds explicit workspace retrieval configuration, durable embedding budget reservations and optional pgvector rows bound to text hashes, memory revisions, dimensions and model/config versions. 0006 adds durable object purge jobs and memory suppression markers. Deleting interpreted memory preserves originals while suppressing future automatic interpretation; full capture deletion removes both semantic state and source mappings and queues byte purge.
+
+Source bytes and historical user/model revisions are not overwritten by corrections. See [V1-STATUS](V1-STATUS.md) for remaining limits.
+
+
 Version: 0.4 | Logical schema. RCL-001 and RCL-002 tables are implemented in `services/backend/migrations/` (0001, 0002); everything else is still logical
 
 ## Design goal

@@ -29,3 +29,10 @@ button:disabled { opacity: .4; cursor: default; }
 .sources { list-style: none; padding: 0; display: grid; gap: 6px; }
 .memory h4 { margin: 16px 0 4px; } .transcription { white-space: pre-wrap; font-family: inherit; background: var(--surface); padding: 10px; border-radius: 8px; max-height: 40vh; overflow: auto; }
 .settings { max-width: 640px; } .switch { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-size: 17px; }
+.library, .review { max-width: 900px; margin: 0 auto; padding: 24px; }
+.library header, .review header { display: flex; gap: 16px; align-items: center; } .library header h1, .review header h1 { flex: 1; }
+.library-filters { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0; } .library-filters label { display: grid; gap: 5px; color: var(--muted); }
+.library-filters input, .library-filters select, .correction textarea { min-height: 44px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.entity-detail, .review-card { margin-top: 18px; padding: 16px; background: var(--surface); border-radius: 12px; } .review-card { display: grid; gap: 10px; }
+.review-card button, .memory button { margin-left: 8px; } .correction { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.correction textarea { width: 100%; min-height: 84px; margin: 8px 0; }

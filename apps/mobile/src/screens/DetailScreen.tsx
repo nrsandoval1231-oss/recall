@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import * as Crypto from "expo-crypto";
@@ -23,6 +23,8 @@ export function DetailScreen({ services, row, onBack, initialSourceId }: { servi
   const [index, setIndex] = useState(0);
   const [verify, setVerify] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ claimId?: string; text: string } | null>(null);
+  const [correctionNote, setCorrectionNote] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -53,10 +55,14 @@ export function DetailScreen({ services, row, onBack, initialSourceId }: { servi
       setRetryNote("Couldn't queue a retry right now.");
     }
   };
-  const pageReading = memory?.interpretation.pages.find((p) => p.page_id === current?.sourceId);
-  const unclear = memory?.interpretation.statements.filter((s) => s.epistemic_state !== "reported" && s.evidence.some((e) => e.page_id === current?.sourceId)) ?? [];
-
   const current = pages[index] as PageView | undefined;
+  const pageReading = memory?.interpretation.pages.find((p) => p.page_id === current?.sourceId);
+  const claims = memory?.claims ?? memory?.interpretation.statements.map((s) => ({ claim_id: s.local_id, text: s.text, epistemic_state: s.epistemic_state, temporal_text: s.temporal_text })) ?? [];
+  const saveCorrection = async () => {
+    if (!editing || !row.memoryId) return;
+    try { await services.api.correctMemory(row.memoryId, { target: "claim", claim_id: editing.claimId, text: editing.text }, `correction-${row.memoryId}-${memory?.revision ?? 0}`, memory?.revision ?? 0); setEditing(null); setCorrectionNote("Correction saved; the original remains available."); }
+    catch { setCorrectionNote("This memory changed elsewhere. Reload before correcting again."); }
+  };
 
   /** Download the cloud original and compare its SHA-256 with the stored value. */
   const verifyCloud = async () => {
@@ -108,7 +114,9 @@ export function DetailScreen({ services, row, onBack, initialSourceId }: { servi
           {memory.interpretation.summary && <Text style={text.body}>{memory.interpretation.summary}</Text>}
           <Text style={[text.muted, { marginTop: space.sm }]}>{memory.labels.transcription}</Text>
           {pageReading && <Text style={[text.body, { marginTop: space.xs }]} selectable>{pageReading.transcription || "(nothing readable)"}</Text>}
-          {unclear.map((s) => <Text key={s.local_id} style={[text.muted, { marginTop: space.xs }]}>? {s.text} ({s.epistemic_state})</Text>)}
+          {claims.filter((s) => { const evidence = (s as { evidence?: { page_id: string }[] }).evidence; return !evidence || evidence.some((e) => e.page_id === current?.sourceId); }).map((s) => <View key={s.claim_id} style={{ marginTop: space.xs }}><Text style={text.muted}>{s.text} ({s.epistemic_state || "reported"}){s.temporal_text ? ` · ${s.temporal_text}` : ""}</Text>{row.memoryId && <Button kind="secondary" label="Correct" onPress={() => setEditing({ claimId: s.claim_id, text: s.text })} />}</View>)}
+          {editing && <View style={{ marginTop: space.sm }}><TextInput value={editing.text} onChangeText={(textValue) => setEditing({ ...editing, text: textValue })} multiline style={styles.editor} accessibilityLabel="Correction text" /><Button label="Save correction" onPress={() => void saveCorrection()} /><Button kind="secondary" label="Cancel" onPress={() => setEditing(null)} /></View>}
+          {correctionNote && <Text style={[text.muted, { marginTop: space.xs }]} accessibilityLiveRegion="polite">{correctionNote}</Text>}
           {memory.validation_notes.length > 0 && <Text style={[text.muted, { marginTop: space.xs }]}>{memory.validation_notes.length} thing(s) Recall couldn't confirm against the page.</Text>}
         </View>
       )}
@@ -119,4 +127,5 @@ export function DetailScreen({ services, row, onBack, initialSourceId }: { servi
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.paper, paddingHorizontal: space.md },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  editor: { minHeight: 88, borderWidth: 1, borderColor: color.border, borderRadius: 8, padding: space.sm, color: color.ink, marginBottom: space.sm },
 });

@@ -14,6 +14,20 @@ import type {
   Me,
   ServerCapture,
   UploadAuthorization,
+  Action,
+  ActionStatus,
+  CorrectionInput,
+  EntityDetail,
+  EntityKind,
+  EntitySummary,
+  IdentityPreview,
+  IdentityResult,
+  SyncChanges,
+  SyncSnapshot,
+  SyncOperation,
+  SyncPushResult,
+  WorkspaceDeletionPreview,
+  DeletionResult,
 } from "./types";
 
 export interface ClientOptions {
@@ -159,8 +173,84 @@ export class RecallApiClient {
     return this.json("GET", `/v1/search?${new URLSearchParams({ q, limit: String(limit) }).toString()}`);
   }
 
-  ask(question: string): Promise<AskResponse> {
-    return this.json("POST", "/v1/ask", { json: { question } });
+  async deleteCapture(captureId: string, idempotencyKey: string, expectedVersion: number): Promise<void> {
+    await this.send("DELETE", `/v1/captures/${captureId}`, { headers: { "Idempotency-Key": idempotencyKey, "If-Match": String(expectedVersion) } });
+  }
+
+  deleteMemory(memoryId: string, idempotencyKey: string, expectedVersion: number): Promise<DeletionResult> {
+    return this.json("DELETE", `/v1/memories/${memoryId}`, { headers: { "Idempotency-Key": idempotencyKey, "If-Match": String(expectedVersion) } });
+  }
+
+  deleteSource(sourceId: string, idempotencyKey: string, expectedVersion: number): Promise<DeletionResult> {
+    return this.json("DELETE", `/v1/sources/${sourceId}`, { headers: { "Idempotency-Key": idempotencyKey, "If-Match": String(expectedVersion) } });
+  }
+
+  workspaceDeletionPreview(): Promise<WorkspaceDeletionPreview> { return this.json("GET", "/v1/workspace/deletion-preview"); }
+  deleteWorkspaceData(idempotencyKey: string, expectedVersion: string): Promise<DeletionResult> {
+    return this.json("DELETE", "/v1/workspace/data", { headers: { "Idempotency-Key": idempotencyKey, "If-Match": expectedVersion } });
+  }
+
+  listEntities(params: { q?: string; kind?: EntityKind; limit?: number } = {}): Promise<{ items: EntitySummary[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params.q) query.set("q", params.q);
+    if (params.kind) query.set("kind", params.kind);
+    if (params.limit) query.set("limit", String(params.limit));
+    const qs = query.toString();
+    return this.json("GET", `/v1/entities${qs ? `?${qs}` : ""}`);
+  }
+
+  getEntity(entityId: string): Promise<EntityDetail> {
+    return this.json("GET", `/v1/entities/${entityId}`);
+  }
+
+  createEntity(entity: { kind: EntityKind; canonical_name: string; aliases?: string[] }, idempotencyKey: string): Promise<EntityDetail> {
+    return this.json("POST", "/v1/entities", { json: entity, headers: { "Idempotency-Key": idempotencyKey } });
+  }
+
+  identityPreview(sourceId: string, targetId: string): Promise<IdentityPreview> {
+    return this.json("GET", `/v1/entities/${sourceId}/identity-preview/${targetId}`);
+  }
+
+  applyIdentity(sourceId: string, targetId: string, body: { source_version: number; target_version: number; mention_ids: string[] }, idempotencyKey: string): Promise<IdentityResult> {
+    return this.json("POST", `/v1/entities/${sourceId}/identity/${targetId}`, { json: body, headers: { "Idempotency-Key": idempotencyKey } });
+  }
+
+  exportZip(): Promise<ArrayBuffer> {
+    return this.send("POST", "/v1/exports").then((response) => response.arrayBuffer());
+  }
+
+  correctMemory(memoryId: string, correction: CorrectionInput, idempotencyKey: string, expectedVersion: number): Promise<MemoryDetail> {
+    return this.json("POST", `/v1/memories/${memoryId}/corrections`, { json: correction, headers: { "Idempotency-Key": idempotencyKey, "If-Match": String(expectedVersion) } });
+  }
+
+  listActions(params: { status?: ActionStatus; limit?: number } = {}): Promise<{ items: Action[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", String(params.limit));
+    const qs = query.toString();
+    return this.json("GET", `/v1/actions${qs ? `?${qs}` : ""}`);
+  }
+
+  updateAction(actionId: string, update: { status?: ActionStatus; text?: string }, idempotencyKey: string, expectedVersion: number): Promise<Action> {
+    return this.json("PATCH", `/v1/actions/${actionId}`, { json: update, headers: { "Idempotency-Key": idempotencyKey, "If-Match": String(expectedVersion) } });
+  }
+
+  syncChanges(cursor?: string | null, limit = 100): Promise<SyncChanges> {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (cursor) query.set("cursor", cursor);
+    return this.json("GET", `/v1/sync/changes?${query.toString()}`);
+  }
+
+  syncSnapshot(): Promise<SyncSnapshot> {
+    return this.json("POST", "/v1/sync/snapshots", { json: {} });
+  }
+
+  syncPush(operations: SyncOperation[]): Promise<{ results: SyncPushResult[] }> {
+    return this.json("POST", "/v1/sync/push", { json: { operations } });
+  }
+
+  ask(question: string, options: { as_of?: string } = {}): Promise<AskResponse> {
+    return this.json("POST", "/v1/ask", { json: { question, ...(options.as_of ? { as_of: options.as_of } : {}) } });
   }
 
   sourceRequest(sourceId: string): { url: string } {

@@ -1,6 +1,17 @@
 # Memory API — V1 contract
 
-Version: 0.3 | RCL-001 and RCL-002 routes are implemented (see the implementation-details sections at the end); later routes remain proposed
+## V1 implemented routes (supersede older packet limitations)
+
+All routes remain `/v1` and derive the workspace from verified membership. Entity list/detail/create and `GET /entities/{source}/identity-preview/{target}` / `POST /entities/{source}/identity/{target}` support explicit merge or selected-mention split, expected source/target versions and idempotency keys.
+
+`POST /memories/{id}/corrections` requires `If-Match` current memory revision and an idempotency key. Targets: summary, transcription, claim, mention_identity and relationship. Claim validity/status may be corrected without replacing text. Memory views include canonical claims, current mentions, entities, relationships and revision history. `POST /ask` accepts bounded entity IDs and explicit RFC 3339 `as_of`; historical evidence uses the selected historical revision.
+
+`POST /sync/snapshots`, `GET /sync/changes?cursor=&limit=` and `POST /sync/push` implement bounded recovery and workspace-bound opaque cursors. Push supports only `memory.correction` and `action.update`, with UUID operation keys and expected versions; results distinguish applied, already_applied, conflict, rejected and retryable_failure.
+
+`POST /exports` returns an authenticated deterministic ZIP containing canonical history, Markdown and verified originals. Snapshot metadata records the sync clock/state change instant; unavailable originals are explicit. `DELETE /captures/{id}`, `/memories/{id}` and `/sources/{id}` require expected versions/idempotency. Source deletion uses its capture version. Partial page deletion from an interpreted capture is refused to preserve corrections; delete the full capture instead. `GET /workspace/deletion-preview` then `DELETE /workspace/data` supports owner-confirmed erasure with the preview sync version. Byte purge is asynchronous and retryable; database visibility is removed atomically first.
+
+
+Version: 1.0 | The V1 implementation above supersedes historical packet limitations below; unsupported routes remain explicitly marked.
 
 ## Common contract
 
@@ -155,8 +166,8 @@ These are the exact, tested semantics of the packet-001 routes. Where they refin
 
 **`POST /v1/captures/{id}/retry-processing`** (requires `Idempotency-Key`, recorded as operation family `capture.retry_processing`: a replay with the same key returns the capture's current processing view even after the retried job has finished; the same key for a different capture is 409 `IDEMPOTENCY_CONFLICT`): re-queues a `failed` job (at most 3 manual retries) or a cancelled one (`retry_available` is true for both); returns the current `processing` view; 409 `NOT_RETRYABLE` / `AI_NOT_CONFIGURED` otherwise.
 
-**`GET /v1/memories`**, **`GET /v1/memories/{id}`**: current revision with `interpretation` (summary, pages[].transcription keyed by `page_id` = `source_id`, mentions, statements with `epistemic_state`, action *suggestions*, uncertainties), `validation_notes`, `model_id`, `processor_version`, and display `labels` ("Machine reading…", "Suggestions only…"). No write routes exist yet (corrections are RCL-003).
+**`GET /v1/memories`**, **`GET /v1/memories/{id}`**: current revision with `interpretation` (summary, pages[].transcription keyed by `page_id` = `source_id`, mentions, statements with `epistemic_state`, action *suggestions*, uncertainties), `validation_notes`, `model_id`, `processor_version`, and display `labels` ("Machine reading…", "Suggestions only…"). Versioned write routes are listed in the V1 section above.
 
-**`GET /v1/search?q=`**: Postgres full-text (`english`) over eligible chunks of current revisions; the question's lexemes are OR-ed and ranked (`ts_rank_cd`), so vague recollections match on shared words. A summary or statement supported by several pages is indexed once per supporting page, so a citation always opens a page that actually supports it. Results carry `memory_id`, `capture_id`, `source_id`, `page`, `kind` (`transcription|statement|summary|context`), `epistemic_state`, `excerpt`. No vectors yet.
+**`GET /v1/search?q=`**: Postgres full-text (`english`) over eligible chunks of current revisions; the question's lexemes are OR-ed and ranked (`ts_rank_cd`), so vague recollections match on shared words. A summary or statement supported by several pages is indexed once per supporting page, so a citation always opens a page that actually supports it. Results carry `memory_id`, `capture_id`, `source_id`, `page`, `kind` (`transcription|statement|summary|context`), `epistemic_state`, `excerpt`. Optional versioned vectors are listed in the V1 section above.
 
 **`POST /v1/ask`** `{"question"}` (`conversation_id`, `entity_ids`, `as_of` must be null/empty in RCL-002, else 422). The server retrieves; with no matches it returns `insufficient_evidence` (`reason: NO_EVIDENCE`) **without a model call**. Otherwise it sends at most 8 excerpts as a packet with server citation ids `c1…`; the model must return sentences each citing ≥1 packet id. Any unknown id, empty answer, or schema failure → `insufficient_evidence` (`reason: ANSWER_UNVERIFIED`) with no answer text. AI off / consent missing / budget reached / provider down → `unavailable` with `reason` (`AI_NOT_CONFIGURED`, `CONSENT_REQUIRED`, `BUDGET_EXHAUSTED`, provider code) and `mode: sources_only`. Every response includes `sources` (matching excerpts with `source_id`/`page`) so the original is always one step away; `citations` are server-resolved from the packet, never from model text. Entailment (does the cited text really support the sentence?) is not checked at runtime; it is an evaluation metric.

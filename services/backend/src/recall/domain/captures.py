@@ -290,7 +290,10 @@ class CaptureService:
 
     @staticmethod
     def _load_view(tx: Tx, capture_id: uuid.UUID) -> dict[str, Any]:
-        row = tx.one("select * from captures where workspace_id=%s and id=%s", (tx.workspace_id, capture_id))
+        row = tx.one(
+            "select * from captures where workspace_id=%s and id=%s and deleted_at is null",
+            (tx.workspace_id, capture_id),
+        )  # noqa: E501
         if row is None:
             raise not_found("Capture not found.")
         pages = tx.all(
@@ -315,7 +318,8 @@ class CaptureService:
                 clause = "and (created_at, id) < (%s, %s)"
                 params += [created_at, last_id]
             rows = tx.all(
-                f"select * from captures where workspace_id=%s {clause} order by created_at desc, id desc limit %s",  # noqa: S608 - clause is a constant
+                f"select * from captures where workspace_id=%s and deleted_at is null {clause} "  # noqa: S608 - clause is a constant
+                "order by created_at desc, id desc limit %s",
                 (*params, limit + 1),
             )
             more = len(rows) > limit
@@ -575,7 +579,7 @@ class CaptureService:
             row = tx.one(
                 "select s.*, c.status as capture_status from source_objects s "
                 "join captures c on c.workspace_id = s.workspace_id and c.id = s.capture_id "
-                "where s.workspace_id=%s and s.id=%s",
+                "where s.workspace_id=%s and s.id=%s and c.deleted_at is null",
                 (tx.workspace_id, source_id),
             )
             if row is None:

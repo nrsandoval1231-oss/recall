@@ -35,7 +35,7 @@ def _token(user: uuid.UUID) -> str:
 
 
 def test_phone_to_cloud_to_desktop_bytes_are_identical(pg_cluster: PgCluster, tmp_path: Path) -> None:
-    tsx = REPO_ROOT / "node_modules/.bin/tsx"
+    tsx = REPO_ROOT / "node_modules/tsx/dist/cli.mjs"
     if not tsx.exists() or not shutil.which("node"):
         pytest.skip("run `npm install` at the repo root to enable the TypeScript e2e")
     _, app_dsn = make_database(pg_cluster)
@@ -77,7 +77,7 @@ def test_phone_to_cloud_to_desktop_bytes_are_identical(pg_cluster: PgCluster, tm
         else:
             pytest.fail("server did not start")
         out = subprocess.run(
-            [str(tsx), "tests/e2e/rcl001.e2e.ts"],
+            ["node", str(tsx), "tests/e2e/rcl001.e2e.ts"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -117,7 +117,7 @@ def test_rcl002_phone_upload_worker_reading_and_desktop_ask(pg_cluster: PgCluste
     from recall.ingestion.worker import Worker
     from recall.storage.local import LocalObjectStore
 
-    tsx = REPO_ROOT / "node_modules/.bin/tsx"
+    tsx = REPO_ROOT / "node_modules/tsx/dist/cli.mjs"
     if not tsx.exists() or not shutil.which("node"):
         pytest.skip("run `npm install` at the repo root to enable the TypeScript e2e")
     owner_dsn, app_dsn = make_database(pg_cluster)
@@ -155,7 +155,7 @@ def test_rcl002_phone_upload_worker_reading_and_desktop_ask(pg_cluster: PgCluste
 
     def node(phase: str) -> dict:
         out = subprocess.run(
-            [str(tsx), "tests/e2e/rcl002.e2e.ts"],
+            ["node", str(tsx), "tests/e2e/rcl002.e2e.ts"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

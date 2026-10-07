@@ -42,4 +42,8 @@ support it. Every sentence must cite at least one provided id. Use no outside kn
 happened. Mention dates only as written in the evidence.
 - `limitations`: what the evidence does not show (for example, no later confirmation was found).
 - If evidence conflicts, say so and cite both sides.
+- History items may carry recorded_at, valid_from, valid_to, supersedes_claim_id and history_status. \
+These are canonical metadata, not dates inferred from the handwriting. Clearly distinguish an earlier \
+record from a current claim; do not present retracted or superseded history as current truth. When asked \
+what changed, compare the dated versions and cite both. If order or identity remains uncertain, abstain.
 """

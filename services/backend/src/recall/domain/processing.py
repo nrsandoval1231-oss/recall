@@ -31,10 +31,14 @@ def enqueue_capture(tx: Tx, settings: Settings, capture_id: uuid.UUID) -> bool:
     if not settings.ai_configured or not consent_active(tx, settings):
         return False
     cap = tx.one(
-        "select id, status, context_hint, timezone from captures where workspace_id=%s and id=%s",
+        "select id, status, context_hint, timezone from captures where workspace_id=%s and id=%s and deleted_at is null",  # noqa: E501
         (tx.workspace_id, capture_id),
     )
     if cap is None or cap["status"] != "stored":
+        return False
+    if tx.one(
+        "select 1 as ok from memory_suppressions where workspace_id=%s and capture_id=%s", (tx.workspace_id, capture_id)
+    ):  # noqa: E501
         return False
     pages = tx.all(
         "select ordinal, server_sha256 from source_objects where workspace_id=%s and capture_id=%s",
@@ -56,7 +60,14 @@ def enqueue_capture(tx: Tx, settings: Settings, capture_id: uuid.UUID) -> bool:
 
 
 def spend(tx: Tx) -> tuple[float, float]:
-    row = tx.one("select day_usd, month_usd from recall_ai_spend()")
+    row = tx.one(
+        """
+        select usage.day_usd + coalesce(reserved.day_usd, 0) as day_usd,
+               usage.month_usd + coalesce(reserved.month_usd, 0) as month_usd
+          from recall_ai_spend() usage
+          cross join recall_embedding_reserved_spend() reserved
+        """
+    )
     assert row is not None
     return float(row["day_usd"]), float(row["month_usd"])
 
@@ -87,5 +98,6 @@ def processing_view(job: Row | None) -> dict[str, Any] | None:
         "max_attempts": job["max_attempts"],
         "blocked_reason": job["blocked_reason"],
         "last_error_code": job["last_error_code"],
-        "retry_available": (job["status"] == "failed" and job["manual_retries"] < 3) or job["status"] == "cancelled",
+        "retry_available": job["last_error_code"] != "MEMORY_DELETED"
+        and ((job["status"] == "failed" and job["manual_retries"] < 3) or job["status"] == "cancelled"),
     }

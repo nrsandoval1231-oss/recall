@@ -12,9 +12,22 @@ from pathlib import Path
 from . import CHUNK, ObjectInfo, ObjectNotFound, StoredObjectConflict, hash_stream
 
 
+def _resolved(path: Path) -> Path:
+    resolved = str(path.resolve())
+    # Windows resolution can return the extended path form while another
+    # writer creates the parent. Normalize its equivalent spelling before
+    # checking containment; do not bypass the resolved-root check.
+    if os.name == "nt":
+        if resolved.startswith("\\\\?\\UNC\\"):
+            resolved = "\\\\" + resolved[8:]
+        elif resolved.startswith("\\\\?\\"):
+            resolved = resolved[4:]
+    return Path(resolved)
+
+
 class LocalObjectStore:
     def __init__(self, root: Path) -> None:
-        self.root = root.resolve()
+        self.root = _resolved(root)
         self.root.mkdir(parents=True, exist_ok=True)
         with contextlib.suppress(OSError):
             self.root.chmod(0o700)
@@ -23,7 +36,7 @@ class LocalObjectStore:
         # Keys are server-generated, but still refuse anything that could escape the root.
         if key.startswith("/") or ".." in key.split("/") or "\\" in key or "\x00" in key:
             raise ValueError("invalid storage key")
-        path = (self.root / key).resolve()
+        path = _resolved(self.root / key)
         if self.root not in path.parents:
             raise ValueError("invalid storage key")
         return path
@@ -45,11 +58,15 @@ class LocalObjectStore:
                 if existing == sha256:
                     return False
                 raise StoredObjectConflict(key) from None
-            dir_fd = os.open(final.parent, os.O_RDONLY)
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
+            # Python's Windows CRT cannot open directory handles for fsync. The
+            # bytes are flushed above and the hard-link publication is atomic;
+            # directory durability across power loss is only promised on POSIX.
+            if os.name != "nt":
+                dir_fd = os.open(final.parent, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
             return True
         finally:
             tmp.unlink(missing_ok=True)
@@ -85,3 +102,6 @@ class LocalObjectStore:
     def check_ready(self) -> None:
         if not self.root.is_dir():
             raise RuntimeError("local object store directory missing")
+
+    def delete(self, key: str) -> None:
+        self._path(key).unlink(missing_ok=True)

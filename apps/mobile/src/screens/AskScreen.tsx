@@ -5,6 +5,7 @@ import { color, copy, minTarget, radius, space } from "@recall/design-tokens";
 import type { AskResponse, Citation } from "@recall/api-client";
 import type { Services } from "../services";
 import { Button, text } from "../ui/kit";
+import { askWithPolicy } from "../askviewmodel";
 
 /** Ask what you remember. answered / ambiguous / insufficient_evidence / unavailable each look different. */
 export function AskScreen({ services, initial, onBack, onOpen }: { services: Services; initial: string; onBack: () => void; onOpen: (c: Citation) => void }) {
@@ -18,9 +19,9 @@ export function AskScreen({ services, initial, onBack, onOpen }: { services: Ser
     setBusy(true);
     setError(null);
     try {
-      setResult(await services.api.ask(question.trim()));
-    } catch {
-      setError("Couldn't reach Recall to answer. Your captures are unaffected.");
+      const outcome = await askWithPolicy(services.api, question);
+      if (outcome.response) setResult(outcome.response);
+      if (outcome.error) setError(outcome.error);
     } finally {
       setBusy(false);
     }

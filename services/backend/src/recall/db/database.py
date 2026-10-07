@@ -59,6 +59,7 @@ class Database:
         Raises LookupError when the user has no workspace and `provision` is False.
         """
         with self.pool.connection() as conn, conn.transaction():
+            conn.execute("select pg_advisory_xact_lock_shared(7402006)")
             conn.execute(
                 "select set_config('app.user_id', %s, true), set_config('app.workspace_id', '', true)",
                 (str(user_id),),
@@ -75,6 +76,9 @@ class Database:
             else:
                 workspace_id = row["workspace_id"]
             conn.execute("select set_config('app.workspace_id', %s, true)", (str(workspace_id),))
+            # Pilot mutations and consistent cache snapshots use the same
+            # workspace lock as the worker. Network/provider I/O stays outside.
+            conn.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"sync:{workspace_id}",))
             yield Tx(conn=conn, user_id=user_id, workspace_id=workspace_id)
 
     def assert_least_privilege(self) -> None:
