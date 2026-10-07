@@ -1,134 +1,257 @@
-# Recall V1 experience specification
+# Recall — Canonical Experience & Visual System
 
-## V1 implemented product surfaces
+Version: 1.0 | Date: 2026-10-07 | Status: **approved canonical product direction**
 
-Today keeps Ask prominent and capture readily available. Mobile Ask displays answered/ambiguous/insufficient-evidence/unavailable states and opens cited originals through Detail. Desktop provides Ask, Library, Review, Memory with original evidence/history, correction controls, conservative identity confirmation and explicit merge/split preview.
+This document defines the target Recall experience. It supersedes conventional dashboard/page-navigation interpretations of the earlier UX baseline while preserving Recall's trust, provenance, accessibility, and universal-memory requirements.
 
-Offline desktop uses cached search and originals available on that device, with an explicit local-search message. Supported corrections/actions are durable before network acknowledgment; conflicts remain visible. Authorization denial clears controlled cache and never falls back to cached originals. Settings exposes portable ZIP export, safe selected-root Markdown export and owner deletion preview/confirmation. Processing states remain tied to actual saved/uploaded/worker state.
+## 1. North-star experience
 
-Browser/component tests and bundles are distinct from physical iPhone and installed Windows acceptance; both live device gates remain OPEN. See [V1-STATUS](V1-STATUS.md).
+**Your life remembers itself.**
 
+Recall should not feel like a notes app, database, CRM, file manager, knowledge graph, or chatbot with storage attached. It should feel like a quiet external memory: capture disappears into the background; asking brings the right understanding and original evidence back into view.
 
-Version: 0.2 | Behavior requirements, not final visual brand
+The primary experience is one continuously transforming **Memory Surface**.
 
-## Intent
+```text
+CAPTURE -> UNDERSTAND -> CONNECT -> REMEMBER -> RECALL -> ACT
+```
 
-Build one recognizable memory product across iPhone and Windows. Mobile prioritizes effortless capture and recall; desktop adds context, comparison, drag/drop, review, and exploration.
+These are not six modules. They are six states of the same environment.
 
-The interface must not expose the complexity of the memory model. Users should not feel that they are maintaining a database, CRM, folder tree, graph, or taxonomy.
+The user should feel that they focus on something and Recall rearranges memory around that intent.
 
-## Core promise in the UI
+## 2. Canonical design language
 
-**Ask what you remember. Capture what you don't want to lose.**
+Recall's visual materials have semantic meaning:
 
-The dominant interaction is a natural-language Ask field plus simple Capture.
+- **Glass = understanding.** Summaries, interpretations, entities, relationships, timelines, reconstructed context, and controls live on translucent glass.
+- **Physical artifacts = evidence.** Notebook pages, photographs, screenshots, emails, PDFs, receipts, documents, and other originals retain their source character.
+- **Light = intelligence.** Restrained illumination communicates active context, relationships, new information, uncertainty, and attention.
+- **Space = relationships.** Proximity and composition communicate what belongs together without forcing the user to maintain links.
+- **Depth = context and focus.** Focused material moves toward the user; supporting context recedes but remains perceptible.
+- **Time = memory evolution.** Recall must make “what I knew then” distinct from “what I know now.”
 
-## Navigation
+The signature composition is **original evidence beneath a translucent interpretation layer**: evidence underneath; understanding above it.
 
-Five primary surfaces: Today, Capture, Memory detail/Review, Ask, Library. Settings/onboarding are utilities.
+Glass is not decoration. If removing translucency, depth, or evidence layering leaves the same generic dashboard, the design has failed.
 
-Domain-specific concepts are views/filters, not separate apps. One user may care about projects and equipment; another about classes and people; another about travel and places.
+## 3. The Memory Surface
 
-## Today
+Recall is not organized around routes that expose the data model. The application may use routes internally, but the perceived interaction is one spatial surface.
 
-Show:
-- dominant “What are you trying to remember?” Ask entry;
-- Capture;
-- recent memories;
-- accepted actions/commitments when present;
-- targeted clarification items.
+The surface has five rendering layers:
 
-Do not manufacture a daily brief, urgency, or activity. Empty state should invite the first capture without asking the user to design an organization system.
+1. **Environment** — warm, quiet atmosphere with restrained depth; never a distracting 3D scene.
+2. **Glass workspace** — translucent semantic boards with hierarchy, refraction/blur, edge response, shadow, and controlled Z-depth.
+3. **Evidence** — source artifacts presented materially and legibly, never demoted to generic attachment icons.
+4. **Intelligence** — subtle relationship/attention/confidence cues; never neon “AI” spectacle.
+5. **Interaction** — Ask, Capture, focus, back, correction, and action remain familiar and accessible.
 
-## Capture
+Implementation should begin DOM/CSS-first. GPU/WebGL effects are justified only where they materially improve the spatial illusion without harming performance, accessibility, or maintainability.
 
-V1: camera/photo import. Typed text is deferred to V1.5 so RCL-001 has one complete, tested source contract.
+## 4. Interaction grammar
 
-Photo flow: request camera permission at need; ordered pages; retake/remove; optional one-line context; Save. Never require a title, folder, tags, entity, project, or note type.
+The canonical verbs are deliberately small:
 
-Saving acknowledges durable local persistence before cloud/AI processing. Explicit states distinguish local save, upload, processing, ready, and needs review.
+- **Ask -> reconstruct.** Relevant memories assemble around the question.
+- **Capture -> remember.** Save first; organizational work is automatic.
+- **Focus -> approach.** Selected content moves forward in depth.
+- **Inspect -> reveal evidence.** Interpretation yields to its original source.
+- **Explore -> reorganize.** Selecting a person/place/project/topic changes the center of gravity rather than opening a database record.
+- **Back -> restore context.** The previous spatial arrangement returns.
+- **Correct -> update understanding.** Original evidence remains immutable; correction and history remain traceable.
+- **Act -> use memory.** Accepted next actions emerge from recalled context without becoming obligations automatically.
 
-Future capture adapters—voice, screenshots/share sheet, files, links, email/calendar—must feed the same source-memory boundary rather than inventing separate organizational systems.
+Motion rule: **nothing merely pops open when depth can communicate the transition. Memory moves through depth.**
 
-## Memory detail / Review
+Normal controls remain conventional: click/tap to focus, scroll to explore, Back to return, Ask to reconstruct, Capture to remember. No free-flight camera, mandatory rotation, or spatial-navigation gimmicks.
 
-Show the interpreted memory with its original source one action away; desktop may show both side by side.
+Reduced-motion mode must preserve the same hierarchy through opacity/layout changes without animated depth.
 
-Expose:
-- capture/source time and separately known event time;
-- summary/transcription;
-- linked/unresolved entities;
-- observations/claims and their uncertainty;
-- ideas/decisions/preferences when supported;
-- accepted/suggested actions;
-- temporal supersession/history;
-- corrections and provenance.
+## 5. Canonical desktop journey
 
-Review asks one small question at a time: “Which Sam?”, “Is this 650 or 850?”, “Is this the same place?” Always allow Not sure/defer.
+The first production-quality vertical slice is:
 
-## Ask
+```text
+Home
+  -> Ask “What do you know about Brooks Campus?”
+  -> Brooks Campus reconstruction assembles
+  -> focus a memory
+  -> original notebook evidence rises forward
+  -> focus a person
+  -> workspace reorganizes around that person
+  -> move through historical/current state
+  -> correct an interpretation
+  -> Back restores Brooks Campus context
+```
 
-Ask accepts human recollection, not query syntax.
+This is a synthetic design fixture, not customer/project evidence.
 
-Examples:
-- “Who was that guy Sarah introduced me to last summer who did solar?”
-- “What did my professor say about mitochondrial DNA?”
-- “What was the restaurant someone recommended in Florence?”
-- “What did we originally expect?”
-- “What is the latest number?”
+### Home
 
-Answers show grounded text, evidence cards, source date/page, uncertainty/conflicts, and limitations. Every material factual claim makes support discoverable.
+Home is intentionally sparse. Ask is the gravitational center. Capture and recent context are secondary. Avoid a dense dashboard.
 
-If multiple candidates fit, Ask clarifies or presents candidates instead of confidently choosing. If evidence is absent, it says so.
+Permanent navigation should be minimal: **Recall / Ask / Capture / Recent** or an equivalently small set. People, Places, Projects, Equipment, Topics, and Timeline emerge contextually instead of becoming organizational chores.
 
-Historical versus latest intent must affect retrieval. “What did we originally think?” must not silently return only the current state.
+### Ask / reconstruction
 
-Offline desktop replaces fresh synthesis with clearly labeled downloaded-memory search. Cached old answers are never masqueraded as newly generated answers.
+An answer is not merely prose. Recall reconstructs the relevant memory context:
 
-## Library
+- concise grounded answer;
+- supporting evidence;
+- relevant people/places/projects/things/topics;
+- temporal context;
+- uncertainty/conflict when material;
+- source access.
 
-Library is optional exploration, not required organization.
+Supporting boards may sit behind or beside the focused answer. They are contextual views over canonical memory, not independent mini-apps.
 
-Search/browse:
-- memories;
-- people;
-- organizations;
-- places;
-- things;
-- events;
-- projects;
-- topics.
+### Focus and evidence
 
-The system may create contextual views from these primitives. A maintenance asset history, student course context, trip view, or customer history is a projection of universal memory.
+Selecting a memory moves it toward the user. Opening evidence causes the interpretation layer to become visually subordinate while the original source moves forward.
 
-## Desktop-specific value
+The user must be able to answer two questions immediately:
 
-Desktop adds:
-- larger evidence/review layouts;
-- drag/drop capture;
-- richer Library exploration;
-- offline cache/search;
-- export/integration settings;
-- optional Open in Obsidian for users who enable that adapter.
+1. What does Recall currently understand?
+2. Why does Recall believe that?
 
-Desktop and mobile share terminology, states, and design tokens without forcing identical component implementations.
+### Entity/context focus
 
-## Settings/onboarding
+Selecting a person, place, project, thing, event, or topic recenters the surface around that concept. Do not default to a literal node-link graph. Relationships should emerge through composition, grouping, depth, and contextual boards. Explicit graph visualization is optional future tooling, not the core metaphor.
 
-Minimum controls:
-- account/workspace;
-- capture permissions;
-- AI processing explanation/consent;
-- source/cache retention;
-- device sync status;
-- export/delete;
-- optional integrations such as Obsidian;
-- sign out.
+### Temporal focus
 
-Do not make Obsidian setup part of standard onboarding. It is an optional advanced integration.
+Time is first-class. A user can distinguish current understanding from historical state and, where evidence supports it, move to an earlier point to inspect what Recall knew then. The UI must never imply historical certainty the data model does not support.
 
-## Accessibility
+### Correction
 
-Keyboard navigation on desktop, visible focus, screen-reader labels, scalable text, adequate contrast, non-color status indicators, large capture targets, reduced-motion support.
+Correction should operate on human statements, not raw metadata. The user selects questionable understanding, states the correction, sees the affected scope, and confirms. Original evidence and prior interpretations remain available according to the canonical correction/history model.
 
-Hands-free driving interaction is not V1 and must not be implied by marketing until separately designed and validated.
+## 6. Mobile adaptation
+
+Mobile is not desktop shrunk down.
+
+**Mobile = Remember + Recall.**
+
+- Camera/capture and Ask dominate.
+- Present one primary glass board at a time.
+- Related context may peek behind the focused board like a physical stack.
+- Evidence remains one gesture away.
+- Deep comparison/exploration can simplify into sequential focus states.
+- No required title, folder, tag, entity selection, transcript approval, or taxonomy maintenance for normal capture.
+
+Desktop is the richer **Think + Explore** surface. Both share the same materials, language, states, provenance, and interaction grammar.
+
+## 7. Capture
+
+Capture must be almost frictionless:
+
+1. photograph/import;
+2. durable Save;
+3. optional context hint;
+4. leave.
+
+Normal capture requires no title, folder, tags, project, entity, or note type. AI processing happens after durable source preservation. Honest local/upload/processing/ready/review/error states remain required.
+
+Do not turn the capture confirmation screen into an organization form.
+
+## 8. Visual character
+
+Recall should feel:
+
+**quiet · human · permanent · trustworthy · cinematic · warm**
+
+Preferred qualities:
+- warm ivory/charcoal tonal system;
+- excellent editorial typography;
+- translucent material with readable contrast;
+- restrained blur/refraction and edge light;
+- source photography/paper texture allowed to feel physical;
+- generous negative space;
+- slow, purposeful spatial transitions;
+- subtle environmental depth.
+
+Avoid:
+- generic SaaS dashboard grids;
+- neon AI gradients;
+- glowing sci-fi orbs;
+- excessive glass on every surface;
+- tiny floating-card constellations;
+- gratuitous 3D;
+- permanent taxonomy sidebars;
+- chat bubbles as the dominant memory representation;
+- fake certainty/confidence theater.
+
+## 9. Glass-board rules
+
+A board exists because it represents a coherent piece of understanding, not because the layout needs another card.
+
+Hierarchy:
+- one primary focused board;
+- a small number of supporting contextual boards;
+- evidence artifacts beneath/behind the interpretation;
+- peripheral material fades/recedes before it competes with focus.
+
+Glass must maintain accessibility: sufficient contrast, legible type, visible focus states, keyboard traversal, scalable text, and non-color-only status. Decorative blur must degrade gracefully.
+
+Pointer-responsive highlights/parallax may reinforce materiality on desktop, but interaction cannot depend on them.
+
+## 10. Trust is visible
+
+The visual system must reinforce the existing trust model:
+
+- originals remain recognizable as originals;
+- interpretation is visibly separate from evidence;
+- corrections do not overwrite source artifacts;
+- uncertainty/conflict is understandable without exposing internal model machinery;
+- material answer claims lead to support;
+- unsupported questions abstain honestly;
+- historical and current state are visually distinguishable.
+
+Recall should feel intelligent because it can show its memory, not because it performs AI theatrics.
+
+## 11. Implementation principle
+
+Do not hard-code the canonical Brooks Campus mockup as a special screen.
+
+Build reusable primitives driven by Recall's actual memory model, for example:
+
+- `MemorySurface`
+- `GlassBoard`
+- `FocusBoard`
+- `EvidenceArtifact`
+- `Reconstruction`
+- `ContextBoard`
+- `TimelineBoard`
+- `AskSurface`
+- `CaptureSurface`
+- `CorrectionSurface`
+- `DepthTransition`
+
+Names are illustrative, not mandated architecture. Reuse existing components/contracts where they already express these responsibilities.
+
+The first implementation should prove the vertical slice before creating a large component library or broad redesign.
+
+## 12. Acceptance bar for the design
+
+The canonical experience is successful when:
+
+- a new user can Ask or Capture without learning Recall's schema;
+- Ask feels like reconstruction, not a search-results page;
+- evidence is visually and interactively inseparable from trustworthy recall;
+- selecting context feels like refocusing the same memory environment rather than navigating an admin application;
+- historical/current state is understandable;
+- the experience remains usable with reduced motion and assistive technology;
+- mobile preserves the same mental model with one focused board at a time;
+- the UI works with real canonical data and honest empty/loading/error/uncertain states;
+- screenshots are visually distinctive enough that Recall cannot be mistaken for a generic notes or AI-chat application.
+
+## 13. Canonical phrase
+
+The product loop remains:
+
+**CAPTURE · UNDERSTAND · CONNECT · REMEMBER · RECALL · ACT**
+
+The experience-level rule beneath it is:
+
+> **Evidence underneath. Understanding above it. Memory moves through depth.**
