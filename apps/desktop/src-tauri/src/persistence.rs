@@ -26,6 +26,12 @@ const MAX_SNAPSHOT_RECORDS: usize = 5_000;
 const MAX_PAYLOAD_BYTES: usize = 2 * 1024 * 1024;
 const MAX_CURSOR_BYTES: usize = 4 * 1024;
 const MAX_QUERY_BYTES: usize = 8 * 1024;
+const MAX_CACHE_RECORDS: i64 = 10_000;
+const MAX_CACHE_PAYLOAD_BYTES: i64 = 32 * 1024 * 1024;
+const MAX_SOURCE_RECORDS: i64 = 5_000;
+const MAX_SOURCE_TOTAL_BYTES: i64 = 512 * 1024 * 1024;
+const MAX_OUTBOX_RECORDS: i64 = 1_000;
+const MAX_OUTBOX_PAYLOAD_BYTES: i64 = 32 * 1024 * 1024;
 
 const SCHEMA: &str = r#"
 PRAGMA foreign_keys = ON;
@@ -127,6 +133,8 @@ pub enum StoreError {
     SourceTooLarge,
     #[error("sync payload exceeds local limit")]
     PayloadTooLarge,
+    #[error("local cache limit exceeded: {0}")]
+    CacheLimit(&'static str),
     #[error("unsafe local source path")]
     UnsafePath,
     #[error("filesystem: {0}")]
@@ -248,6 +256,67 @@ impl NativeStore {
         Ok(payload)
     }
 
+    fn enforce_record_limits(tx: &Transaction<'_>, scope: &Scope) -> Result<(), StoreError> {
+        let (count, bytes): (i64, i64) = tx.query_row(
+            "SELECT count(*),coalesce(sum(length(CAST(payload AS BLOB))),0) FROM records WHERE workspace_id=? AND user_id=?",
+            params![scope.workspace_id, scope.user_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if count > MAX_CACHE_RECORDS {
+            return Err(StoreError::CacheLimit("too many cached records"));
+        }
+        if bytes > MAX_CACHE_PAYLOAD_BYTES {
+            return Err(StoreError::CacheLimit(
+                "cached record payloads exceed 32 MiB",
+            ));
+        }
+        Ok(())
+    }
+
+    fn enforce_outbox_limits(tx: &Transaction<'_>, scope: &Scope) -> Result<(), StoreError> {
+        let (count, bytes): (i64, i64) = tx.query_row(
+            "SELECT count(*),coalesce(sum(length(CAST(payload AS BLOB))),0) FROM outbox WHERE workspace_id=? AND user_id=?",
+            params![scope.workspace_id, scope.user_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if count > MAX_OUTBOX_RECORDS {
+            return Err(StoreError::CacheLimit(
+                "outbox contains more than 1000 commands",
+            ));
+        }
+        if bytes > MAX_OUTBOX_PAYLOAD_BYTES {
+            return Err(StoreError::CacheLimit("outbox payloads exceed 32 MiB"));
+        }
+        Ok(())
+    }
+
+    fn enforce_source_limits(
+        tx: &Transaction<'_>,
+        scope: &Scope,
+        source_id: &str,
+        byte_size: i64,
+    ) -> Result<(), StoreError> {
+        let (count, bytes, prior): (i64, i64, i64) = tx.query_row(
+            "SELECT count(*),coalesce(sum(byte_size),0),coalesce(max(CASE WHEN source_id=? THEN byte_size END),-1) FROM sources WHERE workspace_id=? AND user_id=?",
+            params![source_id, scope.workspace_id, scope.user_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        let projected_count = count + if prior < 0 { 1 } else { 0 };
+        let projected_bytes = bytes
+            .checked_sub(prior.max(0))
+            .and_then(|value| value.checked_add(byte_size))
+            .ok_or(StoreError::CacheLimit(
+                "downloaded source inventory size overflow",
+            ))?;
+        if projected_count > MAX_SOURCE_RECORDS {
+            return Err(StoreError::CacheLimit("too many downloaded sources"));
+        }
+        if projected_bytes > MAX_SOURCE_TOTAL_BYTES {
+            return Err(StoreError::CacheLimit("downloaded sources exceed 512 MiB"));
+        }
+        Ok(())
+    }
+
     fn cursor_ok(cursor: &str) -> Result<(), StoreError> {
         if cursor.len() > MAX_CURSOR_BYTES {
             return Err(StoreError::PayloadTooLarge);
@@ -342,6 +411,7 @@ impl NativeStore {
                 params![scope.workspace_id, scope.user_id, source_id],
             )?;
         }
+        Self::enforce_record_limits(&tx, scope)?;
         tx.execute("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![Self::cursor_key(scope),cursor])?;
         Self::remember_scope(&tx, scope)?;
         // Purge controlled bytes before committing the cursor. If removal is
@@ -424,6 +494,7 @@ impl NativeStore {
                 tx.execute("INSERT INTO local_search(workspace_id,user_id,record_kind,record_id,text) VALUES(?,?,?,?,?)", params![scope.workspace_id,scope.user_id,event.kind,event.record_id,event.payload.to_string()])?;
             }
         }
+        Self::enforce_record_limits(&tx, scope)?;
         tx.execute("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![Self::cursor_key(scope),snapshot.cursor])?;
         Self::remember_scope(&tx, scope)?;
         // A failed purge must not publish a snapshot cursor that makes the
@@ -616,6 +687,7 @@ impl NativeStore {
             return Ok(());
         }
         tx.execute("INSERT INTO outbox(workspace_id,user_id,operation_id,target_id,expected_version,payload,created_at,kind,state) VALUES(?,?,?,?,?,?,?,?, 'pending')", params![scope.workspace_id,scope.user_id,command.operation_id,command.target_id,command.expected_version,payload,command.created_at,command.kind])?;
+        Self::enforce_outbox_limits(&tx, scope)?;
         Self::remember_scope(&tx, scope)?;
         tx.commit()?;
         Ok(())
@@ -891,6 +963,9 @@ impl NativeStore {
             return Err(StoreError::HashMismatch);
         }
         let _files = self.files.lock().unwrap();
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        Self::enforce_source_limits(&tx, scope, source_id, bytes.len() as i64)?;
         let scope_root = self
             .scope_root(scope, true)?
             .ok_or(StoreError::UnsafePath)?;
@@ -923,8 +998,6 @@ impl NativeStore {
             fs::rename(&temp, &final_path)?;
         }
         let path = final_path.to_string_lossy().to_string();
-        let mut conn = self.conn.lock().unwrap();
-        let tx = conn.transaction()?;
         tx.execute("INSERT INTO sources(workspace_id,user_id,source_id,sha256,byte_size,path,verified) VALUES(?,?,?,?,?,?,1) ON CONFLICT(workspace_id,user_id,source_id) DO UPDATE SET sha256=excluded.sha256,byte_size=excluded.byte_size,path=excluded.path,verified=1",params![scope.workspace_id,scope.user_id,source_id,got,bytes.len() as i64,path])?;
         Self::remember_scope(&tx, scope)?;
         tx.commit()?;
@@ -978,7 +1051,7 @@ impl NativeStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
     const USER_ID: &str = "11111111-1111-4111-8111-111111111111";
     const WORKSPACE_ID: &str = "22222222-2222-4222-8222-222222222222";
@@ -1045,6 +1118,10 @@ mod tests {
             NativeStore::open(base.join("cache.sqlite3"), base.join("sources")).unwrap(),
             base,
         )
+    }
+
+    fn synthetic_uuid(index: u128) -> String {
+        Uuid::from_u128(index + 1).hyphenated().to_string()
     }
 
     #[test]
@@ -1331,5 +1408,209 @@ mod tests {
         assert!(!Path::new(&inventory.path).exists());
         drop(s);
         fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn record_limit_overflow_rolls_back_page_cursor_and_preserves_outbox() {
+        let s = NativeStore::memory().unwrap();
+        s.enqueue(&scope(), &command()).unwrap();
+        s.apply_page(&scope(), &[], "cursor-before-limit".into())
+            .unwrap();
+        {
+            let mut conn = s.conn.lock().unwrap();
+            let tx = conn.transaction().unwrap();
+            {
+                let mut insert = tx.prepare("INSERT INTO records(workspace_id,user_id,kind,id,version,sequence,payload,deleted) VALUES(?,?,'memory',?,1,0,'{}',0)").unwrap();
+                for index in 0..MAX_CACHE_RECORDS {
+                    insert
+                        .execute(params![
+                            WORKSPACE_ID,
+                            USER_ID,
+                            synthetic_uuid(index as u128)
+                        ])
+                        .unwrap();
+                }
+            }
+            tx.commit().unwrap();
+        }
+        let overflow_id = synthetic_uuid((MAX_CACHE_RECORDS + 1) as u128);
+        assert!(matches!(
+            s.apply_page(
+                &scope(),
+                &[event(&overflow_id, 1, 1, "overflow")],
+                "cursor-after-limit".into()
+            ),
+            Err(StoreError::CacheLimit("too many cached records"))
+        ));
+        assert_eq!(s.cursor(&scope()).unwrap(), "cursor-before-limit");
+        assert_eq!(s.outbox(&scope()).unwrap().len(), 1);
+        assert!(s
+            .get_record(&scope(), "memory", &overflow_id)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn snapshot_payload_limit_rolls_back_cursor_and_preserves_outbox() {
+        let s = NativeStore::memory().unwrap();
+        s.enqueue(&scope(), &command()).unwrap();
+        s.apply_page(&scope(), &[], "cursor-before-payload-limit".into())
+            .unwrap();
+        let large = "x".repeat(MAX_PAYLOAD_BYTES - 1024);
+        let records = (0..17)
+            .map(|index| event(&synthetic_uuid(index), 0, 1, &large))
+            .collect();
+        assert!(matches!(
+            s.replace_snapshot(
+                &scope(),
+                &Snapshot {
+                    cursor: "cursor-after-payload-limit".into(),
+                    records,
+                }
+            ),
+            Err(StoreError::CacheLimit(
+                "cached record payloads exceed 32 MiB"
+            ))
+        ));
+        assert_eq!(s.cursor(&scope()).unwrap(), "cursor-before-payload-limit");
+        assert_eq!(s.outbox(&scope()).unwrap().len(), 1);
+        assert!(s.records(&scope(), None, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn outbox_limit_rejects_new_command_without_evicting_pending_rows() {
+        let s = NativeStore::memory().unwrap();
+        {
+            let mut conn = s.conn.lock().unwrap();
+            let tx = conn.transaction().unwrap();
+            {
+                let mut insert = tx.prepare("INSERT INTO outbox(workspace_id,user_id,operation_id,kind,target_id,expected_version,payload,created_at,state) VALUES(?,? ,?,'action.update',?,1,'{}','2026-10-06T12:00:00Z','pending')").unwrap();
+                for index in 0..MAX_OUTBOX_RECORDS {
+                    insert
+                        .execute(params![
+                            WORKSPACE_ID,
+                            USER_ID,
+                            synthetic_uuid(index as u128),
+                            MEMORY_ID
+                        ])
+                        .unwrap();
+                }
+            }
+            tx.commit().unwrap();
+        }
+        assert!(matches!(
+            s.enqueue(&scope(), &command()),
+            Err(StoreError::CacheLimit(
+                "outbox contains more than 1000 commands"
+            ))
+        ));
+        let conn = s.conn.lock().unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM outbox WHERE workspace_id=? AND user_id=? AND state='pending'",
+                params![WORKSPACE_ID, USER_ID],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, MAX_OUTBOX_RECORDS);
+    }
+
+    #[test]
+    fn source_total_limit_rejects_before_creating_inventory_or_bytes() {
+        let (s, base) = temp_store("source-total-limit");
+        {
+            let conn = s.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO sources(workspace_id,user_id,source_id,sha256,byte_size,path,verified) VALUES(?,?,?,?,?,?,1)",
+                params![
+                    WORKSPACE_ID,
+                    USER_ID,
+                    synthetic_uuid(9000),
+                    "0".repeat(64),
+                    MAX_SOURCE_TOTAL_BYTES,
+                    "synthetic-limit-fixture"
+                ],
+            )
+            .unwrap();
+        }
+        let digest = hex::encode(Sha256::digest(b"bytes"));
+        assert!(matches!(
+            s.store_source(&scope(), SOURCE_ID, &digest, b"bytes"),
+            Err(StoreError::CacheLimit("downloaded sources exceed 512 MiB"))
+        ));
+        assert!(s.get_source(&scope(), SOURCE_ID).unwrap().is_none());
+        assert!(!base.join("sources").join(USER_ID).exists());
+        drop(s);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn source_inventory_limit_rejects_before_creating_an_extra_file() {
+        let (s, base) = temp_store("source-inventory-limit");
+        {
+            let mut conn = s.conn.lock().unwrap();
+            let tx = conn.transaction().unwrap();
+            {
+                let mut insert = tx.prepare("INSERT INTO sources(workspace_id,user_id,source_id,sha256,byte_size,path,verified) VALUES(?,?,?,'0000000000000000000000000000000000000000000000000000000000000000',0,'synthetic-count-fixture',1)").unwrap();
+                for index in 0..MAX_SOURCE_RECORDS {
+                    insert
+                        .execute(params![
+                            WORKSPACE_ID,
+                            USER_ID,
+                            synthetic_uuid(index as u128)
+                        ])
+                        .unwrap();
+                }
+            }
+            tx.commit().unwrap();
+        }
+        let digest = hex::encode(Sha256::digest(b"bytes"));
+        assert!(matches!(
+            s.store_source(&scope(), SOURCE_ID, &digest, b"bytes"),
+            Err(StoreError::CacheLimit("too many downloaded sources"))
+        ));
+        assert!(s.get_source(&scope(), SOURCE_ID).unwrap().is_none());
+        assert!(!base.join("sources").join(USER_ID).exists());
+        drop(s);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn fts_latency_metric_for_one_thousand_synthetic_records() {
+        let s = NativeStore::memory().unwrap();
+        let records = (0..1000)
+            .map(|index| {
+                event(
+                    &synthetic_uuid(index),
+                    0,
+                    1,
+                    if index == 777 {
+                        "unique_search_needle"
+                    } else {
+                        "ordinary synthetic memory"
+                    },
+                )
+            })
+            .collect();
+        let load_started = Instant::now();
+        s.replace_snapshot(
+            &scope(),
+            &Snapshot {
+                cursor: "cursor-1000".into(),
+                records,
+            },
+        )
+        .unwrap();
+        let load_elapsed = load_started.elapsed();
+        let search_started = Instant::now();
+        let hits = s.search(&scope(), "unique_search_needle", 10).unwrap();
+        let search_elapsed = search_started.elapsed();
+        eprintln!(
+            "metric native_cache_load_1000_ms={} native_fts_search_1000_us={}",
+            load_elapsed.as_millis(),
+            search_elapsed.as_micros()
+        );
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].record_id, synthetic_uuid(777));
     }
 }
