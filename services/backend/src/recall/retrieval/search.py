@@ -30,8 +30,19 @@ def search(tx: Tx, text: str, limit: int) -> list[dict[str, Any]]:
         from q, search_chunks c
         join memories m on m.workspace_id = c.workspace_id and m.id = c.memory_id
         join captures cap on cap.workspace_id = m.workspace_id and cap.id = m.capture_id
+        left join claims cl on cl.workspace_id=c.workspace_id and cl.id=c.claim_id
+        left join claim_revisions cr on cr.workspace_id=cl.workspace_id and cr.claim_id=cl.id
+          and cr.version=cl.current_version
         where c.workspace_id = %s and c.eligible and c.revision = m.current_revision
           and q.query <> ''::tsquery and c.tsv @@ q.query
+          and (c.claim_id is null or (cr.epistemic_state not in ('retracted','superseded')
+               and (cr.valid_from is null or cr.valid_from <= now())
+               and (cr.valid_to is null or cr.valid_to >= now())))
+          and not (c.kind in ('transcription','summary') and c.source_id is not null and exists (
+            select 1 from claim_revisions u
+             where u.workspace_id=c.workspace_id and u.memory_id=c.memory_id and u.origin='user'
+               and u.evidence @> jsonb_build_array(jsonb_build_object('page_id', c.source_id::text))
+          ))
         order by rank desc, cap.captured_at desc, c.id
         limit %s
         """,

@@ -78,3 +78,8 @@ class SupabaseObjectStore:
 
     def check_ready(self) -> None:
         self._client.get(f"/bucket/{quote(self.bucket)}").raise_for_status()
+
+    def delete(self, key: str) -> None:
+        response = self._client.delete(self._object_path(key))
+        if response.status_code not in (200, 204, 404):
+            response.raise_for_status()

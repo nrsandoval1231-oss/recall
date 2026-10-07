@@ -159,7 +159,114 @@ export interface MemoryDetail extends MemorySummary {
   };
   validation_notes: { code: string; detail: string }[];
   labels: { transcription: string; action_suggestions: string };
+  /** RCL-003 additions are optional while older server revisions remain readable. */
+  entities?: EntitySummary[];
+  mentions?: { mention_id: string; text: string; kind: string; entity_id: string | null; resolution: "accepted" | "rejected" | "unresolved"; evidence: Evidence[]; version: number }[];
+  claims?: Claim[];
+  actions?: Action[];
+  relationships?: Relationship[];
+  history?: MemoryHistory[];
 }
+export interface WorkspaceDeletionPreview { workspace_id: string; version: string; captures: number; originals: number; memories: number }
+export interface DeletionResult { id: string; deleted: boolean; replayed: boolean }
+
+export type EntityKind = "person" | "organization" | "place" | "thing" | "event" | "project" | "topic";
+
+export interface EntitySummary {
+  entity_id: string;
+  kind: EntityKind;
+  name: string;
+  canonical_name?: string;
+  aliases?: string[];
+  mention_count?: number;
+  memory_count?: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntityDetail extends EntitySummary {
+  mentions?: { mention_id: string; memory_id: string; raw_text: string; status?: "candidate" | "accepted" | "rejected" | "unresolved"; evidence: Evidence[] }[];
+  timeline?: { claim_id: string; memory_id: string; text: string; epistemic_state: EpistemicState; origin: string; recorded_at: string; valid_from: string | null; valid_to: string | null }[];
+  memories?: MemorySummary[];
+  relationships?: Relationship[];
+}
+export interface IdentityPreview { source_entity_id: string; target_entity_id: string; accepted_mentions: number }
+export interface IdentityResult { operation_id: string; operation: "merge" | "split"; moved_mentions: number; replayed: boolean }
+
+export interface Claim {
+  claim_id: string;
+  memory_id: string;
+  text: string;
+  kind: string;
+  epistemic_state: EpistemicState;
+  temporal_text: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  supersedes_claim_id?: string | null;
+  evidence: Evidence[];
+  version: number;
+}
+
+export interface Relationship {
+  from_name?: string;
+  to_name?: string;
+  relationship_id: string;
+  from_entity_id: string;
+  to_entity_id: string;
+  type: string;
+  status: "candidate" | "accepted" | "rejected";
+  version?: number;
+  evidence?: Evidence[];
+}
+
+/** `open` is the server's persisted accepted state; the UI presents it as accepted. */
+export type ActionStatus = "suggested" | "open" | "accepted" | "done" | "cancelled";
+export interface Action {
+  action_id: string;
+  memory_id: string;
+  kind: "action" | "commitment";
+  text: string;
+  due_text: string | null;
+  status: ActionStatus;
+  version: number;
+  evidence: Evidence[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MemoryHistory {
+  revision: number;
+  origin: "model" | "user";
+  summary: string | null;
+  changed_at: string;
+  reason: string | null;
+}
+
+export interface CorrectionInput {
+  target: "summary" | "transcription" | "claim" | "mention_identity" | "relationship";
+  claim_id?: string;
+  page_id?: string;
+  mention_id?: string;
+  entity_id?: string;
+  from_entity_id?: string;
+  to_entity_id?: string;
+  relation_type?: string;
+  supersedes_claim_id?: string | null;
+  text?: string;
+  epistemic_state?: EpistemicState;
+  resolution?: "accepted" | "rejected";
+  valid_from?: string | null;
+  valid_to?: string | null;
+  reason?: string;
+}
+
+export interface SyncRecord { kind: string; id: string; version: number; data: unknown; deleted?: boolean; }
+export interface SyncChange extends SyncRecord { sequence: number; }
+export interface SyncChanges { events: SyncChange[]; next_cursor: string | null; has_more: boolean; }
+export interface SyncSnapshot { workspace_id: string; cursor: string; records: SyncRecord[]; sources?: { source_id: string; sha256: string; byte_size: number }[]; }
+export interface SyncOperation { operation_id: string; kind: "memory.correction" | "action.update"; target_id: string; expected_version: number; payload: unknown; }
+export interface SyncPushResult { operation_id: string; status: "applied" | "already_applied" | "conflict" | "rejected" | "retryable_failure"; version?: number; data?: unknown; message?: string; }
 
 export interface Citation {
   citation_id: string;
@@ -202,4 +309,5 @@ export interface AskResponse {
   reason: string | null;
   index_as_of: string | null;
   mode: "online_grounded" | "sources_only";
+  temporal_mode?: "current" | "original" | "previous" | "changed" | "history" | "before" | "after" | "all";
 }

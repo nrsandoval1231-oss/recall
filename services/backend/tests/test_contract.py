@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 from conftest import REPO_ROOT, Env, manifest_for, synthetic_image
@@ -84,3 +85,45 @@ def test_cors_is_closed_by_default_and_explicit_when_configured(env: Env) -> Non
             signing_secret="s" * 32,
             cors_allow_origins=["*"],
         )
+
+
+def test_cors_origins_accept_comma_separated_environment(monkeypatch) -> None:
+    from recall.config import Settings
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://recall@example.test/recall")
+    monkeypatch.setenv("RECALL_AUTH_ISSUER", "https://issuer.example.test")
+    monkeypatch.setenv("RECALL_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
+    monkeypatch.setenv("RECALL_SIGNING_SECRET", "s" * 32)
+    monkeypatch.setenv("RECALL_CORS_ORIGINS", "http://tauri.localhost, https://tauri.localhost")
+
+    settings = Settings()
+
+    assert settings.cors_allow_origins == ["http://tauri.localhost", "https://tauri.localhost"]
+
+
+def test_cors_origins_accept_json_array_environment(monkeypatch) -> None:
+    from recall.config import Settings
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://recall@example.test/recall")
+    monkeypatch.setenv("RECALL_AUTH_ISSUER", "https://issuer.example.test")
+    monkeypatch.setenv("RECALL_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
+    monkeypatch.setenv("RECALL_SIGNING_SECRET", "s" * 32)
+    monkeypatch.setenv("RECALL_CORS_ORIGINS", '["http://tauri.localhost", "https://tauri.localhost"]')
+
+    settings = Settings()
+
+    assert settings.cors_allow_origins == ["http://tauri.localhost", "https://tauri.localhost"]
+
+
+@pytest.mark.parametrize("origins", ["*", '["*"]'])
+def test_cors_wildcard_is_rejected_from_environment(monkeypatch, origins: str) -> None:
+    from recall.config import Settings
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://recall@example.test/recall")
+    monkeypatch.setenv("RECALL_AUTH_ISSUER", "https://issuer.example.test")
+    monkeypatch.setenv("RECALL_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
+    monkeypatch.setenv("RECALL_SIGNING_SECRET", "s" * 32)
+    monkeypatch.setenv("RECALL_CORS_ORIGINS", origins)
+
+    with pytest.raises(ValueError, match="explicit origins"):
+        Settings()

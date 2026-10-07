@@ -1,6 +1,6 @@
 # Recall acceptance and evaluation
 
-Version: 0.2 | Test specification; no application tests have run yet
+Version: 0.3 | Automated evidence and OPEN live gates
 
 ## Evidence standard
 
@@ -178,3 +178,7 @@ A flaky E2E also exposed a real defect during this packet: summary chunks cited 
 ### Known limitations
 
 Keyword-only retrieval (no embeddings); one revision per memory (no reprocessing or corrections yet); no entity linking, review queue, or temporal supersession (RCL-003); Ask is single-turn; no runtime entailment check; no lease heartbeat (a call longer than the lease can be reclaimed and repeated — billed twice, never committed twice); HEIC decoding for derivatives relies on `pillow-heif`; usage cost is an estimate from configured prices.
+
+## V1 build evidence
+
+See [V1 implementation and acceptance ledger](V1-STATUS.md) for exact automated evidence, requirement statuses, limitations and live gates. PR checks supersede intermediate local counts. No simulated test closes physical-device or live-provider acceptance.

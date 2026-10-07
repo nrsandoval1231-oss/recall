@@ -2,6 +2,8 @@
 
 Version: 0.2 | Dependency-ordered, not delivery-date promises
 
+The active pilot path is the Cloudflare browser adapter: iPhone browser photo capture and Windows browser retrieval. Native clients remain preserved. Browser implementation/local verification is recorded in V1-STATUS; deployment and real signed-in cross-device acceptance remain open.
+
 ## Foundation
 
 Universal product thesis, trust model, contracts, repository boundaries, synthetic examples, and release criteria. Paul is the first design partner, not a domain boundary.
@@ -28,6 +30,8 @@ Acceptance includes vague-recall questions, not only exact keyword lookup.
 
 ## RCL-003 — Connected and temporal memory
 
+Status: implemented with synthetic automated evidence; live quality OPEN. See [V1-STATUS](V1-STATUS.md).
+
 Objective: repeated people/things/topics across unrelated domains connect without false certainty, and changing knowledge preserves history.
 
 Add universal entities, aliases/mentions, relationships, claims, temporal validity/supersession, correction precedence, review, suggested/accepted actions, and measured pgvector hybrid retrieval.
@@ -36,11 +40,15 @@ Exit includes same-name ambiguity, historical-vs-latest queries, correction repr
 
 ## RCL-004 — Resilient desktop
 
+Status: native persistence/sync/offline implemented; CI verified, installed Windows acceptance OPEN.
+
 Objective: normal desktop work remains useful through connectivity loss and reconnection.
 
 Add SQLite cache, downloaded-original inventory, local text search, durable outbox, ordered sync feed, conflict UX, snapshots, revocation handling, and resumed synchronization.
 
 ## RCL-005 — Ownership and portability
+
+Status: export/delete/backup/managed Markdown implemented; partial processed-source erasure safely restricted.
 
 Objective: Recall is not a data trap.
 

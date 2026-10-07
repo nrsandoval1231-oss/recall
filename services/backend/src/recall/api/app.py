@@ -1,5 +1,6 @@
 """FastAPI transport: authenticate, validate, map errors. Business rules live in `domain`."""
 
+import asyncio
 import logging
 import re
 import tempfile
@@ -20,13 +21,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from ..config import Settings, get_settings
 from ..db.database import Database
 from ..domain.captures import CaptureService
+from ..domain.deletion import DeletionService
+from ..domain.entities import EntityService
+from ..domain.export import export_janitor
 from ..domain.manifest import find_schema_path, load_schema, validate_manifest
 from ..domain.memories import MemoryService
 from ..errors import ApiError, payload_too_large, unauthenticated, unsupported_media, validation
 from ..ingestion.provider import Provider
 from ..storage import ObjectStore
 from ..storage.factory import build_object_store
+from ..sync.routes import register_routes as register_sync_routes
 from .auth import Principal, TokenVerifier
+from .deletion import register_routes as register_deletion_routes
+from .export import register_routes as register_export_routes
 
 log = logging.getLogger("recall")
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
@@ -84,6 +91,8 @@ def create_app(
             refusal_fallback=settings.ai_refusal_fallback,
         )
     memories = MemoryService(db, settings, provider)
+    entities = EntityService(db, settings)
+    deletion = DeletionService(db)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -91,9 +100,15 @@ def create_app(
             db.open()
         db.assert_least_privilege()
         object_store.check_ready()
-        yield
-        if database is None:
-            db.close()
+        stop = asyncio.Event()
+        janitor = asyncio.create_task(export_janitor(stop))
+        try:
+            yield
+        finally:
+            stop.set()
+            await janitor
+            if database is None:
+                db.close()
 
     app = FastAPI(title="Recall API", version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(RequestIdMiddleware)
@@ -101,8 +116,8 @@ def create_app(
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_allow_origins,
-            allow_methods=["GET", "POST", "PUT"],
-            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "If-Match", "X-Request-ID"],
             expose_headers=["X-Request-ID", "X-Recall-Source-SHA256", "ETag"],
             allow_credentials=False,
             max_age=600,
@@ -194,6 +209,12 @@ def create_app(
     def get_capture(who: Auth, capture_id: uuid.UUID) -> JSONResponse:
         return _json(service.get_capture(who.user_id, capture_id))
 
+    @app.delete("/v1/captures/{capture_id}")
+    def delete_capture(
+        who: Auth, capture_id: uuid.UUID, key: IdemKey, if_match: Annotated[int, Header(alias="If-Match")]
+    ) -> JSONResponse:
+        return _json(deletion.delete_capture(who.user_id, capture_id, key, if_match))
+
     @app.post("/v1/captures/{capture_id}/upload-authorizations")
     def post_upload_authorizations(
         who: Auth, capture_id: uuid.UUID, body: Annotated[Any, Body()] = None
@@ -226,9 +247,10 @@ def create_app(
 
         digest = hashlib.sha256()
         size = 0
-        with tempfile.NamedTemporaryFile(prefix="recall-upload-", delete=False) as spool:
-            spool_path = Path(spool.name)
-            try:
+        spool_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(prefix="recall-upload-", delete=False) as spool:
+                spool_path = Path(spool.name)
                 async for chunk in request.stream():
                     size += len(chunk)
                     if size > target.declared_byte_size:
@@ -236,9 +258,11 @@ def create_app(
                     digest.update(chunk)
                     spool.write(chunk)
                 spool.flush()
-            except BaseException:
+        except BaseException:
+            if spool_path is not None:
                 spool_path.unlink(missing_ok=True)
-                raise
+            raise
+        assert spool_path is not None
         try:
             result = await run_in_threadpool(
                 service.complete_upload, who.user_id, target, spool_path, size, digest.hexdigest()
@@ -301,6 +325,61 @@ def create_app(
     def post_ask(who: Auth, body: Annotated[Any, Body()]) -> JSONResponse:
         return _json(memories.ask(who.user_id, body))
 
+    # ------------------------------------------------------------------ RCL-003
+    @app.get("/v1/entities")
+    def list_entities(
+        who: Auth,
+        q: str | None = None,
+        kind: str | None = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    ) -> JSONResponse:
+        return _json(entities.list(who.user_id, q, kind, limit))
+
+    @app.get("/v1/entities/{entity_id}")
+    def get_entity(who: Auth, entity_id: uuid.UUID) -> JSONResponse:
+        return _json(entities.get(who.user_id, entity_id))
+
+    @app.post("/v1/entities")
+    def post_entity(who: Auth, key: IdemKey, body: Annotated[Any, Body()]) -> JSONResponse:
+        return _json(entities.create(who.user_id, key, body), 201)
+
+    @app.get("/v1/entities/{source_id}/identity-preview/{target_id}")
+    def identity_preview(who: Auth, source_id: uuid.UUID, target_id: uuid.UUID) -> JSONResponse:
+        return _json(entities.identity_preview(who.user_id, source_id, target_id))
+
+    @app.post("/v1/entities/{source_id}/identity/{target_id}")
+    def apply_identity(
+        who: Auth, source_id: uuid.UUID, target_id: uuid.UUID, key: IdemKey, body: Annotated[Any, Body()]
+    ) -> JSONResponse:
+        return _json(entities.apply_identity(who.user_id, key, source_id, target_id, body))
+
+    @app.post("/v1/memories/{memory_id}/corrections")
+    def post_correction(
+        who: Auth,
+        memory_id: uuid.UUID,
+        key: IdemKey,
+        if_match: Annotated[int, Header(alias="If-Match")],
+        body: Annotated[Any, Body()],
+    ) -> JSONResponse:
+        return _json(memories.correct_memory(who.user_id, memory_id, key, if_match, body))
+
+    @app.get("/v1/actions")
+    def get_actions(who: Auth, status: str | None = None) -> JSONResponse:
+        return _json(memories.list_actions(who.user_id, status))
+
+    @app.patch("/v1/actions/{action_id}")
+    def patch_action(
+        who: Auth,
+        action_id: uuid.UUID,
+        key: IdemKey,
+        if_match: Annotated[int, Header(alias="If-Match")],
+        body: Annotated[Any, Body()],
+    ) -> JSONResponse:
+        return _json(memories.update_action(who.user_id, action_id, key, if_match, body))
+
+    register_sync_routes(app, db, settings, service, memories, principal)
+    register_export_routes(app, db, object_store, principal)
+    register_deletion_routes(app, db, principal)
     return app
 
 

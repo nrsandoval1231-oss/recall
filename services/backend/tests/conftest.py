@@ -37,6 +37,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _pg_bin() -> Path:
+    portable = os.environ.get("LOCALAPPDATA")
+    if portable:
+        candidate = Path(portable) / "RecallBuildTools" / "postgresql16" / "pgsql" / "bin"
+        if (candidate / "initdb.exe").exists() or (candidate / "initdb").exists():
+            return candidate
     for candidate in sorted(Path("/usr/lib/postgresql").glob("*/bin"), reverse=True):
         if (candidate / "initdb").exists():
             return candidate
@@ -60,11 +65,11 @@ class PgCluster:
         self.dir = Path(tempfile.mkdtemp(prefix="recall-pg-"))
         self.port = _free_port()
         self.as_user: str | None = None
-        if os.geteuid() == 0:
+        if os.name != "nt" and os.geteuid() == 0:
             self.as_user = "postgres"
             shutil.chown(self.dir, user="postgres")
         self.dir.chmod(0o700)
-        self._run(["initdb", "-D", str(self.dir / "data"), "-A", "trust", "-U", "postgres", "--no-sync"])
+        self._run(["initdb", "-D", str(self.dir / "data"), "-A", "trust", "-U", "postgres", "--no-sync", "-E", "UTF8"])
         self._run(
             [
                 "pg_ctl",
@@ -74,7 +79,9 @@ class PgCluster:
                 "-l",
                 str(self.dir / "pg.log"),
                 "-o",
-                f"-p {self.port} -k {self.dir} -c listen_addresses=127.0.0.1 -c fsync=off",
+                f"-p {self.port} "
+                + (f"-k {self.dir} " if os.name != "nt" else "")
+                + "-c listen_addresses=127.0.0.1 -c fsync=off",
                 "start",
             ]
         )
@@ -83,7 +90,12 @@ class PgCluster:
         cmd = [str(self.bin / args[0]), *args[1:]]
         if self.as_user:
             cmd = ["runuser", "-u", self.as_user, "--", *cmd]
-        subprocess.run(cmd, check=True, capture_output=True)
+        # Windows server children inherit pipe handles, so communicate() can
+        # hang after pg_ctl exits. Server diagnostics already go to pg.log.
+        if os.name == "nt" and args[0] == "pg_ctl":
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        else:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
 
     def dsn(self, db: str = "postgres", user: str = "postgres") -> str:
         return f"postgresql://{user}@127.0.0.1:{self.port}/{db}"
@@ -114,6 +126,8 @@ def make_database(cluster: PgCluster, *, apply_migrations: bool = True) -> tuple
     with psycopg.connect(cluster.dsn(name), autocommit=True) as conn:
         conn.execute(f'alter database "{name}" owner to recall_owner')
         conn.execute("grant all on schema public to recall_owner")
+        if conn.execute("select 1 from pg_available_extensions where name='vector'").fetchone():
+            conn.execute("create extension if not exists vector")
     owner_dsn = cluster.dsn(name, "recall_owner")
     if apply_migrations:
         migrate(owner_dsn)

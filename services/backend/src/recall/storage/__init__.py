@@ -46,6 +46,9 @@ class ObjectStore(Protocol):
     def check_ready(self) -> None:
         """Raise if the store is not usable."""
 
+    def delete(self, key: str) -> None:
+        """Irreversibly remove a server-generated private object after a durable purge command."""
+
 
 def hash_stream(chunks: Iterator[bytes]) -> tuple[str, int]:
     digest = hashlib.sha256()

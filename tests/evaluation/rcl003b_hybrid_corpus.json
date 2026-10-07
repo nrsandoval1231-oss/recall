@@ -1,0 +1,35 @@
+{
+  "synthetic": true,
+  "purpose": "deterministic SQL-rank regression fixture; not live embedding quality evidence",
+  "items": [
+    {"id":"person","text":"Daniel Ortiz from Northline called about a delayed permit.","vector":[1,0,0]},
+    {"id":"work","text":"Northline permit review moved to Friday.","vector":[1,0.1,0]},
+    {"id":"equipment","text":"Unit G-17 needs a replacement coolant hose.","vector":[0,1,0]},
+    {"id":"education","text":"Professor Miller recommended a mitochondrial DNA reference.","vector":[0,0,1]},
+    {"id":"travel","text":"Sarah recommended Trattoria Luna in Florence.","vector":[0.1,0,1]},
+    {"id":"household","text":"The garage keypad battery is CR2032.","vector":[0,1,0.1]},
+    {"id":"idea","text":"Sketch a quiet morning planning ritual with paper cards.","vector":[0.2,0.2,0.8]},
+    {"id":"event","text":"April neighborhood cleanup begins at Riverside Park.","vector":[0.8,0.2,0]},
+    {"id":"project","text":"Atlas launch decision is deferred until June.","vector":[0.7,0,0.2]},
+    {"id":"recommendation","text":"Use the blue notebook for chemistry lab observations.","vector":[0,0.3,0.7]},
+    {"id":"number","text":"The inspection note says 43 psi? and remains uncertain.","vector":[0,0.9,0.1]},
+    {"id":"relationship","text":"Maya introduced Daniel Ortiz to the Northline procurement team.","vector":[0.9,0,0.1]},
+    {"id":"distractor","text":"Sarah bought a Florence-print postcard at the airport.","vector":[0.05,0.05,0.2]}
+  ],
+  "held_out_queries": [
+    {"query":"the permit contact I met through Maya","expected":"relationship","vector":[0.9,0,0.1]},
+    {"query":"when did the launch get pushed out","expected":"project","vector":[0.7,0,0.2]},
+    {"query":"that Italian dinner suggestion","expected":"travel","vector":[0.1,0,1]},
+    {"query":"what coin cell opens the garage","expected":"household","vector":[0,1,0.1]},
+    {"query":"the cooling line spare","expected":"equipment","vector":[0,1,0]},
+    {"query":"genetics reading from office hours","expected":"education","vector":[0,0,1]},
+    {"query":"my paper card routine thought","expected":"idea","vector":[0.2,0.2,0.8]},
+    {"query":"community trash day location","expected":"event","vector":[0.8,0.2,0]},
+    {"query":"which notebook for experiments","expected":"recommendation","vector":[0,0.3,0.7]},
+    {"query":"was the pressure reading certain","expected":"number","vector":[0,0.9,0.1]},
+    {"query":"Northline person with the permit delay","expected":"person","vector":[1,0,0]},
+    {"query":"who connected Daniel to purchasing","expected":"relationship","vector":[0.9,0,0.1]}
+  ],
+  "unsupported_queries":["which hotel did Sarah book","what is Daniel's home address"],
+  "cross_workspace_queries":["Northline permit contact"]
+}

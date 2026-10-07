@@ -1,0 +1,28 @@
+{
+  "name": "@recall/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@recall/api-client": "*",
+    "@recall/design-tokens": "*",
+    "@supabase/supabase-js": "^2.58.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "@types/react-dom": "~19.2.2",
+    "@vitejs/plugin-react": "^5",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^26",
+    "vite": "^7",
+    "vitest": "^5"
+  }
+}

@@ -1,0 +1,17 @@
+# Recall web pilot
+
+The Cloudflare Worker serves the Vite app, turns a clicked Supabase email link into an encrypted `HttpOnly`, `Secure`, `SameSite=Lax` session, and proxies only the fixed `/api/v1/*` route to the existing Recall API. It does not replace the canonical Postgres, private storage, or backend.
+
+The sign-in request sets an `HttpOnly` ten-minute login nonce. The email redirect carries the matching state to `/auth/callback`; its temporary Supabase fragment is posted once to `/auth/session`, validated by Supabase, encrypted in the Worker cookie, and immediately removed from the URL. A link opened in another browser cannot establish a session because it lacks that browser's nonce.
+
+Build with `npm run build --workspace @recall/web`, then start an authenticated local Worker with:
+
+```powershell
+npx wrangler@4 dev --config apps/web/wrangler.toml --port 8787
+```
+
+Set ignored local `.dev.vars` values beside `wrangler.toml`: `API_ORIGIN`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SITE_ORIGIN`, and a fresh random 32-byte base64url `SESSION_KEY`. Production `SESSION_KEY` must be supplied with `wrangler secret put SESSION_KEY`, never Vite, Git, or a browser setting. Rotating it signs all web sessions out.
+
+Keep public signups disabled. In Supabase, add the exact deployed `https://…/auth/callback` and its scoped `https://…/auth/callback?state=*` pattern to Auth redirect URLs and retain `{{ .ConfirmationURL }}` in the magic-link email template. The Worker requests `create_user: false`, so only provisioned pilot users can sign in.
+
+Supabase's included email service is currently limited to roughly two messages per hour, which is enough for a one-person smoke test but not a larger pilot. Configure reviewed custom SMTP before expanding the pilot; this application never uses admin link generation to bypass the quota.

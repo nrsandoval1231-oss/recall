@@ -29,7 +29,8 @@ export class NodeFiles implements LocalFiles {
   async copyIn(sourceUri: string, destRel: string) {
     await fs.mkdir(path.dirname(this.abs(destRel)), { recursive: true });
     await fs.copyFile(sourceUri, this.abs(destRel));
-    const handle = await fs.open(this.abs(destRel), "r");
+    // FlushFileBuffers on Windows requires a writable handle.
+    const handle = await fs.open(this.abs(destRel), "r+");
     try {
       await handle.sync();
     } finally {

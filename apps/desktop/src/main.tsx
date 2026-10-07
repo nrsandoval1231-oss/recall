@@ -4,6 +4,7 @@ import { createAuth, RecallApiClient } from "@recall/api-client";
 import { App } from "./App";
 import { readConfig } from "./config";
 import { authStorage } from "./platform/secrets";
+import { NativeCache } from "./platform/native-cache";
 import "./styles.css";
 
 const loaded = readConfig(import.meta.env as Record<string, string | undefined>);
@@ -14,5 +15,5 @@ if ("missing" in loaded) {
 } else {
   const auth = createAuth({ supabaseUrl: loaded.config.supabaseUrl, supabasePublishableKey: loaded.config.supabasePublishableKey, storage: authStorage });
   const api = new RecallApiClient({ baseUrl: loaded.config.apiBaseUrl, getAccessToken: () => auth.getAccessToken() });
-  root.render(<React.StrictMode><App services={{ auth, api }} /></React.StrictMode>);
+  root.render(<React.StrictMode><App services={{ auth, api, cache: new NativeCache(api) }} /></React.StrictMode>);
 }

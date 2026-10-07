@@ -1,5 +1,14 @@
 # Sync, offline behavior, and Obsidian export
 
+## V1 implementation details
+
+The server serializes workspace changes into monotonic identifier events. Native SQLite applies records, FTS/inventory changes and cursor transactionally. Dependent changes use event sequence rather than only parent version. Snapshot recovery preserves pending outbox operations; terminal conflicts/rejections are not endlessly replayed. Downloaded originals are hash verified and scoped by user/workspace. Tombstones remove controlled bytes before advancing SQLite state, so file-lock failures remain retryable.
+
+Portable exports include canonical JSON and full revision/identity/correction history, source UUIDs/hashes, deterministic Markdown and byte-preserved verified originals. Private storage keys are excluded. Manifest snapshot metadata identifies the exported sync state; unverified originals are listed as unavailable. Source/model text is fenced as literal content in Markdown. Server exports are bounded and abandoned private temporary archives expire after 24 hours; normal responses unlink immediately.
+
+The optional native adapter writes only UUID memory files beneath a selected `Recall` root, uses a manifest and recovery journal, and reports conflicts when generated files were edited locally. Arbitrary user files are preserved. A subsequent managed export removes unchanged managed files that no longer exist canonically; offline exports cannot be remotely revoked. Native ZIP IPC is capped at 32 MiB for the pilot; use the portable ZIP independently for larger exports. Backups are a distinct owner-operated format, not portable ZIP import.
+
+
 Version: 0.1 | No bidirectional vault synchronization in V1
 
 ## 1. Source of truth

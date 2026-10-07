@@ -1,20 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { copy } from "@recall/design-tokens";
-import { sha256Hex, type RecallApiClient, type ServerCapture } from "@recall/api-client";
+import { ApiError, sha256Hex, type RecallApiClient, type ServerCapture } from "@recall/api-client";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { formatBytes, statusOf, type IntegrityState } from "../viewmodel";
 import { MemoryPanel } from "./MemoryPanel";
+import type { CacheScope, NativeCache } from "../platform/native-cache";
 
 interface Loaded { url: string; integrity: IntegrityState; bytes: ArrayBuffer; mediaType: string }
+export function shouldUseLocalSourceFallback(failure: unknown): boolean {
+  return !(failure instanceof ApiError && (failure.status === 401 || failure.status === 403));
+}
 
 /**
  * Shows the exact original for each page. Every page is downloaded through the authenticated API and its
  * SHA-256 is computed locally and compared with the server-verified hash. "Verified" is only ever shown after that check.
  */
-export function Viewer({ api, capture, onClose, initialSourceId }: {
-  api: Pick<RecallApiClient, "fetchSource" | "getMemory" | "retryProcessing">;
+export function Viewer({ api, capture, onClose, onDeleted, initialSourceId, cache, scope }: {
+  api: Pick<RecallApiClient, "fetchSource" | "getMemory" | "retryProcessing"> & Partial<Pick<RecallApiClient, "correctMemory" | "deleteCapture" | "deleteMemory" | "deleteSource">>;
   capture: ServerCapture;
   onClose: () => void;
   initialSourceId?: string | null;
+  cache?: NativeCache;
+  scope?: CacheScope | null;
+  onDeleted?: () => void;
 }) {
   const [index, setIndex] = useState(() => Math.max(0, capture.pages.findIndex((p) => p.source_id === initialSourceId)));
   const [retryNote, setRetryNote] = useState<string | null>(null);
@@ -45,7 +53,16 @@ export function Viewer({ api, capture, onClose, initialSourceId }: {
         if (cancelled) return URL.revokeObjectURL(url);
         urls.current.push(url);
         if (!cancelled) setLoaded((l) => ({ ...l, [page.source_id]: { url, integrity, bytes: got.bytes, mediaType: got.mediaType } }));
-      } catch {
+      } catch (failure) {
+        if (shouldUseLocalSourceFallback(failure) && cache?.available && scope) {
+          try {
+            const source = await cache.getSource(scope, page.source_id);
+            if (source && !cancelled) {
+              setLoaded((l) => ({ ...l, [page.source_id]: { url: convertFileSrc(source.path), integrity: { kind: "verified", sha256: source.sha256 }, bytes: new ArrayBuffer(0), mediaType: page.media_type } }));
+              return;
+            }
+          } catch { /* report below */ }
+        }
         if (!cancelled) setError("Couldn't load this original right now. Check your connection and try again.");
       }
     })();
@@ -63,6 +80,16 @@ export function Viewer({ api, capture, onClose, initialSourceId }: {
       setRetryNote("Couldn't queue a retry right now.");
     }
   };
+  const remove = async () => {
+    if (!api.deleteCapture || !window.confirm("Delete this capture and its stored originals? This cannot be undone.")) return;
+    try { await api.deleteCapture(capture.capture_id, crypto.randomUUID(), capture.version); onDeleted?.(); }
+    catch { setError("This capture changed elsewhere or could not be deleted."); }
+  };
+  const removeSource = async () => {
+    if (!api.deleteSource || !page || !window.confirm("Delete this selected original page? Other pages remain available.")) return;
+    try { await api.deleteSource(page.source_id, crypto.randomUUID(), capture.version); setError("Selected original deleted. Refreshing this capture."); onClose(); }
+    catch { setError("This capture changed elsewhere or the original could not be deleted."); }
+  };
 
   return (
     <div ref={root} tabIndex={-1} className="viewer" role="dialog" aria-label="Original pages"
@@ -71,6 +98,7 @@ export function Viewer({ api, capture, onClose, initialSourceId }: {
         <button onClick={onClose}>‹ Back</button>
         <h2>{capture.context_hint ?? copy.untitled}</h2>
         <span className={`pill ${status.tone}`}>{status.glyph} {status.label}</span>
+        {api.deleteCapture && <button onClick={() => void remove()}>Delete capture</button>}
       </div>
       {capture.processing?.retry_available && (
         <p className="note">{status.detail} <button onClick={() => void retry()}>Try reading again</button> {retryNote}</p>
@@ -103,10 +131,11 @@ export function Viewer({ api, capture, onClose, initialSourceId }: {
               {page.original_filename && (<><dt>Filename</dt><dd>{page.original_filename}</dd></>)}
               <dt>Source ID</dt><dd className="mono">{page.source_id}</dd>
             </dl>
-            {capture.memory_id && <MemoryPanel api={api} memoryId={capture.memory_id} pageId={page.source_id} />}
+            {capture.memory_id && <MemoryPanel api={api} memoryId={capture.memory_id} pageId={page.source_id} cache={cache} scope={scope} />}
             {current && (
               <a className="button" href={current.url} download={`recall-${capture.capture_id.slice(0, 8)}-page-${page.ordinal}.${page.media_type.split("/")[1]}`}>Save exact copy</a>
             )}
+            {api.deleteSource && <button onClick={() => void removeSource()}>Delete this original</button>}
           </aside>
         )}
       </div>

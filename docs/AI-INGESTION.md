@@ -1,5 +1,12 @@
 # AI ingestion and grounded retrieval
 
+## V1 correction and embedding implementation
+
+Canonical user overrides are applied before saving a new machine revision, and canonical claim revisions retain user text/status/validity across reprocessing. Evidence keys carry identity decisions across revisions without accepting same-name candidates automatically. Corrected canonical claims produce explicit claim-linked search chunks; superseded/retracted/out-of-validity claims are excluded from current retrieval while historical revisions remain addressable.
+
+Voyage embeddings require explicit provider key/model/dimensions/config version/pricing, matching workspace configuration, consent and budgets. Input and batch sizes are bounded; reservations precede calls, source revisions are rechecked before writing, and incompatible spaces fail closed. No live provider quality is asserted by synthetic fixtures. See [V1-STATUS](V1-STATUS.md).
+
+
 Version: 0.2 | Provider-independent behavior contract
 
 ## Boundary

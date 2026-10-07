@@ -83,6 +83,48 @@ describe("RecallApiClient", () => {
     expect(calls).toEqual(["POST /v1/ask", "GET /v1/search?q=solar+guy&limit=5", "GET /v1/memories/m1", "PUT /v1/settings/ai", "POST /v1/captures/cap1/retry-processing"]);
   });
 
+  it("RCL-003 sends workspace-scoped reads and guarded writes", async () => {
+    const calls: { method: string; path: string; headers: Record<string, string>; body?: string }[] = [];
+    const c = client(async (url, init) => {
+      calls.push({ method: String((init as RequestInit).method), path: String(url).replace("http://api.test", ""), headers: (init as RequestInit).headers as Record<string, string>, body: (init as RequestInit).body as string | undefined });
+      return new Response(JSON.stringify({ items: [], next_cursor: null }));
+    });
+    await c.listEntities({ q: "Sam", kind: "person", limit: 5 });
+    await c.getEntity("e1");
+    await c.createEntity({ kind: "person", canonical_name: "Sam", aliases: ["Samuel"] }, "entity-key");
+    await c.correctMemory("m1", { target: "claim", claim_id: "cl1", text: "Sam is confirmed", reason: "checked" }, "correction-key", 3);
+    await c.listActions({ status: "suggested" });
+    await c.updateAction("a1", { status: "accepted" }, "action-key", 2);
+    expect(calls.map((x) => `${x.method} ${x.path}`)).toEqual([
+      "GET /v1/entities?q=Sam&kind=person&limit=5", "GET /v1/entities/e1", "POST /v1/entities",
+      "POST /v1/memories/m1/corrections", "GET /v1/actions?status=suggested", "PATCH /v1/actions/a1",
+    ]);
+    expect(calls[2]?.headers["Idempotency-Key"]).toBe("entity-key");
+    expect(calls[3]?.headers["Idempotency-Key"]).toBe("correction-key");
+    expect(calls[3]?.headers["If-Match"]).toBe('3');
+    expect(calls[5]?.headers["If-Match"]).toBe('2');
+  });
+
+  it("RCL-003 exposes authenticated export and identity review routes", async () => {
+    const calls: string[] = [];
+    const c = client(async (url, init) => { calls.push(`${String((init as RequestInit).method)} ${String(url).replace("http://api.test", "")}`); return String(url).endsWith("/v1/exports") ? new Response(new Uint8Array([80, 75, 3, 4])) : new Response(JSON.stringify({ source_entity_id: "source", target_entity_id: "target", accepted_mentions: 0, operation_id: "op", operation: "merge", moved_mentions: 0, replayed: false })); });
+    await c.exportZip();
+    await c.identityPreview("source", "target");
+    await c.applyIdentity("source", "target", { source_version: 1, target_version: 2, mention_ids: [] }, "identity-key");
+    expect(calls).toEqual(["POST /v1/exports", "GET /v1/entities/source/identity-preview/target", "POST /v1/entities/source/identity/target"]);
+  });
+
+  it("guards memory, source, and workspace deletion with versions", async () => {
+    const calls: { path: string; headers: Record<string, string> }[] = [];
+    const c = client(async (url, init) => { calls.push({ path: String(url).replace("http://api.test", ""), headers: (init as RequestInit).headers as Record<string, string> }); return new Response(JSON.stringify({ id: "x", deleted: true, replayed: false })); });
+    await c.deleteMemory("m", "mem-key", 4); await c.deleteSource("s", "source-key", 9); await c.deleteWorkspaceData("workspace-key", "cursor-7");
+    expect(calls).toEqual([
+      { path: "/v1/memories/m", headers: expect.objectContaining({ "Idempotency-Key": "mem-key", "If-Match": "4" }) },
+      { path: "/v1/sources/s", headers: expect.objectContaining({ "Idempotency-Key": "source-key", "If-Match": "9" }) },
+      { path: "/v1/workspace/data", headers: expect.objectContaining({ "Idempotency-Key": "workspace-key", "If-Match": "cursor-7" }) },
+    ]);
+  });
+
   it("resolves relative upload URLs against the base", () => {
     expect(client(fetch).resolve("/v1/uploads/abc")).toBe("http://api.test/v1/uploads/abc");
   });

@@ -14,6 +14,10 @@ from ..ingestion.provider import AnswerRequest, Provider, ProviderError, Provide
 PACKET_SIZE = 8
 EXCERPT_CHARS = 1500
 QUOTE_CHARS = 300
+MAX_ANSWER_OUTPUT_TOKENS = 16_000
+# Covers the stable system prompt and structured-output schema. Packet and question bytes are
+# conservative token bounds (a UTF-8 byte is never less than one token in this accounting model).
+MAX_ANSWER_STATIC_INPUT_TOKENS = 8_000
 
 ANSWER_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -49,6 +53,11 @@ UNVERIFIED = "The answer could not be verified against your sources, so here are
 def build_packet(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
     packet = []
     for i, hit in enumerate(hits[:PACKET_SIZE], start=1):
+        history_fields: dict[str, Any] = {
+            key: hit[key]
+            for key in ("recorded_at", "valid_from", "valid_to", "supersedes_claim_id", "history_status")
+            if key in hit
+        }
         packet.append(
             {
                 "citation_id": f"c{i}",
@@ -57,13 +66,20 @@ def build_packet(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "captured_at": hit["captured_at"][:10],
                 "epistemic_state": hit["epistemic_state"],
                 "text": hit["text"][:EXCERPT_CHARS],
+                **history_fields,
             }
         )
     return packet
 
 
+def answer_max_input_tokens(question: str, hits: list[dict[str, Any]]) -> int:
+    """Conservative local bound used before the paid provider request is dispatched."""
+    packet = json.dumps(build_packet(hits[:PACKET_SIZE]), ensure_ascii=False, separators=(",", ":"))
+    return MAX_ANSWER_STATIC_INPUT_TOKENS + len(question.encode("utf-8")) + len(packet.encode("utf-8"))
+
+
 def _citation(hit: dict[str, Any], citation_id: str) -> dict[str, Any]:
-    return {
+    citation = {
         "citation_id": citation_id,
         "memory_id": hit["memory_id"],
         "memory_revision": hit["memory_revision"],
@@ -75,6 +91,10 @@ def _citation(hit: dict[str, Any], citation_id: str) -> dict[str, Any]:
         "epistemic_state": hit["epistemic_state"],
         "kind": hit["kind"],
     }
+    for key in ("recorded_at", "valid_from", "valid_to", "supersedes_claim_id", "history_status"):
+        if key in hit:
+            citation[key] = hit[key]
+    return citation
 
 
 def sources_of(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
