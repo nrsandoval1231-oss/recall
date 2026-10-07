@@ -12,8 +12,14 @@ const MAX_VALUE_LEN: usize = 2000;
 pub fn validate_key(key: &str) -> Result<(), String> {
     let ok = !key.is_empty()
         && key.len() <= MAX_KEY_LEN
-        && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-');
-    if ok { Ok(()) } else { Err("invalid secret key".into()) }
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-');
+    if ok {
+        Ok(())
+    } else {
+        Err("invalid secret key".into())
+    }
 }
 
 fn entry(key: &str) -> Result<Entry, String> {
@@ -59,7 +65,16 @@ mod tests {
 
     #[test]
     fn rejects_empty_oversized_and_path_like_keys() {
-        for key in ["", "../x", "a/b", "a b", "a:b", "a\\b", "ü", &"k".repeat(129)] {
+        for key in [
+            "",
+            "../x",
+            "a/b",
+            "a b",
+            "a:b",
+            "a\\b",
+            "ü",
+            &"k".repeat(129),
+        ] {
             assert!(validate_key(key).is_err(), "{key}");
         }
     }

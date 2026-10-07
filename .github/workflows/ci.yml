@@ -13,7 +13,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
-      - run: sudo apt-get update && sudo apt-get install -y postgresql
+      - run: sudo apt-get update && sudo apt-get install -y postgresql postgresql-16-pgvector
       - run: npm ci
       - working-directory: services/backend
         run: |
@@ -50,3 +50,14 @@ jobs:
       - run: npm ci
       - working-directory: apps/desktop/src-tauri
         run: cargo test --lib && cargo check
+  windows-native:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - working-directory: apps/desktop/src-tauri
+        run: cargo test --lib
+      - working-directory: apps/desktop/src-tauri
+        run: cargo check
