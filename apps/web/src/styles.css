@@ -129,6 +129,7 @@ textarea { resize: vertical; min-height: 88px; }
 .settings-board { display: flex; align-items: center; justify-content: space-between; padding: 24px; margin-bottom: 28px; gap: 20px; max-width: 860px; margin-inline: auto; }
 .settings-board p { margin: 8px 0 0; font-size: 14px; }
 .settings-board .eyebrow { display: none; }
+.settings-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .signin { max-width: 480px; padding: 36px; margin: 12vh auto; }
 .signin h1 { margin: 28px 0 16px; }
 .signin .eyebrow { display: none; }

@@ -80,5 +80,53 @@ describe("web Worker boundary", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("x-recall-source-sha256")).toBe("a".repeat(64));
     expect(response.headers.get("set-cookie")).toContain("__Host-recall_session=");
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=7776000");
+  });
+
+  it("keeps the remembered device session when refresh is temporarily unavailable", async () => {
+    const seed = await relay(new Response("ok"), { access_token: "access", refresh_token: "refresh", expires_at: 1 }, env());
+    const cookie = seed.headers.get("set-cookie")!;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("upstream unavailable", { status: 503 }));
+    const response = await handle(new Request(`${site}/auth/me`, { headers: { cookie } }), env());
+    expect(response.status).toBe(503);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    fetchMock.mockRestore();
+  });
+
+  it("renews an expired remembered session without showing connection again", async () => {
+    const seed = await relay(new Response("ok"), { access_token: "old-access", refresh_token: "refresh", expires_at: 1 }, env());
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "new-access", refresh_token: "new-refresh", expires_at: 2_000_000_000 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ user_id: "u1", email: "pilot@example.test", active_workspace_id: "w1", workspaces: [{ id: "w1" }] }), { status: 200, headers: { "content-type": "application/json" } }));
+    const response = await handle(new Request(`${site}/auth/me`, { headers: { cookie: seed.headers.get("set-cookie")! } }), env());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=7776000");
+    fetchMock.mockRestore();
+  });
+
+  it("requires connection again after an invalid refresh credential", async () => {
+    const seed = await relay(new Response("ok"), { access_token: "old-access", refresh_token: "refresh", expires_at: 1 }, env());
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("invalid", { status: 400 }));
+    const response = await handle(new Request(`${site}/auth/me`, { headers: { cookie: seed.headers.get("set-cookie")! } }), env());
+    expect(response.status).toBe(401);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+    fetchMock.mockRestore();
+  });
+
+  it("preserves the remembered device when refresh returns an invalid success payload", async () => {
+    const seed = await relay(new Response("ok"), { access_token: "old-access", refresh_token: "refresh", expires_at: 1 }, env());
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const response = await handle(new Request(`${site}/auth/me`, { headers: { cookie: seed.headers.get("set-cookie")! } }), env());
+    expect(response.status).toBe(503);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    fetchMock.mockRestore();
+  });
+
+  it("disconnects only this device session at the provider", async () => {
+    const seed = await relay(new Response("ok"), { access_token: "access", refresh_token: "refresh", expires_at: 2_000_000_000 }, env());
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
+    await handle(post("/auth/logout", undefined, seed.headers.get("set-cookie")!), env());
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/auth/v1/logout?scope=local");
+    fetchMock.mockRestore();
   });
 });

@@ -17,6 +17,12 @@ Verification commands and results:
 
 Remaining acceptance: this packet has not been deployed; real signed-in API/upload acceptance, physical iPhone/Windows usability and live-provider quality remain open. Synthetic browser behavior and client tests do not close those gates.
 
+### Remembered browser connection, October 7
+
+Implemented locally, not deployed: each browser connects through the existing authorized email callback and subsequently restores its private workspace session silently. The encrypted HttpOnly cookie now rolls for 90 days of inactivity. Settings holds Disconnect this device, with provider logout scoped to the current session. Transient refresh failures preserve the cookie and return a retryable unavailable response; invalid credentials require reconnection. Clearing cookies, provider revocation or expiry can also require reconnection. This is a remembered browser session, not hardware-bound device authentication.
+
+Validation: `npm run test --workspace @recall/web` passed 40 tests; `npm run build --workspace @recall/web` passed TypeScript and Vite; root `npm run lint` and `git diff --check` passed. Synthetic browser checks verified direct Ask entry, Settings disconnect and the disconnected connection screen. No live email or private-note upload was attempted; hosted deployment and real-device session persistence remain open.
+
 ### Active browser pilot, October 6
 
 The user selected a Cloudflare web app after native email sign-in failures. `apps/web` implements browser email-link callbacks, encrypted server session cookies, durable scoped photo drafts, retry-safe uploads, recent captures, Ask, and hash-verified cited originals. Root verification: 125 client tests passed, including 20 web tests; root lint/typecheck and web production build passed. Actual Wrangler runtime returned 200 for the app/callback with CSP and same-origin resource policy; private unauthenticated routes returned 401/no-store; foreign-origin login POST returned 403; arbitrary proxy routes returned 404. No email was sent by these probes.

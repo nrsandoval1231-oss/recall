@@ -10,13 +10,15 @@ export interface Env {
 }
 
 type Session = { access_token: string; refresh_token: string; expires_at: number };
+type RefreshOutcome = { session: Session | null; transient: boolean };
 const SESSION = "recall_session";
 const PENDING = "recall_login";
 const FORWARDED = ["content-type", "idempotency-key", "if-match", "x-request-id"];
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const MAX_TOKEN_CHARS = 2_048;
 const MAX_SESSION_COOKIE_CHARS = 3_500;
-const refreshes = new Map<string, Promise<Session | null>>();
+const SESSION_MAX_AGE = 90 * 24 * 60 * 60;
+const refreshes = new Map<string, Promise<RefreshOutcome>>();
 
 export default { fetch: (request: Request, env: Env) => handle(request, env) };
 
@@ -44,7 +46,7 @@ async function requestLogin(request: Request, env: Env): Promise<Response> {
     headers: supabaseHeaders(env),
     body: JSON.stringify({ email: body.email.trim(), create_user: false }),
   });
-  if (!upstream.ok) return message("We could not send a sign-in email. Please wait and try again.", upstream.status === 429 ? 429 : 400);
+  if (!upstream.ok) return message("We could not send a connection email. Please wait and try again.", upstream.status === 429 ? 429 : 400);
   return new Response(null, { status: 204, headers: { "set-cookie": pendingCookie(nonce) } });
 }
 
@@ -53,10 +55,10 @@ async function establishSession(request: Request, env: Env): Promise<Response> {
   if (!fromSite(request, env)) return message("Invalid request origin.", 403);
   const body = await readJson<{ access_token?: unknown; refresh_token?: unknown; expires_at?: unknown; state?: unknown }>(request);
   const nonce = cookie(request.headers.get("cookie"), PENDING);
-  if (!body || typeof body.access_token !== "string" || typeof body.refresh_token !== "string" || typeof body.state !== "string" || body.access_token.length > MAX_TOKEN_CHARS || body.refresh_token.length > MAX_TOKEN_CHARS || !nonce || !same(body.state, nonce)) return message("This sign-in link is invalid.", 401, clear(PENDING));
+  if (!body || typeof body.access_token !== "string" || typeof body.refresh_token !== "string" || typeof body.state !== "string" || body.access_token.length > MAX_TOKEN_CHARS || body.refresh_token.length > MAX_TOKEN_CHARS || !nonce || !same(body.state, nonce)) return message("This connection link is invalid.", 401, clear(PENDING));
   // A clicked email link can establish exactly one session in the browser that requested it.
   const valid = await verifyToken(body.access_token, env);
-  if (!valid) return message("This sign-in link is no longer valid.", 401, clear(PENDING));
+  if (!valid) return message("This connection link is no longer valid.", 401, clear(PENDING));
   const expiresAt = typeof body.expires_at === "number" && Number.isFinite(body.expires_at) ? Math.floor(body.expires_at) : Math.floor(Date.now() / 1000) + 300;
   const session = { access_token: body.access_token, refresh_token: body.refresh_token, expires_at: expiresAt };
   const cookieValue = await sealedCookie(session, env.SESSION_KEY);
@@ -71,11 +73,17 @@ async function me(request: Request, env: Env): Promise<Response> {
   if (request.method !== "GET") return notAllowed("GET");
   let session = await readSession(request, env);
   if (!session) return message("Sign in again.", 401, clear(SESSION));
-  if (session.expires_at <= Math.floor(Date.now() / 1000) + 60) session = await refresh(session, env);
+  if (session.expires_at <= Math.floor(Date.now() / 1000) + 60) {
+    const renewed = await refresh(session, env);
+    if (renewed.transient) return message("Recall is temporarily unavailable. Try again.", 503);
+    session = renewed.session;
+  }
   if (!session) return message("Sign in again.", 401, clear(SESSION));
   let upstream = await fetch(`${origin(env.API_ORIGIN)}/v1/me`, { headers: { authorization: `Bearer ${session.access_token}` }, redirect: "manual" });
   if (upstream.status === 401) {
-    session = await refresh(session, env);
+    const renewed = await refresh(session, env);
+    if (renewed.transient) return message("Recall is temporarily unavailable. Try again.", 503);
+    session = renewed.session;
     if (!session) return message("Sign in again.", 401, clear(SESSION));
     upstream = await fetch(`${origin(env.API_ORIGIN)}/v1/me`, { headers: { authorization: `Bearer ${session.access_token}` }, redirect: "manual" });
   }
@@ -90,7 +98,7 @@ async function logout(request: Request, env: Env): Promise<Response> {
   if (session) {
     // Best effort: local deletion always proceeds, while a valid provider session is revoked too.
     try {
-      await fetch(`${origin(env.SUPABASE_URL)}/auth/v1/logout`, { method: "POST", headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, authorization: `Bearer ${session.access_token}` } });
+      await fetch(`${origin(env.SUPABASE_URL)}/auth/v1/logout?scope=local`, { method: "POST", headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, authorization: `Bearer ${session.access_token}` } });
     } catch {
       // Local revocation must remain reliable when the provider is unavailable.
     }
@@ -103,11 +111,17 @@ async function proxy(request: Request, env: Env): Promise<Response> {
   if (request.method !== "GET" && !fromSite(request, env)) return message("Invalid request origin.", 403);
   let session = await readSession(request, env);
   if (!session) return message("Sign in again.", 401, clear(SESSION));
-  if (session.expires_at <= Math.floor(Date.now() / 1000) + 60) session = await refresh(session, env);
+  if (session.expires_at <= Math.floor(Date.now() / 1000) + 60) {
+    const renewed = await refresh(session, env);
+    if (renewed.transient) return message("Recall is temporarily unavailable. Try again.", 503);
+    session = renewed.session;
+  }
   if (!session) return message("Sign in again.", 401, clear(SESSION));
   let upstream = await api(request, session.access_token, env);
   if (upstream.status === 401 && request.method === "GET") {
-    session = await refresh(session, env);
+    const renewed = await refresh(session, env);
+    if (renewed.transient) return message("Recall is temporarily unavailable. Try again.", 503);
+    session = renewed.session;
     if (!session) return message("Sign in again.", 401, clear(SESSION));
     upstream = await api(request, session.access_token, env);
   }
@@ -135,14 +149,19 @@ export async function relay(upstream: Response, session: Session, env: Env): Pro
 }
 
 async function readSession(request: Request, env: Env): Promise<Session | null> { const value = cookie(request.headers.get("cookie"), SESSION); return value ? unseal(value, env.SESSION_KEY) : null; }
-async function refresh(session: Session, env: Env): Promise<Session | null> {
+async function refresh(session: Session, env: Env): Promise<RefreshOutcome> {
   const active = refreshes.get(session.refresh_token);
   if (active) return active;
   const operation = (async () => {
-    const response = await fetch(`${origin(env.SUPABASE_URL)}/auth/v1/token?grant_type=refresh_token`, { method: "POST", headers: supabaseHeaders(env), body: JSON.stringify({ refresh_token: session.refresh_token }) });
-    if (!response.ok) return null;
-    const value = await response.json() as Partial<Session>;
-    return validSession(value) ? value : null;
+    try {
+      const response = await fetch(`${origin(env.SUPABASE_URL)}/auth/v1/token?grant_type=refresh_token`, { method: "POST", headers: supabaseHeaders(env), body: JSON.stringify({ refresh_token: session.refresh_token }) });
+      if (response.status >= 500 || response.status === 429) return { session: null, transient: true };
+      if (!response.ok) return { session: null, transient: false };
+      const value = await response.json() as Partial<Session>;
+      return validSession(value) ? { session: value, transient: false } : { session: null, transient: true };
+    } catch {
+      return { session: null, transient: true };
+    }
   })();
   refreshes.set(session.refresh_token, operation);
   try { return await operation; } finally { refreshes.delete(session.refresh_token); }
@@ -150,7 +169,7 @@ async function refresh(session: Session, env: Env): Promise<Session | null> {
 async function verifyToken(token: string, env: Env): Promise<boolean> { return (await fetch(`${origin(env.SUPABASE_URL)}/auth/v1/user`, { headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, authorization: `Bearer ${token}` } })).ok; }
 function supabaseHeaders(env: Env): HeadersInit { return { apikey: env.SUPABASE_PUBLISHABLE_KEY, authorization: `Bearer ${env.SUPABASE_PUBLISHABLE_KEY}`, "content-type": "application/json" }; }
 
-function sessionCookie(value: string): string { return `__Host-${SESSION}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`; }
+function sessionCookie(value: string): string { return `__Host-${SESSION}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`; }
 function pendingCookie(value: string): string { return `${PENDING}=${value}; Path=/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=600`; }
 function clear(name: string): string { const prefix = name === SESSION ? "__Host-" : ""; return `${prefix}${name}=; Path=${name === PENDING ? "/auth" : "/"}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`; }
 function cookie(header: string | null, name: string): string | null { const actual = `${name === SESSION ? "__Host-" : ""}${name}=`; return header?.split(";").map((part) => part.trim()).find((part) => part.startsWith(actual))?.slice(actual.length) ?? null; }

@@ -39,9 +39,9 @@ export function App({ services }: {
         return <main className="signin glass-board"><div className="brand">Recall<span className="brand-dot"/></div><h1>Recall is unavailable.</h1><p className="error" role="alert">{startupError}</p><button className="button primary" onClick={checkSession}>Try again</button></main>;
     if (session === undefined)
         return <p className="empty loading">Loading Recall…</p>;
-    return session ? <Home key={scopeFor(session)} services={services} session={session}/> : <SignIn auth={services.auth}/>;
+    return session ? <Home key={scopeFor(session)} services={services} session={session}/> : <ConnectDevice auth={services.auth}/>;
 }
-function SignIn({ auth }: {
+function ConnectDevice({ auth }: {
     auth: BrowserAuth;
 }) {
     const cooldownKey = "recall-signin-limited-until";
@@ -60,15 +60,15 @@ function SignIn({ auth }: {
         if (failure instanceof Error && failure.message === "EMAIL_RATE_LIMITED") {
             sessionStorage.setItem(cooldownKey, String(Date.now() + 60 * 60 * 1000));
             setLimited(true);
-            setError("Email sign-in is temporarily limited. Try again later.");
+            setError("Device connection is temporarily limited. Try again later.");
         }
         else
-            setError(failure instanceof Error ? failure.message : "Could not send the sign-in email.");
+            setError(failure instanceof Error ? failure.message : "Could not send the connection email.");
     }
     finally {
         setBusy(false);
     } };
-    return <main className="signin glass-board"><div className="brand">Recall<span className="brand-dot"/></div><p className="eyebrow">PRIVATE MEMORY SPACE</p><h1>Keep what matters.</h1><p className="muted">Sign in to recover your own source-backed memories.</p><div className="field"><label htmlFor="email">Email</label><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email"/></div><button className="button primary" onClick={() => void request()} disabled={busy || limited || sent || !email.includes("@")}>{busy ? "Sending…" : limited ? "Email sign-in temporarily limited" : sent ? "Email sent" : "Email me a sign-in link"}</button>{sent && <p className="status" role="status">Check your email. Follow the link to return to Recall.</p>}{limited && <p className="error" role="alert">Email sign-in is temporarily limited. Try again later; refreshing will not bypass the provider limit.</p>}{error && !limited && <p className="error" role="alert">{error}</p>}</main>;
+    return <main className="signin glass-board"><div className="brand">Recall<span className="brand-dot"/></div><p className="eyebrow">PRIVATE MEMORY SPACE</p><h1>Connect this device.</h1><p className="muted">Connect once to open your source-backed memories directly on this device.</p><div className="field"><label htmlFor="email">Owner email</label><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email"/></div><button className="button primary" onClick={() => void request()} disabled={busy || limited || sent || !email.includes("@")}>{busy ? "Sending…" : limited ? "Connection temporarily limited" : sent ? "Link sent" : "Email me a connection link"}</button>{sent && <p className="status" role="status">Open the connection link in this browser. Future visits will open Recall directly.</p>}{limited && <p className="error" role="alert">Device connection is temporarily limited. Try again later; refreshing will not bypass the provider limit.</p>}{error && !limited && <p className="error" role="alert">{error}</p>}</main>;
 }
 function Home({ services, session }: {
     services: Services;
@@ -224,16 +224,32 @@ function Home({ services, session }: {
         if (active.current)
             setBusy(false);
     } };
+    const disconnect = async () => {
+        if (busy)
+            return;
+        setBusy(true);
+        setError(null);
+        try {
+            await services.auth.signOut();
+        }
+        catch (failure) {
+            if (active.current)
+                setError(failure instanceof Error ? failure.message : "Could not disconnect this device.");
+        }
+        finally {
+            if (active.current)
+                setBusy(false);
+        }
+    };
     return (<main className="space-shell" data-mode={mode}>
       <header className="topbar">
         <button className="brand brand-button" onClick={() => setMode("ask")} aria-label="Recall home">Recall</button>
         <div className="topnav">
           <span className="workspace-chip">Private workspace</span>
           <button className="button" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>Settings</button>
-          <button className="button link" disabled={busy} onClick={() => void services.auth.signOut()}>Sign out</button>
         </div>
       </header>
-      {settingsOpen && <SettingsBoard aiConfigured={aiConfigured} aiEnabled={aiEnabled} busy={busy} toggleAi={() => void toggleAi()}/>}
+      {settingsOpen && <SettingsBoard aiConfigured={aiConfigured} aiEnabled={aiEnabled} busy={busy} toggleAi={() => void toggleAi()} disconnect={() => void disconnect()}/>}
       {mode === "ask" && <AskMode question={question} setQuestion={setQuestionSafe} ask={ask} asking={asking} busy={busy} onAsk={() => void askRecall()} api={services.api} captures={captures} onCapture={() => setMode("capture")}/>}
       {mode === "explore" && <ExploreMode captures={captures} api={services.api} refresh={() => void refresh()}/>}
       {mode === "capture" && <CaptureMode selected={selected} setSelected={setSelected} preview={preview} context={context} setContext={setContext} capture={() => void capture()} busy={busy} drafts={drafts} resume={(draft) => void resume(draft)} removeDraft={(draft) => void removeDraft(draft)} message={message} error={error}/>}
@@ -308,12 +324,13 @@ function CaptureMode({ selected, setSelected, preview, context, setContext, capt
     message: string | null;
     error: string | null;
 }) { return <section className="mode-stage capture-stage"><div className="capture-board glass-board"><div className="stage-heading"><div><h2>Save an original</h2></div></div><label className="dropzone" htmlFor="capture-file"><span className="drop-orbit" aria-hidden="true">＋</span><strong>{selected ? "Ready to save" : "Choose a photo of your note"}</strong><span className="muted">Your original is saved in this browser before upload.</span><span>{selected ? "Choose a different photo" : "JPEG, PNG, HEIC or HEIF"}</span><input id="capture-file" className="capture-input" disabled={busy} type="file" accept="image/jpeg,image/png,image/heic,image/heif" onChange={(event) => setSelected(event.target.files?.[0] ?? null)}/></label>{selected && <div className="file-preview">{preview && <img src={preview} alt="Selected note preview"/>}<span><strong>{selected.name}</strong><br /><span className="muted">{Math.round(selected.size / 1024)} KB · ready to save</span></span></div>}<div className="field"><label htmlFor="context">Context <span>(optional)</span></label><textarea id="context" value={context} disabled={busy} onChange={(event) => setContext(event.target.value)} placeholder="A hint for your future self"/></div><button className="button primary save-button" onClick={capture} disabled={busy || !selected}>{busy ? "Saving…" : "Save original"}</button>{drafts.length > 0 && <div className="pending-panel"><strong>{drafts.length} saved original{drafts.length === 1 ? "" : "s"} waiting to upload.</strong><span className="muted">Pending originals stay here until you retry or remove them.</span>{drafts.map((draft) => <div className="pending-row" key={draft.id}><span>{draft.manifest.context_hint || "Untitled note"}</span><button className="button link" onClick={() => resume(draft)} disabled={busy}>Retry upload</button><button className="button link danger-link" onClick={() => removeDraft(draft)} disabled={busy}>Remove</button></div>)}</div>}{message && <p className="status" role="status">{message}</p>}{error && <p className="error" role="alert">{error}</p>}</div></section>; }
-function SettingsBoard({ aiConfigured, aiEnabled, busy, toggleAi }: {
+function SettingsBoard({ aiConfigured, aiEnabled, busy, toggleAi, disconnect }: {
     aiConfigured: boolean;
     aiEnabled: boolean;
     busy: boolean;
     toggleAi: () => void;
-}) { return <div className="settings-board glass-board"><div><p className="eyebrow">SETTINGS</p><strong>AI reading</strong><p className="muted">{aiConfigured ? "Turn on when you want searchable interpretations." : "AI reading is not configured yet."}</p></div><button className="button ghost" onClick={toggleAi} disabled={busy || !aiConfigured} aria-pressed={aiEnabled}>{aiEnabled ? "On" : "Off"}</button></div>; }
+    disconnect: () => void;
+}) { return <div className="settings-board glass-board"><div><p className="eyebrow">SETTINGS</p><strong>AI reading</strong><p className="muted">{aiConfigured ? "Turn on when you want searchable interpretations." : "AI reading is not configured yet."}</p></div><div className="settings-actions"><button className="button ghost" onClick={toggleAi} disabled={busy || !aiConfigured} aria-pressed={aiEnabled}>{aiEnabled ? "On" : "Off"}</button><button className="button link danger-link" onClick={disconnect} disabled={busy}>Disconnect this device</button></div></div>; }
 function statusLabel(status: ServerCapture["status"]): string { return status === "ready" ? "Ready" : status === "needs_review" ? "Needs review" : status === "failed" ? "Needs retry" : status === "processing" ? "Reading" : status === "awaiting_upload" ? "Incomplete" : status === "stored" ? "Uploaded" : "Queued"; }
 function CaptureBoard({ capture, api }: {
     capture: ServerCapture;
