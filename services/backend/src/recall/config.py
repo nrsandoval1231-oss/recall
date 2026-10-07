@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 MIB = 1024 * 1024
 ACCEPTED_MEDIA_TYPES = ("image/jpeg", "image/png", "image/heic", "image/heif")
@@ -48,7 +49,9 @@ class Settings(BaseSettings):
     max_image_pixels: int = Field(120_000_000, validation_alias="RECALL_MAX_IMAGE_PIXELS")
 
     # Browser/webview origins allowed to call the API (e.g. the Tauri desktop app). Empty = none.
-    cors_allow_origins: list[str] = Field(default_factory=list, validation_alias="RECALL_CORS_ORIGINS")
+    cors_allow_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="RECALL_CORS_ORIGINS"
+    )
 
     capture_schema_path: Path | None = Field(None, validation_alias="RECALL_CAPTURE_SCHEMA_PATH")
 
@@ -121,6 +124,9 @@ class Settings(BaseSettings):
     @classmethod
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
+            value = value.strip()
+            if value.startswith("["):
+                return json.loads(value)
             return [o.strip() for o in value.split(",") if o.strip()]
         return value
 
