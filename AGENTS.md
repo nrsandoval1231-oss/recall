@@ -8,6 +8,8 @@ Preserve the product: a pen-and-paper user photographs notes and retrieves sourc
 
 ## Non-negotiable invariants
 
+- Product target: no account/password/email-link sign-in, including first use. Local-only use requires no remote account. Cross-device private access still requires secure owner-approved device association; QR pairing is proposed, not approved. Never satisfy this requirement by removing authentication from public private-data APIs. RCL-005B is a written design proposal awaiting approval; do not start product code before written-design approval and the subsequent implementation-plan gate.
+
 - Target authority is the Obsidian vault: portable memory notes, links, original attachments and versioned provenance/history. PostgreSQL/pgvector and SQLite support operations, authorization, indexing, synchronization and caches; they must not become the sole owner of memory. The current implementation remains database-authoritative until the documented vault migration is implemented and verified. Do not claim that migration is complete or remove existing integrity/privacy guarantees.
 - All private records and queries are workspace-scoped. Check authorization before retrieval, model context construction, source access, and mutation.
 - Never commit real captures, client data, credentials, local databases, vault exports, or private test corpora. Synthetic fixtures must be clearly marked.

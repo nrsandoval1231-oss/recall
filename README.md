@@ -1,5 +1,7 @@
 # Recall
 
+**Required product target:** no account, password, or email-link sign-in, including first use. Private local use needs no remote account. Secure owner-approved device association is still required for private cross-device use; one-time QR pairing is proposed and awaits the owner’s answer. This is not implemented: existing clients still use Supabase email authentication. See the [RCL-005B design proposal](docs/superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
+
 **Your life remembers itself.**
 
 Recall is a universal external-memory application. People already capture important information in notebooks, screenshots, photos, voice notes, files, links, meetings, and messages. Recall removes the organizational burden after capture: it preserves the source, understands what it means, connects it across time, and lets the user recover it later using the imperfect way humans actually remember.
@@ -18,7 +20,7 @@ Example: “What was the name of that guy Sarah introduced me to last summer who
 
 ## Current status
 
-**RCL-001 (Trusted Capture) and RCL-002 (First Useful Recall) are implemented as code and verified by automated tests; nothing is deployed, no real iPhone → Windows acceptance has been run, and no live AI provider has been called.** RCL-002 adds opt-in AI reading of captures, keyword retrieval, and cited answers that abstain without evidence. The V1 build adds canonical entities and temporal claims, user corrections, hybrid retrieval, SQLite/offline sync, portable exports, managed Markdown, deletion, and backup/restore. See [V1 implementation status](docs/V1-STATUS.md) for current evidence and limitations.
+**RCL-001 (Trusted Capture) and RCL-002 (First Useful Recall) have automated implementation evidence. The status ledger records deployed pilot infrastructure and a browser adapter; real signed-in cross-device acceptance and live handwriting quality remain open.** RCL-002 adds opt-in AI reading of captures, keyword retrieval, and cited answers that abstain without evidence. The V1 build adds canonical entities and temporal claims, user corrections, hybrid retrieval, SQLite/offline sync, portable exports, managed Markdown, deletion, and backup/restore. See [V1 implementation status](docs/V1-STATUS.md) for current evidence and limitations.
 
 What exists: Expo iPhone app, Tauri/React Windows app, FastAPI backend, Postgres schema with RLS, private-storage adapters, shared sync/API/token packages. See [DEVELOPMENT](docs/DEVELOPMENT.md) to run it and [ACCEPTANCE](docs/ACCEPTANCE.md) ("RCL-001 evidence") for exactly what was and was not verified.
 

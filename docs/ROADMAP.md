@@ -1,6 +1,6 @@
 # Recall build roadmap
 
-Version: 0.4 | Dependency-ordered, not delivery-date promises
+Version: 0.5 | Dependency-ordered, not delivery-date promises
 
 The active pilot path is the Cloudflare browser adapter: iPhone browser photo capture and Windows browser retrieval. Native clients remain preserved. Browser implementation/local verification is recorded in V1-STATUS; deployment and real signed-in cross-device acceptance remain open.
 
@@ -72,11 +72,13 @@ Exit: the vertical slice runs against real Recall contracts/data, remains source
 
 ## RCL-005B — Required Obsidian memory spine
 
-Status: **required; not implemented**.
+Status: **written design proposed; awaiting approval; not implemented**.
+
+[Review the RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Product requirement: no account/password/email-link sign-in, including first use. Private local-only use needs no remote account. Cross-device private use still needs secure owner-approved device association; one-time QR pairing is an unresolved proposal. Approve the written design before an implementation plan, then review that plan and select execution before product code. Historical email-auth acceptance is not the new target.
 
 Make an Obsidian vault the user-owned durable memory spine while retaining Recall's Memory Surface and universal memory model. Specify the versioned vault schema, workspace association, authorized browser/mobile bridge, direct-edit reconciliation and migration/rollback before changing storage authority. Keep PostgreSQL/jobs/authorization and SQLite where useful as supporting services/projections, not exclusive owners of semantic memory.
 
-Build the smallest real round trip: capture -> preserved vault original and memory -> edit in Obsidian -> validated Recall understanding -> grounded Ask -> correction/history retained in vault. Do not require manual folders/tags, a community plugin or paid Obsidian Sync.
+Build the smallest real round trip: capture -> preserved vault original and memory -> edit in Obsidian -> validated Recall understanding -> grounded Ask -> correction/history retained in vault. Do not require manual folders/tags, a community plugin, paid Obsidian Sync, or account sign-in. Stage local vault correctness before optional device pairing and transport; preserve phone drafts when the desktop is off and label relay receipt separately from vault commitment.
 
 Exit: crash-safe/idempotent vault writes, direct-edit conflicts, concurrent devices, immutable sources/hash checks, temporal/correction/tombstone preservation, revoked access and cross-workspace isolation, and reconstruction of memory/search projections from vault data. Existing users' memory must migrate with verified parity and a safe rollback; legacy Markdown export alone does not pass.
 

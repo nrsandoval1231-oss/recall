@@ -1,5 +1,9 @@
 # Recall V1 implementation and acceptance
 
+## No-sign-in requirement — OPEN, October 7
+
+The owner requires no account/password/email-link sign-in, including first use. Local-only use must need no remote account; private cross-device use still needs secure owner-approved association. QR pairing is only proposed. The [written RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) awaits review; no runtime, deployed authentication, or storage authority changes have been made. Existing email-flow attempts and deployment evidence below are historical/current evidence and are deliberately retained. Recovering email quota or remembering a session would not satisfy the new requirement.
+
 This is the implementation ledger for the V1 build from accepted baseline `92b4c33aafda412f89d745f38b87858f2d4b2837`. A PASS below means deterministic implementation evidence, not live product quality. Physical devices, live infrastructure and model quality have separate gates.
 
 ## Required architecture gap — Obsidian spine
@@ -18,7 +22,7 @@ The user selected a Cloudflare web app after native email sign-in failures. `app
 
 Cloudflare `recall-web` is deployed at https://recall-web.nicksandoval201121.workers.dev with its server session secret; Supabase Site URL and scoped callback allowlist are saved. Hosted runtime probes confirmed app/callback 200 and private unauthenticated routes 401/no-store. Real signed-in browser upload/source access remains pending. AI processing remains disabled in production. Existing Supabase email quota was exhausted during earlier sign-in attempts; web deployment does not remove that provider limit. Native implementation below remains preserved and is no longer the immediate pilot path.
 
-Live owner sign-in attempted at 23:35 CDT failed: Supabase auth logs record HTTP 429 `over_email_send_rate_limit` for the hosted callback. This confirms provider delivery rejection, not signed-in acceptance. No further email probes were sent during diagnosis. Custom SMTP or quota recovery remains necessary for email sign-in.
+Live owner sign-in attempted at 23:35 CDT failed: Supabase auth logs record HTTP 429 `over_email_send_rate_limit` for the hosted callback. This confirms provider delivery rejection, not signed-in acceptance. No further email probes were sent during diagnosis. Custom SMTP or quota recovery would address the existing email flow only; it is not the proposed next step and cannot satisfy the new no-sign-in requirement.
 
 - Capture: accepted durable Expo capture, ordered originals, hash verification, idempotent uploads and workspace isolation are preserved.
 - Understand: durable bounded interpretation jobs and conservative validation remain intact. User overrides are applied before later machine revisions.
@@ -68,7 +72,7 @@ Live owner sign-in attempted at 23:35 CDT failed: Supabase auth logs record HTTP
 | 22 Design system | PASS | Existing shared tokens preserved, evidence presentation extended |
 | 23 Honest processing | PASS | Local/upload/worker/attention/error states remain real |
 | 24 Security | PARTIAL | RLS/isolation, least privilege and adversarial tests pass; 22 dependency advisories remain; live configuration OPEN |
-| 25 Deployment path | OPEN | Docker image builds/imports in CI; templates prepared; hosting/Supabase deployment not executed |
+| 25 Deployment path | PARTIAL | Pilot API/worker, Supabase setup and Cloudflare browser deployment recorded below; authenticated end-to-end and full release acceptance remain OPEN |
 | 26 Live AI | OPEN | No authorized live evaluation budget/private corpus used |
 | 27 Physical devices | OPEN | No physical iPhone or installed Windows proof |
 | 28 Performance | PARTIAL | Bounded media/results/caches/outbox/spend; synthetic SQL/FTS timings; device latency/memory OPEN |

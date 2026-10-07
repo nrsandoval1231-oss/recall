@@ -1,5 +1,11 @@
 # Recall — Canonical Experience & Visual System
 
+## First use and device access — target, not implemented
+
+The owner requires no account, password, or email-link sign-in anywhere, including first use. Open Recall, create/select an Obsidian vault with the OS folder permission, and capture locally. OS file permission is not a remote account. Do not substitute “sign in once” or remembered sessions. A phone starting alone can save local drafts before a desktop vault is associated.
+
+For cross-device private use, propose an owner-approved one-time QR association with a trusted device; the owner has not accepted this interaction. Until answered, label it proposed and do not build it. Local-only remains available. Show “Saved on this device,” “Waiting for vault,” “Received by relay; waiting for vault,” “Saved in vault,” and “Conflict needs review” only when supported by acknowledgments. Cloud AI and unseen originals remain unavailable offline. Existing email-auth screens are a current implementation gap, not the desired onboarding. See [RCL-005B](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
+
 ## Required memory foundation
 
 Recall's Memory Surface operates over an Obsidian vault as the required, user-owned memory spine. Vault notes, links, original attachments and versioned provenance/history preserve memory outside Recall; PostgreSQL/search/SQLite are supporting services and projections. Obsidian is not an optional export adapter.

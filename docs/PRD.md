@@ -1,6 +1,6 @@
 # Recall — Product Requirements Document
 
-Version: 0.3 | Date: 2026-10-07 | Product owner: Nick Sandoval
+Version: 0.4 | Date: 2026-10-07 | Product owner: Nick Sandoval
 
 Status: universal product vision approved; V1 is a proposed implementation baseline, not delivered functionality.
 
@@ -64,7 +64,8 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 9. Complexity stays behind the glass.
 10. Obsidian is the required, user-owned memory spine. Recall adds intelligence and experience over portable vault memory; Obsidian is not merely an export adapter.
 11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.
-12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
+12. No account, password, or email-link sign-in, including first use. Remembered login does not satisfy this requirement. Local-only use is private without a remote account; cross-device private use requires secure owner-approved device association. One-time QR pairing remains proposed, not approved.
+13. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
 ## 6. Memory layers
 
@@ -173,7 +174,7 @@ Deferred:
 | --- | --- |
 | CAP-01 | Ordered photo capture/import without filing |
 | CAP-02 | Durable local save before network acknowledgement |
-| CAP-03 | Retry-safe, idempotent cloud upload/finalization |
+| CAP-03 | Retry-safe, idempotent transfer/finalization when optional private synchronization is enabled |
 | AI-01 | Structured interpretation with source references |
 | AI-02 | Preserve ambiguity, uncertainty, attribution, and temporal qualifiers |
 | AI-03 | User corrections survive reprocessing |
@@ -189,6 +190,8 @@ Deferred:
 | OFF-01 | Desktop cached browsing/search and durable outbox |
 | EXP-01 | Required Obsidian memory spine; portable vault, structured history and originals |
 | PRIV-01 | Workspace isolation and owner control |
+| PRIV-02 | No account/password/email-link sign-in, including first use; no remote account for local-only use |
+| PRIV-03 | Secure owner-approved association for cross-device private access; QR method pending decision |
 | OPS-01 | Backup, restore, deletion, independently readable export |
 
 ## 13. Success
@@ -210,7 +213,9 @@ The Obsidian vault is the required durable memory spine. Human-readable Markdown
 
 The existing code is still PostgreSQL-authoritative with one-way managed Markdown export. Vault-first commitment, direct vault-edit reconciliation and projection recovery are required migration work, not current capabilities. Precise vault schema and cross-device transport must be specified and validated before implementation; no paid Obsidian Sync service or community plugin is assumed.
 
-Mobile and desktop use the same authenticated Memory API. Neither receives database-owner or AI-provider secrets. AI remains replaceable derived machinery.
+Target local-only capture, vault reading/correction and local search must work without a remote account or network service. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
+
+Existing clients still use Supabase email auth. The [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) compares local-only and paired local-first approaches; neither the proposed QR flow nor the written architecture has been approved or implemented.
 
 ## 15. Product roadmap
 

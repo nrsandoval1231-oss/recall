@@ -1,5 +1,9 @@
 # Developer setup and real-device acceptance (RCL-001)
 
+## Current-system procedures, not target onboarding
+
+Sign-in and provider setup below verify the existing implementation only. The target requires no account/password/email-link sign-in, including first use; local-only use needs no remote account. See the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md), whose device-pairing choice and written architecture await approval. Do not bypass existing private API authentication or change deployed configuration to simulate this target.
+
 ## V1 deployment, recovery and acceptance
 
 Apply all checksummed migrations with the owner connection; enable pgvector as administrator first. API and worker connections must be least privilege and cannot own tables or bypass RLS. Fill `infra/api.env.example` and `infra/worker.env.example` into ignored private `.env` files. `docker compose -f infra/pilot.compose.yml up --build` runs API and worker against external Supabase. Bind is local-only by default; place HTTPS/authenticated ingress in front of it. No external infrastructure is provisioned by these templates.

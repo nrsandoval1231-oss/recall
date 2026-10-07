@@ -1,5 +1,11 @@
 # Security, privacy, and operations
 
+## No-sign-in requirement — proposed security transition
+
+Local-only target use has no remote account and no account/password/email-link sign-in, including first use; privacy relies on scoped native access, app-private storage and OS protection. An unlocked device/vault remains accessible to its OS user. Private cross-device use requires owner-approved cryptographic device association, per-request authorization, revocation and recovery; one-time QR pairing remains unapproved. Never make public private-data APIs anonymous or place credentials in vault text.
+
+The [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) defines proposed bootstrap, trust boundaries and loss/recovery behavior. No persistent credentials are generated, permissions granted, or existing authentication changed by this documentation. Current provider auth and its historical evidence below remain valid until a verified replacement.
+
 ## Required Obsidian spine — security and recovery boundary
 
 The target vault is canonical user-owned memory. It contains private notes, original attachments and versioned metadata/history and must receive the same privacy and integrity protections as existing sources. Vault access is explicitly granted and workspace-scoped; text/frontmatter cannot grant service permissions or select arbitrary filesystem paths. Never silently enable a third-party sync provider or send vault content to an LLM without existing authorization/consent.

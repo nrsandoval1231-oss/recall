@@ -1,5 +1,9 @@
 # Obsidian spine, synchronization and portability
 
+## Proposed no-account local-first synchronization
+
+The [RCL-005B design proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) extends the required spine with private local-only use and optional owner-paired synchronization, without account/password/email-link sign-in even on first use. QR pairing is pending owner decision. Phone drafts remain durable while a desktop is off; relay receipt cannot be labeled vault commitment. Offline devices reconcile expected revisions and tombstones before advancing projections. Existing feed/export behavior below is the current baseline, not proof of the target.
+
 ## Required target — vault-backed memory
 
 Obsidian is the required user-owned memory spine, not an optional export destination. Vault notes, links, immutable source attachments and versioned structured history/provenance hold durable memory. Recall must reconcile direct vault edits, service operations and offline commands without silent overwrite or resurrection. Memory/search projections must be rebuildable from the vault; operational permissions remain protected service state.

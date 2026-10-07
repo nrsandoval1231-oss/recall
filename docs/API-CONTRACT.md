@@ -58,7 +58,7 @@ Versioned record updates require `If-Match` with the current revision/version. A
 | `POST /exports` / `GET /exports/{id}` | Portable snapshot and artifact status | 005 |
 | `DELETE /captures/{id}` | Explicit owner deletion; invalidate derived content and emit tombstones | 005 |
 
-Auth sign-in/token refresh use the selected provider, not custom password endpoints. Administrative quota/consent controls are settings-only capabilities, not a public arbitrary configuration-write endpoint.
+Current auth sign-in/token refresh use the selected provider, not custom password endpoints. This pre-migration contract does not satisfy the new no-sign-in target. Proposed paired-device authentication needs separately reviewed versioned contracts; no pairing endpoint or anonymous private-data access is introduced here. Administrative quota/consent controls are settings-only capabilities, not a public arbitrary configuration-write endpoint.
 
 ## Capture manifest
 

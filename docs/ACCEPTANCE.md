@@ -1,5 +1,12 @@
 # Recall acceptance and evaluation
 
+## No-sign-in target acceptance — OPEN
+
+- Fresh install with no account/session/network: create/select a local Obsidian vault, save and reopen exact originals, edit/correct and search locally without account/password/email-link sign-in. A remembered login fails this criterion.
+- Phone-first capture survives restart before association; desktop-off and Wi-Fi-off capture survives retries and later vault acknowledgment without duplicate memory. Browser durability/eviction and filesystem permission behavior must be tested separately; browser drafts alone do not establish native vault acceptance.
+- If the owner accepts pairing, prove explicit device approval, expired/replayed/wrong-device invitation rejection, revocation, loss/recovery and denial of unauthenticated private network access. QR is proposed, not accepted.
+- Validate vault round trip, projection rebuild, conflicts and migration/rollback against the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). These gates have not been run; historical provider sign-in tests below remain baseline evidence only.
+
 Version: 0.3 | Automated evidence and OPEN live gates
 
 ## Evidence standard

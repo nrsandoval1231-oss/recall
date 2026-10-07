@@ -1,5 +1,11 @@
 # Recall architecture
 
+## No-sign-in target and design gate
+
+No account/password/email-link sign-in is permitted in the target, including first use. Private local-only use needs no remote account. Recommend a local vault adapter and rebuildable local search first, with optional owner-paired private synchronization. Pairing is device authorization, not remembered account login; the one-time QR interaction is explicitly unresolved. Public private-data APIs must continue authenticating and authorizing requests.
+
+The [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) develops this canonical architecture for review, not a competing approved architecture. Current database authority, deployed email authentication and existing API contracts remain in place until a separately approved implementation and verified migration. No runtime/configuration change accompanies these docs.
+
 ## Required target: Obsidian as the memory spine
 
 Product decision, October 7, 2026: **Obsidian is required as Recall's user-owned memory spine.** This supersedes the earlier database-as-canonical/optional-vault architecture. Recall is the capture, intelligence and Memory Surface layer over an Obsidian vault.
@@ -23,7 +29,7 @@ Capture -> durable original/outbox -> authorized, recoverable vault commit
                               grounded Memory Surface
 ```
 
-Vault association is required per workspace. Local capture may precede vault availability, but vault-pending state must remain explicit. Obsidian itself need not be running for an authorized adapter to access the vault; integration must not require a paid sync subscription or community plugin. Browser/mobile access needs a scoped vault bridge or replica transport, not unrestricted filesystem access. Its concrete transport and conflict protocol remain design/implementation work.
+Vault association is required per workspace. Local capture may precede vault availability, but vault-pending state must remain explicit. Obsidian itself need not be running for an authorized adapter to access the vault; integration must not require a paid sync subscription or community plugin. Browser/mobile access needs a scoped vault bridge or replica transport, not unrestricted filesystem access. The [RCL-005B design proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) specifies a reviewable transport and conflict approach; it is not approved or implemented.
 
 Migration must prove journaled crash-safe writes, versioned/idempotent operations, direct-edit ingestion, conflict preservation, immutable evidence, authorization, deletion/tombstone reconciliation and recovery of semantic/search projections from the vault. Preserve current contracts and data until migration and rollback are verified. A one-way export does not meet acceptance.
 
@@ -73,7 +79,7 @@ In current code, Postgres records accepted interpretation/history and object sto
 | Worker | Separate process from the same Python package | Durable jobs survive request completion; no in-process-only background processing |
 | Memory spine (required target) | Obsidian vault | User-owned notes, links, immutable originals and versioned provenance/history; integration remains unimplemented |
 | Supporting cloud state | Managed PostgreSQL with pgvector | Operational services and rebuildable retrieval projections; currently authoritative until vault migration |
-| Identity/storage | Supabase Auth and private Storage, proposed default | Reduce infrastructure assembly; not a claim that defaults are secure or free |
+| Current identity/storage | Supabase Auth and private Storage | Existing email-auth baseline only; target local use has no remote account and proposed synchronization authenticates paired devices |
 | Local state | SQLite | Cache, local full-text search, pending operations, and export manifests |
 | AI | One multimodal provider/model plus one embedding model | Evaluate on handwriting first; no router, agent framework, or speculative model menu |
 
@@ -91,7 +97,7 @@ One Python package contains bounded modules:
 - `exports`: server export snapshots and portable manifests; desktop owns actual local filesystem writes.
 - `db`: persistence, transactions, migrations, and database security context.
 
-The API and worker reuse these modules. Do not split them into separately deployed microservices. The worker has no reason to run on an end user's computer.
+The API and worker reuse these modules. Do not split them into separately deployed microservices. This describes the current hosted worker. The proposed local vault adapter must support local commitment/reconciliation/search without requiring that worker; cloud AI stays optional and separately consented.
 
 ## 4. Current capture write path — vault commit integration pending
 
@@ -128,7 +134,7 @@ If the provider is unavailable, return source search results with a clear explan
 
 ## 7. Auth and authorization
 
-Use an established Auth provider with a native-compatible sign-in flow; validate issuer, audience, expiry, and signature server-side. Store refresh credentials in OS-protected storage, not ordinary SQLite rows, logs, or frontend bundles. API clients receive neither direct database write credentials nor provider/service-role keys.
+Current pre-migration clients use provider sign-in; continue validating issuer, audience, expiry, and signature server-side. This is existing behavior, not the target UX. Target local use relies on the device/OS boundary, while optional synchronization requires owner-authorized device identities without account/password/email-link sign-in. QR association awaits approval; see the RCL-005B proposal. Do not disable existing API authentication to approximate the target. Store refresh credentials in OS-protected storage, not ordinary SQLite rows, logs, or frontend bundles. API clients receive neither direct database write credentials nor provider/service-role keys.
 
 Use workspace membership checks in the API plus database RLS/least-privilege roles as defense in depth. A pooled database connection must establish request context transaction-locally and clear it at transaction end. Do not accidentally deploy the API as a database owner that bypasses the intended policy.
 
@@ -158,4 +164,4 @@ The architecture must allow later source adapters (voice, screenshots, files, li
 
 ## 11. Rollout boundary
 
-Start with an authenticated capture through both client shells. Then add one useful source-backed answer. Finish correction, offline, export, isolation, restore, and real-device evidence before calling the full pilot ready. Paid provisioning and a public launch are separate owner-authorized actions.
+The historical rollout started with authenticated capture through both client shells, then a source-backed answer. The next design gate is the written RCL-005B proposal; after approval, prepare an implementation plan and obtain the owner’s execution choice before product code. Finish correction, offline, export, isolation, restore, and real-device evidence before calling the full pilot ready. Paid provisioning and a public launch are separate owner-authorized actions.

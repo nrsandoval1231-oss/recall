@@ -1,6 +1,6 @@
 # First builder handoff — RCL-001
 
-Status update: RCL-001 has been implemented (see [DEVELOPMENT](DEVELOPMENT.md) and ACCEPTANCE "RCL-001 evidence"). The text below is the original brief and is kept for scope reference. RCL-002 has not been started.
+Status update: RCL-001 and RCL-002 have implementation evidence (see [V1-STATUS](V1-STATUS.md)). The briefs below are historical scope reference, including their sign-in requirements; they are not the active target. Active work is review of the [RCL-005B design proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md): no account/password/email-link sign-in, including first use, required vault authority and proposed device pairing. Do not start product code before written-design approval and the subsequent implementation-plan gate.
 
 This is the bounded first-packet brief. The written foundation still needs owner review; do not interpret the existence of this file as authorization to implement every roadmap item or provision paid infrastructure.
 
