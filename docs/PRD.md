@@ -62,7 +62,9 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 7. AI proposes; deterministic software commits.
 8. Source access is part of recall.
 9. Complexity stays behind the glass.
-10. Portability and privacy are product features; Obsidian is optional.\n11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.\n12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
+10. Portability and privacy are product features; Obsidian is optional.
+11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.
+12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
 ## 6. Memory layers
 
