@@ -1,44 +1,553 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, RecallApiClient, sha256Hex, type AskResponse, type CaptureManifest, type MediaType, type ServerCapture } from "@recall/api-client";
-import { deleteDraft, draftPage, listDrafts, saveDraft, type Draft } from "./storage";
+import {
+  ApiError,
+  RecallApiClient,
+  sha256Hex,
+  type CaptureManifest,
+  type MediaType,
+  type ServerCapture,
+} from "@recall/api-client";
+import {
+  deleteDraft,
+  draftPage,
+  listDrafts,
+  saveDraft,
+  type Draft,
+} from "./storage";
 import type { BrowserAuth, BrowserSession } from "./auth/session";
+import { serverStatusKey, statusPresentation } from "@recall/design-tokens";
+import { MemorySurface } from "./surface/MemorySurface";
 
-interface Services { auth: BrowserAuth; api: RecallApiClient }
-const scopeFor = (session: BrowserSession) => `${session.userId}:${session.workspaceId}`;
+interface Services {
+  auth: BrowserAuth;
+  api: RecallApiClient;
+}
+const scopeFor = (session: BrowserSession) =>
+  `${session.userId}:${session.workspaceId}`;
 
 export function App({ services }: { services: Services }) {
   const [session, setSession] = useState<BrowserSession | null | undefined>();
   const [startupError, setStartupError] = useState<string | null>(null);
-  const checkSession = () => { setStartupError(null); setSession(undefined); void services.auth.getSession().then(setSession).catch((failure) => setStartupError(failure instanceof Error ? failure.message : "Recall could not check your session.")); };
-  useEffect(() => { checkSession(); return services.auth.onChange(setSession); }, [services]);
-  if (startupError) return <main className="signin card"><div className="brand">Recall</div><h1>Recall is unavailable.</h1><p className="error" role="alert">{startupError}</p><button className="button primary" onClick={checkSession}>Try again</button></main>;
+  const sessionSequence = useRef(0);
+  const loseSession = useCallback(() => { sessionSequence.current++; setSession(null); }, []);
+  const checkSession = () => {
+    const ticket = ++sessionSequence.current;
+    setStartupError(null); setSession(undefined);
+    void services.auth.getSession().then(value => { if (sessionSequence.current === ticket) setSession(value); }).catch(failure => { if (sessionSequence.current === ticket) setStartupError(failure instanceof Error ? failure.message : "Recall could not check your session."); });
+  };
+  useEffect(() => {
+    checkSession();
+    const unsubscribe = services.auth.onChange(value => { sessionSequence.current++; setStartupError(null); setSession(value); });
+    return () => { sessionSequence.current++; unsubscribe(); };
+  }, [services]);
+  if (startupError)
+    return (
+      <main className="signin card">
+        <div className="brand">Recall</div>
+        <h1>Recall is unavailable.</h1>
+        <p className="error" role="alert">
+          {startupError}
+        </p>
+        <button className="button primary" onClick={checkSession}>
+          Try again
+        </button>
+      </main>
+    );
   if (session === undefined) return <p className="empty">Loading Recall…</p>;
-  return session ? <Home key={scopeFor(session)} services={services} session={session} /> : <SignIn auth={services.auth} />;
+  return session ? (
+    <Home key={scopeFor(session)} services={services} session={session} onSessionLost={loseSession} />
+  ) : (
+    <SignIn auth={services.auth} />
+  );
 }
 
 function SignIn({ auth }: { auth: BrowserAuth }) {
-  const cooldownKey = "recall-signin-limited-until"; const cooldownUntil = () => { const value = Number(sessionStorage.getItem(cooldownKey) ?? "0"); return Number.isFinite(value) && value > Date.now(); };
-  const [email, setEmail] = useState(""); const [sent, setSent] = useState(false); const [error, setError] = useState<string | null>(null); const [limited, setLimited] = useState(cooldownUntil); const [busy, setBusy] = useState(false);
-  const request = async () => { if (limited || busy || sent) return; setBusy(true); setError(null); try { await auth.requestSignIn(email.trim()); setSent(true); } catch (failure) { if (failure instanceof Error && failure.message === "EMAIL_RATE_LIMITED") { sessionStorage.setItem(cooldownKey, String(Date.now() + 60 * 60 * 1000)); setLimited(true); setError("Email sign-in is temporarily limited. Try again later."); } else setError(failure instanceof Error ? failure.message : "Could not send the sign-in email."); } finally { setBusy(false); } };
-  return <main className="signin card"><div className="brand">Recall</div><h1>Keep what matters.</h1><p className="muted">Sign in privately. The link in your email returns here automatically.</p><div className="field"><label htmlFor="email">Email</label><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></div><button className="button primary" onClick={() => void request()} disabled={busy || limited || sent || !email.includes("@")}>{busy ? "Sending…" : limited ? "Email sign-in temporarily limited" : sent ? "Email sent" : "Email me a sign-in link"}</button>{sent && <p className="status" role="status">Check your email. Follow the link to return to Recall.</p>}{limited && <p className="error" role="alert">Email sign-in is temporarily limited. Try again later; refreshing will not bypass the provider limit.</p>}{error && !limited && <p className="error" role="alert">{error}</p>}</main>;
+  const cooldownKey = "recall-signin-limited-until";
+  const cooldownUntil = () => {
+    const value = Number(sessionStorage.getItem(cooldownKey) ?? "0");
+    return Number.isFinite(value) && value > Date.now();
+  };
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [limited, setLimited] = useState(cooldownUntil);
+  const [busy, setBusy] = useState(false);
+  const request = async () => {
+    if (limited || busy || sent) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await auth.requestSignIn(email.trim());
+      setSent(true);
+    } catch (failure) {
+      if (
+        failure instanceof Error &&
+        failure.message === "EMAIL_RATE_LIMITED"
+      ) {
+        sessionStorage.setItem(
+          cooldownKey,
+          String(Date.now() + 60 * 60 * 1000),
+        );
+        setLimited(true);
+        setError("Email sign-in is temporarily limited. Try again later.");
+      } else
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Could not send the sign-in email.",
+        );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="signin card">
+      <div className="brand">Recall</div>
+      <h1>Keep what matters.</h1>
+      <p className="muted">
+        Sign in privately. The link in your email returns here automatically.
+      </p>
+      <div className="field">
+        <label htmlFor="email">Email</label>
+        <input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+        />
+      </div>
+      <button
+        className="button primary"
+        onClick={() => void request()}
+        disabled={busy || limited || sent || !email.includes("@")}
+      >
+        {busy
+          ? "Sending…"
+          : limited
+            ? "Email sign-in temporarily limited"
+            : sent
+              ? "Email sent"
+              : "Email me a sign-in link"}
+      </button>
+      {sent && (
+        <p className="status" role="status">
+          Check your email. Follow the link to return to Recall.
+        </p>
+      )}
+      {limited && (
+        <p className="error" role="alert">
+          Email sign-in is temporarily limited. Try again later; refreshing will
+          not bypass the provider limit.
+        </p>
+      )}
+      {error && !limited && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </main>
+  );
 }
 
-function Home({ services, session }: { services: Services; session: BrowserSession }) {
-  const scope = scopeFor(session); const active = useRef(true);
-  useEffect(() => { active.current = true; return () => { active.current = false; }; }, [scope]);
-  const [captures, setCaptures] = useState<ServerCapture[]>([]); const [drafts, setDrafts] = useState<Draft[]>([]); const [selected, setSelected] = useState<File | null>(null); const [context, setContext] = useState(""); const [message, setMessage] = useState<string | null>(null); const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [ask, setAsk] = useState<AskResponse | null>(null); const [question, setQuestion] = useState(""); const [aiEnabled, setAiEnabled] = useState(false); const [aiConfigured, setAiConfigured] = useState(false);
-  const refresh = useCallback(async () => { try { const [identity, list, settings] = await Promise.all([services.api.me(), services.api.listCaptures({ limit: 20 }), services.api.getAiSettings()]); if (!active.current || identity.user_id !== session.userId) return; await services.api.registerDevice({ device_id: deviceId(), platform: "web", name: navigator.userAgent.slice(0, 80), app_version: "0.1.0" }); setCaptures(list.items); setAiEnabled(settings.enabled); setAiConfigured(settings.ai_configured); setError(null); } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : "Could not load your captures."); } }, [services.api, session.userId]);
-  useEffect(() => { void refresh(); void listDrafts(scope).then((items) => { if (active.current) setDrafts(items); }).catch((failure) => { if (active.current) setError(failure instanceof Error ? failure.message : "Local captures could not be loaded."); }); }, [refresh, scope]);
-  const preview = useMemo(() => selected ? URL.createObjectURL(selected) : null, [selected]); useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  const uploadDraft = async (draft: Draft) => { const page = draft.manifest.pages[0]; if (!page) throw new Error("This saved capture has no page."); const bytes = await draft.files[page.client_page_id]?.arrayBuffer(); if (!bytes) throw new Error("The saved original is unavailable."); const server = await services.api.createCapture(draft.manifest, draft.id); const auths = await services.api.authorizeUploads(server.capture_id); const authorization = auths.find((item) => item.source_id === server.pages[0]?.source_id) ?? auths[0]; if (!authorization) throw new Error("Recall did not provide an upload authorization."); const uploaded = await services.api.putUpload(authorization, bytes); return services.api.finalize(server.capture_id, [{ source_id: authorization.source_id, sha256: uploaded.sha256 }], draft.id); };
-  const capture = async () => { if (!selected) return; setBusy(true); setError(null); try { const mediaType = selected.type as MediaType; if (!["image/jpeg", "image/png", "image/heic", "image/heif"].includes(mediaType)) throw new Error("Choose a JPEG, PNG, HEIC, or HEIF image."); const bytes = await selected.arrayBuffer(); const captureId = crypto.randomUUID(); const pageId = crypto.randomUUID(); const manifest: CaptureManifest = { schema_version: "1.0", client_capture_id: captureId, device_id: deviceId(), captured_at: new Date().toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", source_kind: "handwritten_note", context_hint: context.trim() || null, pages: [{ client_page_id: pageId, ordinal: 1, media_type: mediaType, byte_size: selected.size, sha256: await sha256Hex(bytes), original_filename: selected.name || null }] }; const draft = draftPage(scope, manifest, manifest.pages[0]!, selected); await saveDraft(draft); if (!active.current) return; setDrafts(await listDrafts(scope)); const finalized = await uploadDraft(draft); if (!active.current) return; await deleteDraft(captureId); setDrafts(await listDrafts(scope)); setSelected(null); setContext(""); setMessage(finalized.processing ? "Saved. Recall is reading the original." : "Saved. Your original is uploaded and protected."); await refresh(); } catch (failure) { if (active.current) setError(failure instanceof ApiError && failure.retryable ? `${failure.message} Your original is still saved on this device; try again.` : failure instanceof Error ? failure.message : "Capture failed. Your original remains saved locally."); } finally { if (active.current) setBusy(false); } };
-  const resume = async (draft: Draft) => { setBusy(true); setError(null); try { await uploadDraft(draft); if (!active.current) return; await deleteDraft(draft.id); setDrafts(await listDrafts(scope)); setMessage("Saved original uploaded successfully."); await refresh(); } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : "Retry failed. The original remains saved on this device."); } finally { if (active.current) setBusy(false); } };
-  const removeDraft = async (draft: Draft) => { if (!window.confirm("Remove this unsynced original from this browser? This cannot be undone.")) return; try { await deleteDraft(draft.id); if (active.current) setDrafts(await listDrafts(scope)); } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : "Could not remove this local original."); } };
-  const askRecall = async () => { if (!question.trim()) return; setBusy(true); try { setAsk(await services.api.ask(question.trim())); } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : "Recall could not answer right now."); } finally { if (active.current) setBusy(false); } };
-  const toggleAi = async () => { setBusy(true); try { const next = await services.api.setAiEnabled(!aiEnabled); if (active.current) setAiEnabled(next.enabled); } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : "AI reading could not be changed."); } finally { if (active.current) setBusy(false); } };
-  return <main className="shell"><header className="topbar"><div className="brand">Recall</div><nav className="topnav"><span className="muted">Private workspace</span><button className="button link" disabled={busy} title={busy ? "Finish saving this original before signing out." : undefined} onClick={() => void services.auth.signOut()}>Sign out</button></nav></header><section className="hero"><h1>Capture once.<br />Find it later.</h1><p>Photograph a note, keep the original safe, and ask Recall when the details matter again.</p></section><div className="grid"><section className="card"><h2>Save a note</h2><label className="dropzone" htmlFor="capture-file"><span><strong>{selected ? "Ready to save" : "Choose a photo of your note"}</strong><span className="muted">Your original is saved in this browser before upload.</span></span><span className="button primary">{selected ? "Choose a different photo" : "Choose photo"}</span><input id="capture-file" className="capture-input" type="file" accept="image/jpeg,image/png,image/heic,image/heif" onChange={(event) => setSelected(event.target.files?.[0] ?? null)} /></label>{selected && <div className="preview">{preview && <img src={preview} alt="Selected note preview" />}<span><strong>{selected.name}</strong><br /><span className="muted">{Math.round(selected.size / 1024)} KB · original preserved</span></span></div>}<div className="field"><label htmlFor="context">Context (optional)</label><textarea id="context" value={context} onChange={(event) => setContext(event.target.value)} placeholder="A hint for your future self" /></div><button className="button primary" onClick={() => void capture()} disabled={busy || !selected}>{busy ? "Saving…" : "Save original"}</button>{drafts.length > 0 && <div className="status"><strong>{drafts.length} saved original{drafts.length === 1 ? "" : "s"} waiting to upload.</strong><br /><span className="muted">Pending originals stay on this browser until you explicitly retry or remove them.</span>{drafts.map((draft) => <div key={draft.id}><span className="muted">{draft.manifest.context_hint || "Untitled note"}</span> <button className="button link" onClick={() => void resume(draft)} disabled={busy}>Retry upload</button><button className="button link" onClick={() => void removeDraft(draft)} disabled={busy}>Remove</button></div>)}</div>}{message && <p className="status" role="status">{message}</p>}{error && <p className="error" role="alert">{error}</p>}</section><section className="card"><div className="section-head"><h2>Recent notes</h2><button className="button link" onClick={() => void refresh()}>Refresh</button></div>{captures.length === 0 ? <p className="empty">Your saved notes will appear here.</p> : <div className="capture-list">{captures.map((item) => <CaptureRow key={item.capture_id} capture={item} api={services.api} />)}</div>}<div className="settings"><div><strong>AI reading</strong><div className="muted">{aiConfigured ? "Turn on when you want searchable interpretations." : "AI reading is not configured yet."}</div></div><button className="button" onClick={() => void toggleAi()} disabled={busy || !aiConfigured} aria-pressed={aiEnabled}>{aiEnabled ? "On" : "Off"}</button></div></section></div><section className="card ask"><h2>Ask Recall</h2><form className="ask-form" onSubmit={(event) => { event.preventDefault(); void askRecall(); }}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What are you trying to remember?" /><button className="button primary" disabled={busy || !question.trim()}>Ask</button></form>{ask && <Answer response={ask} api={services.api} />}</section></main>;
+function Home({
+  services,
+  session,
+  onSessionLost,
+}: {
+  services: Services;
+  session: BrowserSession;
+  onSessionLost: () => void;
+}) {
+  const scope = scopeFor(session);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, [scope]);
+  const [captures, setCaptures] = useState<ServerCapture[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [selected, setSelected] = useState<File | null>(null);
+  const [context, setContext] = useState("");
+  const [captureState, setCaptureState] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(false);
+  const [aiExplanation, setAiExplanation] = useState("");
+  const denySession = useCallback(() => { setCaptures([]); setDrafts([]); onSessionLost(); }, [onSessionLost]);
+  const refresh = useCallback(async () => {
+    try {
+      const [identity, list, settings] = await Promise.all([
+        services.api.me(),
+        services.api.listCaptures({ limit: 20 }),
+        services.api.getAiSettings(),
+      ]);
+      if (
+        !active.current ||
+        identity.user_id !== session.userId ||
+        identity.active_workspace_id !== session.workspaceId
+      )
+        return;
+      await services.api.registerDevice({
+        device_id: deviceId(),
+        platform: "web",
+        name: navigator.userAgent.slice(0, 80),
+        app_version: "0.1.0",
+      });
+      if (!active.current) return;
+      setCaptures(list.items);
+      setAiEnabled(settings.enabled);
+      setAiConfigured(settings.ai_configured);
+      setAiExplanation(settings.explanation);
+      setError(null);
+    } catch (failure) {
+      if (active.current && failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) { denySession(); return; }
+      if (active.current) setError(failure instanceof Error ? failure.message : "Could not load your captures.");
+    }
+  }, [services.api, session.userId, session.workspaceId, denySession]);
+  useEffect(() => {
+    void refresh();
+    void listDrafts(scope)
+      .then((items) => {
+        if (active.current) setDrafts(items);
+      })
+      .catch((failure) => {
+        if (active.current)
+          setError(
+            failure instanceof Error
+              ? failure.message
+              : "Local captures could not be loaded.",
+          );
+      });
+  }, [refresh, scope]);
+  const preview = useMemo(
+    () => (selected ? URL.createObjectURL(selected) : null),
+    [selected],
+  );
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
+  const uploadDraft = async (draft: Draft) => {
+    const page = draft.manifest.pages[0];
+    if (!page) throw new Error("This saved capture has no page.");
+    const bytes = await draft.files[page.client_page_id]?.arrayBuffer();
+    if (!bytes) throw new Error("The saved original is unavailable.");
+    setCaptureState("Uploading · your original is saved on this device.");
+    const server = await services.api.createCapture(draft.manifest, draft.id);
+    if (server.pages.length === draft.manifest.pages.length && server.pages.every(page => page.upload_state === "verified" && page.server_sha256 === page.declared_sha256)) {
+      return services.api.finalize(server.capture_id, server.pages.map(page => ({ source_id: page.source_id, sha256: page.declared_sha256 })), draft.id);
+    }
+    const auths = await services.api.authorizeUploads(server.capture_id);
+    const authorization =
+      auths.find((item) => item.source_id === server.pages[0]?.source_id) ??
+      auths[0];
+    if (!authorization)
+      throw new Error("Recall did not provide an upload authorization.");
+    const uploaded = await services.api.putUpload(authorization, bytes);
+    return services.api.finalize(
+      server.capture_id,
+      [{ source_id: authorization.source_id, sha256: uploaded.sha256 }],
+      draft.id,
+    );
+  };
+  const capture = async () => {
+    if (!selected) return;
+    setBusy(true);
+    setCaptureState("Saving locally · upload has not started.");
+    setError(null);
+    let savedLocally = false;
+    try {
+      const mediaType = selected.type as MediaType;
+      if (
+        !["image/jpeg", "image/png", "image/heic", "image/heif"].includes(
+          mediaType,
+        )
+      )
+        throw new Error("Choose a JPEG, PNG, HEIC, or HEIF image.");
+      const bytes = await selected.arrayBuffer();
+      const captureId = crypto.randomUUID();
+      const pageId = crypto.randomUUID();
+      const manifest: CaptureManifest = {
+        schema_version: "1.0",
+        client_capture_id: captureId,
+        device_id: deviceId(),
+        captured_at: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        source_kind: "handwritten_note",
+        context_hint: context.trim() || null,
+        pages: [
+          {
+            client_page_id: pageId,
+            ordinal: 1,
+            media_type: mediaType,
+            byte_size: selected.size,
+            sha256: await sha256Hex(bytes),
+            original_filename: selected.name || null,
+          },
+        ],
+      };
+      const draft = draftPage(scope, manifest, manifest.pages[0]!, selected);
+      await saveDraft(draft);
+      savedLocally = true;
+      setCaptureState("Saved on this device · not uploaded yet.");
+      if (!active.current) return;
+      setDrafts(await listDrafts(scope));
+      const finalized = await uploadDraft(draft);
+      if (!active.current) return;
+      await deleteDraft(captureId);
+      setDrafts(await listDrafts(scope));
+      setSelected(null);
+      setContext("");
+      const state = statusPresentation[serverStatusKey(finalized.status, finalized.processing)];
+      setCaptureState(null);
+      setMessage(`Saved. ${state.label}. ${state.detail}`);
+      await refresh();
+    } catch (failure) {
+      if (active.current) setCaptureState(savedLocally ? "Upload failed · original saved on this device. Retry in Capture." : "Not saved · keep the selected original and try again.");
+      if (active.current)
+        setError(
+          failure instanceof ApiError && failure.retryable
+            ? `${failure.message} Your original is still saved on this device; try again.`
+            : failure instanceof Error
+              ? failure.message
+              : "Capture failed. Your original remains saved locally.",
+        );
+    } finally {
+      if (active.current) setBusy(false);
+    }
+  };
+  const resume = async (draft: Draft) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await uploadDraft(draft);
+      if (!active.current) return;
+      await deleteDraft(draft.id);
+      setDrafts(await listDrafts(scope));
+      setCaptureState(null);
+      setMessage("Saved original uploaded successfully.");
+      await refresh();
+    } catch (failure) {
+      if (active.current) setCaptureState("Upload failed · original saved on this device. Retry in Capture.");
+      if (active.current)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Retry failed. The original remains saved on this device.",
+        );
+    } finally {
+      if (active.current) setBusy(false);
+    }
+  };
+  const removeDraft = async (draft: Draft) => {
+    if (
+      !window.confirm(
+        "Remove this unsynced original from this browser? This cannot be undone.",
+      )
+    )
+      return;
+    try {
+      await deleteDraft(draft.id);
+      if (active.current) setDrafts(await listDrafts(scope));
+    } catch (failure) {
+      if (active.current)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Could not remove this local original.",
+        );
+    }
+  };
+  const toggleAi = async () => {
+    setBusy(true);
+    try {
+      const next = await services.api.setAiEnabled(!aiEnabled);
+      if (active.current) setAiEnabled(next.enabled);
+    } catch (failure) {
+      if (active.current)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "AI reading could not be changed.",
+        );
+    } finally {
+      if (active.current) setBusy(false);
+    }
+  };
+  return (
+    <MemorySurface
+      api={services.api}
+      captures={captures}
+      onAccessDenied={denySession}
+      capturePanel={
+        <>
+          <label className="dropzone" htmlFor="capture-file">
+            <span>
+              <strong>
+                {selected ? "Ready to save" : "Choose a photo of your note"}
+              </strong>
+              <span className="muted">
+                Your original is saved in this browser before upload.
+              </span>
+            </span>
+            <span className="button primary">
+              {selected ? "Choose a different photo" : "Choose photo"}
+            </span>
+            <input
+              id="capture-file"
+              className="capture-input"
+              aria-label="Choose a photo of your note"
+              type="file"
+              accept="image/jpeg,image/png,image/heic,image/heif"
+              onChange={(event) => setSelected(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          {selected && (
+            <div className="preview">
+              {preview && <img src={preview} alt="Selected note preview" />}
+              <span>
+                <strong>{selected.name}</strong>
+                <br />
+                <span className="muted">
+                  {Math.round(selected.size / 1024)} KB · selected locally, not saved yet
+                </span>
+              </span>
+            </div>
+          )}
+          <div className="field">
+            <label htmlFor="context">Context (optional)</label>
+            <textarea
+              id="context"
+              value={context}
+              onChange={(event) => setContext(event.target.value)}
+              placeholder="A hint for your future self"
+            />
+          </div>
+          <button
+            className="button primary"
+            onClick={() => void capture()}
+            disabled={busy || !selected}
+          >
+            {busy ? "Saving original…" : "Save original"}
+          </button>
+          {drafts.length > 0 && (
+            <div className="status">
+              <strong>
+                {drafts.length} saved original{drafts.length === 1 ? "" : "s"}{" "}
+                saved on this device.
+              </strong>
+              <br />
+              <span className="muted">
+                Pending originals stay on this browser until you explicitly
+                retry or remove them.
+              </span>
+              {drafts.map((draft) => (
+                <div key={draft.id}>
+                  <span className="muted">
+                    {draft.manifest.context_hint || "Untitled note"}
+                  </span>{" "}
+                  <button
+                    className="button link"
+                    onClick={() => void resume(draft)}
+                    disabled={busy}
+                  >
+                    Retry upload
+                  </button>
+                  <button
+                    className="button link"
+                    onClick={() => void removeDraft(draft)}
+                    disabled={busy}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="capture-state">
+            {captureState
+              ? captureState
+              : selected
+                ? "Selected locally · save to preserve this original"
+                : "Photograph or import. Save. Leave."}
+          </p>
+        </>
+      }
+      settingsPanel={
+        <div className="settings">
+          <div>
+            <strong>AI reading</strong>
+            <p className="muted">
+              {aiConfigured
+                ? aiExplanation || "Turn on when you want searchable interpretations."
+                : "AI reading is not configured yet."}
+            </p>
+          </div>
+          <button
+            className="button"
+            onClick={() => void toggleAi()}
+            disabled={busy || !aiConfigured}
+            aria-pressed={aiEnabled}
+          >
+            {aiEnabled ? "On" : "Off"}
+          </button>
+        </div>
+      }
+      accountControls={
+        <button
+          className="button link"
+          disabled={busy}
+          title={
+            busy ? "Finish saving this original before signing out." : undefined
+          }
+          onClick={() => void services.auth.signOut().catch(() => setError("Could not sign out. Try again."))}
+        >
+          Sign out
+        </button>
+      }
+      notices={
+        <>
+          {captureState && <p className="status" role="status">{captureState}</p>}
+          {message && (
+            <p className="status" role="status">
+              {message}
+            </p>
+          )}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          {drafts.length > 0 && !busy && (
+            <p className="status">
+              {drafts.length} saved original{drafts.length === 1 ? "" : "s"}{" "}
+              waiting to upload. Open Capture to retry.
+            </p>
+          )}
+          <button
+            className="button link refresh-control"
+            onClick={() => void refresh()}
+          >
+            Refresh memory
+          </button>
+        </>
+      }
+    />
+  );
 }
 
-function CaptureRow({ capture, api }: { capture: ServerCapture; api: RecallApiClient }) { const [open, setOpen] = useState(false); const [url, setUrl] = useState<string | null>(null); const [error, setError] = useState<string | null>(null); useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]); const load = async () => { try { const page = capture.pages[0]; if (!page) throw new Error("Original page unavailable."); const source = await api.fetchSource(page.source_id); if (!source.serverSha256) throw new Error("Original integrity hash unavailable."); const digest = await sha256Hex(source.bytes); if (digest !== source.serverSha256 || digest !== page.declared_sha256) throw new Error("Original failed integrity verification."); if (url) URL.revokeObjectURL(url); setUrl(URL.createObjectURL(new Blob([source.bytes], { type: source.mediaType }))); setOpen(true); setError(null); } catch (failure) { setError(failure instanceof Error ? failure.message : "Original unavailable."); } }; return <div><button className="capture-row" onClick={() => void load()}><span><span className="capture-name">{capture.context_hint || "Notebook page"}</span><br /><span className="muted">{new Date(capture.captured_at).toLocaleDateString()}</span></span><span className="badge">{capture.status === "ready" ? "Ready" : capture.status === "failed" ? "Needs retry" : capture.status === "processing" ? "Reading" : capture.status === "awaiting_upload" ? "Incomplete" : "Uploaded"}</span></button>{error && <p className="error" role="alert">{error}</p>}{open && url && <div className="preview"><img src={url} alt="Original note" /></div>}</div>; }
-function Answer({ response, api }: { response: AskResponse; api: RecallApiClient }) { const [sourceUrl, setSourceUrl] = useState<string | null>(null); const [sourceError, setSourceError] = useState<string | null>(null); useEffect(() => () => { if (sourceUrl) URL.revokeObjectURL(sourceUrl); }, [sourceUrl]); const open = async (sourceId: string | null) => { if (!sourceId) return; try { const source = await api.fetchSource(sourceId); if (!source.serverSha256) throw new Error("Original integrity hash unavailable."); const digest = await sha256Hex(source.bytes); if (digest !== source.serverSha256) throw new Error("Original failed integrity verification."); if (sourceUrl) URL.revokeObjectURL(sourceUrl); setSourceUrl(URL.createObjectURL(new Blob([source.bytes], { type: source.mediaType }))); setSourceError(null); } catch (failure) { setSourceError(failure instanceof Error ? failure.message : "Source unavailable."); } }; return <div className="answer"><strong>{response.status === "answered" ? "Recall found this" : response.status === "insufficient_evidence" ? "Not enough evidence" : response.status === "ambiguous" ? "A few memories may match" : "Answers are currently limited"}</strong>{response.answer && <p>{response.answer}</p>}{response.limitations.length > 0 && <p className="muted">{response.limitations.join(" ")}</p>}<div>{response.citations.map((citation) => <button className="citation" key={citation.citation_id} disabled={!citation.source_id} onClick={() => void open(citation.source_id)}>Source · page {citation.page ?? "?"}</button>)}</div>{sourceUrl && <img className="source-image" src={sourceUrl} alt="Cited original" />}{sourceError && <p className="error">{sourceError}</p>}</div>; }
-function deviceId(): string { const key = "recall-web-device-id"; const existing = localStorage.getItem(key); if (existing) return existing; const next = crypto.randomUUID(); localStorage.setItem(key, next); return next; }
+function deviceId(): string {
+  const key = "recall-web-device-id";
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+  const next = crypto.randomUUID();
+  localStorage.setItem(key, next);
+  return next;
+}
