@@ -2,7 +2,7 @@
 
 Version: 0.5 | Dependency-ordered, not delivery-date promises
 
-The active pilot path is the Cloudflare browser adapter: iPhone browser photo capture and Windows browser retrieval. Native clients remain preserved. Browser implementation/local verification is recorded in V1-STATUS; deployment and real signed-in cross-device acceptance remain open.
+The existing pilot uses the Cloudflare browser adapter for iPhone photo capture and Windows retrieval; native clients remain preserved. [V1-STATUS](V1-STATUS.md) records deployment of the older email-authenticated pilot. Deployment of the newer canonical Memory Surface is not established by its [local/fixture evidence](implementation/memory-surface/README.md), and real signed-in cross-device acceptance remains open. The next work is review of the proposed local-first RCL-005B design below, not further email-sign-in rollout; QR pairing and written-design approval remain pending.
 
 ## Required architecture decision
 
