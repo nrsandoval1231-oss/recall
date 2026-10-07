@@ -711,7 +711,7 @@ impl NativeStore {
                 Self::uuid_ok(source_id)?;
             }
             let scope_root = self.scope_root(scope, false)?;
-            let source_paths = Self::validated_source_entries(scope_root.as_deref())?
+            let source_paths: Vec<PathBuf> = Self::validated_source_entries(scope_root.as_deref())?
                 .into_iter()
                 .map(|(_, path)| path)
                 .collect();
