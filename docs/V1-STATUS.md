@@ -18,7 +18,8 @@ This is the implementation ledger for the V1 build from accepted baseline `92b4c
 
 - Final client run: 94 passed (API 16, tokens 4, sync 30, desktop 35, mobile 9), with lint and typechecking clean. Rendered desktop tests cover correction durability/conflicts, identity/date/status payloads, deletion confirmation, managed export conflict, historical Ask and authorization denial. Desktop production build passes; iOS JavaScript bundle passes without signing or hardware proof.
 - Native foundation CI run `37559687200`: Windows 31 passed plus cargo check; Linux 32 passed plus cargo check (includes Unix symlink case). The integrated PR additionally emits the measured FTS benchmark output.
-- Final local full backend run: 192 passed, eight pgvector skips; includes four real-PostgreSQL Ask privacy race tests. Ruff, format and source mypy are clean. Final integrated CI must supersede these counts and execute all pgvector cases. Focused structural claim identity tests pass (3); temporal tests pass (4); relationship reprocessing passes (1); timed cleanup/workspace rotation passes (2).
+- Backend CI run `37562821713` at code commit `63b89e5451f1363abcc0d69f3bc918450d543177`: 200 passed including pgvector, two client E2E tests and ten migration tests. Local full run: 192 passed, eight pgvector skips. Ruff, format and source mypy are clean. Includes four real-PostgreSQL Ask privacy race tests, three claim identity tests, three mention identity tests, relationship reprocessing/source-deletion coverage and timed cleanup/workspace rotation.
+- Dependency audit remains a release gate: `npm audit --omit=dev` reports 22 advisories (15 high, seven moderate, zero critical), primarily Expo/Metro/configuration dependency paths. Current compatible transitive versions lack safe patches; automated suggestions downgrade the accepted Expo/RN stack. No forced downgrade or blind incompatible UUID override was applied. See SECURITY-AND-OPERATIONS.
 - Clean and baseline-upgrade migrations are tested on real throwaway PostgreSQL. Accepted migrations 0001/0002 are unchanged.
 - Synthetic SQL corpus: 13 items and 12 held-out questions. Actual local keyword SQL recall@1=0.25, recall@3=0.5833, MRR=0.4167. Fixed-vector pgvector fusion runs in CI. These synthetic vectors do not measure live embedding quality.
 - Native FTS at CI run `37561900902`: 1,000 synthetic records loaded in 41 ms on Windows / 55 ms on Linux; searches took 451 µs / 650 µs respectively. This is a CI-runner microbenchmark, not a device or end-to-end latency guarantee.
@@ -50,8 +51,8 @@ This is the implementation ledger for the V1 build from accepted baseline `92b4c
 | 21 Product UX | PASS | Today/Ask/Capture/Library/Memory flows; hardware usability OPEN |
 | 22 Design system | PASS | Existing shared tokens preserved, evidence presentation extended |
 | 23 Honest processing | PASS | Local/upload/worker/attention/error states remain real |
-| 24 Security | PASS | RLS/isolation, least privilege, deterministic correction and negative tests; live configuration OPEN |
-| 25 Deployment path | OPEN | Templates prepared; Docker image/hosting/Supabase deployment not executed |
+| 24 Security | PARTIAL | RLS/isolation, least privilege and adversarial tests pass; 22 dependency advisories remain; live configuration OPEN |
+| 25 Deployment path | OPEN | Docker image builds/imports in CI; templates prepared; hosting/Supabase deployment not executed |
 | 26 Live AI | OPEN | No authorized live evaluation budget/private corpus used |
 | 27 Physical devices | OPEN | No physical iPhone or installed Windows proof |
 | 28 Performance | PARTIAL | Bounded media/results/caches/outbox/spend; synthetic SQL/FTS timings; device latency/memory OPEN |

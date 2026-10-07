@@ -6,7 +6,13 @@ New tables enforce workspace RLS. Source and memory deletion use narrow SECURITY
 
 `python -m recall.db.backup backup <private.zip>` uses `RECALL_BACKUP_DATABASE_URL` for a privileged operator connection and normal storage configuration. It takes an explicit maintenance window, exports a consistent pg_dump snapshot, copies/hash-verifies originals and records migration versions, workspace sync clocks and capture time. Archives are private plaintext: store on an owner-controlled encrypted volume. Restore only trusted operator backups into an empty database and empty object store using `python -m recall.db.backup restore <private.zip>`. All archive paths/hashes are validated before writes; pg_restore restores schema, roles' grants, state and source mappings. Keep a failed destination isolated and retry in fresh destinations. Never pass an untrusted archive to privileged pg_restore.
 
-Deployment templates are in `infra/`; production API and worker use separate least-privilege database roles, private Supabase storage and explicit CORS/native origins. Owner migrations and backups are separate operations. Docker/hosting, signing, live provider quality and hardware acceptance remain OPEN until executed. See [V1-STATUS](V1-STATUS.md).
+Deployment templates are in `infra/`; production API and worker use separate least-privilege database roles, private Supabase storage and explicit CORS/native origins. Owner migrations and backups are separate operations. The backend image builds and its packaged modules import as the restricted runtime user in CI. Hosting, signing, live provider quality and hardware acceptance remain OPEN until executed. See [V1-STATUS](V1-STATUS.md).
+
+### Dependency release gate
+
+The final npm audit reports 22 advisories even with development dependencies omitted: 15 high, seven moderate, zero critical. These are primarily Expo/Metro/configuration dependency chains: Expo 57.0.27 / React Native 0.86.3 include node-forge 1.4.0, micromatch 4.0.8, braces 3.0.3 and xcode 3.0.1 with uuid 7.0.3. The audit counts affected parent packages separately from the underlying advisories; it does not prove every package is exploitable in the shipped mobile bundle.
+
+Registry inspection found no compatible patch for the affected node-forge/micromatch/braces versions. The suggested Expo 44 / RN 0.72 downgrade breaks the accepted stack. UUID's fixed range is at least 11.1.1 while xcode requires major 7, so a blind override is not a safe fix. Keep this gate open until compatible ecosystem updates or a reviewed, bounded exposure exception are accepted. No security-clean or production-ready claim is made from passing application tests.
 
 
 Version: 0.1 | Requirements to implement and verify, not security certification
