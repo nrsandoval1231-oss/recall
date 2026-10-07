@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { BrowserAuth, BrowserSession } from "./auth/session";
 import type { Draft } from "./storage";
-import type { RecallApiClient } from "@recall/api-client";
+import type { AskResponse, RecallApiClient } from "@recall/api-client";
 
 const storage = vi.hoisted(() => ({ clearDrafts: vi.fn(async () => undefined), deleteDraft: vi.fn(async () => undefined), draftPage: vi.fn(), listDrafts: vi.fn<(scope: string) => Promise<Draft[]>>(async (_scope) => []), saveDraft: vi.fn(async () => undefined) }));
 vi.mock("./storage", () => storage);
@@ -27,17 +27,110 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe("web capture privacy and source boundary", () => {
   it("shows sign-in without invoking private API reads while signed out", async () => { const auth = makeAuth(null); const api = {} as RecallApiClient; render(<App services={{ auth, api }} />); expect(await screen.findByText("Keep what matters.")).toBeTruthy(); });
   it("disables sign out while the durable original is uploading", async () => {
-    const auth = makeAuth(session("u1", "w1")); let release: (() => void) | undefined; const api = makeApi({ createCapture: vi.fn(() => new Promise(() => { release = () => undefined; })) }); render(<App services={{ auth, api }} />); await screen.findByText("Choose a photo of your note"); const input = document.getElementById("capture-file")!; fireEvent.change(input, { target: { files: [Object.assign(new File(["abc"], "note.png", { type: "image/png" }), { arrayBuffer: async () => new TextEncoder().encode("abc").buffer })] } }); fireEvent.click(screen.getByRole("button", { name: "Save original" })); await waitFor(() => expect((screen.getByRole("button", { name: "Sign out" }) as HTMLButtonElement).disabled).toBe(true)); expect(storage.saveDraft.mock.invocationCallOrder[0]).toBeLessThan((api.createCapture as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0] ?? Infinity); release?.(); });
+    const auth = makeAuth(session("u1", "w1")); let release: (() => void) | undefined; const api = makeApi({ createCapture: vi.fn(() => new Promise(() => { release = () => undefined; })) }); render(<App services={{ auth, api }} />); fireEvent.click(await screen.findByRole("button", { name: /^Capture$/ })); await screen.findByText("Choose a photo of your note"); const input = document.getElementById("capture-file")!; fireEvent.change(input, { target: { files: [Object.assign(new File(["abc"], "note.png", { type: "image/png" }), { arrayBuffer: async () => new TextEncoder().encode("abc").buffer })] } }); fireEvent.click(screen.getByRole("button", { name: "Save original" })); await waitFor(() => expect((screen.getByRole("button", { name: "Sign out" }) as HTMLButtonElement).disabled).toBe(true)); expect(storage.saveDraft.mock.invocationCallOrder[0]).toBeLessThan((api.createCapture as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0] ?? Infinity); release?.(); });
   it("retains pending drafts across logout and hides them from another workspace", async () => {
-    const auth = makeAuth(session("u1", "w1")); storage.listDrafts.mockImplementation(async (scope: string) => scope === "u1:w1" ? [pendingDraft] : []); const api = makeApi(); render(<App services={{ auth, api }} />); expect(await screen.findByText("pending note")).toBeTruthy(); auth.emit(null); await screen.findByText("Keep what matters."); expect(storage.clearDrafts).not.toHaveBeenCalled(); auth.emit(session("u2", "w2")); await waitFor(() => expect(screen.queryByText("pending note")).toBeNull()); expect(storage.clearDrafts).not.toHaveBeenCalled(); });
+    const auth = makeAuth(session("u1", "w1")); storage.listDrafts.mockImplementation(async (scope: string) => scope === "u1:w1" ? [pendingDraft] : []); const api = makeApi(); render(<App services={{ auth, api }} />); fireEvent.click(await screen.findByRole("button", { name: /^Capture$/ })); expect(await screen.findByText("pending note")).toBeTruthy(); auth.emit(null); await screen.findByText("Keep what matters."); expect(storage.clearDrafts).not.toHaveBeenCalled(); auth.emit(session("u2", "w2")); await waitFor(() => expect(screen.queryByText("pending note")).toBeNull()); expect(storage.clearDrafts).not.toHaveBeenCalled(); });
   it("refuses to display an original when the server hash header is absent", async () => {
-    const auth = makeAuth(session("u1", "w1")); const api = makeApi({ listCaptures: vi.fn(async () => ({ items: [capture], next_cursor: null })), fetchSource: vi.fn(async () => ({ bytes: new Uint8Array([97, 98, 99]).buffer, mediaType: "image/png", serverSha256: null })) }); render(<App services={{ auth, api }} />); const row = await screen.findByRole("button", { name: /source note/ }); fireEvent.click(row); expect(await screen.findByText("Original integrity hash unavailable.")).toBeTruthy(); expect(screen.queryByAltText("Original note")).toBeNull(); });
+    const auth = makeAuth(session("u1", "w1")); const api = makeApi({ listCaptures: vi.fn(async () => ({ items: [capture], next_cursor: null })), fetchSource: vi.fn(async () => ({ bytes: new Uint8Array([97, 98, 99]).buffer, mediaType: "image/png", serverSha256: null })) }); render(<App services={{ auth, api }} />); fireEvent.click(await screen.findByRole("button", { name: /Explore/ })); const row = await screen.findByRole("button", { name: /source note/ }); fireEvent.click(row); expect(await screen.findByText("Original integrity hash unavailable.")).toBeTruthy(); expect(screen.queryByAltText("Original note")).toBeNull(); });
   it("removes a pending original only after explicit confirmation", async () => {
-    const auth = makeAuth(session("u1", "w1")); let removed = false; storage.listDrafts.mockImplementation(async (scope: string) => scope === "u1:w1" && !removed ? [pendingDraft] : []); storage.deleteDraft.mockImplementation(async () => { removed = true; }); vi.spyOn(window, "confirm").mockReturnValue(true); const api = makeApi(); render(<App services={{ auth, api }} />); expect(await screen.findByText("pending note")).toBeTruthy(); fireEvent.click(screen.getByRole("button", { name: "Remove" })); await waitFor(() => expect(screen.queryByText("pending note")).toBeNull()); expect(storage.deleteDraft).toHaveBeenCalledWith("draft-1");
+    const auth = makeAuth(session("u1", "w1")); let removed = false; storage.listDrafts.mockImplementation(async (scope: string) => scope === "u1:w1" && !removed ? [pendingDraft] : []); storage.deleteDraft.mockImplementation(async () => { removed = true; }); vi.spyOn(window, "confirm").mockReturnValue(true); const api = makeApi(); render(<App services={{ auth, api }} />); fireEvent.click(await screen.findByRole("button", { name: /^Capture$/ })); expect(await screen.findByText("pending note")).toBeTruthy(); fireEvent.click(screen.getByRole("button", { name: "Remove" })); await waitFor(() => expect(screen.queryByText("pending note")).toBeNull()); expect(storage.deleteDraft).toHaveBeenCalledWith("draft-1");
   });
 
   it("shows the provider rate limit and prevents a second request", async () => {
     sessionStorage.clear(); const auth = makeAuth(null); auth.requestSignIn = vi.fn(async () => { throw new Error("EMAIL_RATE_LIMITED"); }); const api = {} as RecallApiClient; render(<App services={{ auth, api }} />); await screen.findByText("Keep what matters."); fireEvent.change(screen.getByLabelText("Email"), { target: { value: "pilot@example.com" } }); fireEvent.click(screen.getByRole("button", { name: "Email me a sign-in link" })); expect(await screen.findByText(/Email sign-in is temporarily limited/)).toBeTruthy(); expect(auth.requestSignIn).toHaveBeenCalledTimes(1); expect((screen.getByRole("button", { name: /temporarily limited/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+});
+
+const groundedAnswer: AskResponse = {
+  question: "Where was the café?", status: "answered", answer: "The synthetic note says Lisbon.", sentences: [],
+  citations: [{ citation_id: "citation-1", memory_id: "memory-1", memory_revision: 1, capture_id: "cap-1", source_id: "source-1", page: 2, quote: "Café in Lisbon?", captured_at: "2026-09-18T12:00:00Z", epistemic_state: "uncertain", kind: "transcription" }],
+  sources: [], limitations: ["The note leaves the location uncertain."], reason: null, index_as_of: null, mode: "online_grounded",
+};
+
+describe("adaptive glass-board interactions (synthetic)", () => {
+  it("does not restore an old session after an authoritative sign-out event", async () => {
+    const auth = makeAuth(null);
+    let finish!: (value: BrowserSession | null) => void;
+    auth.getSession = vi.fn(() => new Promise<BrowserSession | null>((resolve) => { finish = resolve; }));
+    const api = makeApi();
+    render(<App services={{ auth, api }} />);
+    await act(async () => { auth.emit(null); });
+    expect(await screen.findByText("Keep what matters.")).toBeTruthy();
+    await act(async () => { finish(session("u1", "w1")); });
+    expect(screen.getByText("Keep what matters.")).toBeTruthy();
+    expect(api.me).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed upload retryable without allowing a duplicate Save", async () => {
+    const createCapture = vi.fn(async () => { throw new Error("Offline."); });
+    storage.listDrafts.mockResolvedValue([pendingDraft]);
+    render(<App services={{ auth: makeAuth(session("u1", "w1")), api: makeApi({ createCapture }) }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Capture" }));
+    const file = Object.assign(new File(["abc"], "synthetic.png", { type: "image/png" }), { arrayBuffer: async () => new TextEncoder().encode("abc").buffer });
+    fireEvent.change(document.getElementById("capture-file")!, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Save original" }));
+    expect(await screen.findByText(/Offline.*original remains saved/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Save original" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Retry upload" })).toBeTruthy();
+    expect(createCapture).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the selected file and context when changing activities", async () => {
+    const auth = makeAuth(session("u1", "w1"));
+    render(<App services={{ auth, api: makeApi() }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Capture" }));
+    const file = new File(["synthetic"], "synthetic.png", { type: "image/png" });
+    fireEvent.change(document.getElementById("capture-file")!, { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText(/Context/), { target: { value: "Synthetic travel" } });
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+    expect(screen.queryByLabelText(/Context/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Capture" }));
+    expect((screen.getByLabelText(/Context/) as HTMLTextAreaElement).value).toBe("Synthetic travel");
+    expect(screen.getByText("synthetic.png")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Save original" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("discards a pending answer after the question changes and permits a new request", async () => {
+    let finish!: (answer: AskResponse) => void;
+    const ask = vi.fn().mockImplementationOnce(() => new Promise<AskResponse>((resolve) => { finish = resolve; })).mockResolvedValueOnce({ ...groundedAnswer, question: "New question" });
+    render(<App services={{ auth: makeAuth(session("u1", "w1")), api: makeApi({ ask }) }} />);
+    const input = await screen.findByLabelText("What are you trying to remember?");
+    fireEvent.change(input, { target: { value: "Old question" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask Recall" }));
+    fireEvent.change(input, { target: { value: "New question" } });
+    await act(async () => { finish(groundedAnswer); });
+    expect(screen.queryByText(groundedAnswer.answer!)).toBeNull();
+    expect((screen.getByRole("button", { name: "Ask Recall" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Ask Recall" }));
+    expect(await screen.findByText(groundedAnswer.answer!)).toBeTruthy();
+    expect(ask).toHaveBeenLastCalledWith("New question");
+  });
+
+  it("focuses an answer and opens evidence only on explicit action, retaining uncertainty", async () => {
+    const fetchSource = vi.fn(async () => ({ bytes: new Uint8Array([1]).buffer, mediaType: "image/png", serverSha256: null }));
+    render(<App services={{ auth: makeAuth(session("u1", "w1")), api: makeApi({ ask: vi.fn(async () => groundedAnswer), fetchSource }) }} />);
+    fireEvent.change(await screen.findByLabelText("What are you trying to remember?"), { target: { value: groundedAnswer.question } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask Recall" }));
+    expect(await screen.findByText(groundedAnswer.answer!)).toBeTruthy();
+    expect(screen.getByText(groundedAnswer.limitations[0]!)).toBeTruthy();
+    expect(fetchSource).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Focus answer" }));
+    expect(screen.getByRole("button", { name: "Show sources" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /View evidence/ }));
+    expect(fetchSource).toHaveBeenCalledWith("source-1");
+    expect(await screen.findByText("Original integrity hash unavailable.")).toBeTruthy();
+    expect(screen.queryByAltText("Cited original")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Close evidence" }));
+    expect(screen.queryByText("Original integrity hash unavailable.")).toBeNull();
+    fireEvent.change(screen.getByLabelText("What are you trying to remember?"), { target: { value: "Different" } });
+    expect(screen.queryByText(groundedAnswer.answer!)).toBeNull();
+  });
+
+  it("keeps an unprocessed source's review state honest", async () => {
+    render(<App services={{ auth: makeAuth(session("u1", "w1")), api: makeApi({ listCaptures: vi.fn(async () => ({ items: [{ ...capture, status: "needs_review" }], next_cursor: null })) }) }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Explore" }));
+    expect(await screen.findByText("Needs review")).toBeTruthy();
+    expect(screen.queryByText("Ready")).toBeNull();
+  });
 });

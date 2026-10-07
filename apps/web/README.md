@@ -1,5 +1,7 @@
 # Recall web pilot
 
+The adaptive glass-board UI and palette exploration are recorded in [the design archive](../../docs/design/2026-10-glass-ui/README.md). To try the real UI with synthetic services, run `npm run dev --workspace @recall/web -- --host 127.0.0.1` from the repository root and open `/dev/preview.html` on the local Vite server. This development entry makes no production API, provider or email calls and is excluded from the normal production bundle.
+
 The Cloudflare Worker serves the Vite app, turns a clicked Supabase email link into an encrypted `HttpOnly`, `Secure`, `SameSite=Lax` session, and proxies only the fixed `/api/v1/*` route to the existing Recall API. It does not replace the canonical Postgres, private storage, or backend.
 
 The sign-in request sets an `HttpOnly` ten-minute login nonce. The email redirect carries the matching state to `/auth/callback`; its temporary Supabase fragment is posted once to `/auth/session`, validated by Supabase, encrypted in the Worker cookie, and immediately removed from the URL. A link opened in another browser cannot establish a session because it lacks that browser's nonce.

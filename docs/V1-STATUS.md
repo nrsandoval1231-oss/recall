@@ -4,6 +4,19 @@ This is the implementation ledger for the V1 build from accepted baseline `92b4c
 
 ## What works
 
+### Adaptive glass-board browser UI, October 7
+
+Implementation on base commit `70d3d7a3fcc7e643f099039a48c1c25676fed9a8`, saved on `codex/recall-glass-ui`; exact packet revision is available in Git/PR history. No deployment was created for this UI packet. The approved space-black/glass direction now supports explicit Ask, Explore and Capture modes, source selection, answer focus, verified original opening/closure and per-page original navigation. Selected capture files/context survive mode switches. Editing a question invalidates its old result; closed, replaced or unmounted original viewers reject late responses and revoke object URLs. Durable-save upload failures retain the original as a retryable draft and prevent duplicate Save from the same selection. Settings remain explicit; no consent is inferred from navigation. Scope remains the existing single-image web capture and current API contracts.
+
+Verification commands and results:
+
+- `npm run test`: 137 client tests passed (API 26, tokens 4, sync 30, desktop 36, mobile 9, web 32). Synthetic regressions cover draft preservation, late Ask cancellation, stale startup-session rejection, duplicate-save prevention, honest review status and explicit hash-verified source access.
+- `npm run typecheck`: all workspace checks and client E2E types passed; final `npm run build --workspace @recall/web` also passed TypeScript and Vite production bundling.
+- `npm run lint`: passed. `git diff --check`: passed. Impeccable mechanical detector on App/styles returned no findings.
+- Local browser verification with a clearly labeled synthetic fixture: Ask/result, Explore, Capture, focus/restore, original open/close, and 390px phone layout without horizontal overflow. The original temporary fixture was removed; the equivalent development-only source is now preserved in `apps/web/dev/preview.html` and included in TypeScript validation. A standalone interactive preview remains outside the repository. All six generated concepts and a working-UI screenshot are archived in [the design archive](design/2026-10-glass-ui/README.md). No provider calls, real-note uploads or sign-in emails were used for these checks.
+
+Remaining acceptance: this packet has not been deployed; real signed-in API/upload acceptance, physical iPhone/Windows usability and live-provider quality remain open. Synthetic browser behavior and client tests do not close those gates.
+
 ### Active browser pilot, October 6
 
 The user selected a Cloudflare web app after native email sign-in failures. `apps/web` implements browser email-link callbacks, encrypted server session cookies, durable scoped photo drafts, retry-safe uploads, recent captures, Ask, and hash-verified cited originals. Root verification: 125 client tests passed, including 20 web tests; root lint/typecheck and web production build passed. Actual Wrangler runtime returned 200 for the app/callback with CSP and same-origin resource policy; private unauthenticated routes returned 401/no-store; foreign-origin login POST returned 403; arbitrary proxy routes returned 404. No email was sent by these probes.

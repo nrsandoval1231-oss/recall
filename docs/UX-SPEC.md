@@ -2,6 +2,18 @@
 
 ## V1 implemented product surfaces
 
+### Browser glass-board UI packet — October 7
+
+Approved direction: digital glass boards on a space-black canvas; originals appear only when explicitly opened. The browser adapts to explicit user intent, rather than inferring private context or creating new obligations:
+
+- Ask emphasizes the question and grounded response. Changing the question invalidates the displayed answer; pending requests cannot display results for a different question or workspace.
+- Explore emphasizes the existing recent-capture list and the selected original. It does not imply graph exploration, related-memory discovery or generative offline recall.
+- Capture emphasizes selecting an image, optional context, durable Save and pending-upload recovery. Switching views must preserve a selected file and context.
+- Selecting evidence brings its source forward after authorization and integrity checks. A closed or replaced viewer must not reopen from a late request.
+- Settings exposes the existing explicit AI reading control; layout changes never toggle AI consent.
+
+Phone uses stacked boards; desktop uses adjacent boards. Navigation and source selection work with keyboard controls and visible focus. Reduced motion preserves the complete interaction without animated transitions. The visual contract lives in `apps/web/DESIGN.md`; implementation evidence belongs in V1-STATUS.
+
 Today keeps Ask prominent and capture readily available. Mobile Ask displays answered/ambiguous/insufficient-evidence/unavailable states and opens cited originals through Detail. Desktop provides Ask, Library, Review, Memory with original evidence/history, correction controls, conservative identity confirmation and explicit merge/split preview.
 
 Offline desktop uses cached search and originals available on that device, with an explicit local-search message. Supported corrections/actions are durable before network acknowledgment; conflicts remain visible. Authorization denial clears controlled cache and never falls back to cached originals. Settings exposes portable ZIP export, safe selected-root Markdown export and owner deletion preview/confirmation. Processing states remain tied to actual saved/uploaded/worker state.
