@@ -2,6 +2,10 @@
 
 This is the implementation ledger for the V1 build from accepted baseline `92b4c33aafda412f89d745f38b87858f2d4b2837`. A PASS below means deterministic implementation evidence, not live product quality. Physical devices, live infrastructure and model quality have separate gates.
 
+## Required architecture gap — Obsidian spine
+
+The October 7 product direction requires Obsidian as the user-owned durable memory spine. **This is not implemented:** current memory remains PostgreSQL-authoritative, with a one-way native Markdown exporter. Vault commitment, direct-edit reconciliation, versioned history/provenance and projection reconstruction are required migration work in RCL-005B. Existing tests and canonical-browser acceptance do not establish vault-spine acceptance. Preserve current behavior until migration is specified and verified.
+
 ## What works
 
 ### Canonical browser Memory Surface, October 7

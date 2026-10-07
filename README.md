@@ -24,15 +24,22 @@ What exists: Expo iPhone app, Tauri/React Windows app, FastAPI backend, Postgres
 
 This repository is public. Every checked-in example must remain synthetic. Never commit private notes, customer information, personal documents, credentials, exported memories, or a private evaluation corpus.
 
+## Required Obsidian spine
+
+Obsidian is the required memory spine, not an optional export destination. The user-owned vault holds durable memory notes, relationships, original attachments and the provenance/history needed to preserve meaning over time. Recall adds low-friction capture, LLM-assisted understanding, grounded retrieval and the Memory Surface over that foundation. Users do not need to organize folders or maintain a taxonomy.
+
+**Implementation gap:** current code still commits authoritative memory to PostgreSQL and offers one-way managed Markdown export. Bidirectional vault integration, recoverable vault commits and reconstruction of database projections from the vault are required work; they are not implemented. See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
+
 ## Product layers
 
 | Layer | Responsibility |
 | --- | --- |
 | Original sources | Immutable evidence: photos first; later voice, screenshots, files, links, text, and other authorized inputs |
-| Cloud PostgreSQL + pgvector | Canonical memory state, temporal history, relationships, corrections, permissions, and retrieval indexes |
+| Obsidian vault | Required user-owned memory spine: notes, links, original attachments and versioned provenance/history |
+| PostgreSQL + pgvector | Supporting operational state, authorization, synchronization and rebuildable memory/search projections; currently authoritative in the pre-migration implementation |
 | Desktop SQLite | Rebuildable offline cache and durable pending operations |
 | AI | Interpretation, extraction, retrieval synthesis, and proposals; never canonical truth |
-| Exports/integrations | Portable Markdown/JSON/originals; Obsidian is one optional adapter, not a core dependency |
+| Portability/integrations | Vault-compatible Markdown, structured history and originals; other tools are adapters to the Obsidian-backed memory |
 
 ## First useful loop
 
@@ -56,8 +63,9 @@ V1 proves trusted photo capture and grounded recall. Typed text joins voice, scr
 - Mobile: Expo / React Native / TypeScript, iPhone first.
 - Desktop: Tauri 2 / React / TypeScript, Windows first.
 - Backend: FastAPI + durable worker.
-- Canonical state: managed PostgreSQL + pgvector.
-- Original evidence: private object storage.
+- Required memory spine: user-owned Obsidian vault.
+- Supporting service database/search: PostgreSQL + pgvector; vault-authority migration remains open.
+- Original evidence: immutable vault attachments with authorized private-storage replicas; current code uses private object storage.
 - Desktop offline state: SQLite.
 - AI: one evaluated multimodal configuration plus embeddings; no model router or autonomous agent framework in V1.
 

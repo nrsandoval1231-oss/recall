@@ -62,7 +62,9 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 7. AI proposes; deterministic software commits.
 8. Source access is part of recall.
 9. Complexity stays behind the glass.
-10. Portability and privacy are product features; Obsidian is optional.\n11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.\n12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
+10. Obsidian is the required, user-owned memory spine. Recall adds intelligence and experience over portable vault memory; Obsidian is not merely an export adapter.
+11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.
+12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
 ## 6. Memory layers
 
@@ -129,7 +131,8 @@ Included:
 - Natural-language Ask with source-backed answers and abstention.
 - Corrections/review and suggested versus accepted actions.
 - Desktop SQLite cache/outbox and offline text search.
-- Portable export; optional one-way Obsidian/Markdown adapter.
+- Required Obsidian vault integration with durable memory, original evidence, history and conflict-safe reconciliation of direct vault edits. The current one-way Markdown exporter is an implementation gap, not fulfillment of this requirement.
+- Portable export and vault recovery.
 - Workspace isolation even during a single-user pilot.
 
 Deferred:
@@ -182,9 +185,9 @@ Deferred:
 | ASK-03 | Historical/latest queries respect temporal state |
 | REV-01 | Targeted clarification; defer/not-sure always allowed |
 | ACT-01 | Suggested actions/commitments do not become obligations automatically |
-| SYN-01 | One canonical server state with conflict-safe sync |
+| SYN-01 | Obsidian-backed canonical memory with conflict-safe vault/service/device synchronization |
 | OFF-01 | Desktop cached browsing/search and durable outbox |
-| EXP-01 | Portable export; Obsidian is optional adapter |
+| EXP-01 | Required Obsidian memory spine; portable vault, structured history and originals |
 | PRIV-01 | Workspace isolation and owner control |
 | OPS-01 | Backup, restore, deletion, independently readable export |
 
@@ -203,7 +206,9 @@ Evaluation includes both Paul-style difficult handwriting and general-domain cas
 
 ## 14. Architecture constraints
 
-Cloud Postgres + pgvector is canonical structured state. Private object storage holds original evidence. Desktop SQLite is a rebuildable cache/outbox. Markdown/JSON/original export is the portability layer. Obsidian is one optional consumer.
+The Obsidian vault is the required durable memory spine. Human-readable Markdown and links coexist with immutable original attachments and versioned structured provenance/history, so memory remains owned and usable outside Recall. PostgreSQL/pgvector provide supporting transactional services, authorization, synchronization and rebuildable memory/search projections; SQLite is a cache/outbox. Neither an LLM nor a database-only record replaces vault-backed memory.
+
+The existing code is still PostgreSQL-authoritative with one-way managed Markdown export. Vault-first commitment, direct vault-edit reconciliation and projection recovery are required migration work, not current capabilities. Precise vault schema and cross-device transport must be specified and validated before implementation; no paid Obsidian Sync service or community plugin is assumed.
 
 Mobile and desktop use the same authenticated Memory API. Neither receives database-owner or AI-provider secrets. AI remains replaceable derived machinery.
 

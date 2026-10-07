@@ -1,8 +1,12 @@
 # Recall build roadmap
 
-Version: 0.3 | Dependency-ordered, not delivery-date promises
+Version: 0.4 | Dependency-ordered, not delivery-date promises
 
 The active pilot path is the Cloudflare browser adapter: iPhone browser photo capture and Windows browser retrieval. Native clients remain preserved. Browser implementation/local verification is recorded in V1-STATUS; deployment and real signed-in cross-device acceptance remain open.
+
+## Required architecture decision
+
+Obsidian is the required memory spine. Existing database-authoritative capture/retrieval and one-way Markdown export are the pre-migration baseline. RCL-005B below is a mandatory dependency for claiming the architecture fulfills this vision; completed earlier packets do not prove vault integration.
 
 ## Foundation
 
@@ -52,11 +56,31 @@ Status: export/delete/backup/managed Markdown implemented; partial processed-sou
 
 Objective: Recall is not a data trap.
 
-Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tombstones, backup/restore, and optional managed Obsidian adapter with local-edit conflict protection.
+Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tombstones, backup/restore, and the existing managed Markdown exporter with local-edit conflict protection.
 
-Obsidian remains optional and must never be required for Recall correctness.
+The existing exporter is insufficient for the required Obsidian spine. Its conflict protections must be preserved during migration.
 
-## RCL-005A — Canonical Memory Surface\n\nObjective: replace conventional dashboard/page presentation with the approved Recall interaction language without changing canonical memory semantics.\n\nBuild the smallest real vertical slice first: sparse Home -> Ask reconstruction -> contextual glass boards -> memory focus -> original evidence forward -> entity refocus -> historical/current state -> correction -> Back restores context. Mobile adapts this to one primary board at a time.\n\nThe visual semantics are locked in [UX-SPEC](UX-SPEC.md): glass = understanding; physical artifacts = evidence; light = intelligence; space = relationships; depth = context; time = memory evolution. DOM/CSS-first; add GPU/WebGL only where measured value justifies it. Preserve keyboard/reduced-motion/accessibility and honest loading/error/uncertain states. Do not hard-code the synthetic Brooks Campus design fixture.\n\nExit: the vertical slice runs against real Recall contracts/data, remains source-grounded, passes interaction/accessibility regression coverage, and is visually recognizable as Recall rather than a generic notes/dashboard/chat application.\n\n## RCL-006 — Private multi-domain pilot
+## RCL-005A — Canonical Memory Surface
+
+Objective: replace conventional dashboard/page presentation with the approved Recall interaction language without changing canonical memory semantics.
+
+Build the smallest real vertical slice first: sparse Home -> Ask reconstruction -> contextual glass boards -> memory focus -> original evidence forward -> entity refocus -> historical/current state -> correction -> Back restores context. Mobile adapts this to one primary board at a time.
+
+The visual semantics are locked in [UX-SPEC](UX-SPEC.md): glass = understanding; physical artifacts = evidence; light = intelligence; space = relationships; depth = context; time = memory evolution. DOM/CSS-first; add GPU/WebGL only where measured value justifies it. Preserve keyboard/reduced-motion/accessibility and honest loading/error/uncertain states. Do not hard-code the synthetic Brooks Campus design fixture.
+
+Exit: the vertical slice runs against real Recall contracts/data, remains source-grounded, passes interaction/accessibility regression coverage, and is visually recognizable as Recall rather than a generic notes/dashboard/chat application.
+
+## RCL-005B — Required Obsidian memory spine
+
+Status: **required; not implemented**.
+
+Make an Obsidian vault the user-owned durable memory spine while retaining Recall's Memory Surface and universal memory model. Specify the versioned vault schema, workspace association, authorized browser/mobile bridge, direct-edit reconciliation and migration/rollback before changing storage authority. Keep PostgreSQL/jobs/authorization and SQLite where useful as supporting services/projections, not exclusive owners of semantic memory.
+
+Build the smallest real round trip: capture -> preserved vault original and memory -> edit in Obsidian -> validated Recall understanding -> grounded Ask -> correction/history retained in vault. Do not require manual folders/tags, a community plugin or paid Obsidian Sync.
+
+Exit: crash-safe/idempotent vault writes, direct-edit conflicts, concurrent devices, immutable sources/hash checks, temporal/correction/tombstone preservation, revoked access and cross-workspace isolation, and reconstruction of memory/search projections from vault data. Existing users' memory must migrate with verified parity and a safe rollback; legacy Markdown export alone does not pass.
+
+## RCL-006 — Private multi-domain pilot
 
 Objective: prove Recall solves real memory retrieval, not merely Paul's specific note structure.
 

@@ -1,6 +1,12 @@
 # Canonical data model
 
-## V1 implemented schema
+## Required vault ownership
+
+The Obsidian vault is the required canonical memory spine. The universal model below must have a durable, versioned vault representation: stable IDs, linked memories/entities, immutable source attachments and hashes, evidence references, uncertainty, temporal revisions, corrections and tombstones. PostgreSQL/search/SQLite semantic projections must be recoverable from this representation; service authorization and secrets are separate protected operational state.
+
+The exact frontmatter/sidecar schema, operation journal and migration contract are not yet implemented or finalized. Do not claim ordinary exported Markdown already preserves every semantic invariant. Direct user edits require validated reconciliation; paths/titles are not identity or authorization.
+
+## V1 implemented schema — database-authoritative baseline
 
 0003 adds `entities`, `entity_aliases`, evidence-keyed `mentions`, `entity_links`, `claims`, append-only `claim_revisions`, `actions`, `memory_overrides`, and `identity_operations`. Kinds are person, organization, place, thing, event, project and topic. Name matching creates candidates, never accepted identity. Explicit merge/split records actor and moved mention IDs.
 
@@ -17,7 +23,7 @@ Version: 0.4 | Logical schema. RCL-001 and RCL-002 tables are implemented in `se
 
 ## Design goal
 
-The core model is universal external memory, not a CRM, CMMS, mining database, or Obsidian schema. Domain-specific concepts are represented with universal entities, memories, typed attributes, and relationships.
+The core model is universal external memory, not a CRM, CMMS or mining database. Its required durable representation is an Obsidian-compatible vault; that storage choice must not impose a domain-specific taxonomy on users. Domain-specific concepts are represented with universal entities, memories, typed attributes, and relationships.
 
 Use UUIDs. Every user-data row includes `workspace_id`. Mutable canonical records carry versions and timestamps. Derived rows record source capture, processor version, and provenance.
 

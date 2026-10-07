@@ -1,4 +1,12 @@
-# Sync, offline behavior, and Obsidian export
+# Obsidian spine, synchronization and portability
+
+## Required target — vault-backed memory
+
+Obsidian is the required user-owned memory spine, not an optional export destination. Vault notes, links, immutable source attachments and versioned structured history/provenance hold durable memory. Recall must reconcile direct vault edits, service operations and offline commands without silent overwrite or resurrection. Memory/search projections must be rebuildable from the vault; operational permissions remain protected service state.
+
+The target requires a workspace-scoped vault association, journaled/idempotent commits, stable IDs independent of filenames, explicit conflicts, source hashes, temporal/correction history and tombstones. Capture remains locally durable when the vault is unavailable, with explicit vault-pending state. A cloud upload alone cannot be represented as completed vault synchronization. Browser/mobile need an authorized vault bridge or replica transport; neither a specific paid sync service nor a community plugin is assumed. Transport, vault schema and conflict protocol remain open implementation work.
+
+Acceptance must include capture reaching the vault, Obsidian edits returning to Recall, correction history surviving restart/reindex, rebuilding memory/search projections from the vault, and deletion/privacy/crash recovery. The sections below document the existing pre-migration implementation and its safe exporter, not fulfillment of the required target.
 
 ## V1 implementation details
 
@@ -6,14 +14,14 @@ The server serializes workspace changes into monotonic identifier events. Native
 
 Portable exports include canonical JSON and full revision/identity/correction history, source UUIDs/hashes, deterministic Markdown and byte-preserved verified originals. Private storage keys are excluded. Manifest snapshot metadata identifies the exported sync state; unverified originals are listed as unavailable. Source/model text is fenced as literal content in Markdown. Server exports are bounded and abandoned private temporary archives expire after 24 hours; normal responses unlink immediately.
 
-The optional native adapter writes only UUID memory files beneath a selected `Recall` root, uses a manifest and recovery journal, and reports conflicts when generated files were edited locally. Arbitrary user files are preserved. A subsequent managed export removes unchanged managed files that no longer exist canonically; offline exports cannot be remotely revoked. Native ZIP IPC is capped at 32 MiB for the pilot; use the portable ZIP independently for larger exports. Backups are a distinct owner-operated format, not portable ZIP import.
+The existing one-way native adapter writes only UUID memory files beneath a selected `Recall` root, uses a manifest and recovery journal, and reports conflicts when generated files were edited locally. Arbitrary user files are preserved. A subsequent managed export removes unchanged managed files that no longer exist canonically; offline exports cannot be remotely revoked. Native ZIP IPC is capped at 32 MiB for the pilot; use the portable ZIP independently for larger exports. Backups are a distinct owner-operated format, not portable ZIP import.
 
 
-Version: 0.1 | No bidirectional vault synchronization in V1
+Version: 0.2 | Required bidirectional vault integration remains unimplemented
 
 ## 1. Source of truth
 
-Cloud PostgreSQL is authoritative for committed application state. SQLite stores a local projection and durable pending commands. Local records are never copied wholesale over server records. Obsidian is an optional one-way export, not a second master.
+Current code uses PostgreSQL as authoritative committed application state and SQLite as a local projection/outbox. Its Obsidian integration is one-way export. This implementation must migrate to the required vault spine above; until migration is verified, preserve existing conflict/authorization semantics rather than enabling competing uncoordinated masters.
 
 Offline work is acknowledged as saved on this device until the server accepts it. The UI shows last successful sync and any failed/conflicting operations. Do not say "synced" just because a request was sent.
 
@@ -61,7 +69,7 @@ V1 does not attempt automatic rich-text merging or a general CRDT. Preserve both
 
 Mobile guarantees durable offline drafts in V1; full offline library/Ask parity is not required. Do not infer offline availability from a thumbnail.
 
-## 6. Safe Markdown projection
+## 6. Existing safe Markdown exporter — insufficient as the spine
 
 The user chooses an existing vault or a new export destination. Create a dedicated `Recall/` subfolder. V1 writes nowhere else and does not ingest or relocate existing Paul-Intelligence notes automatically.
 
@@ -96,7 +104,7 @@ For each managed file, store the last generated content hash and corresponding R
 - Unmanaged file/path collision: never replace it; select a safe ID-qualified path or require resolution.
 - Missing file: recreate only according to the selected export policy and show that it is managed output.
 
-There is no automatic import of Obsidian edits in V1. Paul can retain a personal note or explicitly apply the correction in Recall. The UI must explain this before export is enabled. Do not put Recall-managed output under multiple competing live sync engines.
+There is currently no automatic import of Obsidian edits. This is a required architecture gap, not the intended product boundary. Paul can retain a personal note or explicitly apply the correction in Recall. The UI must explain this before export is enabled. Do not put Recall-managed output under multiple competing live sync engines.
 
 ## 8. Filesystem boundary
 
@@ -110,4 +118,4 @@ Deleting a capture immediately removes its content from live retrieval and sched
 
 The app can clean controlled cache/managed copies when online, but cannot guarantee erasure from an offline device, a manually copied vault, or a downloaded external backup. Describe that limit clearly. Locally edited exports must not be silently destroyed by deletion reconciliation; surface them for the user's decision.
 
-A complete user export includes Markdown, a JSON snapshot of structured records/relationships/versions, original sources, and a hash manifest. Markdown alone is not a full application backup. Exports identify the snapshot time and any unavailable sources. Recovery requires database data and source objects; see [SECURITY-AND-OPERATIONS](SECURITY-AND-OPERATIONS.md).
+A complete user export includes Markdown, a JSON snapshot of structured records/relationships/versions, original sources, and a hash manifest. Markdown alone is not a full application backup. Exports identify the snapshot time and any unavailable sources. Current implementation recovery requires database data and source objects; target recovery must also validate the vault and reconstruct semantic projections from its notes, originals and structured history; see [SECURITY-AND-OPERATIONS](SECURITY-AND-OPERATIONS.md).

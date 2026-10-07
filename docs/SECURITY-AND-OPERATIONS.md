@@ -1,5 +1,12 @@
 # Security, privacy, and operations
 
+## Required Obsidian spine — security and recovery boundary
+
+The target vault is canonical user-owned memory. It contains private notes, original attachments and versioned metadata/history and must receive the same privacy and integrity protections as existing sources. Vault access is explicitly granted and workspace-scoped; text/frontmatter cannot grant service permissions or select arbitrary filesystem paths. Never silently enable a third-party sync provider or send vault content to an LLM without existing authorization/consent.
+
+Target backup/restore must preserve and validate the whole vault, immutable attachment hashes, stable IDs, correction/temporal history and tombstones, then rebuild semantic/search projections. Ordinary Markdown export alone is insufficient. Protected service authorization/operational state has its own recovery plan; vault reconstruction cannot restore revoked privileges. Existing database/object backup procedures below remain required until a verified migration replaces their memory-ownership role. Offline/manual vault copies and external backups cannot be remotely erased reliably.
+
+
 ## V1 operations and limitations
 
 New tables enforce workspace RLS. Source and memory deletion use narrow SECURITY DEFINER commands with fixed search paths and verified membership, rather than granting generic client DELETE access. Purge workers consume only server-recorded private object keys, use bounded retry/backoff and keep provider error content out of the database. Deleted memory is durably suppressed from future processing; full capture purge removes its derived state and queues original byte deletion. Provider retention is controlled by the provider account terms; Recall cannot erase copies already sent to a provider or arbitrary exported files.

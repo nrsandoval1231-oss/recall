@@ -1,6 +1,33 @@
 # Recall architecture
 
-## V1 implementation update
+## Required target: Obsidian as the memory spine
+
+Product decision, October 7, 2026: **Obsidian is required as Recall's user-owned memory spine.** This supersedes the earlier database-as-canonical/optional-vault architecture. Recall is the capture, intelligence and Memory Surface layer over an Obsidian vault.
+
+The vault owns durable memory: readable Markdown, links, original attachments and versioned structured metadata sufficient to preserve IDs, provenance, uncertainty, corrections, temporal history and deletion state. Markdown prose alone is insufficient. Users can read and edit their memory in Obsidian without Recall, and those edits must enter explicit, conflict-safe reconciliation rather than remain disconnected exports.
+
+PostgreSQL/pgvector remain useful for authenticated operations, jobs, authorization, synchronization and rebuildable memory/search projections. SQLite remains a local cache/outbox. Private object storage can hold authorized replicas of vault originals. Operational permissions and credentials stay in protected services, not editable vault text; an edited note cannot grant access. The LLM proposes interpretations and answers, never owns memory or writes arbitrary files.
+
+Required target path:
+
+```text
+Capture -> durable original/outbox -> authorized, recoverable vault commit
+                                       |
+                                Obsidian memory spine
+                                notes + links + originals
+                                versioned provenance/history
+                                       |
+                            validated service projections
+                            PostgreSQL / search / SQLite
+                                       |
+                              grounded Memory Surface
+```
+
+Vault association is required per workspace. Local capture may precede vault availability, but vault-pending state must remain explicit. Obsidian itself need not be running for an authorized adapter to access the vault; integration must not require a paid sync subscription or community plugin. Browser/mobile access needs a scoped vault bridge or replica transport, not unrestricted filesystem access. Its concrete transport and conflict protocol remain design/implementation work.
+
+Migration must prove journaled crash-safe writes, versioned/idempotent operations, direct-edit ingestion, conflict preservation, immutable evidence, authorization, deletion/tombstone reconciliation and recovery of semantic/search projections from the vault. Preserve current contracts and data until migration and rollback are verified. A one-way export does not meet acceptance.
+
+## Current V1 implementation — pre-migration
 
 The active pilot client is a responsive React web app served by a Cloudflare Worker. The Worker holds encrypted HttpOnly session cookies, validates the Supabase email callback, and proxies only the fixed Recall API origin. Browser tokens are removed from callback URLs before network redemption. Canonical PostgreSQL, private originals, and the Python API/worker remain unchanged. Browser IndexedDB is a workspace-scoped original-draft outbox, not the native SQLite cache or an offline generative service. Pending drafts survive logout and have explicit confirmed removal controls. Deployment and live browser acceptance are tracked separately in V1-STATUS.
 
@@ -11,9 +38,9 @@ Desktop Rust owns scoped SQLite, FTS, downloaded-original inventory, outbox and 
 See [V1-STATUS](V1-STATUS.md) for verification boundaries; proposed future capabilities below are not all implemented.
 
 
-Version: 0.1 | 2026-10-06 | Proposed implementation baseline
+Version: 0.2 | 2026-10-07 | Obsidian target required; database baseline below describes current implementation
 
-## 1. Ownership and topology
+## 1. Current implementation ownership and topology
 
 ```text
 Expo mobile ------------------+
@@ -33,7 +60,7 @@ Future adapters --------------+   + pgvector              (bounded calls)
 
 Solid implementation scope is mobile, desktop, API, worker, database, storage, cache, and export. Assistant/connectors are future adapters and must not be dependencies of the first build.
 
-Postgres records the current accepted interpretation and its history, not objective truth. Object storage holds original evidence. AI and indexes are replaceable derived machinery. SQLite is a synchronized working copy plus local pending operations. Markdown is a portable projection, not a peer database.
+In current code, Postgres records accepted interpretation/history and object storage holds originals; SQLite is a working copy/outbox and Markdown is a one-way projection. This is the pre-migration implementation, not the required target ownership. The target vault must preserve durable memory/history and support rebuilding semantic projections. AI and indexes remain replaceable derived machinery.
 
 ## 2. Stack decisions
 
@@ -44,7 +71,8 @@ Postgres records the current accepted interpretation and its history, not object
 | Shared clients | Contracts, generated API types, design tokens, sync protocol | Share behavior and language, not an assumption of identical React Native/DOM components |
 | API | FastAPI | Authentication, validation, domain commands, retrieval, and source authorization |
 | Worker | Separate process from the same Python package | Durable jobs survive request completion; no in-process-only background processing |
-| Cloud state | Managed PostgreSQL with pgvector | Relational records, full-text, and measured vector retrieval without another database |
+| Memory spine (required target) | Obsidian vault | User-owned notes, links, immutable originals and versioned provenance/history; integration remains unimplemented |
+| Supporting cloud state | Managed PostgreSQL with pgvector | Operational services and rebuildable retrieval projections; currently authoritative until vault migration |
 | Identity/storage | Supabase Auth and private Storage, proposed default | Reduce infrastructure assembly; not a claim that defaults are secure or free |
 | Local state | SQLite | Cache, local full-text search, pending operations, and export manifests |
 | AI | One multimodal provider/model plus one embedding model | Evaluate on handwriting first; no router, agent framework, or speculative model menu |
@@ -65,7 +93,7 @@ One Python package contains bounded modules:
 
 The API and worker reuse these modules. Do not split them into separately deployed microservices. The worker has no reason to run on an end user's computer.
 
-## 4. Capture write path
+## 4. Current capture write path — vault commit integration pending
 
 1. Mobile copies each selected/camera image from its temporary URI into app-private durable storage before acknowledging local Save. Persist the ordered manifest and a client-generated UUID operation ID.
 2. The authenticated API creates or reuses a capture using workspace-scoped idempotency. It returns narrowly scoped upload authorization.
@@ -106,7 +134,7 @@ Use workspace membership checks in the API plus database RLS/least-privilege rol
 
 The worker's elevated access is narrowly scoped by code and tests to its claimed workspace/capture. Storage buckets remain private. Read URLs, when used, are short-lived bearer capabilities with explicit TTL limits.
 
-## 8. Synchronization and local files
+## 8. Current synchronization and local files — vault reconciliation pending
 
 A versioned change feed updates desktop SQLite. Client commands carry operation IDs and expected entity/record versions. Source downloads are separately tracked and hash-verified. Offline originals are not implied by a cached record.
 
@@ -116,7 +144,7 @@ The desktop is the local bridge; there is no separate always-on service in V1. I
 
 **Canonical local Postgres:** makes phone capture and cloud integrations depend on a specific desktop or a second synchronization system. Local Postgres remains appropriate for developer tests, not canonical user memory.
 
-**Markdown as the application database:** makes concurrency, correction precedence, tenant authorization, and offline reconciliation depend on file parsing and filesystem races. Markdown remains the escape hatch.
+**Unversioned Markdown-only transactions:** are insufficient for concurrency, correction precedence, authorization and offline reconciliation. This rejects unsafe file mutation, not the required Obsidian spine. Vault notes need stable IDs, structured history, journaled writes and validated synchronization; service databases can supply operational guarantees without exclusively owning memory.
 
 **Separate graph/vector/queue services:** create operating overhead before workload evidence warrants it. Relational entity links, pgvector, and a jobs table are sufficient starting boundaries.
 
@@ -124,7 +152,7 @@ The desktop is the local bridge; there is no separate always-on service in V1. I
 
 Core services operate only on universal captures, sources, memories, entities, relationships, statements, actions, and temporal/provenance records. Domain-specific experiences are projections/adapters. Do not fork storage or retrieval into separate schemas for maintenance, sales, education, travel, or other verticals.
 
-Obsidian is an optional export adapter. No core capture, Ask, correction, sync, or retrieval path may depend on Obsidian being installed or configured.
+Obsidian is the required memory spine. Capture, Ask, correction and synchronization must operate over vault-backed memory through authorized adapters. Recall must preserve its universal model and simple Memory Surface without exposing vault organization as mandatory user work.
 
 The architecture must allow later source adapters (voice, screenshots, files, links, connected apps) to enter through the same trusted source-memory boundary and later assistant surfaces to access memory through the same authenticated API/tool contract.
 

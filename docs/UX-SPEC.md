@@ -1,5 +1,12 @@
 # Recall — Canonical Experience & Visual System
 
+## Required memory foundation
+
+Recall's Memory Surface operates over an Obsidian vault as the required, user-owned memory spine. Vault notes, links, original attachments and versioned provenance/history preserve memory outside Recall; PostgreSQL/search/SQLite are supporting services and projections. Obsidian is not an optional export adapter.
+
+This foundation stays behind the experience: Capture does not require folders/tags, Ask remains reconstruction, and users do not navigate a vault taxonomy to use Recall. Direct edits in Obsidian must reconcile explicitly without erasing evidence or history. Vault-unavailable/pending/conflict states remain honest. The current one-way exporter does not fulfill this requirement; see the architecture and RCL-005B migration gap.
+
+
 Version: 1.0 | Date: 2026-10-07 | Status: **approved canonical product direction**
 
 This document defines the target Recall experience. It supersedes conventional dashboard/page-navigation interpretations of the earlier UX baseline while preserving Recall's trust, provenance, accessibility, and universal-memory requirements.

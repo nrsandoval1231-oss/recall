@@ -1,5 +1,9 @@
 # Memory API — V1 contract
 
+## Required Obsidian architecture boundary
+
+This document describes current implemented API behavior, not completed Obsidian-spine integration. The required vault-backed memory target needs versioned vault commit/reconciliation acknowledgments and conflict/provenance handling; exact extensions remain unspecified. Do not invent working vault endpoints or silently redefine existing `stored`/sync responses. Maintain authorization, integrity, idempotency and expected-version contracts while the migration is designed. See [ARCHITECTURE](ARCHITECTURE.md) and [SYNC-AND-EXPORT](SYNC-AND-EXPORT.md).
+
 ## V1 implemented routes (supersede older packet limitations)
 
 All routes remain `/v1` and derive the workspace from verified membership. Entity list/detail/create and `GET /entities/{source}/identity-preview/{target}` / `POST /entities/{source}/identity/{target}` support explicit merge or selected-mention split, expected source/target versions and idempotency keys.

@@ -4,18 +4,18 @@
 
 Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository starts as documentation and a scaffold, not an existing working app.
 
-Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. Mobile and desktop are one product. Obsidian is optional. Do not rebuild a general productivity suite.
+Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. Mobile and desktop are one product. Obsidian is the required, user-owned memory spine. Recall supplies capture, intelligence and the Memory Surface over that vault. Do not rebuild a general productivity suite.
 
 ## Non-negotiable invariants
 
-- Cloud Postgres owns canonical state. Original files live in private object storage. SQLite is a local cache/outbox. Markdown is an export.
+- Target authority is the Obsidian vault: portable memory notes, links, original attachments and versioned provenance/history. PostgreSQL/pgvector and SQLite support operations, authorization, indexing, synchronization and caches; they must not become the sole owner of memory. The current implementation remains database-authoritative until the documented vault migration is implemented and verified. Do not claim that migration is complete or remove existing integrity/privacy guarantees.
 - All private records and queries are workspace-scoped. Check authorization before retrieval, model context construction, source access, and mutation.
 - Never commit real captures, client data, credentials, local databases, vault exports, or private test corpora. Synthetic fixtures must be clearly marked.
 - Save original bytes durably before AI processing. Report local-only, uploaded, processed, and failed states honestly.
 - Model output is untrusted input. Validate schema and references; the model cannot choose permissions, paths, SQL, or arbitrary tools.
 - Never turn a question mark, hypothesis, illegible number, or unresolved first name into a verified fact or identity.
 - Reprocessing must not undo a human correction. Every material answer needs eligible source evidence.
-- Retry-safe writes, optimistic concurrency, and atomic local export are required. Never silently replace a locally edited Obsidian file.
+- Retry-safe writes, optimistic concurrency, and atomic journaled vault writes are required. Direct vault edits must participate in conflict-safe reconciliation; a one-way exporter does not satisfy the spine requirement. Never silently replace a locally edited Obsidian file.
 - Never claim offline generative answers when only cached keyword search exists.
 - No default location tracking, contact scraping, inbox access, public sharing, or external actions.
 
