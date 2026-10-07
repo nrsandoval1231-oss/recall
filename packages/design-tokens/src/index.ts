@@ -144,6 +144,8 @@ export const copy = {
   ambiguous: "More than one thing in your captures could match. Here's what I found:",
   unavailable: "Answers are off right now. These are the closest matches in your captures:",
   signIn: "Sign in",
+  signInCredentialLabel: "Code or sign-in link",
+  signInLinkHint: "Right-click the Sign in button in the email, choose Copy link address, and paste it here without opening it.",
   signOut: "Sign out",
 } as const;
 

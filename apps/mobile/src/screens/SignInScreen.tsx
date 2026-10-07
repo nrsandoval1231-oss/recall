@@ -37,9 +37,10 @@ export function SignInScreen({ auth }: { auth: Services["auth"] }) {
         </>
       ) : (
         <>
-          <Text style={text.muted}>Code sent to {email}</Text>
-          <TextInput accessibilityLabel="One-time code" style={styles.input} value={code} onChangeText={setCode} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="one-time-code" />
-          <Button label={copy.signIn} disabled={busy || code.trim().length < 6} onPress={() => run(() => auth.verifyEmailCode(email.trim(), code.trim()))} />
+          <Text style={text.muted}>{copy.signInCredentialLabel} sent to {email}</Text>
+          <TextInput accessibilityLabel={copy.signInCredentialLabel} style={styles.input} value={code} onChangeText={setCode} keyboardType="default" textContentType="oneTimeCode" autoComplete="one-time-code" autoCapitalize="none" autoCorrect={false} />
+          <Text style={[text.muted, { marginBottom: space.sm }]}>{copy.signInLinkHint}</Text>
+          <Button label={copy.signIn} disabled={busy || code.trim().length < 6} onPress={() => run(() => code.trim().startsWith("https://") ? auth.verifyEmailLink(code.trim()) : auth.verifyEmailCode(email.trim(), code.trim()))} />
           <Button kind="secondary" label="Use a different email" style={{ marginTop: space.sm }} onPress={() => { setSent(false); setCode(""); }} />
         </>
       )}

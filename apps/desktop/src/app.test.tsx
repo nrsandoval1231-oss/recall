@@ -28,7 +28,7 @@ function capture(over: Partial<ServerCapture> = {}): ServerCapture {
 
 function services(items: ServerCapture[], fetchSource?: DesktopServices["api"]["fetchSource"], extra: Partial<DesktopServices["api"]> = {}): DesktopServices {
   return {
-    auth: { requestEmailCode: vi.fn(), verifyEmailCode: vi.fn(), signOut: vi.fn(), hasSession: async () => true, onSignedInChange: () => () => undefined },
+    auth: { requestEmailCode: vi.fn(), verifyEmailCode: vi.fn(), verifyEmailLink: vi.fn(), signOut: vi.fn(), hasSession: async () => true, onSignedInChange: () => () => undefined },
     api: {
       me: vi.fn(async () => ({}) as never),
       listCaptures: vi.fn(async () => ({ items, next_cursor: null })),

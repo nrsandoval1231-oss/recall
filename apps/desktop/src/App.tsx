@@ -16,7 +16,7 @@ export function managedExportNotice(result: { written: string[]; conflicts: { re
 }
 
 export interface DesktopServices {
-  auth: Pick<RecallAuth, "requestEmailCode" | "verifyEmailCode" | "signOut" | "hasSession" | "onSignedInChange"> & Partial<Pick<RecallAuth, "getUserId">>;
+  auth: Pick<RecallAuth, "requestEmailCode" | "verifyEmailCode" | "verifyEmailLink" | "signOut" | "hasSession" | "onSignedInChange"> & Partial<Pick<RecallAuth, "getUserId">>;
   api: Pick<RecallApiClient, "listCaptures" | "getCapture" | "fetchSource" | "me" | "ask" | "getMemory" | "retryProcessing" | "getAiSettings" | "setAiEnabled"> & Partial<Pick<RecallApiClient, "deleteCapture" | "deleteMemory" | "deleteSource" | "workspaceDeletionPreview" | "deleteWorkspaceData" | "listEntities" | "getEntity" | "listActions" | "updateAction" | "correctMemory" | "exportZip" | "identityPreview" | "applyIdentity">>;
   cache?: NativeCache;
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { copy } from "@recall/design-tokens";
 import type { RecallAuth } from "@recall/api-client";
 
-export function SignIn({ auth }: { auth: Pick<RecallAuth, "requestEmailCode" | "verifyEmailCode"> }) {
+export function SignIn({ auth }: { auth: Pick<RecallAuth, "requestEmailCode" | "verifyEmailCode" | "verifyEmailLink"> }) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
@@ -22,8 +22,9 @@ export function SignIn({ auth }: { auth: Pick<RecallAuth, "requestEmailCode" | "
           <button type="submit" className="primary" disabled={busy}>Email me a code</button>
         </form>
       ) : (
-        <form onSubmit={(e) => { e.preventDefault(); void run(() => auth.verifyEmailCode(email.trim(), code.trim())); }}>
-          <label>Code sent to {email}<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required /></label>
+        <form onSubmit={(e) => { e.preventDefault(); void run(() => code.trim().startsWith("https://") ? auth.verifyEmailLink(code.trim()) : auth.verifyEmailCode(email.trim(), code.trim())); }}>
+          <label>{copy.signInCredentialLabel} sent to {email}<input inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required /></label>
+          <p> {copy.signInLinkHint}</p>
           <button type="submit" className="primary" disabled={busy}>{copy.signIn}</button>
           <button type="button" onClick={() => { setSent(false); setCode(""); }}>Use a different email</button>
         </form>

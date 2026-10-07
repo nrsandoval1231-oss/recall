@@ -36,6 +36,35 @@ export function createAuth(config: AuthConfig) {
       const { error } = await client.auth.verifyOtp({ email, token: code, type: "email" });
       if (error) throw new Error(error.message);
     },
+    async verifyEmailLink(link: string): Promise<void> {
+      let parsed: URL;
+      try {
+        parsed = new URL(link);
+      } catch {
+        throw new Error("That sign-in link is invalid.");
+      }
+      const configuredOrigin = new URL(config.supabaseUrl).origin;
+      const types = parsed.searchParams.getAll("type");
+      const tokenValues = parsed.searchParams.getAll("token");
+      const tokenHashValues = parsed.searchParams.getAll("token_hash");
+      const tokenHash = tokenValues[0] ?? tokenHashValues[0];
+      if (
+        parsed.protocol !== "https:" ||
+        parsed.origin !== configuredOrigin ||
+        parsed.username !== "" ||
+        parsed.password !== "" ||
+        parsed.hash !== "" ||
+        parsed.pathname !== "/auth/v1/verify" ||
+        types.length !== 1 ||
+        (types[0] !== "magiclink" && types[0] !== "email") ||
+        tokenValues.length + tokenHashValues.length !== 1 ||
+        !tokenHash
+      ) {
+        throw new Error("That sign-in link is not a valid Recall sign-in link.");
+      }
+      const { error } = await client.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+      if (error) throw new Error(error.message);
+    },
     async signOut(): Promise<void> {
       await client.auth.signOut();
     },
