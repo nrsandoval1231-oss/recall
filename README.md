@@ -8,7 +8,7 @@ Recall is a universal external-memory application. People already capture import
 Capture -> Understand -> Connect -> Remember -> Recall -> Act
 ```
 
-The user should not need to file, tag, name, link, or maintain a taxonomy. Paul Cockerham is the first design partner and a demanding pilot because his work spans handwriting, consulting, generator maintenance, people, equipment, projects, numbers, and vague recall queries. His workflows validate the universal product; they do not define its domain model.
+The user should not need to file, tag, name, link, or maintain a taxonomy. The approved interface is a continuously transforming **Memory Surface**: glass represents Recall's understanding, original artifacts remain visible as evidence, light signals intelligence/attention, space expresses relationships, depth expresses context, and time expresses memory evolution. See [UX](docs/UX-SPEC.md). Paul Cockerham is the first design partner and a demanding pilot because his work spans handwriting, consulting, generator maintenance, people, equipment, projects, numbers, and vague recall queries. His workflows validate the universal product; they do not define its domain model.
 
 ## North-star test
 
@@ -48,7 +48,7 @@ V1 proves trusted photo capture and grounded recall. Typed text joins voice, scr
 1. [Product requirements](docs/PRD.md)
 2. [Architecture](docs/ARCHITECTURE.md)
 3. [Data model](docs/DATA-MODEL.md), [API contract](docs/API-CONTRACT.md), and [AI ingestion](docs/AI-INGESTION.md)
-4. [UX](docs/UX-SPEC.md), [sync/export](docs/SYNC-AND-EXPORT.md), and [security/operations](docs/SECURITY-AND-OPERATIONS.md)
+4. **[Canonical experience & visual system](docs/UX-SPEC.md)**, [sync/export](docs/SYNC-AND-EXPORT.md), and [security/operations](docs/SECURITY-AND-OPERATIONS.md)
 5. [Acceptance](docs/ACCEPTANCE.md), [roadmap](docs/ROADMAP.md), and [builder handoff](docs/BUILD-HANDOFF.md)
 
 ## Stack
