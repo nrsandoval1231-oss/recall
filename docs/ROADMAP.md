@@ -2,6 +2,8 @@
 
 Version: 0.2 | Dependency-ordered, not delivery-date promises
 
+The active pilot path is the Cloudflare browser adapter: iPhone browser photo capture and Windows browser retrieval. Native clients remain preserved. Browser implementation/local verification is recorded in V1-STATUS; deployment and real signed-in cross-device acceptance remain open.
+
 ## Foundation
 
 Universal product thesis, trust model, contracts, repository boundaries, synthetic examples, and release criteria. Paul is the first design partner, not a domain boundary.

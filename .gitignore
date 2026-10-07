@@ -51,3 +51,9 @@ apps/desktop/src-tauri/Cargo.lock.bak
 # Local dev storage/state
 .recall-storage/
 .env.local-dev
+
+# Cloudflare local secrets and generated runtime state
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/

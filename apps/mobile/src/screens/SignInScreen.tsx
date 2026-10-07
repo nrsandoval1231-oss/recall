@@ -8,7 +8,7 @@ import { Button, text } from "../ui/kit";
 export function SignInScreen({ auth }: { auth: Services["auth"] }) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [sent, setSent] = useState(false);
+  const [credentialVisible, setCredentialVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +18,8 @@ export function SignInScreen({ auth }: { auth: Services["auth"] }) {
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      const message = e instanceof Error ? e.message : "Something went wrong.";
+      setError(/rate limit|too many|429|quota/i.test(message) ? copy.signInRateLimit : message);
     } finally {
       setBusy(false);
     }
@@ -29,19 +30,22 @@ export function SignInScreen({ auth }: { auth: Services["auth"] }) {
       <Text style={text.title} accessibilityRole="header">{copy.appName}</Text>
       <Text style={[text.body, { marginTop: space.sm }]}>{copy.tagline}</Text>
       <View style={{ height: space.xl }} />
-      {!sent ? (
+      {!credentialVisible ? (
         <>
           <Text style={text.muted}>Email</Text>
           <TextInput accessibilityLabel="Email address" style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
-          <Button label="Email me a code" disabled={busy || !email.includes("@")} onPress={() => run(async () => { await auth.requestEmailCode(email.trim()); setSent(true); })} />
+          <Button label={copy.requestSignInLink} disabled={busy || !email.includes("@")} onPress={() => run(async () => { await auth.requestEmailCode(email.trim()); setCredentialVisible(true); })} />
+          <Button kind="secondary" label={copy.useExistingSignInCredential} style={{ marginTop: space.sm }} onPress={() => setCredentialVisible(true)} />
         </>
       ) : (
         <>
-          <Text style={text.muted}>{copy.signInCredentialLabel} sent to {email}</Text>
+          <Text style={text.muted}>Email (required for a code)</Text>
+          <TextInput accessibilityLabel="Email address" style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
+          <Text style={text.muted}>{copy.signInCredentialLabel}{email ? ` for ${email}` : ""}</Text>
           <TextInput accessibilityLabel={copy.signInCredentialLabel} style={styles.input} value={code} onChangeText={setCode} keyboardType="default" textContentType="oneTimeCode" autoComplete="one-time-code" autoCapitalize="none" autoCorrect={false} />
           <Text style={[text.muted, { marginBottom: space.sm }]}>{copy.signInLinkHint}</Text>
-          <Button label={copy.signIn} disabled={busy || code.trim().length < 6} onPress={() => run(() => code.trim().startsWith("https://") ? auth.verifyEmailLink(code.trim()) : auth.verifyEmailCode(email.trim(), code.trim()))} />
-          <Button kind="secondary" label="Use a different email" style={{ marginTop: space.sm }} onPress={() => { setSent(false); setCode(""); }} />
+          <Button label={copy.signIn} disabled={busy || (!code.trim().startsWith("https://") && (!email.includes("@") || code.trim().length < 6))} onPress={() => run(() => code.trim().startsWith("https://") ? auth.verifyEmailLink(code.trim()) : auth.verifyEmailCode(email.trim(), code.trim()))} />
+          <Button kind="secondary" label={copy.useExistingSignInCredential} style={{ marginTop: space.sm }} onPress={() => { setCredentialVisible(false); setCode(""); }} />
         </>
       )}
       {busy && <ActivityIndicator style={{ marginTop: space.md }} />}

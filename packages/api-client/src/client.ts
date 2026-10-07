@@ -33,7 +33,9 @@ import type {
 export interface ClientOptions {
   baseUrl: string;
   /** Returns a currently valid access token (the auth provider refreshes it). */
-  getAccessToken: () => Promise<string | null>;
+  getAccessToken?: () => Promise<string | null>;
+  /** Use the same-origin BFF session cookie instead of exposing a token to the browser. */
+  useSessionCookie?: boolean;
   fetch?: typeof fetch;
 }
 
@@ -59,7 +61,8 @@ export class RecallApiClient {
 
   /** Headers for an authenticated request made by something other than this client (e.g. RN <Image>). */
   async authHeaders(): Promise<Record<string, string>> {
-    const token = await this.options.getAccessToken();
+    if (this.options.useSessionCookie) return {};
+    const token = await this.options.getAccessToken?.();
     if (!token) throw new ApiError("UNAUTHENTICATED", "Sign in to continue.", 401, false, null);
     return { Authorization: `Bearer ${token}` };
   }
@@ -73,7 +76,7 @@ export class RecallApiClient {
     }
     let response: Response;
     try {
-      response = await this.fetchImpl(this.resolve(path), { method, headers, body });
+      response = await this.fetchImpl(this.resolve(path), { method, headers, body, credentials: this.options.useSessionCookie ? "include" : undefined });
     } catch (cause) {
       throw new NetworkError("Could not reach Recall. Check your connection.", { cause });
     }
