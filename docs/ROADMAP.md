@@ -1,6 +1,6 @@
 # Recall build roadmap
 
-Version: 0.2 | Dependency-ordered, not delivery-date promises
+Version: 0.3 | Dependency-ordered, not delivery-date promises
 
 The active pilot path is the Cloudflare browser adapter: iPhone browser photo capture and Windows browser retrieval. Native clients remain preserved. Browser implementation/local verification is recorded in V1-STATUS; deployment and real signed-in cross-device acceptance remain open.
 
@@ -56,7 +56,7 @@ Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tom
 
 Obsidian remains optional and must never be required for Recall correctness.
 
-## RCL-006 — Private multi-domain pilot
+## RCL-005A — Canonical Memory Surface\n\nObjective: replace conventional dashboard/page presentation with the approved Recall interaction language without changing canonical memory semantics.\n\nBuild the smallest real vertical slice first: sparse Home -> Ask reconstruction -> contextual glass boards -> memory focus -> original evidence forward -> entity refocus -> historical/current state -> correction -> Back restores context. Mobile adapts this to one primary board at a time.\n\nThe visual semantics are locked in [UX-SPEC](UX-SPEC.md): glass = understanding; physical artifacts = evidence; light = intelligence; space = relationships; depth = context; time = memory evolution. DOM/CSS-first; add GPU/WebGL only where measured value justifies it. Preserve keyboard/reduced-motion/accessibility and honest loading/error/uncertain states. Do not hard-code the synthetic Brooks Campus design fixture.\n\nExit: the vertical slice runs against real Recall contracts/data, remains source-grounded, passes interaction/accessibility regression coverage, and is visually recognizable as Recall rather than a generic notes/dashboard/chat application.\n\n## RCL-006 — Private multi-domain pilot
 
 Objective: prove Recall solves real memory retrieval, not merely Paul's specific note structure.
 
@@ -84,6 +84,6 @@ Each adapter uses the same authorization, provenance, and memory contracts.
 
 ## Explicit non-goals until justified
 
-Teams, billing, generic agents, graph UI, ERP/CRM/CMMS replacement, separate vector/graph database, domain-specific schema forks, or broad autonomous workflows.
+Teams, billing, generic agents, dedicated node-link graph UI, ERP/CRM/CMMS replacement, separate vector/graph database, domain-specific schema forks, or broad autonomous workflows. The approved Memory Surface may spatially render relationships without introducing a graph product or graph database.
 
 The product earns complexity by first proving faithful memory.
