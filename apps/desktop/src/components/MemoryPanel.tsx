@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ApiError, type EpistemicState, type MemoryDetail, type RecallApiClient } from "@recall/api-client";
+import { ApiError, type EpistemicState, type MemoryDetail, type RecallApiClient, type Relationship } from "@recall/api-client";
 import { epistemicLabel } from "../viewmodel";
 import type { CacheScope, NativeCache } from "../platform/native-cache";
 
@@ -66,6 +66,21 @@ export function MemoryPanel({ api, memoryId, pageId, cache, scope }: { api: Pick
       else setEditNote(queued ? "Identity review saved for retry; the server may have changed this reading." : "Couldn't update this identity review. It has not been saved.");
     }
   };
+  const resolveRelationship = async (relationship: Relationship, resolution: "accepted" | "rejected") => {
+    if (!api.correctMemory) return;
+    const key = crypto.randomUUID();
+    const correction = { target: "relationship" as const, from_entity_id: relationship.from_entity_id, to_entity_id: relationship.to_entity_id, relation_type: relationship.type, resolution };
+    let queued = false;
+    try {
+      if (cache?.available && scope) { await cache.enqueue(scope, { operation_id: key, kind: "memory.correction", target_id: memoryId, expected_version: memory.revision, payload: correction, created_at: new Date().toISOString() }); queued = true; }
+      setMemory(await api.correctMemory(memoryId, correction, key, memory.revision));
+      setEditNote(`Relationship ${resolution}.`);
+    } catch (failure) {
+      if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) { setMemory(null); setError(true); }
+      else setEditNote(queued ? "Relationship review saved for retry; this memory may have changed." : "Couldn't update this relationship. It has not been saved.");
+    }
+  };
+  const entityName = (id: string) => memory.entities?.find((entity) => entity.entity_id === id)?.canonical_name ?? "An identity";
   return (
     <section className="memory" aria-label="Reading">
       {ex.summary && <p><strong>Summary:</strong> {ex.summary} {api.correctMemory && <button onClick={() => setEdit({ target: "summary", text: ex.summary ?? "" })}>Correct summary</button>}</p>}
@@ -87,6 +102,7 @@ export function MemoryPanel({ api, memoryId, pageId, cache, scope }: { api: Pick
       {memory.claims?.length ? <><h4>Claims and history</h4><ul>{memory.claims.map((claim) => <li key={claim.claim_id}>{claim.text} <span className="pill warning">{epistemicLabel[claim.epistemic_state] || "reported"}</span>{claim.temporal_text && <span className="muted"> · {claim.temporal_text}</span>}{api.correctMemory && <button onClick={() => setEdit({ target: "claim", claimId: claim.claim_id, text: claim.text, epistemic_state: claim.epistemic_state, valid_from: claim.valid_from ?? null, valid_to: claim.valid_to ?? null })}>Correct</button>}</li>)}</ul></> : null}
       {memory.mentions?.length ? <><h4>Identity review</h4><ul>{memory.mentions.map((mention) => <li key={mention.mention_id}>{mention.text} <span className="pill warning">{mention.resolution}</span>{api.correctMemory && <><button onClick={() => void resolveMention(mention.mention_id, mention.entity_id, "accepted")}>Accept identity</button><button onClick={() => void resolveMention(mention.mention_id, mention.entity_id, "rejected")}>Reject identity</button></>}</li>)}</ul></> : null}
       {memory.entities?.length ? <><h4>People and things</h4><ul>{memory.entities.map((entity) => <li key={entity.entity_id}>{entity.canonical_name} <span className="muted">{entity.kind}</span></li>)}</ul></> : null}
+      {memory.relationships?.length ? <><h4>Relationship review</h4><ul>{memory.relationships.map((relationship) => <li key={relationship.relationship_id}>{relationship.from_name ?? entityName(relationship.from_entity_id)} {relationship.type.replaceAll("_", " ")} {relationship.to_name ?? entityName(relationship.to_entity_id)} <span className="pill warning">{relationship.status}</span>{api.correctMemory && <><button onClick={() => void resolveRelationship(relationship, "accepted")}>Accept relationship</button><button onClick={() => void resolveRelationship(relationship, "rejected")}>Reject relationship</button></>}</li>)}</ul></> : null}
       {memory.history?.length ? <details><summary>Revision history ({memory.history.length})</summary><ul>{memory.history.map((h) => <li key={h.revision}>Revision {h.revision} · {h.origin} · {h.reason ?? "No reason recorded"}</li>)}</ul></details> : null}
       {ex.action_suggestions.length > 0 && (
         <>

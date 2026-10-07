@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import unicodedata
 import uuid
 from collections import Counter
 from collections.abc import Collection
@@ -19,9 +21,24 @@ def evidence_key(evidence: list[dict[str, str]]) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _identity_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value)).casefold()).strip()
+
+
+def mention_identity_key(mention: dict[str, Any]) -> str:
+    """Identify one grounded mention without relying on its model-local id."""
+    identity = {
+        "evidence": evidence_key(mention["evidence"]),
+        "kind": _identity_text(mention["kind"]),
+        "raw_text": _identity_text(mention["raw_text"]),
+    }
+    payload = json.dumps(identity, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def mention_evidence_keys(extraction: dict[str, Any]) -> dict[str, str]:
     """Resolve model-local mention ids to source identities before ids are discarded."""
-    return {mention["local_id"]: evidence_key(mention["evidence"]) for mention in extraction["mentions"]}
+    return {mention["local_id"]: mention_identity_key(mention) for mention in extraction["mentions"]}
 
 
 def claim_identity_key(statement: dict[str, Any], mention_keys: dict[str, str]) -> str:

@@ -15,7 +15,7 @@ export function Library({ api, cache, scope, onClose, onOpenMemory }: { api: Lib
   useEffect(() => {
     let active = true;
     void api.listEntities({ q: query.trim() || undefined, kind: kind || undefined, limit: 50 }).then((r) => active && setItems(r.items), async (failure) => {
-      if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) { if (active) setError("Your session no longer has access to this Library."); return; }
+      if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) { if (active) { setItems([]); setSelected(null); setIdentity(null); setMentionIds([]); setError("Your session no longer has access to this Library."); } return; }
       if (!cache?.available || !scope) { if (active) setError("Couldn't load the Library right now."); return; }
       try {
         const records = await cache.listRecords(scope, "entity", 50);
@@ -27,8 +27,8 @@ export function Library({ api, cache, scope, onClose, onOpenMemory }: { api: Lib
     return () => { active = false; };
   }, [api, query, kind]);
   const open = async (entity: EntitySummary) => {
-    try { setSelected(await api.getEntity(entity.entity_id)); setMentionIds([]); } catch (failure) {
-      if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) { setError("Your session no longer has access to this entity."); return; }
+    try { setSelected(await api.getEntity(entity.entity_id)); setMentionIds([]); setIdentity(null); setError(null); } catch (failure) {
+      if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) { setSelected(null); setIdentity(null); setMentionIds([]); setError("Your session no longer has access to this entity."); return; }
       if (cache?.available && scope) {
         try { const record = await cache.getRecord(scope, "entity", entity.entity_id); const detail = record && cachedDetail(record.payload); if (detail) { setSelected(detail); setError("Offline. Showing cached entity details."); return; } } catch { /* report below */ }
       }

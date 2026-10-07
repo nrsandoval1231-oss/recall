@@ -249,6 +249,10 @@ export interface CorrectionInput {
   page_id?: string;
   mention_id?: string;
   entity_id?: string;
+  from_entity_id?: string;
+  to_entity_id?: string;
+  relation_type?: string;
+  supersedes_claim_id?: string | null;
   text?: string;
   epistemic_state?: EpistemicState;
   resolution?: "accepted" | "rejected";
@@ -305,5 +309,5 @@ export interface AskResponse {
   reason: string | null;
   index_as_of: string | null;
   mode: "online_grounded" | "sources_only";
-  temporal_mode?: "current" | "original" | "previous" | "changed";
+  temporal_mode?: "current" | "original" | "previous" | "changed" | "history" | "before" | "after" | "all";
 }

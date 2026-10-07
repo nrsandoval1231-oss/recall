@@ -357,10 +357,26 @@ class MemoryService:
             )
             entity_ids = list({m["entity_id"] for m in mentions if m["entity_id"] is not None})
             links = tx.all(
-                "select * from entity_links where workspace_id=%s "
-                "and (from_entity_id=any(%s) or to_entity_id=any(%s)) order by created_at limit 100",
-                (tx.workspace_id, entity_ids, entity_ids),
+                "select l.* from entity_links l where l.workspace_id=%s "
+                "and (l.from_entity_id=any(%s) or l.to_entity_id=any(%s)) "
+                "and (l.status='accepted' or exists (select 1 from jsonb_array_elements(l.evidence) ev "
+                "join source_objects s on s.workspace_id=l.workspace_id and s.id::text=ev.value->>'page_id' "
+                "where s.capture_id=%s)) order by l.created_at limit 100",
+                (tx.workspace_id, entity_ids, entity_ids, row["capture_id"]),
             )
+            entities: list[dict[str, str]] = []
+            seen_entity_ids: set[object] = set()
+            for mention in mentions:
+                entity_id = mention["entity_id"]
+                if entity_id is not None and entity_id not in seen_entity_ids:
+                    seen_entity_ids.add(entity_id)
+                    entities.append(
+                        {
+                            "entity_id": str(entity_id),
+                            "canonical_name": mention["canonical_name"],
+                            "kind": mention["entity_kind"],
+                        }
+                    )
             return {
                 **_memory_summary(row),
                 "timezone": row["timezone"],
@@ -404,11 +420,7 @@ class MemoryService:
                     }
                     for m in mentions
                 ],
-                "entities": [
-                    {"entity_id": str(m["entity_id"]), "canonical_name": m["canonical_name"], "kind": m["entity_kind"]}
-                    for m in mentions
-                    if m["entity_id"] is not None
-                ],
+                "entities": entities,
                 "relationships": [
                     {
                         "relationship_id": str(link["id"]),
@@ -1109,7 +1121,7 @@ class MemoryService:
             "sources": ask_module.sources_of(hits[: ask_module.PACKET_SIZE]),
         }
         if requested_mode or natural_mode:
-            base["temporal_mode"] = requested_mode or natural_mode
+            base["temporal_mode"] = natural_mode or requested_mode
         if not hits:
             return {
                 **base,

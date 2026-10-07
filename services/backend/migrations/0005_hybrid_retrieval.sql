@@ -18,6 +18,15 @@ grant select, insert, update on retrieval_index_config to recall_app;
 create policy retrieval_index_config_worker on retrieval_index_config for select to recall_worker
   using (workspace_id=recall_current_workspace_id());
 grant select on retrieval_index_config to recall_worker;
+-- The narrow discovery helper below runs as the migration owner and must enumerate
+-- enabled workspace ids without granting the worker a global table read. FORCE RLS
+-- still applies to a non-superuser table owner, so give that owner an explicit policy.
+do $$ begin
+  execute format(
+    'create policy retrieval_index_config_owner_discovery on retrieval_index_config for select to %I using (enabled)',
+    current_user
+  );
+end $$;
 create function recall_embedding_enabled_workspaces()
 returns table(workspace_id uuid) language sql stable security definer set search_path=pg_catalog,public as $$
   select ric.workspace_id from public.retrieval_index_config ric where ric.enabled

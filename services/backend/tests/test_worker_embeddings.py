@@ -79,15 +79,55 @@ def _enable_index(env: Env, user_id: uuid.UUID) -> None:
     )
 
 
+def _set_index_enabled(env: Env, user_id: uuid.UUID, *, enabled: bool) -> None:
+    workspace = admin(env, "select workspace_id from workspace_members where user_id=%s", (user_id,))[0][0]
+    admin(env, "update retrieval_index_config set enabled=%s where workspace_id=%s", (enabled, workspace))
+
+
+def test_worker_can_discover_enabled_workspaces_without_content_scope(
+    pg_cluster: PgCluster, jwt_key: ec.EllipticCurvePrivateKey, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    config = EmbeddingConfig("synthetic-not-real", "synthetic-vectors", 3, "test-v1", 1.0)
+    overrides = {
+        **AI,
+        "embedding_provider": "voyage",
+        "embedding_model_id": config.model_id,
+        "embedding_api_key": config.api_key,
+        "embedding_dimensions": config.dimensions,
+        "embedding_version": config.version,
+        "embedding_input_usd_per_mtok": config.input_usd_per_mtok,
+    }
+    env = Env(
+        pg_cluster,
+        jwt_key,
+        tmp_path_factory.mktemp("embedding-discovery"),
+        overrides=overrides,
+        provider=FakeProvider(),
+    )
+    try:
+        user = env.user()
+        consent(user)
+        _enable_index(env, user.id)
+        workspace = admin(env, "select workspace_id from workspace_members where user_id=%s", (user.id,))[0][0]
+        with psycopg.connect(env.worker_dsn) as conn:
+            discovered = conn.execute("select workspace_id from recall_embedding_enabled_workspaces()").fetchall()
+        assert discovered == [(workspace,)]
+    finally:
+        env.close()
+
+
 def test_idle_sweep_indexes_new_chunk(embedding_env: tuple[Env, FakeProvider, FakeEmbeddings]) -> None:
     env, fake, embeddings = embedding_env
     user = env.user()
     consent(user)
     _enable_index(env, user.id)
+    _set_index_enabled(env, user.id, enabled=False)
     worker = _worker(env, fake, embeddings)
     try:
         capture_with(env, user, fake, ["synthetic semantic backlog"])
         drain(worker)
+        assert embeddings.calls == []
+        _set_index_enabled(env, user.id, enabled=True)
         worker.run_once()  # idle sweep
         assert embeddings.calls
         assert admin(env, "select count(*) from search_chunk_embeddings")[0][0] > 0
@@ -123,11 +163,14 @@ def test_provider_failure_sets_idle_backoff(embedding_env: tuple[Env, FakeProvid
     user = env.user()
     consent(user)
     _enable_index(env, user.id)
-    embeddings.fail = True
+    _set_index_enabled(env, user.id, enabled=False)
     worker = _worker(env, fake, embeddings)
     try:
         capture_with(env, user, fake, ["retry only after backoff"])
         drain(worker)
+        assert embeddings.calls == []
+        _set_index_enabled(env, user.id, enabled=True)
+        embeddings.fail = True
         worker.run_once()
         assert embeddings.calls
         assert worker._embedding_retry_not_before

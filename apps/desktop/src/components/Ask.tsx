@@ -17,6 +17,7 @@ export function Ask({ api, onOpenCitation, cache, scope }: { api: Pick<RecallApi
     setBusy(true);
     setError(null);
     setCached([]);
+    setResult(null);
     try {
       setResult(await api.ask(question.trim(), asOf ? { as_of: new Date(`${asOf}T23:59:59Z`).toISOString() } : {}));
     } catch (failure) {

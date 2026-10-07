@@ -65,6 +65,28 @@ describe("desktop correction and destructive flow regressions", () => {
     expect(listRecords).not.toHaveBeenCalled();
   });
 
+  it("clears an earlier answer when a later Ask loses authorization", async () => {
+    const ask = vi.fn().mockResolvedValueOnce({ question: "first", status: "answered", answer: "Private answer", sentences: [{ text: "Private answer", citation_ids: [] }], citations: [], limitations: [], sources: [], reason: null, index_as_of: null, mode: "online_grounded" }).mockRejectedValueOnce(new ApiError("FORBIDDEN", "denied", 403, false, null));
+    render(<Ask api={{ ask }} onOpenCitation={vi.fn()} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("What are you trying to remember?"), "first");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    expect(await screen.findByText("Private answer")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    expect(await screen.findByText(/no longer has access/i)).toBeTruthy();
+    expect(screen.queryByText("Private answer")).toBeNull();
+  });
+
+  it("lets a person explicitly accept an evidence-backed relationship", async () => {
+    const current = memory();
+    current.relationships = [{ relationship_id: "r", from_entity_id: "a", to_entity_id: "b", from_name: "Alex", to_name: "Jordan", type: "met", status: "candidate" }];
+    const enqueue = vi.fn(async () => undefined); const correctMemory = vi.fn(async () => current);
+    render(<MemoryPanel api={{ getMemory: vi.fn(async () => current), correctMemory }} memoryId={current.memory_id} pageId={undefined} cache={cache(enqueue)} scope={{ user_id: "u", workspace_id: "w" }} />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Accept relationship" }));
+    await waitFor(() => expect(correctMemory).toHaveBeenCalledWith(current.memory_id, { target: "relationship", from_entity_id: "a", to_entity_id: "b", relation_type: "met", resolution: "accepted" }, expect.any(String), current.revision));
+    expect(enqueue).toHaveBeenCalledBefore(correctMemory);
+  });
+
   it("never loads cached interpretations after authorization denial", async () => {
     const getRecord = vi.fn(async () => ({ payload: memory() }));
     render(<MemoryPanel api={{ getMemory: vi.fn(async () => { throw new ApiError("FORBIDDEN", "denied", 403, false, null); }) }} memoryId="m" pageId={undefined} cache={{ available: true, getRecord } as never} scope={{ user_id: "u", workspace_id: "w" }} />);

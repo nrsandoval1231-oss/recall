@@ -16,12 +16,12 @@ This is the implementation ledger for the V1 build from accepted baseline `92b4c
 
 ## Verification ledger
 
-- Final client run: 92 passed (API 16, tokens 4, sync 30, desktop 33, mobile 9), with lint and typechecking clean. Rendered desktop tests cover correction durability/conflicts, identity/date/status payloads, deletion confirmation, managed export conflict, historical Ask and authorization denial. Desktop production build passes; iOS JavaScript bundle passes without signing or hardware proof.
+- Final client run: 94 passed (API 16, tokens 4, sync 30, desktop 35, mobile 9), with lint and typechecking clean. Rendered desktop tests cover correction durability/conflicts, identity/date/status payloads, deletion confirmation, managed export conflict, historical Ask and authorization denial. Desktop production build passes; iOS JavaScript bundle passes without signing or hardware proof.
 - Native foundation CI run `37559687200`: Windows 31 passed plus cargo check; Linux 32 passed plus cargo check (includes Unix symlink case). The integrated PR additionally emits the measured FTS benchmark output.
-- Local full backend run: 183 passed, eight pgvector skips. Four subsequently added real-PostgreSQL Ask privacy race tests also pass. Ruff, format and source mypy are clean. Final integrated CI must supersede these counts and execute all pgvector cases. Focused structural claim identity tests pass (3); temporal tests pass (4); relationship reprocessing passes (1); timed cleanup/workspace rotation passes (2).
+- Final local full backend run: 192 passed, eight pgvector skips; includes four real-PostgreSQL Ask privacy race tests. Ruff, format and source mypy are clean. Final integrated CI must supersede these counts and execute all pgvector cases. Focused structural claim identity tests pass (3); temporal tests pass (4); relationship reprocessing passes (1); timed cleanup/workspace rotation passes (2).
 - Clean and baseline-upgrade migrations are tested on real throwaway PostgreSQL. Accepted migrations 0001/0002 are unchanged.
 - Synthetic SQL corpus: 13 items and 12 held-out questions. Actual local keyword SQL recall@1=0.25, recall@3=0.5833, MRR=0.4167. Fixed-vector pgvector fusion runs in CI. These synthetic vectors do not measure live embedding quality.
-- Native FTS test measures 1,000 synthetic cached records and prints timing without claiming a hardware latency target.
+- Native FTS at CI run `37561900902`: 1,000 synthetic records loaded in 41 ms on Windows / 55 ms on Linux; searches took 451 µs / 650 µs respectively. This is a CI-runner microbenchmark, not a device or end-to-end latency guarantee.
 
 ## Requirement matrix
 

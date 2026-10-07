@@ -6,6 +6,8 @@
 
 Canonical claim identity hashes the source evidence, normalized kind/predicate and subject/object mention evidence keys. Model-local IDs and generated prose are not identity. Two distinct predicates can share a quote without sharing a correction. Duplicate structural identities are ambiguous: processing requires review and excludes their canonical claim/search/relationship projection rather than silently collapsing them. This conservative rule lacks finer handwritten span coordinates and can withhold otherwise useful same-line claims.
 
+Mention identity combines evidence, normalized kind and verbatim mention text, so Alex and Jordan can share a quoted line without sharing an identity decision. Accepted or rejected legacy evidence-only decisions are carried forward only when text and kind also match. Candidate relationship evidence unions across supporting captures; deleting one source preserves remaining support. Automatic projection cannot modify evidence, status or validity for an accepted/rejected human relationship.
+
 0004 adds workspace sync clocks/floors and identifier-only `change_events`; deleted resource identifiers hydrate as tombstones. 0005 adds explicit workspace retrieval configuration, durable embedding budget reservations and optional pgvector rows bound to text hashes, memory revisions, dimensions and model/config versions. 0006 adds durable object purge jobs and memory suppression markers. Deleting interpreted memory preserves originals while suppressing future automatic interpretation; full capture deletion removes both semantic state and source mappings and queues byte purge.
 
 Source bytes and historical user/model revisions are not overwritten by corrections. See [V1-STATUS](V1-STATUS.md) for remaining limits.

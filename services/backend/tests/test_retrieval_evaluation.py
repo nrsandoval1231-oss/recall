@@ -5,6 +5,7 @@ This is a fixed-vector regression corpus, not live Voyage quality evidence.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from pathlib import Path
@@ -83,16 +84,18 @@ def test_synthetic_corpus_measures_keyword_and_pgvector_fusion(
         "create table search_chunk_embeddings (workspace_id uuid, chunk_id uuid, memory_id uuid, memory_revision integer, embedding_version text, model_id text, dimensions integer, source_text_sha256 text, status text, embedding vector)"
     )
     rows = conn.execute(
-        "select id,memory_id,revision,text from search_chunks where workspace_id=%s", (workspace,)
+        "select id,memory_id,revision,text from search_chunks where workspace_id=%s and id=any(%s)",
+        (workspace, [uuid.UUID(chunk) for chunk in vectors]),
     ).fetchall()
     for row in rows:
         conn.execute(
-            "insert into search_chunk_embeddings values (%s,%s,%s,%s,'eval-v1','eval-model',3,'hash','current',%s::vector)",
+            "insert into search_chunk_embeddings values (%s,%s,%s,%s,'eval-v1','eval-model',3,%s,'current',%s::vector)",
             (
                 workspace,
                 row["id"],
                 row["memory_id"],
                 row["revision"],
+                hashlib.sha256(row["text"].encode("utf-8")).hexdigest(),
                 "[" + ",".join(map(str, vectors[str(row["id"])])) + "]",
             ),
         )

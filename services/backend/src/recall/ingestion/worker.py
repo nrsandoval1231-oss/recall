@@ -54,6 +54,7 @@ from .projection import (
     claim_identity_key,
     duplicate_claim_identity_keys,
     mention_evidence_keys,
+    mention_identity_key,
     write_search_chunks,
 )
 from .provider import InterpretRequest, PageImage, Provider, ProviderError
@@ -480,7 +481,7 @@ class Worker:
 
 
 def _evidence_key(evidence: list[dict[str, str]]) -> str:
-    """Stable only within a memory: corrections follow the source span, never a model local id."""
+    """Legacy mention key used only to carry existing human resolutions forward."""
     canonical = json.dumps(sorted(evidence, key=lambda item: (item["page_id"], item["quote"])), separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
 
@@ -491,12 +492,22 @@ def _project_semantics(
     """Persist model proposals as bounded projections. Mentions stay unresolved until a person accepts a link."""
     rejected_claim_keys = rejected_claim_keys or set()
     for mention in ex["mentions"]:
-        evidence_key = _evidence_key(mention["evidence"])
-        prior = tx.one(
-            "select entity_id,resolution_status from mentions where workspace_id=%s and memory_id=%s "
-            "and evidence_key=%s and resolution_status in ('accepted','rejected') "
-            "order by created_at desc limit 1",
-            (tx.workspace_id, memory_id, evidence_key),
+        evidence_key = mention_identity_key(mention)
+        legacy_key = _evidence_key(mention["evidence"])
+        prior_candidates = tx.all(
+            "select entity_id,resolution_status,text,kind,evidence from mentions "
+            "where workspace_id=%s and memory_id=%s and (evidence_key=%s or evidence_key=%s) "
+            "and resolution_status in ('accepted','rejected') order by revision desc,version desc,id",
+            (tx.workspace_id, memory_id, evidence_key, legacy_key),
+        )
+        prior = next(
+            (
+                row
+                for row in prior_candidates
+                if mention_identity_key({"evidence": row["evidence"], "kind": row["kind"], "raw_text": row["text"]})
+                == evidence_key
+            ),
+            None,
         )
         proposed_entity = None
         if prior is None and mention["kind"] != "unknown":
@@ -605,7 +616,10 @@ def _project_semantics(
             # identities were accepted. A rerun cannot reverse a user's decision.
             tx.run(
                 "insert into entity_links(id,workspace_id,from_entity_id,to_entity_id,relation_type,status,evidence) "
-                "values(%s,%s,%s,%s,%s,'candidate',%s) on conflict do nothing",
+                "values(%s,%s,%s,%s,%s,'candidate',%s) on conflict (workspace_id,from_entity_id,to_entity_id,relation_type) "
+                "do update set evidence=(select coalesce(jsonb_agg(item), '[]'::jsonb) from "
+                "(select distinct item from jsonb_array_elements(entity_links.evidence || excluded.evidence) item) evidence_items), "
+                "version=entity_links.version+1 where entity_links.status='candidate'",
                 (
                     uuid.uuid4(),
                     tx.workspace_id,
