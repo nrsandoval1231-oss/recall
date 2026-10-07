@@ -20,6 +20,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
+      - name: Configure reliable Ubuntu package downloads
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g; s|https://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources
+          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99recall-ci-network >/dev/null
       - run: sudo apt-get update && sudo apt-get install -y postgresql postgresql-16-pgvector
       - run: npm ci
       - working-directory: services/backend
@@ -39,6 +43,13 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run build -w @recall/web
+      - name: Configure reliable Ubuntu package downloads
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g; s|https://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources
+          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99recall-ci-network >/dev/null
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
       - name: Desktop production build
         working-directory: apps/desktop
         env: { VITE_API_BASE_URL: http://localhost:8000, VITE_SUPABASE_URL: https://example.invalid, VITE_SUPABASE_PUBLISHABLE_KEY: placeholder }
@@ -53,6 +64,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
+      - name: Configure reliable Ubuntu package downloads
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g; s|https://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources
+          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99recall-ci-network >/dev/null
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev librsvg2-dev libxdo-dev libssl-dev pkg-config
       - run: npm ci
       - working-directory: apps/desktop/src-tauri

@@ -57,3 +57,7 @@ apps/desktop/src-tauri/Cargo.lock.bak
 .dev.vars.*
 !.dev.vars.example
 .wrangler/
+
+# Browser verification artifacts (synthetic screenshots are explicitly saved under docs)
+/test-results/
+/playwright-report/
