@@ -56,7 +56,17 @@ Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tom
 
 Obsidian remains optional and must never be required for Recall correctness.
 
-## RCL-005A — Canonical Memory Surface\n\nObjective: replace conventional dashboard/page presentation with the approved Recall interaction language without changing canonical memory semantics.\n\nBuild the smallest real vertical slice first: sparse Home -> Ask reconstruction -> contextual glass boards -> memory focus -> original evidence forward -> entity refocus -> historical/current state -> correction -> Back restores context. Mobile adapts this to one primary board at a time.\n\nThe visual semantics are locked in [UX-SPEC](UX-SPEC.md): glass = understanding; physical artifacts = evidence; light = intelligence; space = relationships; depth = context; time = memory evolution. DOM/CSS-first; add GPU/WebGL only where measured value justifies it. Preserve keyboard/reduced-motion/accessibility and honest loading/error/uncertain states. Do not hard-code the synthetic Brooks Campus design fixture.\n\nExit: the vertical slice runs against real Recall contracts/data, remains source-grounded, passes interaction/accessibility regression coverage, and is visually recognizable as Recall rather than a generic notes/dashboard/chat application.\n\n## RCL-006 — Private multi-domain pilot
+## RCL-005A — Canonical Memory Surface
+
+Objective: replace conventional dashboard/page presentation with the approved Recall interaction language without changing canonical memory semantics.
+
+Build the smallest real vertical slice first: sparse Home -> Ask reconstruction -> contextual glass boards -> memory focus -> original evidence forward -> entity refocus -> historical/current state -> correction -> Back restores context. Mobile adapts this to one primary board at a time.
+
+The visual semantics are locked in [UX-SPEC](UX-SPEC.md): glass = understanding; physical artifacts = evidence; light = intelligence; space = relationships; depth = context; time = memory evolution. DOM/CSS-first; add GPU/WebGL only where measured value justifies it. Preserve keyboard/reduced-motion/accessibility and honest loading/error/uncertain states. Do not hard-code the synthetic Brooks Campus design fixture.
+
+Exit: the vertical slice runs against real Recall contracts/data, remains source-grounded, passes interaction/accessibility regression coverage, and is visually recognizable as Recall rather than a generic notes/dashboard/chat application.
+
+## RCL-006 — Private multi-domain pilot
 
 Objective: prove Recall solves real memory retrieval, not merely Paul's specific note structure.
 
