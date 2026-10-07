@@ -1,8 +1,10 @@
 # RCL-005B — No-sign-in Obsidian memory spine
 
-Date: 2026-10-07. Status: **PROPOSED — written design awaiting owner review.**
+Date: 2026-10-07. Status: **Local-only foundation authorized for implementation; pairing/relay remain proposed.**
 
-This develops [ARCHITECTURE](../../ARCHITECTURE.md), [PRD](../../PRD.md) and [RCL-005B](../../ROADMAP.md), which remain the canonical product documents. It is not an implementation plan or permission to change deployed systems. No product code, credential creation, permission grant, private-data migration, deployment, purchase or merge is included.
+Subsequent owner direction: “Ok keep going until the product is finished”. The bounded [local-only implementation plan](../plans/2026-10-07-local-vault-foundation.md) carries this design forward with tests and independent review; routine stage approval is not required for that scope. QR association remains unanswered. No operational permission is implied. The proposal text below retains the full target and excluded future stages.
+
+This develops [ARCHITECTURE](../../ARCHITECTURE.md), [PRD](../../PRD.md) and [RCL-005B](../../ROADMAP.md), which remain the canonical product documents. It is not an implementation plan or permission to change deployed systems. The proposal itself changes no runtime. The subsequent local-only plan permits product code; credential creation, permission grants, private-data migration, deployment, purchase and merge remain excluded.
 
 ## 1. Requirement and decision boundary
 
@@ -10,7 +12,7 @@ The owner said: “i dont want to have to sign in anywhere”. Required meaning:
 
 Cross-device private use still needs secure owner-approved device association. **One-time QR pairing is proposed, not accepted.** The owner has already been asked whether that interaction is acceptable; no answer is assumed. If declined, local-only remains viable, but automatic private cross-device access cannot be implemented by opening the vault or API to strangers. A different owner-approved association method would need review.
 
-Written-design approval permits preparing an implementation plan, not implementation. The owner must subsequently review that plan and choose its execution method before product code. This is the architectural gate from the brainstorming workflow; this document remains a proposal until that review.
+The original architectural gate called for separate written-design and plan approvals. Subsequent owner direction authorizes the bounded local-only work and agent-selected execution approach; no approval is inferred for unanswered QR pairing or operational changes.
 
 ## 2. Approaches and recommendation
 
@@ -113,4 +115,4 @@ Required future evidence: fresh install without network/account; phone-first for
 
 Documentation checks do not prove these behaviors. The current change supplies only reviewed requirements and a proposed architecture.
 
-**Smallest unresolved product decision:** is a one-time owner-approved QR device association acceptable, provided there is no account, password or email-link sign-in, including first use? Pending that answer, review this written spec; do not infer approval from the request to fix documentation. Next after written-spec approval: a bounded implementation plan starting with local vault correctness, then owner review and execution choice.
+**Smallest unresolved product decision:** is a one-time owner-approved QR device association acceptable, provided there is no account, password or email-link sign-in, including first use? Pending that answer, continue the now-authorized local-only implementation plan. Pairing, relay and operational migration remain outside that work.
