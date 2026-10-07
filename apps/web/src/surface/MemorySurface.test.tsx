@@ -435,3 +435,311 @@ it("summary remains correctable alongside statements and correction restores key
     screen.getByRole("button", { name: "Correct understanding" }),
   );
 });
+
+function concurrentMemory(revision: number): MemoryDetail {
+  return {
+    ...memory,
+    revision,
+    interpretation: {
+      ...memory.interpretation,
+      summary: `Another editor's summary, revision ${revision}.`,
+    },
+    claims: memory.claims!.map((c) => ({
+      ...c,
+      text: `Another editor's statement, revision ${revision}.`,
+    })),
+  };
+}
+async function startCorrection() {
+  await focusMemory();
+  fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
+  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+    target: { value: "My preserved correction draft." },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review affected scope" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+  await screen.findByText(/This memory changed while/);
+}
+async function reloadCorrection(revision: number) {
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reload latest understanding" }),
+  );
+  await screen.findByText(`Another editor's statement, revision ${revision}.`);
+  expect(
+    (
+      screen.getByLabelText(
+        "What should Recall understand?",
+      ) as HTMLTextAreaElement
+    ).value,
+  ).toBe("My preserved correction draft.");
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Review affected scope",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  fireEvent.click(
+    screen.getByLabelText("I have reviewed the latest understanding"),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review affected scope" }),
+  );
+}
+it("conflict reload preserves draft and requires review before retrying the latest revision", async () => {
+  const { ApiError } = await import("@recall/api-client");
+  let server = memory;
+  const writes: { revision: number; operation: string }[] = [];
+  const client = api({
+    getMemory: async () => server,
+    correctMemory: async (_, input, operation, revision) => {
+      writes.push({ revision, operation });
+      if (revision !== server.revision)
+        throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+      server = {
+        ...server,
+        revision: server.revision + 1,
+        claims: server.claims!.map((c) => ({ ...c, text: input.text! })),
+      };
+      return server;
+    },
+  });
+  render(<MemorySurface api={client} captures={[]} />);
+  await focusMemory();
+  server = concurrentMemory(3);
+  fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
+  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+    target: { value: "My preserved correction draft." },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review affected scope" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+  await screen.findByText(/This memory changed while/);
+  await reloadCorrection(3);
+  expect(screen.getByText(/in revision 3/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+  await screen.findByText(/Correction saved/);
+  expect(screen.getByText("My preserved correction draft.")).toBeTruthy();
+  expect(server.interpretation.summary).toBe(
+    "Another editor's summary, revision 3.",
+  );
+  expect(writes.map((w) => w.revision)).toEqual([2, 3]);
+  expect(writes[0]!.operation).not.toBe(writes[1]!.operation);
+});
+it("repeated conflicts require a fresh reload and review each time", async () => {
+  const { ApiError } = await import("@recall/api-client");
+  let revision = 3;
+  const client = api({
+    getMemory: vi
+      .fn()
+      .mockResolvedValueOnce(memory)
+      .mockImplementation(async () => concurrentMemory(revision)),
+    correctMemory: async () => {
+      throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+    },
+  });
+  render(<MemorySurface api={client} captures={[]} />);
+  await startCorrection();
+  await reloadCorrection(3);
+  revision = 4;
+  fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+  await screen.findByText(/This memory changed while/);
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Review affected scope",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  await reloadCorrection(4);
+  expect(screen.getByText(/in revision 4/)).toBeTruthy();
+});
+it("cancelling a conflicted reload ignores its late response and does not lose the previous context", async () => {
+  const { ApiError } = await import("@recall/api-client");
+  let resolve!: (value: MemoryDetail) => void;
+  const client = api({
+    getMemory: vi
+      .fn()
+      .mockResolvedValueOnce(memory)
+      .mockImplementation(
+        () =>
+          new Promise<MemoryDetail>((yes) => {
+            resolve = yes;
+          }),
+      ),
+    correctMemory: async () => {
+      throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+    },
+  });
+  render(<MemorySurface api={client} captures={[]} />);
+  await startCorrection();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reload latest understanding" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Cancel correction" }));
+  await act(async () => resolve(concurrentMemory(3)));
+  expect(screen.queryByText(/Another editor's/)).toBeNull();
+  expect(screen.queryByText(/Correction saved/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByText(answer.answer!)).toBeTruthy();
+});
+
+it("failed conflict reload preserves the draft and keeps retry blocked", async () => {
+  const { ApiError } = await import("@recall/api-client");
+  const client = api({
+    getMemory: vi
+      .fn()
+      .mockResolvedValueOnce(memory)
+      .mockRejectedValue(new Error("Offline while reloading")),
+    correctMemory: async () => {
+      throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+    },
+  });
+  render(<MemorySurface api={client} captures={[]} />);
+  await startCorrection();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reload latest understanding" }),
+  );
+  await screen.findByText("Offline while reloading");
+  expect(
+    (
+      screen.getByLabelText(
+        "What should Recall understand?",
+      ) as HTMLTextAreaElement
+    ).value,
+  ).toBe("My preserved correction draft.");
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Review affected scope",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+});
+it("revoked access during conflict recovery clears private memory and history", async () => {
+  const { ApiError } = await import("@recall/api-client");
+  const denied = vi.fn();
+  const client = api({
+    getMemory: vi
+      .fn()
+      .mockResolvedValueOnce(memory)
+      .mockRejectedValue(
+        new ApiError("FORBIDDEN", "No access", 403, false, null),
+      ),
+    correctMemory: async () => {
+      throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+    },
+  });
+  render(<MemorySurface api={client} captures={[]} onAccessDenied={denied} />);
+  await startCorrection();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reload latest understanding" }),
+  );
+  await waitFor(() => expect(denied).toHaveBeenCalledOnce());
+  expect(screen.queryByText("Campus visit")).toBeNull();
+  expect(screen.queryByLabelText("What should Recall understand?")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+});
+it("removed correction target cannot be silently redirected to a summary or another statement", async () => {
+  const { ApiError } = await import("@recall/api-client");
+  const client = api({
+    getMemory: vi
+      .fn()
+      .mockResolvedValueOnce(memory)
+      .mockResolvedValue({ ...concurrentMemory(3), claims: [] }),
+    correctMemory: async () => {
+      throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+    },
+  });
+  render(<MemorySurface api={client} captures={[]} />);
+  await startCorrection();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reload latest understanding" }),
+  );
+  await screen.findByText(/The statement was removed or retracted/);
+  expect(
+    (
+      screen.getByLabelText(
+        "What should Recall understand?",
+      ) as HTMLTextAreaElement
+    ).value,
+  ).toBe("My preserved correction draft.");
+  fireEvent.click(
+    screen.getByLabelText("I have reviewed the latest understanding"),
+  );
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Review affected scope",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel correction" }));
+  expect(
+    screen.getByText("Another editor's summary, revision 3."),
+  ).toBeTruthy();
+  expect(document.activeElement).toBe(document.getElementById("surface-focus"));
+});
+it("conflict reload and correction preserve an earlier historical reconstruction and its original citation", async () => {
+  const { ApiError } = await import("@recall/api-client");
+  let current = memory;
+  const client = api({
+    ask: async () => ({ ...answer, temporal_mode: "original" }),
+    getMemory: async () => current,
+    correctMemory: async (_, input, _key, revision) => {
+      if (revision !== current.revision)
+        throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+      current = {
+        ...current,
+        revision: current.revision + 1,
+        claims: current.claims!.map((c) => ({ ...c, text: input.text! })),
+      };
+      return current;
+    },
+  });
+  const capture = {
+    capture_id: "capture",
+    client_capture_id: "capture",
+    memory_id: "memory",
+    status: "stored" as const,
+    source_kind: "handwritten_note" as const,
+    captured_at: memory.captured_at,
+    timezone: "UTC",
+    context_hint: "Campus visit",
+    created_at: memory.captured_at,
+    stored_at: memory.captured_at,
+    version: 1,
+    processing: null,
+    pages: [],
+  };
+  render(<MemorySurface api={client} captures={[capture]} />);
+  await ask();
+  fireEvent.click(screen.getByRole("button", { name: /Focus memory/ }));
+  await screen.findByText("Historical evidence");
+  fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+  fireEvent.click(screen.getByRole("button", { name: /Campus visit/ }));
+  await screen.findByText("Campus visit");
+  current = concurrentMemory(3);
+  fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
+  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+    target: { value: "My preserved correction draft." },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review affected scope" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+  await screen.findByText(/This memory changed while/);
+  await reloadCorrection(3);
+  fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+  await screen.findByText(/Correction saved/);
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByText("Historical evidence")).toBeTruthy();
+  expect(screen.getByText("January 2027", { exact: true })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByText(answer.answer!)).toBeTruthy();
+  expect(screen.queryByText(/Understanding changed/)).toBeNull();
+});

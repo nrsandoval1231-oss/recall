@@ -196,6 +196,7 @@ describe("web capture privacy and source boundary", () => {
           .disabled,
       ).toBe(true),
     );
+    await waitFor(() => expect(api.createCapture).toHaveBeenCalledOnce());
     expect(storage.saveDraft.mock.invocationCallOrder[0]).toBeLessThan(
       (api.createCapture as ReturnType<typeof vi.fn>).mock
         .invocationCallOrder[0] ?? Infinity,
