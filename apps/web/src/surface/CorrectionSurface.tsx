@@ -31,6 +31,11 @@ export function CorrectionSurface({
   const [error, setError] = useState<string | null>(null);
   const operation = useRef(crypto.randomUUID());
   const live = useRef(true);
+  const textInput = useRef<HTMLTextAreaElement>(null);
+  const confirm = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    (preview ? confirm.current : textInput.current)?.focus();
+  }, [preview]);
   useEffect(() => {
     live.current = true;
     return () => {
@@ -92,6 +97,7 @@ export function CorrectionSurface({
             What should Recall understand?
           </label>
           <textarea
+            ref={textInput}
             id="correction-text"
             autoFocus
             value={text}
@@ -121,6 +127,7 @@ export function CorrectionSurface({
           <button
             className="button primary"
             disabled={busy}
+            ref={confirm}
             onClick={() => void save()}
           >
             {busy ? "Saving correction…" : "Confirm correction"}

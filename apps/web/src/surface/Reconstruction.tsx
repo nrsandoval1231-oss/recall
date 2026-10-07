@@ -38,6 +38,10 @@ export function Reconstruction({
   supportCount,
   setSupportCount,
 }: Props) {
+  const historical = Boolean(
+    view.asOf ||
+    (view.response.temporal_mode && view.response.temporal_mode !== "current"),
+  );
   return (
     <div className="reconstruction">
       <GlassBoard
@@ -45,7 +49,7 @@ export function Reconstruction({
         className="primary-board answer-board"
       >
         <p className="eyebrow">
-          {view.asOf ? "Historical understanding" : "Recall understands"}
+          {historical ? "Historical understanding" : "Recall understands"}
         </p>
         <h1>{view.response.question}</h1>
         <p className="status-heading" data-status={view.response.status}>
@@ -101,7 +105,7 @@ export function Reconstruction({
         )}
         <div className="time-control">
           <span className="time-dot" />
-          <span>{view.asOf ? "Then" : "Now"}</span>
+          <span>{historical ? "Then" : "Now"}</span>
           <label htmlFor="as-of">What I knew by</label>
           <input
             id="as-of"

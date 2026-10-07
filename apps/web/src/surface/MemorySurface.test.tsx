@@ -302,6 +302,8 @@ it("natural historical Ask never refocuses through today's memory", async () => 
   });
   render(<MemorySurface api={client} captures={[]} />);
   await ask();
+  expect(screen.getByText("Historical understanding")).toBeTruthy();
+  expect(screen.queryByText("Now", { exact: true })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: /Focus memory/ }));
   expect(await screen.findByText("Historical evidence")).toBeTruthy();
   expect(client.getMemory).not.toHaveBeenCalled();
@@ -339,12 +341,97 @@ it("restores expanded supporting context on Back", async () => {
   );
 });
 it("does not restore denied evidence or prior private understanding", async () => {
-  const { ApiError } = await import("@recall/api-client"); const denied = vi.fn(); const client = api({ fetchSource: vi.fn(async () => { throw new ApiError("FORBIDDEN", "Source access denied.", 403, false, null); }) });
-  render(<MemorySurface api={client} captures={[]} onAccessDenied={denied} />); await focusMemory(); fireEvent.click(screen.getByRole("button", { name: "Inspect original · page 1" })); await waitFor(() => expect(denied).toHaveBeenCalled()); expect(screen.queryByText("Campus visit")).toBeNull(); expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  const { ApiError } = await import("@recall/api-client");
+  const denied = vi.fn();
+  const client = api({
+    fetchSource: vi.fn(async () => {
+      throw new ApiError(
+        "FORBIDDEN",
+        "Source access denied.",
+        403,
+        false,
+        null,
+      );
+    }),
+  });
+  render(<MemorySurface api={client} captures={[]} onAccessDenied={denied} />);
+  await focusMemory();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Inspect original · page 1" }),
+  );
+  await waitFor(() => expect(denied).toHaveBeenCalled());
+  expect(screen.queryByText("Campus visit")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
 });
 it("ignores an evidence response after Back and releases verified URLs on session exit", async () => {
-  let release!: (value: Awaited<ReturnType<SurfaceApi['fetchSource']>>) => void; const client = api({ fetchSource: () => new Promise(resolve => { release = resolve; }) }); const { unmount } = render(<MemorySurface api={client} captures={[]} />); await focusMemory(); fireEvent.click(screen.getByRole("button", { name: "Inspect original · page 1" })); fireEvent.click(screen.getByRole("button", { name: "Back" })); await act(async () => release({ bytes: new TextEncoder().encode("abc").buffer, mediaType: "image/png", serverSha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" })); expect(URL.createObjectURL).not.toHaveBeenCalled(); unmount();
+  let release!: (value: Awaited<ReturnType<SurfaceApi["fetchSource"]>>) => void;
+  const client = api({
+    fetchSource: () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  });
+  const { unmount } = render(<MemorySurface api={client} captures={[]} />);
+  await focusMemory();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Inspect original · page 1" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  await act(async () =>
+    release({
+      bytes: new TextEncoder().encode("abc").buffer,
+      mediaType: "image/png",
+      serverSha256:
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    }),
+  );
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  unmount();
 });
 it("shows a correction conflict without replacing newer knowledge", async () => {
-  const { ApiError } = await import("@recall/api-client"); render(<MemorySurface api={api({ correctMemory: async () => { throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null); } })} captures={[]} />); await focusMemory(); fireEvent.click(screen.getByRole("button", { name: "Correct statement" })); fireEvent.change(screen.getByLabelText("What should Recall understand?"), { target: { value: "March 2027" } }); fireEvent.click(screen.getByRole("button", { name: "Review affected scope" })); fireEvent.click(screen.getByRole("button", { name: "Confirm correction" })); expect(await screen.findByText(/This memory changed while/)).toBeTruthy(); expect(screen.queryByText(/Correction saved/)).toBeNull();
+  const { ApiError } = await import("@recall/api-client");
+  render(
+    <MemorySurface
+      api={api({
+        correctMemory: async () => {
+          throw new ApiError("VERSION_CONFLICT", "Changed", 409, false, null);
+        },
+      })}
+      captures={[]}
+    />,
+  );
+  await focusMemory();
+  fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
+  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+    target: { value: "March 2027" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review affected scope" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+  expect(await screen.findByText(/This memory changed while/)).toBeTruthy();
+  expect(screen.queryByText(/Correction saved/)).toBeNull();
+});
+
+it("summary remains correctable alongside statements and correction restores keyboard focus", async () => {
+  render(<MemorySurface api={api()} captures={[]} />);
+  await focusMemory();
+  const opening = screen.getByRole("button", { name: "Correct understanding" });
+  opening.focus();
+  fireEvent.click(opening);
+  const input = screen.getByLabelText("What should Recall understand?");
+  expect(document.activeElement).toBe(input);
+  fireEvent.change(input, {
+    target: { value: "The updated project summary." },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review affected scope" }),
+  );
+  expect(document.activeElement).toBe(
+    screen.getByRole("button", { name: "Confirm correction" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Cancel correction" }));
+  expect(document.activeElement).toBe(
+    screen.getByRole("button", { name: "Correct understanding" }),
+  );
 });

@@ -37,6 +37,7 @@ export function MemoryFocus({
               />
             ) : null,
           )
+          .filter(Boolean)
           .slice(0, 1)}
       </div>
       <GlassBoard
@@ -72,6 +73,7 @@ export function MemoryFocus({
               </span>
               <button
                 className="statement-correction"
+                data-focus-key={`correct-${claim.claim_id}`}
                 aria-label="Correct statement"
                 onClick={() => setEdit({ claim })}
               >
@@ -79,9 +81,10 @@ export function MemoryFocus({
               </button>
             </div>
           ))}
-        {!view.memory.claims?.length && view.memory.interpretation.summary && (
+        {view.memory.interpretation.summary && (
           <button
             className="button link"
+            data-focus-key="correct-summary"
             onClick={() => setEdit({ claim: null })}
           >
             Correct understanding

@@ -59,6 +59,7 @@ type View =
       title: string;
       quote: string;
       expectedHash?: string;
+      capturedAt?: string;
     };
 type Snapshot = {
   view: View;
@@ -97,6 +98,21 @@ export function MemorySurface({
   const [error, setError] = useState<string | null>(null);
   const [stack, setStack] = useState<Snapshot[]>([]);
   const [edit, setEdit] = useState<{ claim: Claim | null } | null>(null);
+  const correctionOrigin = useRef<HTMLElement | null>(null);
+  const previousEdit = useRef(false);
+  useEffect(() => {
+    if (!edit && previousEdit.current)
+      document
+        .querySelector<HTMLElement>(
+          `[data-focus-key="${correctionOrigin.current?.dataset.focusKey}"]`,
+        )
+        ?.focus();
+    previousEdit.current = Boolean(edit);
+  }, [edit]);
+  const beginCorrection = (next: { claim: Claim | null }) => {
+    correctionOrigin.current = document.activeElement as HTMLElement;
+    setEdit(next);
+  };
   const [savingCorrection, setSavingCorrection] = useState(false);
   const [supportCount, setSupportCount] = useState(3);
   const sequence = useRef(0);
@@ -268,8 +284,29 @@ export function MemorySurface({
     title: string,
     quote: string,
     expectedHash?: string,
-  ) =>
-    navigate({ kind: "evidence", sourceId, page, title, quote, expectedHash });
+  ) => {
+    const capturedAt =
+      view.kind === "memory"
+        ? view.memory.captured_at
+        : view.kind === "historical"
+          ? view.citation.captured_at
+          : view.kind === "result"
+            ? [...view.response.citations, ...view.response.sources].find(
+                (c) => c.source_id === sourceId,
+              )?.captured_at
+            : captures.find((c) =>
+                c.pages.some((p) => p.source_id === sourceId),
+              )?.captured_at;
+    navigate({
+      kind: "evidence",
+      sourceId,
+      page,
+      title,
+      quote,
+      expectedHash,
+      capturedAt,
+    });
+  };
   const corrected = (memory: MemoryDetail) => {
     sequence.current++;
     setEdit(null);
@@ -514,7 +551,7 @@ export function MemorySurface({
           <MemoryFocus
             view={view}
             evidence={evidence}
-            setEdit={setEdit}
+            setEdit={beginCorrection}
             focusEntity={focusEntity}
             inspect={inspect}
             supportCount={supportCount}
@@ -585,6 +622,7 @@ export function MemorySurface({
               sourceId={view.sourceId}
               page={view.page}
               expectedHash={view.expectedHash}
+              capturedAt={view.capturedAt}
               onVerified={evidence.retain}
               onStart={evidence.forget}
               onFailure={sourceFailure}

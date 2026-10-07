@@ -25,6 +25,7 @@ export function useReducedMotion() {
     const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     if (!media) return;
     const change = () => setReduced(media.matches);
+    change();
     media.addEventListener("change", change);
     return () => media.removeEventListener("change", change);
   }, []);
@@ -35,6 +36,7 @@ export function EvidenceArtifact({
   sourceId,
   page,
   expectedHash,
+  capturedAt,
   onVerified,
   onStart,
   onFailure,
@@ -43,6 +45,7 @@ export function EvidenceArtifact({
   sourceId: string;
   page: number | null;
   expectedHash?: string;
+  capturedAt?: string;
   onVerified?: (sourceId: string, url: string) => void;
   onStart?: (sourceId: string) => void;
   onFailure?: (failure: unknown) => void;
@@ -104,6 +107,11 @@ export function EvidenceArtifact({
         <span>Original evidence · page {page ?? "unknown"}</span>
         <span>{original ? "Verified original" : "Checking source"}</span>
       </figcaption>
+      {capturedAt && (
+        <p className="source-provenance">
+          Captured {displayDate(capturedAt)} · immutable original
+        </p>
+      )}
       {error ? (
         <p className="error" role="alert">
           {error}
