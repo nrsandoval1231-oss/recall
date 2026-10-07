@@ -28,6 +28,7 @@ export function createBrowserAuth(fetchImpl: typeof fetch = fetch, basePath = ""
     getSession,
     async requestSignIn(email) {
       const response = await fetchImpl(url("/auth/request"), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      if (response.status === 429) throw new Error("EMAIL_RATE_LIMITED");
       if (!response.ok) throw new Error("Could not send the sign-in email.");
     },
     async signOut() {

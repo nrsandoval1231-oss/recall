@@ -36,14 +36,8 @@ describe("web capture privacy and source boundary", () => {
     const auth = makeAuth(session("u1", "w1")); let removed = false; storage.listDrafts.mockImplementation(async (scope: string) => scope === "u1:w1" && !removed ? [pendingDraft] : []); storage.deleteDraft.mockImplementation(async () => { removed = true; }); vi.spyOn(window, "confirm").mockReturnValue(true); const api = makeApi(); render(<App services={{ auth, api }} />); expect(await screen.findByText("pending note")).toBeTruthy(); fireEvent.click(screen.getByRole("button", { name: "Remove" })); await waitFor(() => expect(screen.queryByText("pending note")).toBeNull()); expect(storage.deleteDraft).toHaveBeenCalledWith("draft-1");
   });
 
+  it("shows the provider rate limit and prevents a second request", async () => {
+    sessionStorage.clear(); const auth = makeAuth(null); auth.requestSignIn = vi.fn(async () => { throw new Error("EMAIL_RATE_LIMITED"); }); const api = {} as RecallApiClient; render(<App services={{ auth, api }} />); await screen.findByText("Keep what matters."); fireEvent.change(screen.getByLabelText("Email"), { target: { value: "pilot@example.com" } }); fireEvent.click(screen.getByRole("button", { name: "Email me a sign-in link" })); expect(await screen.findByText(/Email sign-in is temporarily limited/)).toBeTruthy(); expect(auth.requestSignIn).toHaveBeenCalledTimes(1); expect((screen.getByRole("button", { name: /temporarily limited/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
 });
-
-
-
-
-
-
-
-
-
-

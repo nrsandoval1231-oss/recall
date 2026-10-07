@@ -19,6 +19,11 @@ describe("browser BFF auth", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/auth/me");
   });
 
+  it("preserves the provider email rate-limit signal", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 429 }));
+    await expect(createBrowserAuth(fetchMock).requestSignIn("pilot@example.com")).rejects.toThrow("EMAIL_RATE_LIMITED");
+  });
+
   it("redeems a clicked email link once, then removes tokens from the URL", async () => {
     window.history.replaceState(null, "", "/auth/callback?state=nonce#access_token=access&refresh_token=refresh&expires_at=2000000000&token_type=bearer");
     const fetchMock = vi.fn<typeof fetch>()

@@ -10,6 +10,8 @@ The user selected a Cloudflare web app after native email sign-in failures. `app
 
 Cloudflare `recall-web` is deployed at https://recall-web.nicksandoval201121.workers.dev with its server session secret; Supabase Site URL and scoped callback allowlist are saved. Hosted runtime probes confirmed app/callback 200 and private unauthenticated routes 401/no-store. Real signed-in browser upload/source access remains pending. AI processing remains disabled in production. Existing Supabase email quota was exhausted during earlier sign-in attempts; web deployment does not remove that provider limit. Native implementation below remains preserved and is no longer the immediate pilot path.
 
+Live owner sign-in attempted at 23:35 CDT failed: Supabase auth logs record HTTP 429 `over_email_send_rate_limit` for the hosted callback. This confirms provider delivery rejection, not signed-in acceptance. No further email probes were sent during diagnosis. Custom SMTP or quota recovery remains necessary for email sign-in.
+
 - Capture: accepted durable Expo capture, ordered originals, hash verification, idempotent uploads and workspace isolation are preserved.
 - Understand: durable bounded interpretation jobs and conservative validation remain intact. User overrides are applied before later machine revisions.
 - Connect: universal entities/aliases, candidate mentions, explicit accepted/rejected identity, merge/split history and bounded relationships.
