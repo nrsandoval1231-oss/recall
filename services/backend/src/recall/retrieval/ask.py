@@ -14,6 +14,10 @@ from ..ingestion.provider import AnswerRequest, Provider, ProviderError, Provide
 PACKET_SIZE = 8
 EXCERPT_CHARS = 1500
 QUOTE_CHARS = 300
+MAX_ANSWER_OUTPUT_TOKENS = 16_000
+# Covers the stable system prompt and structured-output schema. Packet and question bytes are
+# conservative token bounds (a UTF-8 byte is never less than one token in this accounting model).
+MAX_ANSWER_STATIC_INPUT_TOKENS = 8_000
 
 ANSWER_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -66,6 +70,12 @@ def build_packet(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return packet
+
+
+def answer_max_input_tokens(question: str, hits: list[dict[str, Any]]) -> int:
+    """Conservative local bound used before the paid provider request is dispatched."""
+    packet = json.dumps(build_packet(hits[:PACKET_SIZE]), ensure_ascii=False, separators=(",", ":"))
+    return MAX_ANSWER_STATIC_INPUT_TOKENS + len(question.encode("utf-8")) + len(packet.encode("utf-8"))
 
 
 def _citation(hit: dict[str, Any], citation_id: str) -> dict[str, Any]:

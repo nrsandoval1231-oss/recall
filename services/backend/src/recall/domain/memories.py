@@ -25,7 +25,7 @@ from ..ingestion.embeddings import (
     reserve_embedding_budget,
     vector_index_available,
 )
-from ..ingestion.provider import Provider
+from ..ingestion.provider import Provider, ProviderResult
 from ..retrieval import ask as ask_module
 from ..retrieval.hybrid import SemanticIndexUnavailable, hybrid_search, temporal_claim_search, validate_as_of
 from . import processing
@@ -981,7 +981,13 @@ class MemoryService:
         return {"query": q, "results": [{k: v for k, v in h.items() if k != "text"} for h in hits]}
 
     def _finalize_ask(
-        self, user_id: uuid.UUID, hits: list[dict[str, Any]], result: Any, *, historical: bool
+        self,
+        user_id: uuid.UUID,
+        hits: list[dict[str, Any]],
+        result: ProviderResult | None,
+        reservation: uuid.UUID,
+        *,
+        historical: bool,
     ) -> str | None:
         """Re-authorize provider output before it can leave the service or create usage.
 
@@ -1014,19 +1020,17 @@ class MemoryService:
                     is None
                 ):
                     return "EVIDENCE_DELETED"
-            if result is not None:
-                tx.run(
-                    "insert into ai_usage (id, workspace_id, job_id, purpose, model_id, input_tokens, output_tokens, "
-                    "estimated_cost_usd) values (%s,%s,null,'answer',%s,%s,%s,%s)",
-                    (
-                        uuid.uuid4(),
-                        tx.workspace_id,
-                        result.model_id if result.model_id != "unknown" else (self.settings.ai_model_id or "unknown"),
-                        result.input_tokens,
-                        result.output_tokens,
-                        processing.estimate_cost(self.settings, result.input_tokens, result.output_tokens),
-                    ),
-                )
+            processing.finalize_provider_reservation(
+                tx,
+                self.settings,
+                reservation,
+                purpose="answer",
+                job_id=None,
+                result=result,
+                # A provider error without usage can still have reached the remote service.  Keep
+                # its pre-dispatch reservation for operator settlement instead of treating it as free.
+                uncertain=result is None,
+            )
             return None
 
         try:
@@ -1148,11 +1152,35 @@ class MemoryService:
                 "limitations": ["Answers are off; these are the closest matching sources."],
                 "reason": reason,
             }
+        try:
+            reservation = self._guard(
+                user_id,
+                lambda tx: processing.reserve_provider_budget(
+                    tx,
+                    self.settings,
+                    purpose="answer",
+                    model_id=self.settings.ai_model_id or "unknown",
+                    max_input_tokens=ask_module.answer_max_input_tokens(question, hits),
+                    max_output_tokens=ask_module.MAX_ANSWER_OUTPUT_TOKENS,
+                ),
+            )
+        except processing.BudgetReservationError as exc:
+            return {
+                **base,
+                "mode": "sources_only",
+                "status": "unavailable",
+                "answer": None,
+                "sentences": [],
+                "citations": [],
+                "limitations": ["Answers are off; these are the closest matching sources."],
+                "reason": str(exc),
+            }
         body_out, result = ask_module.answer(self.provider, question, hits)
         discarded = self._finalize_ask(
             user_id,
             hits,
             result,
+            reservation,
             historical=as_of is not None or natural_mode is not None,
         )
         if discarded is not None:

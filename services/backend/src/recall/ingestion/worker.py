@@ -57,10 +57,17 @@ from .projection import (
     mention_identity_key,
     write_search_chunks,
 )
-from .provider import InterpretRequest, PageImage, Provider, ProviderError
+from .provider import InterpretRequest, PageImage, Provider, ProviderError, ProviderResult
 from .validate import InvalidExtraction, Validated, validate_extraction
 
 log = logging.getLogger("recall.worker")
+
+# Sonnet 5.5 can consume at most 4,784 visual tokens per high-resolution image.  The static
+# allowance covers the stable system prompt, output schema, envelope and bounded repair note.
+# It is deliberately conservative because the API does not expose a free exact token-count call.
+MAX_VISUAL_TOKENS_PER_PAGE = 4_784
+MAX_INTERPRET_TEXT_INPUT_TOKENS = 20_000
+MAX_INTERPRET_OUTPUT_TOKENS = 64_000
 
 
 class JobFailure(Exception):
@@ -305,16 +312,28 @@ class Worker:
         page_map = {str(p["id"]): p["ordinal"] for p in pages}
         repair: str | None = None
         for purpose in ("interpret", "repair"):
-            if not self._budget_ok(job):
-                raise JobFailure("BUDGET_EXHAUSTED", retryable=True)
+            try:
+                reservation = self._reserve_provider_budget(job, purpose, len(images))
+            except processing.BudgetReservationError as exc:
+                raise JobFailure(str(exc), retryable=str(exc) == "BUDGET_EXHAUSTED") from None
             try:
                 result = self.provider.interpret(
                     InterpretRequest(envelope=envelope, pages=images, schema=self.schema, repair_note=repair)
                 )
             except ProviderError as err:
-                self._record_usage(job, purpose, self.settings.ai_model_id or "unknown", *err.usage)
+                billed = (
+                    ProviderResult(
+                        text="",
+                        model_id=self.settings.ai_model_id or "unknown",
+                        input_tokens=err.usage[0],
+                        output_tokens=err.usage[1],
+                    )
+                    if any(err.usage)
+                    else None
+                )
+                self._finalize_provider_budget(job, reservation, purpose, billed, uncertain=billed is None)
                 raise JobFailure(err.code, retryable=err.retryable) from None
-            self._record_usage(job, purpose, result.model_id, result.input_tokens, result.output_tokens)
+            self._finalize_provider_budget(job, reservation, purpose, result, uncertain=False)
             try:
                 validated = validate_extraction(
                     result.text,
@@ -330,26 +349,30 @@ class Worker:
             return validated, result.model_id
         raise JobFailure("EXTRACTION_INVALID", retryable=True)
 
-    def _budget_ok(self, job: Row) -> bool:
+    def _reserve_provider_budget(self, job: Row, purpose: str, page_count: int) -> uuid.UUID:
         with self._tx(job["workspace_id"]) as tx:
-            return processing.budget_available(self.settings, *processing.spend(tx))
+            return processing.reserve_provider_budget(
+                tx,
+                self.settings,
+                purpose=purpose,
+                model_id=self.settings.ai_model_id or "unknown",
+                max_input_tokens=page_count * MAX_VISUAL_TOKENS_PER_PAGE + MAX_INTERPRET_TEXT_INPUT_TOKENS,
+                max_output_tokens=MAX_INTERPRET_OUTPUT_TOKENS,
+            )
 
-    def _record_usage(self, job: Row, purpose: str, model_id: str, input_tokens: int, output_tokens: int) -> None:
+    def _finalize_provider_budget(
+        self, job: Row, reservation: uuid.UUID, purpose: str, result: ProviderResult | None, *, uncertain: bool
+    ) -> None:
         with self._tx(job["workspace_id"]) as tx:
             existing_job = tx.one("select id from processing_jobs where id=%s", (job["id"],))
-            tx.run(
-                "insert into ai_usage (id, workspace_id, job_id, purpose, model_id, input_tokens, output_tokens, "
-                "estimated_cost_usd) values (%s,%s,%s,%s,%s,%s,%s,%s)",
-                (
-                    uuid.uuid4(),
-                    job["workspace_id"],
-                    job["id"] if existing_job else None,
-                    purpose,
-                    model_id,
-                    input_tokens,
-                    output_tokens,
-                    processing.estimate_cost(self.settings, input_tokens, output_tokens),
-                ),
+            processing.finalize_provider_reservation(
+                tx,
+                self.settings,
+                reservation,
+                purpose=purpose,
+                job_id=job["id"] if existing_job else None,
+                result=result,
+                uncertain=uncertain,
             )
 
     # ------------------------------------------------------------------ commit

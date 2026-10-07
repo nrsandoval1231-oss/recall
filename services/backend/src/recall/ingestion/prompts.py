@@ -1,4 +1,4 @@
-"""Prompts. Kept stable and free of per-request values so the system prompt can be cached."""
+"""Prompts. Kept stable and free of per-request values."""
 
 INTERPRET_SYSTEM = """\
 You read photographed pages that a person saved so they can recall them later. Your output is a \

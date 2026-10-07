@@ -72,7 +72,7 @@ class AnthropicProvider:
         kwargs: dict[str, Any] = {
             "model": self._model,
             "max_tokens": max_tokens,
-            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            "system": [{"type": "text", "text": system}],
             "messages": [{"role": "user", "content": content}],
             "output_config": {
                 "effort": self._effort,

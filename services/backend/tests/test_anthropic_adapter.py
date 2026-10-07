@@ -98,7 +98,7 @@ def test_interpret_request_shape_and_success() -> None:
     content = body["messages"][0]["content"]
     image = next(c for c in content if c["type"] == "image")
     assert image["source"]["media_type"] == "image/jpeg" and image["source"]["type"] == "base64"
-    assert "DATA" in body["system"][0]["text"] and body["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert "DATA" in body["system"][0]["text"] and "cache_control" not in body["system"][0]
     assert req.headers["x-api-key"] == "test-key-not-real"
 
 

@@ -45,6 +45,7 @@ MIGRATIONS = [
     "0004_resilient_sync.sql",
     "0005_hybrid_retrieval.sql",
     "0006_portability.sql",
+    "0007_provider_budget_reservations.sql",
 ]
 
 

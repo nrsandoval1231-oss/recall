@@ -487,6 +487,42 @@ def test_ask_usage_is_accounted_and_budget_blocks_answers(ai: Env, fake: FakePro
     assert len(fake.answer_calls) == calls
 
 
+def test_inflight_answer_reservation_blocks_a_second_paid_answer_before_dispatch(
+    ai: Env, fake: FakeProvider, worker: Worker
+) -> None:
+    """A committed reservation counts before another Ask can enter provider I/O."""
+    from recall.domain import processing
+    from recall.domain.memories import MemoryService
+
+    user, _ = _vague_corpus(ai, fake, worker)
+    with ai.db.tx(user.id) as tx:
+        day, month = processing.spend(tx)
+    # One answer's conservative reservation is about $0.35 under this synthetic pricing.  Leave
+    # enough room for exactly one and prove the second request does not reach the fake provider.
+    settings = ai.settings.model_copy(update={"ai_daily_budget_usd": day + 0.4, "ai_monthly_budget_usd": month + 0.4})
+    with ai.db.tx(user.id) as tx:
+        reservation = processing.reserve_provider_budget(
+            tx,
+            settings,
+            purpose="answer",
+            model_id="fake-model",
+            max_input_tokens=8_000,
+            max_output_tokens=16_000,
+        )
+        held = tx.one(
+            "select expires_at = 'infinity' as permanent from embedding_reservations where id=%s", (reservation,)
+        )
+        assert held is not None and held["permanent"]
+    calls = len(fake.answer_calls)
+    blocked = MemoryService(ai.db, settings, fake).ask(user.id, {"question": "mitochondrial DNA"})
+    assert blocked["status"] == "unavailable" and blocked["reason"] == "BUDGET_EXHAUSTED"
+    assert len(fake.answer_calls) == calls
+    with ai.db.tx(user.id) as tx:
+        processing.finalize_provider_reservation(
+            tx, settings, reservation, purpose="answer", job_id=None, result=None, uncertain=False
+        )
+
+
 # ------------------------------------------------------------------ isolation
 def test_memories_search_and_ask_are_workspace_isolated(ai: Env, fake: FakeProvider, worker: Worker) -> None:
     owner, caps = _vague_corpus(ai, fake, worker)
