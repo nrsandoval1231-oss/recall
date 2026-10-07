@@ -102,11 +102,11 @@ export function MemorySurface({
   const previousEdit = useRef(false);
   useEffect(() => {
     if (!edit && previousEdit.current)
-      document
-        .querySelector<HTMLElement>(
+      (
+        document.querySelector<HTMLElement>(
           `[data-focus-key="${correctionOrigin.current?.dataset.focusKey}"]`,
-        )
-        ?.focus();
+        ) ?? heading.current
+      )?.focus();
     previousEdit.current = Boolean(edit);
   }, [edit]);
   const beginCorrection = (next: { claim: Claim | null }) => {
@@ -145,6 +145,7 @@ export function MemorySurface({
     [api],
   );
   useEffect(() => {
+    if (edit) return;
     const previous = restore.current;
     restore.current = null;
     const control = previous?.focus
@@ -307,14 +308,15 @@ export function MemorySurface({
       capturedAt,
     });
   };
-  const corrected = (memory: MemoryDetail) => {
-    sequence.current++;
-    setEdit(null);
+  const updateMemoryContexts = (memory: MemoryDetail) => {
     setStack((old) =>
       old.map((entry) => ({
         ...entry,
         view:
-          entry.view.kind === "result"
+          entry.view.kind === "result" &&
+          !entry.view.asOf &&
+          (!entry.view.response.temporal_mode ||
+            entry.view.response.temporal_mode === "current")
             ? { ...entry.view, invalidated: true }
             : entry.view.kind === "entity"
               ? { ...entry.view, invalidated: true }
@@ -324,6 +326,24 @@ export function MemorySurface({
                 : entry.view,
       })),
     );
+  };
+  const reloaded = (memory: MemoryDetail) => {
+    updateMemoryContexts(memory);
+    setView((old) =>
+      old.kind === "memory" && old.memory.memory_id === memory.memory_id
+        ? {
+            ...old,
+            memory,
+            notice:
+              "Latest understanding loaded. Your correction draft remains open for review.",
+          }
+        : old,
+    );
+  };
+  const corrected = (memory: MemoryDetail) => {
+    sequence.current++;
+    setEdit(null);
+    updateMemoryContexts(memory);
     setView({
       kind: "memory",
       memory,
@@ -463,6 +483,7 @@ export function MemorySurface({
             claim={edit.claim}
             api={api}
             onSaved={corrected}
+            onReloaded={reloaded}
             onCancel={() => setEdit(null)}
             onSavingChange={setSavingCorrection}
             onFailure={sourceFailure}
