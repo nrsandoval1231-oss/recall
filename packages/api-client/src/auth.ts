@@ -29,7 +29,7 @@ export function createAuth(config: AuthConfig) {
   return {
     client,
     async requestEmailCode(email: string): Promise<void> {
-      const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+      const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
       if (error) throw new Error(error.message);
     },
     async verifyEmailCode(email: string, code: string): Promise<void> {
