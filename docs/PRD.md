@@ -1,6 +1,6 @@
 # Recall — Product Requirements Document
 
-Version: 0.2 | Date: 2026-10-06 | Product owner: Nick Sandoval
+Version: 0.3 | Date: 2026-10-07 | Product owner: Nick Sandoval
 
 Status: universal product vision approved; V1 is a proposed implementation baseline, not delivered functionality.
 
@@ -62,7 +62,7 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 7. AI proposes; deterministic software commits.
 8. Source access is part of recall.
 9. Complexity stays behind the glass.
-10. Portability and privacy are product features; Obsidian is optional.
+10. Portability and privacy are product features; Obsidian is optional.\n11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.\n12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
 ## 6. Memory layers
 
@@ -137,7 +137,7 @@ Deferred:
 - Proactive pattern discovery, scheduled briefs, autonomous reminders/actions.
 - Claude/MCP and other assistant adapters.
 - Android/macOS, teams, billing, public launch.
-- Dedicated graph UI, separate graph/vector databases, autonomous agents.
+- Dedicated node-link graph UI, separate graph/vector databases, autonomous agents. Spatial relationship/context rendering on the canonical Memory Surface is part of the approved UX and must not require a graph database.
 - Domain-specific ERP/CMMS/CRM behavior.
 
 ## 10. Five primary screens
