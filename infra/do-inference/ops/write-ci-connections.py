@@ -10,6 +10,23 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 directory = Path(__file__).resolve().parents[1] / "secrets"
 host = os.environ["DO_OPS_TEST_DATABASE_HOST"]
+
+
+def replace_runner_file(path: Path, content: str) -> None:
+    """Atomically replace a runner-owned CI file without widening its final mode."""
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o400)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 connections: dict[str, str] = {}
 for name, file_name in (
     ("operator", "ci_operator_database_url.local"),
@@ -19,12 +36,7 @@ for name, file_name in (
     fields["host"] = host
     dsn = make_conninfo(**fields)
     connections[name] = dsn
-    (directory / file_name).write_text(dsn + "\n", encoding="utf-8")
-    os.chmod(directory / file_name, 0o400)
+    replace_runner_file(directory / file_name, dsn + "\n")
 target = directory / "ci-test-connections.local"
-fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o400)
-with os.fdopen(fd, "w", encoding="utf-8") as stream:
-    json.dump(connections, stream)
-    stream.write("\n")
-os.chmod(target, 0o400)
+replace_runner_file(target, json.dumps(connections) + "\n")
 print("Host-test connection file prepared.")

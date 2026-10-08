@@ -82,6 +82,59 @@ def test_ci_activation_candidate_becomes_runner_writable_before_mutation(tmp_pat
     assert json.loads(original.read_text(encoding="utf-8")) == {"review_id": "synthetic"}
 
 
+def test_ci_preflight_negatives_use_supported_compose_run_and_prove_refusal_marker() -> None:
+    workflow = (Path(__file__).resolve().parents[3] / ".github" / "workflows" / "do-inference-ops.yml").read_text(
+        encoding="utf-8"
+    )
+    command = "--entrypoint python api /ops/preflight.py"
+    marker = "Inference preflight failed; verify the private activation, role, and recovery records."
+    assert command in workflow
+    assert "--no-ports" not in workflow
+    assert workflow.count("run_preflight") >= 8  # clean before mutations and after each restoration
+    assert f"grep -Fqx '{marker}'" in workflow
+    assert "runtime_env uid=%u gid=%g mode=%a" in workflow
+    assert "10001:10001:400" in workflow
+    assert "$(id -u):$(id -g):600" in workflow
+    restored_transitions = (
+        'sudo install -o 10001 -g 10001 -m 0400 "$original_activation" secrets/activation_record.local\n          run_preflight',
+        'cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local\n          run_preflight\n          sed -i \'s/^AI_MODEL_ID=',
+        'cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local\n          run_preflight\n          sed -i \'s/^ANTHROPIC_CUSTOM_HEADERS=',
+        'cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local\n          run_preflight\n          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql',
+        "-c 'REVOKE pg_read_all_data FROM recall_api'\n          run_preflight",
+        "WHERE version='0001_trusted_capture.sql'\"\n          run_preflight",
+    )
+    assert all(transition in workflow for transition in restored_transitions)
+
+
+def test_ci_secret_writers_keep_protected_files_final_mode_and_runtime_runner_writable() -> None:
+    root = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops"
+    prepare = (root / "prepare-ci.py").read_text(encoding="utf-8")
+    connections = (root / "write-ci-connections.py").read_text(encoding="utf-8")
+    assert "mode: int = 0o400" in prepare
+    assert '"runtime.env"' in prepare and "0o600" in prepare
+    assert "def replace_runner_file" in connections
+    assert "os.O_EXCL, 0o600" in connections
+    assert "os.chmod(temporary, 0o400)" in connections
+    assert "os.replace(temporary, path)" in connections
+
+
+def test_ci_connection_replacement_is_atomic_and_leaves_final_file_protected(tmp_path) -> None:
+    path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "write-ci-connections.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    helper = next(
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "replace_runner_file"
+    )
+    namespace = {"os": os, "Path": Path}
+    exec(compile(ast.Module(body=[helper], type_ignores=[]), str(path), "exec"), namespace)
+    target = tmp_path / "ci_api_database_url.local"
+    target.write_text("old\n", encoding="utf-8")
+    namespace["replace_runner_file"](target, "new\n")  # type: ignore[operator]
+    assert target.read_text(encoding="utf-8") == "new\n"
+    if os.name == "posix":
+        assert target.stat().st_mode & 0o777 == 0o400
+    assert not (tmp_path / ".ci_api_database_url.local.tmp").exists()
+
+
 def _restore_module():  # type: ignore[no-untyped-def]
     path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "restore.py"
     spec = spec_from_file_location("do_ops_restore", path)

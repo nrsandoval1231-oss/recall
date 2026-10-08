@@ -21,14 +21,14 @@ passwords = {name: secrets.token_urlsafe(32) for name in ("operator", "migration
 db_host = "db"
 
 
-def write(name: str, content: str, uid: int | None = None) -> None:
+def write(name: str, content: str, uid: int | None = None, mode: int = 0o400) -> None:
     path = secret_dir / f"{name}.local"
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o400)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
     with os.fdopen(fd, "w", encoding="utf-8") as stream:
         stream.write(content)
         if not content.endswith("\n"):
             stream.write("\n")
-    os.chmod(path, 0o400)
+    os.chmod(path, mode)
     if os.name == "posix" and os.geteuid() == 0:
         owner = uid if uid is not None else int(os.environ["SUDO_UID"])
         group = uid if uid is not None else int(os.environ["SUDO_GID"])
@@ -106,6 +106,7 @@ write(
         )
     ),
     None,
+    0o600,
 )
 print("Synthetic CI-only secret files prepared.")
 if os.name == "posix" and os.geteuid() == 0:

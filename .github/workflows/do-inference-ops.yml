@@ -54,11 +54,25 @@ jobs:
       - name: Assert actual container refuses review, budget, header, ledger and role-elevation mismatches
         working-directory: infra/do-inference
         run: |
+          run_preflight() {
+            docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile runtime run --rm --no-deps --entrypoint python api /ops/preflight.py
+          }
           refuse_api() {
-            if docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile runtime run --rm --no-deps --no-ports api; then
+            refusal_log="$RUNNER_TEMP/preflight-refusal.log"
+            if run_preflight >"$refusal_log" 2>&1; then
               exit 1
             fi
+            grep -Fqx 'Inference preflight failed; verify the private activation, role, and recovery records.' "$refusal_log"
           }
+          run_preflight
+          stat -c 'activation_record uid=%u gid=%g mode=%a' secrets/activation_record.local
+          stat -c 'api_database_url uid=%u gid=%g mode=%a' secrets/api_database_url.local
+          stat -c 'ai_api_key uid=%u gid=%g mode=%a' secrets/ai_api_key.local
+          stat -c 'runtime_env uid=%u gid=%g mode=%a' secrets/runtime.env.local
+          test "$(stat -c '%u:%g:%a' secrets/activation_record.local)" = '10001:10001:400'
+          test "$(stat -c '%u:%g:%a' secrets/api_database_url.local)" = '10001:10001:400'
+          test "$(stat -c '%u:%g:%a' secrets/ai_api_key.local)" = '10001:10001:400'
+          test "$(stat -c '%u:%g:%a' secrets/runtime.env.local)" = "$(id -u):$(id -g):600"
           original_activation="$RUNNER_TEMP/activation-record-original.json"
           candidate_activation="$RUNNER_TEMP/activation-record-candidate.json"
           sudo cp -- secrets/activation_record.local "$original_activation"
@@ -77,23 +91,29 @@ jobs:
           sudo install -o 10001 -g 10001 -m 0400 "$candidate_activation" secrets/activation_record.local
           refuse_api
           sudo install -o 10001 -g 10001 -m 0400 "$original_activation" secrets/activation_record.local
+          run_preflight
           cp secrets/runtime.env.local "$RUNNER_TEMP/runtime.env"
           sed -i 's/^RECALL_AI_DAILY_BUDGET_USD=.*/RECALL_AI_DAILY_BUDGET_USD=1/' secrets/runtime.env.local
           refuse_api
           cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
+          run_preflight
           sed -i 's/^AI_MODEL_ID=.*/AI_MODEL_ID=wrong-synthetic-model/' secrets/runtime.env.local
           refuse_api
           cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
+          run_preflight
           sed -i 's/^ANTHROPIC_CUSTOM_HEADERS=.*/ANTHROPIC_CUSTOM_HEADERS=anthropic-workspace-id: wrong-synthetic-workspace/' secrets/runtime.env.local
           refuse_api
           cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
+          run_preflight
           docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'GRANT pg_read_all_data TO recall_api'
           refuse_api
           docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'REVOKE pg_read_all_data FROM recall_api'
+          run_preflight
           expected_checksum="$(sha256sum ../../services/backend/migrations/0001_trusted_capture.sql | cut -d ' ' -f1)"
           docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='tampered' WHERE version='0001_trusted_capture.sql'"
           refuse_api
           docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='$expected_checksum' WHERE version='0001_trusted_capture.sql'"
+          run_preflight
       - name: Start the preflighted API container
         working-directory: infra/do-inference
         run: |
@@ -129,6 +149,10 @@ jobs:
           restore_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -q restore-db)"
           restore_host="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$restore_id")"
           DO_OPS_TEST_DATABASE_HOST="$db_host" uv run --project ../../services/backend python ops/write-ci-connections.py
+          stat -c 'ci_api_database_url uid=%u gid=%g mode=%a' secrets/ci_api_database_url.local
+          stat -c 'ci_operator_database_url uid=%u gid=%g mode=%a' secrets/ci_operator_database_url.local
+          test "$(stat -c '%u:%g:%a' secrets/ci_api_database_url.local)" = "$(id -u):$(id -g):400"
+          test "$(stat -c '%u:%g:%a' secrets/ci_operator_database_url.local)" = "$(id -u):$(id -g):400"
           printf 'DO_OPS_RESTORE_DATABASE_HOST=%s\n' "$restore_host" >> "$GITHUB_ENV"
           DO_OPS_TEST_CONNECTION_FILE="$PWD/secrets/ci-test-connections.local" uv run --project ../../services/backend pytest ../../services/backend/tests/test_do_ops.py -q
       - name: Prepare an ephemeral age key without retaining its identity
