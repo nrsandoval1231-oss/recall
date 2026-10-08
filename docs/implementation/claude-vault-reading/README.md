@@ -30,7 +30,7 @@ Same-ID recovery GET may lead to one identical POST after 404, only after fresh 
 | --- | --- | --- |
 | Backend, independently reviewed `6e81987` | Separately run full pytest: 267 passed, no skips; Ruff/mypy passed. Actual synthetic protected HTTP/SQL and SDK stream fixtures cover authorization-before-body, binding/validation, duplicate/in-flight recovery, Unicode output, expiry and known/unknown charge accounting. | No paid/live Claude call or production enablement. Not rerun for this renderer-only task. |
 | Native, independently reviewed `7249249` | Separately run full Rust: 152 passed; check/fmt and 118 pre-UI desktop tests passed. Real temporary vault files and loopback TCP cover exact source bytes, v3 fence/history, correction precedence, crash/cancellation rollback, GET404→same POST, stale/changed source/session/connection and Unicode equivalence. | No installed Windows/keyring/TLS/live-provider acceptance. Not rerun for this renderer-only task. |
-| Renderer | 18 dedicated reading regressions plus existing adapter/local/lifecycle tests. Full root client suite is recorded below. | Injected native methods test real rendered UI, not native disk or OS scheduling. |
+| Renderer | Initial delivery had 18 reading regressions; review repair expands this to 25, plus existing adapter/local/lifecycle tests. Initial full root suite and scoped repair checks are recorded below. | Injected native methods test real rendered UI, not native disk or OS scheduling. |
 | Browser | Real Chromium against default entry, synthetic test-only native IPC, both desktop and reduced-motion. Six new journeys cover consent, comparison/correction/search/history/reload, pending cancel, uncertain recovery, vault-switch staleness and stale-correction/narrow layout; existing local journeys remain covered. | Fixture operation/history/browser storage model native DTOs; browser reload does not establish filesystem crash durability. |
 | Accessibility and hierarchy | Axe A/AA/2.1 AA scans at disconnected/consent/comparison/correction/history/pending/recovery/narrow states; 390px overflow assertion; 1440×1000 first-viewport assertions for reading text and complete original image. | Not exhaustive screen-reader or installed WebView certification. |
 
@@ -56,6 +56,21 @@ Final fresh checks from repository root, Linux, after the source-revision guard 
 - `git diff --check`: passed; changed-document relative Markdown targets resolved. Historical foundation/lifecycle screenshot directories have no diff.
 
 Native/backend code and web UI were unchanged in Task 3; their separately recorded native/backend results above and the root web unit suite remain applicable. No fresh backend/native or separate web Playwright run is claimed. Independent UI/whole-branch review and exact-head draft PR/CI/installer delivery are coordinator follow-ups; the previous foundation/lifecycle installer is not evidence for this slice.
+
+## Independent review repair over delivery head `0a18121`
+
+The independent UI review reproduced two Important gaps. A genuine revision-zero native diagnostic has no reading and blank source/note metadata; the earlier spread-based fixture incorrectly retained a reading, masking the disappearance of the correction editor. The editor/draft/reload route now remains visible independently of reading availability. A diagnostic draft is read-only/copyable, current reading/evidence is unavailable, and saving stays disabled until authoritative healthy reload and explicit review. No old original is displayed as current evidence. The synthetic component/browser fixtures now return that actual diagnostic shape and verify recovery after simulated repair.
+
+The original-photo source load previously shared the transport epoch, so a read/recover/cancel gesture discarded its response without starting another request. Source validity now binds view/session/memory/revision/hash/state separately from transport invalidation. Success and errors remain usable through an unsuccessful reread/recovery/cancellation, while older-revision and departed-view/session replies remain fenced.
+
+Fresh scoped verification:
+
+- Added/updated authentic diagnostic and source success/error regressions: **8 failed / 17 passed** before repair; `npm test --workspace @recall/desktop -- src/local/photo-reading.test.tsx src/local/local-app.test.tsx src/platform/local-vault.test.ts`: **105 passed**, including 25 reading cases, no skips.
+- Independent reviewer probes, explicitly selecting `review.test.tsx` with `-t REVIEW`: **2 passed**, 18 unrelated baseline cases filtered. The original generic Vitest harness command also discovered a later-added Playwright keyboard spec and errored at suite discovery; selecting the correct Vitest file resolved that harness issue.
+- `RECALL_CHROMIUM=/usr/bin/chromium npm run test:local-vault -- reading.spec.ts`: **16 passed**, desktop/reduced-motion, no skips. Includes copyable draft/reload/repair with the real diagnostic shape and a delayed original after an unknown reread, plus all prior reading journeys and Axe/viewport checks.
+- Root `npm run typecheck`, `npm run lint`, and `git diff --check`: passed. No new screenshots or unchanged broad backend/native/client/browser suites were rerun for this scoped repair; the earlier full-delivery evidence remains historical.
+
+The Minor keyboard-focus return finding remains recorded for final review; this repair addresses the two Important cases. No native/backend/contract/provisioning behavior changed. Scoped independent rereview remains required.
 
 ## Synthetic screenshots
 

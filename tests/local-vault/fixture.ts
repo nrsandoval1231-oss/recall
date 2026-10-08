@@ -12,7 +12,7 @@ export async function installVaultFixture(page: Page) {
     const state: State = JSON.parse(localStorage.getItem(key) || JSON.stringify(empty));
     state.receipts ??= {};
     state.readings ??= {};
-    const control = { readingEnabled: false, delayReading: false, readingPending: false, releaseReading: () => {}, unknownReading: false, failRemovalOnce: false, failRebuildOnce: false, delayRemoval: false, removalPending: false, releaseRemoval: () => {}, cancelCapture: false, cancelSelect: false, conflict: false, switchVault: false, delaySource: false, sourcePending: false, releaseSource: () => {}, calls: [] as { command: string; args: Record<string, unknown> }[] };
+    const control = { diagnosticReading: false, readingEnabled: false, delayReading: false, readingPending: false, releaseReading: () => {}, unknownReading: false, failRemovalOnce: false, failRebuildOnce: false, delayRemoval: false, removalPending: false, releaseRemoval: () => {}, cancelCapture: false, cancelSelect: false, conflict: false, switchVault: false, delaySource: false, sourcePending: false, releaseSource: () => {}, calls: [] as { command: string; args: Record<string, unknown> }[] };
     Object.assign(window, { syntheticVault: control });
     const save = () => localStorage.setItem(key, JSON.stringify(state));
     const now = "2026-10-08T12:00:00Z";
@@ -85,7 +85,10 @@ export async function installVaultFixture(page: Page) {
         const m: VaultMemory = { id: crypto.randomUUID(), revision: 1, note: String(args.note), source_name: "SYNTHETIC-test-card.png", source_sha256: (await original()).sha256, captured_at: now, updated_at: now, conflict: null, state: "active", note_path: "synthetic.md" };
         state.memories.push(m); state.history[m.id] = [{ revision: 1, note: m.note, recorded_at: now, origin: "human:recall", kind: "capture" }]; return remember(m);
       }
-      if (command === "vault_list") return projection(String(args.query), args.includeDeleted === true);
+      if (command === "vault_list") {
+        if (control.diagnosticReading) return state.memories.map(m => ({ id: m.id, revision: 0, note: "", source_name: "", source_sha256: "", captured_at: "", updated_at: "", conflict: "SYNTHETIC memory authority unavailable", state: "conflict", note_path: null }));
+        return projection(String(args.query), args.includeDeleted === true);
+      }
       if (command === "vault_rebuild") {
         if (control.failRebuildOnce) { control.failRebuildOnce = false; throw new Error("SYNTHETIC rebuild unavailable"); }
         return projection("", args.includeDeleted === true);

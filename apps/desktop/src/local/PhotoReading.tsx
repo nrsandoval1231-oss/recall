@@ -42,7 +42,7 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
   const alive = useRef(true);
   const currentOperation = useRef<ReadingOperation | null>(null);
   const transport = useRef(false);
-  const current = useRef({ active, visible, generation }); current.current = { active, visible, generation };
+  const current = useRef({ active, visible, generation, memoryId: memory.id, revision: memory.revision, sourceHash: memory.source_sha256, state: memory.state }); current.current = { active, visible, generation, memoryId: memory.id, revision: memory.revision, sourceHash: memory.source_sha256, state: memory.state };
   const artifact = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const draftRevision = useRef<number | null>(null);
@@ -75,8 +75,10 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
     }, e => { if (valid() && request === localRequest.current) { setError(message(e)); setCapability({ enabled: false, explanation: "Reading availability could not be checked. Local capture and search remain available." }); } });
   }, [active, visible, generation, session, memory.id]);
   useEffect(() => {
-    if (!active || !visible || !memory.reading || !eligible(memory)) return;
-    const valid = guard(); const request = ++sourceRequest.current; setSourceError("");
+    if (!active || !visible || !memory.reading || !eligible(memory)) { releaseSource(); return; }
+    // Reading transport may change its own epoch while these source bytes remain current.
+    const valid = () => alive.current && current.current.active && current.current.visible && current.current.generation === generation && current.current.memoryId === memory.id && current.current.revision === memory.revision && current.current.sourceHash === memory.source_sha256 && current.current.state === memory.state;
+    const request = ++sourceRequest.current; setSourceError("");
     void vault.source(session, memory.id).then(s => {
       if (!valid() || request !== sourceRequest.current) return;
       if (s.sha256 !== memory.source_sha256) throw new Error("Source hash changed");
@@ -120,7 +122,7 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
     setNotice(""); setPanel("correct");
   }
   async function saveCorrection() {
-    if (working || blocked || !eligible(memory) || (needsReview && (!reviewReady || !reviewed))) return;
+    if (working || blocked || !eligible(memory) || !memory.reading || (needsReview && (!reviewReady || !reviewed))) return;
     const valid = guard(); const intent = correction ?? { operationId: crypto.randomUUID(), revision: memory.revision, text: draft }; setCorrection(intent); setWorking(true); setError("");
     try { const result = await vault.correctReading(session, memory.id, intent.revision, intent.operationId, intent.text); if (valid()) { onSaved(result); draftRevision.current = null; setCorrection(null); setNeedsReview(false); setPanel("reading"); setNotice("Your reading correction is saved in the vault."); } }
     catch (e) { if (valid()) { setError(message(e)); setNeedsReview(true); setReviewReady(false); setReviewed(false); } }
@@ -132,6 +134,7 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
     catch (e) { if (valid()) setError(message(e)); }
     finally { if (valid()) setWorking(false); }
   }
+  const showCorrection = panel === "correct" || (!memory.reading && draftRevision.current !== null);
   const pending = operation && unfinished(operation);
   const canRead = eligible(memory) && !blocked && capability?.enabled && operationsReady && !working && !cancelling && !pending;
   return <section hidden={!visible || !active} className="local-photo-reading" aria-label="Photo reading">
@@ -142,8 +145,8 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
     </section>}
     {panel === "consent" ? <section className="local-review" aria-label="Claude reading consent"><h2 ref={heading} tabIndex={-1}>Send this photo for a reading?</h2><p><strong>{memory.source_name}</strong></p><p>Only this selected photo will be sent to your configured private service and Claude for full-page vision reading. Your original stays in the vault. The machine reading may be wrong.</p><p>After sending, cancellation may not stop processing or a charge. Your correction will take precedence over later machine readings.</p><div className="local-actions"><button className="local-primary" disabled={!canRead} onClick={() => void read()}>Send this photo to Claude</button><button onClick={() => setPanel("reading")}>Keep it local</button></div></section>
       : <div className="local-actions"><button disabled={!canRead || panel === "correct"} onClick={() => { setError(""); setNotice(""); setPanel("consent"); }}>Read this photo with Claude</button>{memory.reading && <button disabled={!eligible(memory) || blocked || working || Boolean(pending) || panel === "correct"} onClick={startCorrection}>Correct reading</button>}</div>}
-    {memory.reading && <div className="local-reading-comparison"><div className="local-reading-understanding"><ReadingText reading={memory.reading} />
-      {panel === "correct" && <section className="local-review" aria-label="Correct the photo reading"><h2 ref={heading} tabIndex={-1}>Correct the reading</h2><p>Your original, machine proposal and earlier corrections remain in the vault. Your annotation is separate.</p>{needsReview && <><p>Your reading draft is retained. Reload the current reading before resolving this attempt.</p><button disabled={working} onClick={() => void reloadCorrection()}>Reload latest reading</button>{reviewReady && <><p>Current reading · revision {memory.revision}</p><label><input type="checkbox" checked={reviewed} onChange={e => { setReviewed(e.target.checked); if (e.target.checked) setCorrection(null); }} />I reviewed the latest reading</label></>}</>}<label htmlFor="reading-correction">Your reading correction</label><textarea id="reading-correction" value={draft} readOnly={Boolean(correction) || !eligible(memory)} onChange={e => setDraft(e.target.value)} /><div className="local-actions"><button className="local-primary" disabled={working || blocked || !eligible(memory) || (needsReview && (!reviewReady || !reviewed))} onClick={() => void saveCorrection()}>Save reading correction</button><button disabled={working} onClick={() => setPanel("reading")}>Back to reading</button></div></section>}
-    </div><div className="local-reading-evidence"><h2>Original photo</h2>{sourceError && <p role="alert" className="local-error">{sourceError}</p>}{source && <figure className="local-artifact"><img src={source} alt="Original photo for comparison" onLoad={() => setDecoded(true)} onError={() => { releaseSource(); setSourceError("Original unavailable: this image could not be decoded."); onSaved({ ...memory, state: "conflict", conflict: "Original image could not be decoded" }); }} />{decoded && <figcaption>Original bytes unchanged · hash checked by this device. This does not verify the reading’s claims.</figcaption>}</figure>}{!source && !sourceError && eligible(memory) && <p role="status">Loading the original photo…</p>}</div></div>}
+    {(memory.reading || showCorrection) && <div className="local-reading-comparison"><div className="local-reading-understanding">{memory.reading ? <ReadingText reading={memory.reading} /> : <p className="local-muted">The current reading is unavailable. Your correction draft remains here for review or copying.</p>}
+      {showCorrection && <section className="local-review" aria-label="Correct the photo reading"><h2 ref={heading} tabIndex={-1}>Correct the reading</h2><p>Your original, machine proposal and earlier corrections remain in the vault. Your annotation is separate.</p>{needsReview && <><p>Your reading draft is retained. Reload the current reading before resolving this attempt.</p><button disabled={working} onClick={() => void reloadCorrection()}>Reload latest reading</button>{reviewReady && <><p>Current reading · revision {memory.revision}</p><label><input type="checkbox" checked={reviewed} onChange={e => { setReviewed(e.target.checked); if (e.target.checked) setCorrection(null); }} />I reviewed the latest reading</label></>}</>}<label htmlFor="reading-correction">Your reading correction</label><textarea id="reading-correction" value={draft} readOnly={Boolean(correction) || !eligible(memory) || !memory.reading} onChange={e => setDraft(e.target.value)} /><div className="local-actions"><button className="local-primary" disabled={working || blocked || !eligible(memory) || !memory.reading || (needsReview && (!reviewReady || !reviewed))} onClick={() => void saveCorrection()}>Save reading correction</button><button disabled={working} onClick={() => setPanel("reading")}>Back to reading</button></div></section>}
+    </div><div className="local-reading-evidence"><h2>Original photo</h2>{sourceError && <p role="alert" className="local-error">{sourceError}</p>}{source && memory.reading && eligible(memory) && <figure className="local-artifact"><img src={source} alt="Original photo for comparison" onLoad={() => setDecoded(true)} onError={() => { releaseSource(); setSourceError("Original unavailable: this image could not be decoded."); onSaved({ ...memory, state: "conflict", conflict: "Original image could not be decoded" }); }} />{decoded && <figcaption>Original bytes unchanged · hash checked by this device. This does not verify the reading’s claims.</figcaption>}</figure>}{!source && !sourceError && eligible(memory) && memory.reading && <p role="status">Loading the original photo…</p>}{(!eligible(memory) || !memory.reading) && <p className="local-muted">Original evidence is unavailable for the current memory state.</p>}</div></div>}
   </section>;
 }
