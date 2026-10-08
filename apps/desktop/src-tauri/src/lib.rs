@@ -229,8 +229,11 @@ fn vault_list(
     state: tauri::State<'_, local_vault::LocalVaultState>,
     expected_vault_id: String,
     query: String,
+    include_deleted: Option<bool>,
 ) -> Result<Vec<local_vault::VaultMemory>, String> {
-    state.with(&expected_vault_id, |vault| vault.list(&query))
+    state.with(&expected_vault_id, |vault| {
+        vault.list_with_deleted(&query, include_deleted.unwrap_or(false))
+    })
 }
 #[tauri::command]
 fn vault_correct(
@@ -243,6 +246,46 @@ fn vault_correct(
 ) -> Result<local_vault::VaultMemory, String> {
     state.with(&expected_vault_id, |vault| {
         vault.correct(&memory_id, expected_revision, &operation_id, &note)
+    })
+}
+#[tauri::command]
+fn vault_restore_note(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    memory_id: String,
+    expected_revision: u64,
+    operation_id: String,
+) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| {
+        vault.restore_note(&memory_id, expected_revision, &operation_id)
+    })
+}
+#[tauri::command]
+fn vault_remove(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    memory_id: String,
+    expected_revision: u64,
+    operation_id: String,
+    expected_state: String,
+) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| {
+        vault.remove(
+            &memory_id,
+            expected_revision,
+            &operation_id,
+            &expected_state,
+        )
+    })
+}
+#[tauri::command]
+fn vault_rebuild(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    include_deleted: Option<bool>,
+) -> Result<Vec<local_vault::VaultMemory>, String> {
+    state.with(&expected_vault_id, |vault| {
+        vault.list_with_deleted("", include_deleted.unwrap_or(false))
     })
 }
 #[tauri::command]
@@ -288,6 +331,9 @@ pub fn run() {
             vault_capture,
             vault_list,
             vault_correct,
+            vault_restore_note,
+            vault_remove,
+            vault_rebuild,
             vault_source,
             vault_history,
             secrets::secret_get,

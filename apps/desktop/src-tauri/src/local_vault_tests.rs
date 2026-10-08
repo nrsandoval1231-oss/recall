@@ -214,7 +214,9 @@ fn recovery_does_not_overwrite_external_edit() {
         .unwrap()
         .replace("base", "external");
     fs::write(v.note_path(&m.id), &edited).unwrap();
-    assert!(f.vault().capture_receipt(&o, "base").is_err());
+    let current = f.vault().capture_receipt(&o, "base").unwrap().unwrap();
+    assert_eq!(current.note, "external");
+    assert_eq!(current.revision, 2);
     assert_eq!(fs::read_to_string(v.note_path(&m.id)).unwrap(), edited);
 }
 #[test]
@@ -626,4 +628,1075 @@ fn filename_queries_cannot_promote_corrupt_or_conflicted_memories() {
     assert!(v.list("corrupt").unwrap().is_empty());
     assert!(v.list("missing").unwrap().is_empty());
     assert!(v.list("").unwrap().iter().all(|m| m.conflict.is_some()));
+}
+
+#[test]
+fn lifecycle_unique_rename_reconciles_edit_and_keeps_basename() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let renamed = v.path("Memories/Synthetic renamed.md");
+    fs::rename(v.note_path(&m.id), &renamed).unwrap();
+    let found = v.list("").unwrap().remove(0);
+    assert!(
+        found.conflict.is_none(),
+        "unique stable identity rename must remain eligible"
+    );
+    assert_eq!(
+        serde_json::to_value(&found).unwrap()["note_path"],
+        "Synthetic renamed.md"
+    );
+    fs::write(
+        &renamed,
+        fs::read_to_string(&renamed)
+            .unwrap()
+            .replace("base", "external?"),
+    )
+    .unwrap();
+    assert_eq!(v.list("").unwrap()[0].revision, 2);
+    v.correct(&m.id, 2, &op(), "corrected?").unwrap();
+    assert!(!v.note_path(&m.id).exists());
+    assert!(fs::read_to_string(&renamed)
+        .unwrap()
+        .ends_with("corrected?"));
+    assert_eq!(f.vault().list("").unwrap()[0].revision, 3);
+}
+
+#[test]
+fn lifecycle_old_capture_retry_returns_current_authoritative_revision() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let operation = op();
+    let m = v
+        .capture(&operation, "synthetic.png", &photo(), "base")
+        .unwrap();
+    v.correct(&m.id, 1, &op(), "current").unwrap();
+    assert_eq!(
+        v.capture_receipt(&operation, "base")
+            .unwrap()
+            .unwrap()
+            .revision,
+        2
+    );
+    assert_eq!(
+        v.capture(&operation, "synthetic.png", &photo(), "base")
+            .unwrap()
+            .note,
+        "current"
+    );
+}
+
+#[test]
+fn lifecycle_parent_hash_uses_exact_stored_bytes() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let operation = op();
+    let m = v
+        .capture(&operation, "synthetic.png", &photo(), "base")
+        .unwrap();
+    let value: serde_json::Value = decode(&v.history_path(&m.id, 1)).unwrap();
+    let bytes = serde_json::to_vec_pretty(&value).unwrap();
+    fs::write(v.history_path(&m.id, 1), &bytes).unwrap();
+    fs::write(v.journal_path(&operation), &bytes).unwrap();
+    fs::write(v.done_path(&operation), hash(&bytes)).unwrap();
+    v.correct(&m.id, 1, &op(), "current").unwrap();
+    let child: Event = decode(&v.history_path(&m.id, 2)).unwrap();
+    assert_eq!(child.parent_sha256, Some(hash(&bytes)));
+    assert_eq!(f.vault().history(&m.id).unwrap().len(), 2);
+}
+
+#[test]
+fn lifecycle_missing_old_receipt_never_replays_over_later_head() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let operation = op();
+    let m = v
+        .capture(&operation, "synthetic.png", &photo(), "base")
+        .unwrap();
+    v.correct(&m.id, 1, &op(), "later").unwrap();
+    let bytes = fs::read(v.note_path(&m.id)).unwrap();
+    fs::remove_file(v.done_path(&operation)).unwrap();
+    assert_eq!(
+        v.capture_receipt(&operation, "base")
+            .unwrap()
+            .unwrap()
+            .revision,
+        2
+    );
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), bytes);
+}
+
+#[test]
+fn lifecycle_pending_revision_forks_publish_neither_variant() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let before = fs::read(v.note_path(&m.id)).unwrap();
+    let operation = op();
+    v.correct(&m.id, 1, &operation, "first fork").unwrap();
+    let mut competing: Event = decode(&v.journal_path(&operation)).unwrap();
+    fs::remove_file(v.done_path(&operation)).unwrap();
+    fs::remove_file(v.history_path(&m.id, 2)).unwrap();
+    fs::write(v.note_path(&m.id), &before).unwrap();
+    fs::remove_file(v.backup_path(&operation)).unwrap();
+    competing.operation_id = op();
+    competing.memory.note = "second fork".into();
+    competing.markdown = markdown(&competing.memory);
+    competing.payload_sha256 = payload(
+        "correct",
+        &m.id,
+        1,
+        "second fork",
+        &m.source_sha256,
+        &m.source_name,
+    )
+    .unwrap();
+    fs::write(
+        v.journal_path(&competing.operation_id),
+        json(&competing).unwrap(),
+    )
+    .unwrap();
+    assert!(v.list("").unwrap()[0].conflict.is_some());
+    assert_eq!(
+        fs::read(v.note_path(&m.id)).unwrap(),
+        before,
+        "UUID ordering cannot select a fork winner"
+    );
+    assert!(!v.history_path(&m.id, 2).exists());
+}
+
+#[test]
+fn lifecycle_explicit_restore_is_revisioned_and_stale_confirmation_preserves_editor() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let before = fs::read(v.note_path(&m.id)).unwrap();
+    fs::remove_file(v.note_path(&m.id)).unwrap();
+    assert_eq!(v.list("").unwrap()[0].state, "missing");
+    assert!(v.restore_note(&m.id, 2, &op()).is_err());
+    let restore = op();
+    let restored = v.restore_note(&m.id, 1, &restore).unwrap();
+    assert_eq!(restored.state, "active");
+    assert_eq!(restored.revision, 2);
+    assert_eq!(v.restore_note(&m.id, 1, &restore).unwrap().revision, 2);
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), before);
+    assert_eq!(v.history(&m.id).unwrap()[1].kind, "restore");
+    fs::remove_file(v.note_path(&m.id)).unwrap();
+    assert_eq!(v.list("").unwrap()[0].state, "missing");
+    fs::write(v.note_path(&m.id), &before).unwrap();
+    assert!(v.restore_note(&m.id, 2, &op()).is_err());
+    assert!(v.remove(&m.id, 2, &op(), "missing").is_err());
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), before);
+}
+
+#[test]
+fn lifecycle_removal_retains_bytes_and_dominates_old_receipts() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let capture = op();
+    let m = v
+        .capture(&capture, "synthetic.png", &photo(), "base")
+        .unwrap();
+    let correction = op();
+    v.correct(&m.id, 1, &correction, "current").unwrap();
+    let note = fs::read(v.note_path(&m.id)).unwrap();
+    let original = fs::read(v.source_path(&m.id)).unwrap();
+    let removal = op();
+    let removed = v.remove(&m.id, 2, &removal, "active").unwrap();
+    assert_eq!(removed.state, "deleted");
+    assert_eq!(removed.revision, 3);
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), note);
+    assert_eq!(fs::read(v.source_path(&m.id)).unwrap(), original);
+    assert!(v.list("").unwrap().is_empty());
+    assert!(v.list("current").unwrap().is_empty());
+    assert!(v.source(&m.id).is_err());
+    assert_eq!(v.history(&m.id).unwrap()[2].kind, "remove");
+    assert_eq!(
+        v.remove(&m.id, 2, &removal, "active").unwrap().state,
+        "deleted"
+    );
+    assert!(v.remove(&m.id, 2, &removal, "missing").is_err());
+    assert!(v.restore_note(&m.id, 3, &op()).is_err());
+    assert!(v.correct(&m.id, 3, &op(), "resurrect").is_err());
+    assert_eq!(
+        v.capture(&capture, "synthetic.png", &photo(), "base")
+            .unwrap()
+            .state,
+        "deleted"
+    );
+    assert_eq!(
+        v.correct(&m.id, 1, &correction, "current").unwrap().state,
+        "deleted"
+    );
+    fs::remove_file(v.done_path(&capture)).unwrap();
+    fs::remove_file(v.done_path(&correction)).unwrap();
+    fs::write(v.note_path(&m.id), b"EXTERNAL EDIT AFTER TOMBSTONE").unwrap();
+    assert_eq!(
+        f.vault()
+            .capture_receipt(&capture, "base")
+            .unwrap()
+            .unwrap()
+            .state,
+        "deleted"
+    );
+    assert_eq!(
+        fs::read(v.note_path(&m.id)).unwrap(),
+        b"EXTERNAL EDIT AFTER TOMBSTONE"
+    );
+}
+
+// Test-only, thread-scoped hooks observe real disk operations. No environment
+// variable or production mode can enable these faults.
+type FaultHook = Box<dyn FnMut(&str, &Path) -> Result<()>>;
+thread_local! { static FAULT: std::cell::RefCell<Option<FaultHook>> = const { std::cell::RefCell::new(None) }; }
+pub(super) fn boundary(point: &str, path: &Path) -> Result<()> {
+    FAULT.with(|slot| match slot.borrow_mut().as_mut() {
+        Some(hook) => hook(point, path),
+        None => Ok(()),
+    })
+}
+struct FaultGuard;
+impl FaultGuard {
+    fn set(hook: impl FnMut(&str, &Path) -> Result<()> + 'static) -> Self {
+        FAULT.with(|slot| *slot.borrow_mut() = Some(Box::new(hook)));
+        Self
+    }
+}
+impl Drop for FaultGuard {
+    fn drop(&mut self) {
+        FAULT.with(|slot| *slot.borrow_mut() = None);
+    }
+}
+
+#[test]
+fn lifecycle_injected_disk_errors_never_acknowledge_partial_operations() {
+    for kind in ["capture", "correct", "restore", "remove"] {
+        for directory in [
+            "Sources",
+            "_meta/journal",
+            "Memories",
+            "History",
+            "_meta/commits",
+        ] {
+            if directory == "Sources" && kind != "capture"
+                || directory == "Memories" && kind == "remove"
+            {
+                continue;
+            }
+            for point in [
+                "create_before",
+                "write_after",
+                "sync_before",
+                "sync_after",
+                "publish_before",
+                "publish_after",
+                "cleanup_before",
+            ] {
+                let f = Fixture::new();
+                let v = f.vault();
+                let neighbor = v
+                    .capture(&op(), "synthetic.png", &photo(), "healthy neighbor")
+                    .unwrap();
+                let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+                if kind == "restore" {
+                    fs::remove_file(v.note_path(&m.id)).unwrap();
+                }
+                let original = fs::read(v.source_path(&m.id)).unwrap();
+                let first_history = fs::read(v.history_path(&m.id, 1)).unwrap();
+                let operation = op();
+                let target = v.path(directory);
+                let hit = std::rc::Rc::new(std::cell::Cell::new(false));
+                let observed = hit.clone();
+                let fault = FaultGuard::set(move |at, path| {
+                    if at == point && path.starts_with(&target) && !observed.replace(true) {
+                        return Err(format!(
+                            "INJECTED {}",
+                            std::io::Error::from_raw_os_error(if at == "create_before" {
+                                30
+                            } else {
+                                28
+                            })
+                        ));
+                    }
+                    Ok(())
+                });
+                let attempt = || match kind {
+                    "capture" => v.capture(&operation, "synthetic.png", &photo(), "captured"),
+                    "correct" => v.correct(&m.id, 1, &operation, "corrected"),
+                    "restore" => v.restore_note(&m.id, 1, &operation),
+                    _ => v.remove(&m.id, 1, &operation, "active"),
+                };
+                assert!(
+                    attempt().is_err(),
+                    "{kind}/{directory}/{point} acknowledged injected failure"
+                );
+                assert!(
+                    hit.get(),
+                    "fault boundary did not execute: {kind}/{directory}/{point}"
+                );
+                drop(fault);
+                let reopened = f.vault();
+                assert_eq!(
+                    reopened.list("healthy neighbor").unwrap()[0].id,
+                    neighbor.id
+                );
+                assert_eq!(fs::read(v.source_path(&m.id)).unwrap(), original);
+                assert_eq!(fs::read(v.history_path(&m.id, 1)).unwrap(), first_history);
+                // A restore interrupted after note publication deliberately stays
+                // diagnostic: an identical external return cannot be distinguished.
+                match attempt() {
+                    Ok(current) => assert_eq!(
+                        current.state,
+                        if kind == "remove" {
+                            "deleted"
+                        } else {
+                            "active"
+                        }
+                    ),
+                    Err(_) => {
+                        assert!(v.journal_path(&operation).exists());
+                        let all = reopened.list_with_deleted("", true).unwrap();
+                        assert!(
+                            all.iter().any(|row| row.conflict.is_some()),
+                            "missing recovery diagnostic {kind}/{directory}/{point}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn lifecycle_restore_returned_note_after_journal_is_not_adopted() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let bytes = fs::read(v.note_path(&m.id)).unwrap();
+    fs::remove_file(v.note_path(&m.id)).unwrap();
+    let note = v.note_path(&m.id);
+    let copied = bytes.clone();
+    let _fault = FaultGuard::set(move |point, _| {
+        if point == "before_note" {
+            fs::write(&note, &copied).unwrap();
+        }
+        Ok(())
+    });
+    assert!(v.restore_note(&m.id, 1, &op()).is_err());
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), bytes);
+    assert!(!v.history_path(&m.id, 2).exists());
+}
+
+// Independent v1 wire fixture: no current Event/VaultMemory serialization builds
+// these bytes. Whitespace and key ordering intentionally differ by revision.
+fn legacy_fixture(v: &Vault) -> (String, String, Vec<Vec<u8>>) {
+    let memory = op();
+    let correction = op();
+    let stamp = "2026-10-07T12:00:00Z";
+    fs::write(v.source_path(&memory), photo()).unwrap();
+    fs::create_dir(v.path(&format!("History/{memory}"))).unwrap();
+    let mut bytes: Vec<Vec<u8>> = Vec::new();
+    let mut previous: Option<String> = None;
+    for (revision, kind, operation, note) in [
+        (1, "capture", &memory, "v1 base"),
+        (2, "correct", &correction, "v1 latest?"),
+    ] {
+        let markdown = format!("<!-- Recall memory {memory} | human annotation, not OCR -->\n[Original photo](../Sources/{memory}.png)\n\n{note}");
+        let value = serde_json::json!({
+            "format": "recall-local-vault-v1", "vault_id": v.id, "operation_id": operation,
+            "kind": kind, "expected_revision": revision - 1,
+            "payload_sha256": hash(&serde_json::to_vec(&(kind, &memory, revision - 1, note, hash(&photo()), "synthetic.png")).unwrap()),
+            "parent_sha256": bytes.last().map(|b| hash(b)), "origin": "human:recall",
+            "memory": { "id": memory, "revision": revision, "note": note,
+                "source_sha256": hash(&photo()), "source_name": "synthetic.png", "captured_at": stamp, "updated_at": stamp, "conflict": null },
+            "previous_markdown": previous, "markdown": markdown,
+        });
+        let raw = if revision == 1 {
+            serde_json::to_vec_pretty(&value).unwrap()
+        } else {
+            serde_json::to_vec(&value).unwrap()
+        };
+        fs::write(v.history_path(&memory, revision), &raw).unwrap();
+        fs::write(v.journal_path(operation), &raw).unwrap();
+        fs::write(v.done_path(operation), hash(&raw)).unwrap();
+        if let Some(prior) = previous {
+            fs::write(v.backup_path(operation), prior).unwrap();
+        }
+        previous = Some(markdown);
+        bytes.push(raw);
+    }
+    fs::write(v.note_path(&memory), previous.unwrap()).unwrap();
+    (memory, correction, bytes)
+}
+
+#[test]
+fn lifecycle_v1_multirevision_bytes_receipts_backups_survive_v2_transition() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let manifest = fs::read(v.path("_meta/manifest.json")).unwrap();
+    let (memory, correction, bytes) = legacy_fixture(&v);
+    assert_eq!(f.vault().list("").unwrap()[0].revision, 2);
+    assert_eq!(fs::read(v.path("_meta/manifest.json")).unwrap(), manifest);
+    assert_eq!(
+        v.capture_receipt(&memory, "v1 base").unwrap().unwrap().note,
+        "v1 latest?"
+    );
+    let backup = fs::read(v.backup_path(&correction)).unwrap();
+    for (index, raw) in bytes.iter().enumerate() {
+        let decoded: Event = serde_json::from_slice(raw).unwrap();
+        let normalized = serde_json::to_value(&decoded).unwrap();
+        assert_eq!(
+            normalized,
+            serde_json::from_slice::<serde_json::Value>(raw).unwrap()
+        );
+        assert!(normalized.get("note_path").is_none());
+        assert!(normalized["memory"].get("state").is_none());
+        assert_eq!(
+            fs::read(v.history_path(&memory, index as u64 + 1)).unwrap(),
+            *raw
+        );
+    }
+    v.correct(&memory, 2, &op(), "v2 correction").unwrap();
+    assert_eq!(
+        decode::<Manifest>(&v.path("_meta/manifest.json"))
+            .unwrap()
+            .format,
+        FORMAT_V2
+    );
+    // This is the exact old binary's writer-version rejection predicate.
+    assert_ne!(
+        decode::<Manifest>(&v.path("_meta/manifest.json"))
+            .unwrap()
+            .format,
+        FORMAT
+    );
+    assert_eq!(
+        fs::read(v.path("_meta/manifest-v1.json")).unwrap(),
+        manifest
+    );
+    assert_eq!(fs::read(v.backup_path(&correction)).unwrap(), backup);
+    assert_eq!(v.history(&memory).unwrap().len(), 3);
+    for (index, raw) in bytes.iter().enumerate() {
+        assert_eq!(
+            fs::read(v.history_path(&memory, index as u64 + 1)).unwrap(),
+            *raw
+        );
+    }
+}
+
+#[test]
+fn lifecycle_pending_v1_recovers_exact_bytes_without_fencing_a_read() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let (memory, correction, bytes) = legacy_fixture(&v);
+    fs::remove_file(v.done_path(&correction)).unwrap();
+    fs::remove_file(v.history_path(&memory, 2)).unwrap();
+    fs::remove_file(v.note_path(&memory)).unwrap();
+    assert_eq!(f.vault().list("").unwrap()[0].note, "v1 latest?");
+    assert_eq!(fs::read(v.history_path(&memory, 2)).unwrap(), bytes[1]);
+    assert_eq!(
+        fs::read(v.done_path(&correction)).unwrap(),
+        hash(&bytes[1]).as_bytes()
+    );
+    assert_eq!(
+        decode::<Manifest>(&v.path("_meta/manifest.json"))
+            .unwrap()
+            .format,
+        FORMAT
+    );
+}
+
+#[test]
+fn lifecycle_interrupted_version_fence_remains_reopenable_with_original_v1_bytes() {
+    for point in ["fence_before", "fence_after"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let (memory, _, bytes) = legacy_fixture(&v);
+        let operation = op();
+        let fault = FaultGuard::set(move |at, _| {
+            if at == point {
+                return Err("INJECTED manifest transition interruption".into());
+            }
+            Ok(())
+        });
+        assert!(v.correct(&memory, 2, &operation, "v2").is_err());
+        drop(fault);
+        assert!(!v.journal_path(&operation).exists());
+        assert_eq!(f.vault().list("").unwrap()[0].note, "v1 latest?");
+        assert_eq!(
+            decode::<Manifest>(&v.path("_meta/manifest.json"))
+                .unwrap()
+                .format,
+            if point == "fence_before" {
+                FORMAT
+            } else {
+                FORMAT_V2
+            }
+        );
+        v.correct(&memory, 2, &operation, "v2").unwrap();
+        for (index, raw) in bytes.iter().enumerate() {
+            assert_eq!(
+                fs::read(v.history_path(&memory, index as u64 + 1)).unwrap(),
+                *raw
+            );
+        }
+    }
+}
+
+#[test]
+fn lifecycle_journaled_correction_rename_or_duplicate_never_publishes() {
+    for duplicate in [false, true] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let original = v.note_path(&m.id);
+        let renamed = v.path("Memories/Editor renamed.md");
+        let saved = fs::read(&original).unwrap();
+        let new_path = renamed.clone();
+        let _fault = FaultGuard::set(move |point, _| {
+            if point == "before_note" {
+                if duplicate {
+                    fs::copy(&original, &new_path).unwrap();
+                } else {
+                    fs::rename(&original, &new_path).unwrap();
+                }
+            }
+            Ok(())
+        });
+        let operation = op();
+        assert!(v.correct(&m.id, 1, &operation, "draft").is_err());
+        assert_eq!(fs::read(renamed).unwrap(), saved);
+        assert!(!v.history_path(&m.id, 2).exists());
+        assert!(v.journal_path(&operation).exists());
+    }
+}
+
+#[test]
+fn lifecycle_journaled_missing_removal_rechecks_reappearance() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let note = v.note_path(&m.id);
+    let bytes = fs::read(&note).unwrap();
+    fs::remove_file(&note).unwrap();
+    let external = bytes.clone();
+    let fault = FaultGuard::set(move |point, _| {
+        if point == "before_history" {
+            fs::write(&note, &external).unwrap();
+        }
+        Ok(())
+    });
+    let operation = op();
+    assert!(v.remove(&m.id, 1, &operation, "missing").is_err());
+    drop(fault);
+    assert!(!v.history_path(&m.id, 2).exists());
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), bytes);
+    assert!(v.remove(&m.id, 1, &operation, "missing").is_err());
+    assert_eq!(v.list("").unwrap()[0].state, "conflict");
+}
+
+#[test]
+fn lifecycle_missing_removal_restore_receipt_and_damaged_original_history() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    fs::remove_file(v.note_path(&m.id)).unwrap();
+    let restore = op();
+    v.restore_note(&m.id, 1, &restore).unwrap();
+    fs::remove_file(v.note_path(&m.id)).unwrap();
+    v.remove(&m.id, 2, &op(), "missing").unwrap();
+    assert!(!v.note_path(&m.id).exists());
+    assert_eq!(v.restore_note(&m.id, 1, &restore).unwrap().state, "deleted");
+    fs::write(v.source_path(&m.id), b"DAMAGED SYNTHETIC ORIGINAL").unwrap();
+    assert_eq!(v.history(&m.id).unwrap().len(), 3);
+    assert_eq!(v.list_with_deleted("", true).unwrap()[0].state, "deleted");
+    assert!(v.source(&m.id).is_err());
+}
+
+#[test]
+fn lifecycle_renamed_basename_participates_in_keyword_search() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v
+        .capture(&op(), "synthetic.png", &photo(), "Garden uncertain?")
+        .unwrap();
+    fs::rename(v.note_path(&m.id), v.path("Memories/Workshop Sketch.md")).unwrap();
+    assert_eq!(v.list("wOrKsHoP garden").unwrap()[0].id, m.id);
+    assert!(v.list("workshop absent").unwrap().is_empty());
+    fs::copy(
+        v.path("Memories/Workshop Sketch.md"),
+        v.path("Memories/duplicate.md"),
+    )
+    .unwrap();
+    assert!(v.list("workshop").unwrap().is_empty());
+}
+
+#[test]
+fn lifecycle_nested_move_stays_conflict_and_cannot_be_restored() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    fs::create_dir(v.path("Memories/Nested")).unwrap();
+    fs::rename(v.note_path(&m.id), v.path("Memories/Nested/renamed.md")).unwrap();
+    assert_eq!(v.list("").unwrap()[0].state, "conflict");
+    assert!(v.restore_note(&m.id, 1, &op()).is_err());
+    assert!(v.remove(&m.id, 1, &op(), "missing").is_err());
+    assert!(!v.note_path(&m.id).exists());
+}
+
+#[test]
+fn lifecycle_receipt_rejects_journal_payload_changed_after_commit() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let operation = op();
+    let m = v
+        .capture(&operation, "synthetic.png", &photo(), "base")
+        .unwrap();
+    let mut event: Event = decode(&v.journal_path(&operation)).unwrap();
+    event.memory.note = "forged historical payload".into();
+    event.markdown = markdown(&event.memory);
+    event.payload_sha256 = payload(
+        "capture",
+        &m.id,
+        0,
+        &event.memory.note,
+        &m.source_sha256,
+        &m.source_name,
+    )
+    .unwrap();
+    fs::write(v.journal_path(&operation), json(&event).unwrap()).unwrap();
+    assert!(v
+        .capture_receipt(&operation, "forged historical payload")
+        .is_err());
+    assert!(v.list("base").unwrap().is_empty());
+}
+
+#[test]
+fn lifecycle_old_receipt_cannot_bypass_pending_correction_conflict() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let capture = op();
+    let m = v
+        .capture(&capture, "synthetic.png", &photo(), "base")
+        .unwrap();
+    let correction = op();
+    v.correct(&m.id, 1, &correction, "draft").unwrap();
+    fs::remove_file(v.history_path(&m.id, 2)).unwrap();
+    fs::remove_file(v.done_path(&correction)).unwrap();
+    fs::write(v.note_path(&m.id), "EXTERNAL EDITOR BYTES").unwrap();
+    assert!(v.capture_receipt(&capture, "base").is_err());
+    assert_eq!(
+        fs::read(v.note_path(&m.id)).unwrap(),
+        b"EXTERNAL EDITOR BYTES"
+    );
+}
+
+#[test]
+fn lifecycle_backup_rename_faults_preserve_base_and_retry() {
+    for point in ["rename_before", "rename_after"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let original = fs::read(v.note_path(&m.id)).unwrap();
+        let fault = FaultGuard::set(move |at, _| {
+            if at == point {
+                return Err("INJECTED backup rename interruption".into());
+            }
+            Ok(())
+        });
+        let operation = op();
+        assert!(v.correct(&m.id, 1, &operation, "draft").is_err());
+        drop(fault);
+        let retained = if point == "rename_before" {
+            v.note_path(&m.id)
+        } else {
+            v.backup_path(&operation)
+        };
+        assert_eq!(fs::read(retained).unwrap(), original);
+        assert_eq!(
+            f.vault()
+                .correct(&m.id, 1, &operation, "draft")
+                .unwrap()
+                .note,
+            "draft"
+        );
+        assert_eq!(fs::read(v.backup_path(&operation)).unwrap(), original);
+    }
+}
+
+#[test]
+fn lifecycle_tombstone_receipt_and_cleanup_interruptions_resolve_authoritatively() {
+    for point in [
+        "before_history",
+        "before_receipt",
+        "after_receipt",
+        "cleanup_after",
+    ] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let bytes = fs::read(v.note_path(&m.id)).unwrap();
+        let commits = v.path("_meta/commits");
+        let fault = FaultGuard::set(move |at, path| {
+            if at == point && (point != "cleanup_after" || path.starts_with(&commits)) {
+                return Err("INJECTED tombstone interruption".into());
+            }
+            Ok(())
+        });
+        let operation = op();
+        assert!(v.remove(&m.id, 1, &operation, "active").is_err());
+        drop(fault);
+        assert_eq!(
+            f.vault()
+                .remove(&m.id, 1, &operation, "active")
+                .unwrap()
+                .state,
+            "deleted"
+        );
+        assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), bytes);
+        assert!(v.list("").unwrap().is_empty());
+    }
+}
+
+#[test]
+fn lifecycle_partial_staged_metadata_and_malformed_neighbor_remain_diagnostic() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let good = v
+        .capture(&op(), "synthetic.png", &photo(), "healthy")
+        .unwrap();
+    let journals = v.path("_meta/journal");
+    let fault = FaultGuard::set(move |point, path| {
+        if point == "write_after" && path.starts_with(&journals) {
+            fs::write(path, b"{").unwrap();
+            return Err("INJECTED partial metadata write".into());
+        }
+        Ok(())
+    });
+    let capture = op();
+    assert!(v
+        .capture(&capture, "synthetic.png", &photo(), "pending")
+        .is_err());
+    drop(fault);
+    assert!(!v.journal_path(&capture).exists());
+    assert!(entries(&v.path("_meta/journal")).unwrap().iter().any(|p| p
+        .extension()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .starts_with("stage-")
+        && fs::read(p).unwrap() == b"{"));
+    v.capture(&capture, "synthetic.png", &photo(), "pending")
+        .unwrap();
+    fs::write(v.journal_path(&capture), b"{").unwrap();
+    assert_eq!(f.vault().list("healthy").unwrap()[0].id, good.id);
+    assert!(v.list("pending").unwrap().is_empty());
+    assert!(v
+        .list("")
+        .unwrap()
+        .iter()
+        .any(|m| m.id == capture && m.state == "conflict"));
+}
+
+#[test]
+fn lifecycle_strict_v1_unknown_fields_and_unsafe_v2_paths_are_rejected() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let (memory, _, bytes) = legacy_fixture(&v);
+    let old: serde_json::Value = serde_json::from_slice(&bytes[0]).unwrap();
+    for (key, value) in [
+        ("note_path", serde_json::Value::Null),
+        ("note_path", serde_json::json!("note.md")),
+        ("expected_state", serde_json::Value::Null),
+        ("unexpected", serde_json::json!(true)),
+    ] {
+        let mut changed = old.clone();
+        changed[key] = value;
+        assert!(serde_json::from_value::<Event>(changed)
+            .and_then(|e| v.event_valid(&e).map_err(serde::de::Error::custom))
+            .is_err());
+    }
+    let mut e: Event = serde_json::from_slice(&bytes[0]).unwrap();
+    e.format = FORMAT_V2.into();
+    for path in [
+        "../escape.md",
+        "Nested/note.md",
+        "C:\\escape.md",
+        "bad.txt",
+        "/absolute.md",
+    ] {
+        e.note_path = Some(path.into());
+        assert!(v.event_valid(&e).is_err());
+    }
+    assert_eq!(v.history(&memory).unwrap().len(), 2);
+}
+
+fn copy_synthetic_tree(source: &Path, destination: &Path) {
+    fs::create_dir(destination).unwrap();
+    for entry in fs::read_dir(source).unwrap() {
+        let entry = entry.unwrap();
+        let target = destination.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_synthetic_tree(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+#[test]
+fn lifecycle_copied_complete_vault_rebuilds_deterministically() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let active = v
+        .capture(&op(), "synthetic.png", &photo(), "active")
+        .unwrap();
+    fs::rename(v.note_path(&active.id), v.path("Memories/Renamed.md")).unwrap();
+    let missing = v
+        .capture(&op(), "synthetic.png", &photo(), "missing")
+        .unwrap();
+    fs::remove_file(v.note_path(&missing.id)).unwrap();
+    let deleted = v
+        .capture(&op(), "synthetic.png", &photo(), "deleted")
+        .unwrap();
+    v.remove(&deleted.id, 1, &op(), "active").unwrap();
+    let corrupt = v
+        .capture(&op(), "synthetic.png", &photo(), "corrupt")
+        .unwrap();
+    fs::write(v.source_path(&corrupt.id), b"SYNTHETIC DAMAGE").unwrap();
+    let pending = op();
+    let fault = FaultGuard::set(|point, _| {
+        if point == "before_note" {
+            Err("INJECTED pending capture".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v
+        .capture(&pending, "synthetic.png", &photo(), "pending")
+        .is_err());
+    drop(fault);
+    fs::write(v.note_path(&pending), b"USER CREATED FILE").unwrap();
+    let first = serde_json::to_value(v.list_with_deleted("", true).unwrap()).unwrap();
+    let copy = Fixture::new();
+    copy_synthetic_tree(&v.path(""), &copy.0.join("Recall"));
+    for _ in 0..3 {
+        assert_eq!(
+            serde_json::to_value(f.vault().list_with_deleted("", true).unwrap()).unwrap(),
+            first
+        );
+        assert_eq!(
+            serde_json::to_value(copy.vault().list_with_deleted("", true).unwrap()).unwrap(),
+            first
+        );
+        assert_eq!(copy.vault().list("active").unwrap()[0].id, active.id);
+        assert_eq!(copy.vault().history(&active.id).unwrap().len(), 1);
+        assert_eq!(copy.vault().history(&deleted.id).unwrap().len(), 2);
+    }
+    assert_eq!(first.as_array().unwrap().len(), 5);
+    assert!(first
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|m| m["state"] == "missing"));
+    assert!(first
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|m| m["state"] == "deleted"));
+    assert_eq!(
+        fs::read(copy.vault().note_path(&pending)).unwrap(),
+        b"USER CREATED FILE"
+    );
+}
+
+#[test]
+fn lifecycle_changed_header_occupied_canonical_and_unsafe_neighbor_never_overwrite() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let canonical = v.note_path(&m.id);
+    let renamed = v.path("Memories/Renamed.md");
+    fs::rename(&canonical, &renamed).unwrap();
+    fs::write(&canonical, b"UNRELATED USER NOTE").unwrap();
+    assert_eq!(v.list("").unwrap()[0].state, "conflict");
+    assert!(v.correct(&m.id, 1, &op(), "draft").is_err());
+    assert_eq!(fs::read(&canonical).unwrap(), b"UNRELATED USER NOTE");
+    fs::remove_file(&canonical).unwrap();
+    let changed = fs::read_to_string(&renamed)
+        .unwrap()
+        .replace("../Sources/", "../Elsewhere/");
+    fs::write(&renamed, &changed).unwrap();
+    assert_eq!(v.list("").unwrap()[0].state, "conflict");
+    assert!(v.source(&m.id).is_err());
+    assert_eq!(fs::read_to_string(&renamed).unwrap(), changed);
+}
+
+#[test]
+fn lifecycle_backup_created_during_publication_is_never_replaced() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let operation = op();
+    let backup = v.backup_path(&operation);
+    let inserted = backup.clone();
+    let original = fs::read(v.note_path(&m.id)).unwrap();
+    let _fault = FaultGuard::set(move |point, _| {
+        if point == "rename_before" {
+            fs::write(&inserted, b"EXTERNAL USER BACKUP").unwrap();
+        }
+        Ok(())
+    });
+    assert!(v.correct(&m.id, 1, &operation, "draft").is_err());
+    assert_eq!(fs::read(backup).unwrap(), b"EXTERNAL USER BACKUP");
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), original);
+}
+
+#[test]
+fn lifecycle_correction_without_disk_precondition_is_invalid() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let operation = op();
+    v.correct(&m.id, 1, &operation, "draft").unwrap();
+    let mut event: Event = decode(&v.journal_path(&operation)).unwrap();
+    event.previous_markdown = None;
+    assert!(v.event_valid(&event).is_err());
+}
+
+#[test]
+fn lifecycle_stale_pending_operation_after_tombstone_remains_deleted() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let capture = op();
+    let m = v
+        .capture(&capture, "synthetic.png", &photo(), "base")
+        .unwrap();
+    let removal = op();
+    v.remove(&m.id, 1, &removal, "active").unwrap();
+    let mut stale: Event = decode(&v.journal_path(&removal)).unwrap();
+    stale.operation_id = op();
+    stale.kind = "correct".into();
+    stale.expected_state = None;
+    stale.expected_revision = 2;
+    stale.memory.revision = 3;
+    stale.memory.note = "must not resurrect".into();
+    stale.parent_sha256 = Some(hash(&fs::read(v.history_path(&m.id, 2)).unwrap()));
+    stale.markdown = markdown(&stale.memory);
+    stale.payload_sha256 = payload(
+        "correct",
+        &m.id,
+        2,
+        &stale.memory.note,
+        &m.source_sha256,
+        &m.source_name,
+    )
+    .unwrap();
+    fs::write(v.journal_path(&stale.operation_id), json(&stale).unwrap()).unwrap();
+    let before = fs::read(v.note_path(&m.id)).unwrap();
+    assert!(v.list("").unwrap().is_empty());
+    let removed = v.list_with_deleted("", true).unwrap().remove(0);
+    assert_eq!(removed.state, "deleted");
+    assert!(removed.conflict.is_some());
+    assert_eq!(
+        v.capture_receipt(&capture, "base").unwrap().unwrap().state,
+        "deleted"
+    );
+    assert_eq!(v.history(&m.id).unwrap().len(), 2);
+    assert!(!v.history_path(&m.id, 3).exists());
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), before);
+}
+
+#[test]
+fn lifecycle_v1_serializer_matches_original_field_order_byte_for_byte() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let (_, _, records) = legacy_fixture(&v);
+    // Frozen field order from v1's Event and VaultMemory declarations. This is
+    // independent of the current structs and catches accidental added fields.
+    let event_fields = [
+        "format",
+        "vault_id",
+        "operation_id",
+        "kind",
+        "expected_revision",
+        "payload_sha256",
+        "parent_sha256",
+        "origin",
+        "memory",
+        "previous_markdown",
+        "markdown",
+    ];
+    let memory_fields = [
+        "id",
+        "revision",
+        "note",
+        "source_sha256",
+        "source_name",
+        "captured_at",
+        "updated_at",
+        "conflict",
+    ];
+    for bytes in records {
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let memory = format!(
+            "{{{}}}",
+            memory_fields
+                .iter()
+                .map(|key| format!(
+                    "{}:{}",
+                    serde_json::to_string(key).unwrap(),
+                    serde_json::to_string(&value["memory"][key]).unwrap()
+                ))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let golden = format!(
+            "{{{}}}",
+            event_fields
+                .iter()
+                .map(|key| format!(
+                    "{}:{}",
+                    serde_json::to_string(key).unwrap(),
+                    if *key == "memory" {
+                        memory.clone()
+                    } else {
+                        serde_json::to_string(&value[key]).unwrap()
+                    }
+                ))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let decoded: Event = serde_json::from_slice(golden.as_bytes()).unwrap();
+        assert_eq!(json(&decoded).unwrap(), golden.as_bytes());
+        v.event_valid(&decoded).unwrap();
+    }
+}
+
+#[test]
+fn lifecycle_malformed_correction_journal_cannot_leave_its_memory_eligible() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let good = v
+        .capture(&op(), "synthetic.png", &photo(), "healthy")
+        .unwrap();
+    let correction = op();
+    v.correct(&m.id, 1, &correction, "changed").unwrap();
+    fs::write(v.journal_path(&correction), b"{").unwrap();
+    assert!(v.list("changed").unwrap().is_empty());
+    assert!(v.source(&m.id).is_err());
+    assert_eq!(v.list("healthy").unwrap()[0].id, good.id);
+}
+
+#[test]
+fn lifecycle_unattributable_journal_refuses_rebuild_without_mutating_files() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v
+        .capture(&op(), "synthetic.png", &photo(), "healthy")
+        .unwrap();
+    let original = fs::read(v.note_path(&m.id)).unwrap();
+    fs::write(v.path("_meta/journal/unattributable.json"), b"{").unwrap();
+    assert!(v.list_with_deleted("", true).is_err());
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), original);
 }
