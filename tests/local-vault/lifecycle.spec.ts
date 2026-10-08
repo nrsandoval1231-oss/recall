@@ -95,6 +95,14 @@ test("removal requires confirmation; removed history survives reload and stale c
   await expect(row(page)).toHaveCount(0);
   await page.getByRole("button", { name: "Removed items", exact: true }).click();
   await expect(row(page)).toHaveCount(1);
+  await row(page).click(); await page.getByRole("button", { name: "History", exact: true }).click();
+  const captureRevision = page.locator(".local-history li").filter({ has: page.getByRole("heading", { name: "Revision 1", exact: true }) });
+  const removalRevision = page.locator(".local-history li").filter({ has: page.getByRole("heading", { name: "Revision 2", exact: true }) });
+  await expect(captureRevision).toHaveCount(1); await expect(removalRevision).toHaveCount(1);
+  await expect(captureRevision.getByText(/capture · human:recall/)).toBeVisible();
+  await expect(removalRevision.getByText(/remove · human:recall/)).toBeVisible();
+  await expect(captureRevision.getByText(note, { exact: true })).toBeVisible();
+  await expect(removalRevision.getByText(note, { exact: true })).toBeVisible();
 });
 
 test("failed removal retains exact decision across cancellation and supports explicit current-state review", async ({ page }) => {

@@ -444,3 +444,22 @@ it("authoritative removal clears the earlier capture success notice from home", 
   await screen.findByRole("button", { name: /Synthetic garden note/ });
   expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
 });
+it.each([['remove', false], ['remove', true], ['restore', false]] as const)("lifecycle %s reload publishes revision-zero diagnostics (filtered home: %s) and retains the fixed retry", async (kind, filtered) => {
+  const initial = kind === "restore" ? missing : memory;
+  const diagnostic: VaultMemory = { ...memory, revision: 0, state: "conflict", note: "", source_name: "", note_path: null, conflict: "Retained journal conflict: manual recovery required" };
+  const list = vi.fn().mockResolvedValueOnce([initial]); if (filtered) list.mockResolvedValueOnce([initial]); list.mockResolvedValue([diagnostic]);
+  const mutation = vi.fn(async () => { throw new Error("Interrupted lifecycle publication"); });
+  mount(vault({ list, remove: mutation, restoreNote: mutation }));
+  if (filtered) { await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "garden"); await userEvent.click(screen.getByRole("button", { name: "Search" })); }
+  await openMemory(); await userEvent.click(screen.getByRole("button", { name: kind === "restore" ? "Restore missing note" : "Remove from Recall" })); if (kind === "remove") await userEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+  await screen.findByText("Interrupted lifecycle publication"); const submitted = mutation.mock.calls[0]; await userEvent.click(screen.getByRole("button", { name: "Reload current state" })); await screen.findByText("Current state could not be validated. The previous decision is retained.");
+  expect(screen.getByText(diagnostic.conflict!)).toBeTruthy(); expect(screen.queryByRole("button", { name: /Review a new .* decision/ })).toBeNull();
+  if (kind === "remove") await userEvent.click(screen.getByRole("button", { name: "Back to note" }));
+  expect(screen.getByRole("heading", { name: "Memory needs attention" })).toBeTruthy(); expect(screen.queryByText("Saved in vault · This device only")).toBeNull(); expect(screen.queryByText("Markdown note missing · decision needed")).toBeNull();
+  for (const name of ["View original", "History", "Correct note", "Remove from Recall"]) expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "Restore missing note" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Retry same " + (kind === "remove" ? "removal" : "restore") })); await screen.findByText("Interrupted lifecycle publication"); expect(mutation.mock.calls[1]).toEqual(submitted);
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull(); expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+  if (filtered) { expect(screen.queryByRole("button", { name: /Memory needs attention/ })).toBeNull(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden"); }
+  else { expect(screen.getByRole("button", { name: /Memory needs attention.*Needs attention/ })).toBeTruthy(); await userEvent.click(screen.getByRole("button", { name: /Memory needs attention/ })); expect(screen.getByRole("button", { name: "Retry same " + (kind === "remove" ? "removal" : "restore") })).toBeTruthy(); }
+});

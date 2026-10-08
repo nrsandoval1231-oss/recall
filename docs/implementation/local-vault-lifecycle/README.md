@@ -24,7 +24,7 @@ An interrupted restore after note publication but before history can remain a co
 | --- | --- | --- |
 | Native Linux | Reviewed `2672b2f97baf594066bfe2edcd195975a55ca515`: full Rust suite 113 passed; check/fmt passed. Real temporary files cover rename/correction/reopen, missing restore, retained tombstones, old receipts, forks, v1 raw-byte compatibility and v2 fence interruptions. Test-only fault seam includes a 112-case operation/directory/boundary matrix. | Installed native dialogs/renderer, actual power loss, actual full/read-only volume, or Windows filesystem durability |
 | Native fault injection | Synthetic ENOSPC/EROFS, create/write/flush/hard-link/rename/publication/cleanup failures, partial metadata and editor races at real-file boundaries | Measured disk exhaustion or read-only hardware; production exposes no fault-mode toggle |
-| Renderer contracts/components | Reviewed product head `f4332324d10d81ea06a202c815c02ad8d6cc0fd8`; final delivery adds a focused obsolete-notice regression. Typed commands require ephemeral `expectedVaultId`; `note_path` remains display-only. | Live Tauri IPC/platform scheduling |
+| Renderer contracts/components | Reviewed product head `f4332324d10d81ea06a202c815c02ad8d6cc0fd8`; delivery adds a focused obsolete-notice regression; the final diagnostic-state repair below adds removal/restore reload coverage. Typed commands require ephemeral `expectedVaultId`; `note_path` remains display-only. | Live Tauri IPC/platform scheduling |
 | Browser integration | Separate `tests/local-vault` suite drives the real default entry with test-only injected native commands. Fixture keeps per-memory history and operation receipts, clones IPC values, applies eligible/deleted filtering, and supplies explicit synthetic error/delay responses. | Native disk changes, crash recovery or actual OS picker behavior |
 | Browser accessibility | Axe A/AA/2.1 AA scans include missing focus, confirmation, removed list/history and failed rebuild alongside prior home/evidence/conflict/preview checks. Both desktop and reduced-motion projects run. | Exhaustive screen-reader/keyboard certification or installed WebView accessibility |
 
@@ -44,6 +44,25 @@ Run from repository root, Linux, Chromium `/usr/bin/chromium`, over the reviewed
 
 Regression-first record: five lifecycle scenarios initially failed against the prior schema-only fixture, exposing missing handlers/search semantics. Those are test-harness failures, not claimed product RED. After fixture implementation all 16 browser checks passed. Screenshot inspection then found an actual product defect: a successful removal left an old capture “Saved in vault” notice on home/Removed items. A component regression and rendered assertion both failed before the narrow fix. Authoritative memory publication now clears superseded home notices; capture sets its new current-state receipt after publication, preserving honest current-deleted retry wording. No filesystem or native behavior changed. The targeted component run moved from one failure (71 filtered skips) to one pass; the targeted browser assertion moved from one failure to the full 16-check passing suite. One lint attempt raced Playwright cleanup of `test-results` and stopped with ENOENT; the sequential fresh lint run passed without changing lint configuration.
 
+## Final adversarial review repair
+
+The whole-branch review found that **Reload current state** discarded an explicit revision-zero conflict DTO after an interrupted removal/restore. The renderer now publishes that returned diagnostic before checking mutation eligibility. Focus/home show the conflict or exclude it from nonempty eligible-only queries; the original operation ID, revision/state and retry decision remain frozen. Revision zero cannot enable new mutation/evidence/history controls. The native diagnostic is visible in the pending removal view. No native code changed.
+
+Regression-first evidence over delivery head `835403c65c4ddf5d2be94af252b564353cecd349` plus this scoped repair:
+
+- `npm run test --workspace @recall/desktop -- src/local/local-app.test.tsx src/platform/local-vault.test.ts`: the three new removal/restore/filtered-home cases first failed (**3 failed, 75 passed**) and then passed in the **78-test** affected suite. They assert current diagnostic publication, disabled ineligible actions, filtered-home exclusion, and identical retry arguments after reload/navigation.
+- The independent final-review reproduction first failed on the stale active row and then passed (**1 passed; 3 unrelated copied tests filtered out**). These are injected synthetic component-boundary checks; the separate review's real-file reproduction establishes that interrupted native removal can produce the revision-zero DTO while preserving editor bytes.
+- `RECALL_CHROMIUM=/usr/bin/chromium npm run test:local-vault -- lifecycle.spec.ts -g 'removal requires confirmation'`: **2 passed**, desktop and reduced-motion. After reload/stale receipt/rebuild, the scenario now reopens removed History and checks capture revision 1 and removal revision 2, each kind/provenance and the retained synthetic note. The original full 16-local/42-web results above remain historical; this repair reruns the changed scenario only.
+
+Fresh checks after the scoped renderer/browser repair:
+
+- `npm run test`: **233 passed**, all 21 files (API 26, tokens 4, sync 30, desktop **116**, mobile 9, web 48).
+- `npm run lint` and `npm run typecheck`: passed across the root workspaces and browser TypeScript projects.
+- `npm run build --workspace @recall/desktop`: passed, TypeScript and Vite 99 modules.
+- `git diff --check` and changed-document relative-link validation: passed.
+
+No native, device, durability or installed-acceptance rerun is implied. Browser/docs delivery includes the narrow notice and diagnostic renderer repairs; the adapter is implemented for its bounded annotation scope. [Draft PR12](https://github.com/nrsandoval1231-oss/recall/pull/12), stacked on the preserved foundation branch, carries scoped rereview and final exact-head CI/installer delivery evidence as the coordinator verifies those gates. Final exact-head CI/artifact linkage belongs in that PR evidence after verification.
+
 ## Synthetic screenshots
 
 All are browser command-boundary fixtures, visually inspected for readable labels, state and controls. Historical PR11 foundation screenshots remain unchanged in the separate [foundation evidence](../local-vault/README.md).
@@ -59,7 +78,7 @@ All are browser command-boundary fixtures, visually inspected for readable label
 | Slice | Exact head / CI / installer | Acceptance boundary |
 | --- | --- | --- |
 | Preserved PR11 foundation | `650e9eae6878b46673d81411789d02e9388077a0`; successful [run 37708945255](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255); unsigned [artifact 11521925107](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255/artifacts/11521925107); delivered ZIP `file_0000000099f081f599ed9c8fa1be3aa9` | Previous foundation build and delivery; not lifecycle or installed-device acceptance. CI artifacts have seven-day retention, so keep the delivered ZIP reference. |
-| Lifecycle slice | Separate stacked draft PR, exact-head full CI and new artifact reference pending coordinator verification | Do not substitute the older installer for this slice. No merge, release or deployment. |
+| Lifecycle slice | [Draft PR12](https://github.com/nrsandoval1231-oss/recall/pull/12), stacked on the foundation branch; coordinator records final exact-head full CI and the new installer reference in its delivery evidence after verification | Do not substitute the older installer for this slice. No merge, release or deployment. |
 
 The authorized Windows desktop is offline. No other connected desktop was used; no installed acceptance is claimed. The previous installer and instructions were already delivered; this report makes no duplicate installation request. The [future synthetic-only Windows checklist](../../ACCEPTANCE.md#future-installed-windows-lifecycle-checklist--blocked) is documentation only, includes v1→v2 compatibility/older-writer refusal and preserves both artifact references.
 

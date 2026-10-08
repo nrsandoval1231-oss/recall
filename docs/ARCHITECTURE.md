@@ -107,7 +107,7 @@ One Python package contains bounded modules:
 - `exports`: server export snapshots and portable manifests; desktop owns actual local filesystem writes.
 - `db`: persistence, transactions, migrations, and database security context.
 
-The API and worker reuse these modules. Do not split them into separately deployed microservices. This describes the current hosted worker. The proposed local vault adapter must support local commitment/reconciliation/search without requiring that worker; cloud AI stays optional and separately consented.
+The API and worker reuse these modules. Do not split them into separately deployed microservices. This describes the current hosted worker. The implemented bounded local vault adapter supports local commitment/reconciliation/annotation keyword search without requiring that worker; cloud AI stays optional and separately consented.
 
 ## 4. Legacy cloud capture write path — migration pending
 

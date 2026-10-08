@@ -70,3 +70,5 @@ Self-review: all new behavior is covered below; storage/renderer names must matc
 ## Task3 handoff boundary
 
 Native and renderer tasks passed independent rereview after fixes through `f4332324d10d81ea06a202c815c02ad8d6cc0fd8`; applicable native count is 113. [Lifecycle evidence](../../implementation/local-vault-lifecycle/README.md) records the separate browser/client checks, screenshot-driven notice repair and remaining platform limits. The combined delivery-review checkbox stays open until independent Task3 and whole-branch review complete; root owns stacked draft PR, exact-head CI and new artifact verification. Prior PR11 artifact evidence remains preserved.
+
+The final adversarial review identified a revision-zero lifecycle-decision reload diagnostic publication defect. The scoped repair and post-reload history assertion are recorded in the lifecycle evidence; scoped rereview and final exact-head CI/installer verification remain open. [Draft PR12](https://github.com/nrsandoval1231-oss/recall/pull/12) is stacked on the preserved foundation branch and carries coordinator-verified delivery evidence. Review/CI checkboxes stay open until their actual gates pass.
