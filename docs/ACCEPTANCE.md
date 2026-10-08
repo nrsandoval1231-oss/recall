@@ -2,7 +2,7 @@
 
 ## Local desktop foundation evidence — bounded; platform acceptance OPEN
 
-The authorized implementation supplies a no-sign-in desktop vault loop for new local captures. [Local verification evidence](implementation/local-vault/README.md) separates 72 real-disk Rust tests from rendered synthetic Tauri-boundary journeys and installed-device gates. Neither mock commands nor an unsigned Windows CI artifact prove installed native acceptance. Full RCL-005B, migration, phone association/transport and live AI remain open.
+The authorized implementation supplies a no-sign-in desktop vault loop for new local captures. [Local verification evidence](implementation/local-vault/README.md) separates 76 aggregate native Rust tests (including real-disk checks) from rendered synthetic Tauri-boundary journeys and installed-device gates. Neither mock commands nor an unsigned Windows CI artifact prove installed native acceptance. Full RCL-005B, migration, phone association/transport and live AI remain open.
 
 ## Full no-sign-in target acceptance — OPEN
 

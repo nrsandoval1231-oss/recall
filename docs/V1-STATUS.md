@@ -14,7 +14,7 @@ The October 7 product direction requires Obsidian as the user-owned durable memo
 
 ### Local desktop foundation, October 8
 
-Native and renderer tasks were independently reviewed and repaired through `2210d1f`. Native Linux synthetic filesystem suite: 72 passed. Root client suite at that head: 186 passed. Separate browser-injected Tauri boundary journeys and current delivery checks are recorded in [local foundation evidence](implementation/local-vault/README.md). CI is now configured to build an unsigned Windows installer without cloud variables; producing an artifact does not prove installed Windows acceptance. No installed native UI, iPhone, live AI, real-data migration, release or deployment is claimed.
+Native and renderer tasks were independently reviewed and repaired through `2210d1f`. Native Linux suite after final filename-search review repair: 76 passed, including synthetic filesystem checks. Root client suite at `2210d1f`: 186 passed (not rerun for that native-search/fixture repair). Separate browser-injected Tauri boundary journeys and current delivery checks are recorded in [local foundation evidence](implementation/local-vault/README.md). CI is now configured to build an unsigned Windows installer without cloud variables; producing an artifact does not prove installed Windows acceptance. No installed native UI, iPhone, live AI, real-data migration, release or deployment is claimed.
 
 ### Canonical browser Memory Surface, October 7
 

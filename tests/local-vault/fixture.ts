@@ -6,8 +6,8 @@ import type { VaultMemory, VaultRevision, VaultStatus } from "../../apps/desktop
 export async function installVaultFixture(page: Page) {
   await page.addInitScript(() => {
     const key = "synthetic.test.native";
-    type State = { status: VaultStatus; memories: VaultMemory[]; history: VaultRevision[] };
-    const empty: State = { status: { root: null, vault_id: null, vault_identity: null }, memories: [], history: [] };
+    type State = { status: VaultStatus; memories: VaultMemory[]; history: Record<string, VaultRevision[]> };
+    const empty: State = { status: { root: null, vault_id: null, vault_identity: null }, memories: [], history: {} };
     const state: State = JSON.parse(localStorage.getItem(key) || JSON.stringify(empty));
     const control = { cancelCapture: false, cancelSelect: false, conflict: false, switchVault: false, delaySource: false, sourcePending: false, releaseSource: () => {}, calls: [] as { command: string; args: Record<string, unknown> }[] };
     Object.assign(window, { syntheticVault: control });
@@ -30,27 +30,33 @@ export async function installVaultFixture(page: Page) {
         if (control.cancelSelect) { control.cancelSelect = false; return null; }
         const id = control.switchVault ? "b" : "a";
         state.status = { root: `/synthetic/vault-${id}`, vault_id: crypto.randomUUID(), vault_identity: `synthetic-${id}` };
-        if (control.switchVault) { state.memories = []; state.history = []; }
+        if (control.switchVault) { state.memories = []; state.history = {}; }
         save(); return state.status;
       }
       if (args.expectedVaultId !== state.status.vault_id) throw new Error("Stale vault session");
       if (command === "vault_capture") {
         if (control.cancelCapture) { control.cancelCapture = false; return null; }
         const m: VaultMemory = { id: crypto.randomUUID(), revision: 1, note: String(args.note), source_name: "SYNTHETIC-test-card.png", source_sha256: (await original()).sha256, captured_at: now, updated_at: now, conflict: null };
-        state.memories.push(m); state.history.push({ revision: 1, note: m.note, recorded_at: now, origin: "human:recall" }); save(); return m;
+        state.memories.push(m); state.history[m.id] = [{ revision: 1, note: m.note, recorded_at: now, origin: "human:recall" }]; save(); return m;
       }
-      if (command === "vault_list") return state.memories.filter(m => `${m.note} ${m.source_name}`.toLowerCase().includes(String(args.query).toLowerCase()));
+      if (command === "vault_list") {
+        const terms = String(args.query).toLowerCase().split(/\s+/).filter(Boolean);
+        return state.memories.filter(m => terms.length === 0 || (m.conflict === null && terms.every(term => m.note.toLowerCase().includes(term) || m.source_name.toLowerCase().includes(term))));
+      }
+      const memory = state.memories.find(m => m.id === args.memoryId);
+      if (["vault_correct", "vault_history", "vault_source"].includes(command) && !memory) throw new Error("Unknown memory ID");
       if (command === "vault_correct") {
-        const m = state.memories.find(m => m.id === args.memoryId)!;
+        const m = memory!;
         if (control.conflict) {
           control.conflict = false; m.note = "SYNTHETIC external Obsidian edit"; m.revision++;
-          state.history.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:obsidian" }); save(); throw new Error("Revision conflict: review latest note");
+          state.history[m.id]!.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:obsidian" }); save(); throw new Error("Revision conflict: review latest note");
         }
         if (args.expectedRevision !== m.revision) throw new Error("Revision conflict");
-        m.note = String(args.note); m.revision++; state.history.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:recall" }); save(); return m;
+        m.note = String(args.note); m.revision++; state.history[m.id]!.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:recall" }); save(); return m;
       }
-      if (command === "vault_history") return state.history;
+      if (command === "vault_history") return state.history[memory!.id];
       if (command === "vault_source") {
+        if (memory!.conflict) throw new Error("Memory evidence unavailable");
         const source = await original();
         if (control.delaySource) { control.sourcePending = true; await new Promise<void>(resolve => { control.releaseSource = resolve; }); }
         return source;

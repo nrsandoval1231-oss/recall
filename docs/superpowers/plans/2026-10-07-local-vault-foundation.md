@@ -67,4 +67,4 @@ Covered local-only spec sections 1–4, desktop bootstrap, originals/history/com
 
 ## Recorded implementation evidence — October 8
 
-Tasks 1 and 2 completed with independent review repairs through `2210d1f`: 72 native Linux tests and 186 client tests. The [local foundation evidence](../../implementation/local-vault/README.md) records separate synthetic browser/native boundaries and remaining platform/full-RCL-005B gaps. Task 3 push/draft-PR/exact-head CI/final independent review remain coordinator-owned and unchecked until completed. No merge or deployment is authorized.
+Tasks 1 and 2 completed with independent review repairs through `2210d1f`: 72 native Linux tests and 186 client tests at that stage; final filename-search review repair subsequently passed 76 aggregate native tests and the six local browser checks. The [local foundation evidence](../../implementation/local-vault/README.md) records separate synthetic browser/native boundaries and remaining platform/full-RCL-005B gaps. Task 3 push/draft-PR/exact-head CI/final independent review remain coordinator-owned and unchecked until completed. No merge or deployment is authorized.

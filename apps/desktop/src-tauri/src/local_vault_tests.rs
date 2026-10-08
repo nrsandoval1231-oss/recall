@@ -564,3 +564,66 @@ fn status_exposes_stable_identity_separate_from_selection_permission() {
         .with(json["vault_identity"].as_str().unwrap(), |_| Ok(()))
         .is_err());
 }
+
+#[test]
+fn filename_only_search_finds_capture_without_note() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v
+        .capture(&op(), "SYNTHETIC-workshop.png", &photo(), "")
+        .unwrap();
+    assert_eq!(
+        v.list("workshop").unwrap().first().map(|m| &m.id),
+        Some(&m.id)
+    );
+}
+#[test]
+fn filename_search_is_case_insensitive() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v
+        .capture(&op(), "SYNTHETIC-Workshop.PNG", &photo(), "")
+        .unwrap();
+    assert_eq!(
+        v.list("wOrKsHoP").unwrap().first().map(|m| &m.id),
+        Some(&m.id)
+    );
+}
+#[test]
+fn all_search_terms_may_match_across_note_and_filename_fields() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v
+        .capture(
+            &op(),
+            "SYNTHETIC-workshop.png",
+            &photo(),
+            "Garden plans uncertain?",
+        )
+        .unwrap();
+    assert_eq!(
+        v.list("  WORKSHOP  garden  ")
+            .unwrap()
+            .first()
+            .map(|m| &m.id),
+        Some(&m.id)
+    );
+    assert!(v.list("workshop absent").unwrap().is_empty());
+    assert!(v.list("garden absent").unwrap().is_empty());
+}
+#[test]
+fn filename_queries_cannot_promote_corrupt_or_conflicted_memories() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let corrupt = v
+        .capture(&op(), "SYNTHETIC-corrupt.png", &photo(), "")
+        .unwrap();
+    let missing = v
+        .capture(&op(), "SYNTHETIC-missing.png", &photo(), "")
+        .unwrap();
+    fs::write(v.source_path(&corrupt.id), b"corrupt original").unwrap();
+    fs::remove_file(v.note_path(&missing.id)).unwrap();
+    assert!(v.list("corrupt").unwrap().is_empty());
+    assert!(v.list("missing").unwrap().is_empty());
+    assert!(v.list("").unwrap().iter().all(|m| m.conflict.is_some()));
+}

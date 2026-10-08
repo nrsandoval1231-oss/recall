@@ -917,8 +917,13 @@ impl Vault {
                     conflict: Some(format!("Memory unavailable: {err}")),
                 },
             };
+            let note = m.note.to_lowercase();
+            let filename = m.source_name.to_lowercase();
             if terms.is_empty()
-                || (m.conflict.is_none() && terms.iter().all(|t| m.note.to_lowercase().contains(t)))
+                || (m.conflict.is_none()
+                    && terms
+                        .iter()
+                        .all(|term| note.contains(term) || filename.contains(term)))
             {
                 out.push(m);
             }

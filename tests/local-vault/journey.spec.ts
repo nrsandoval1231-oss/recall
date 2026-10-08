@@ -32,7 +32,14 @@ test("no-config local journey: import, search, original, conflict, history and r
   await expect(page.getByText("No account needed. No cloud connection.")).toBeVisible();
   await accessible(page); await screenshot(page, info, "first-use");
   await capture(page); await screenshot(page, info, "home"); await accessible(page);
-  await page.getByLabel("Search notes and filenames").fill("garden");
+  await page.getByLabel("Search notes and filenames").fill("  CaRd   GARDEN  ");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByRole("button", { name: /SYNTHETIC garden workshop note/ })).toBeVisible();
+  await page.getByLabel("Search notes and filenames").fill("card absent");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByText(/No matching notes or filenames/)).toBeVisible();
+  // This term occurs only in the filename, never in the human note.
+  await page.getByLabel("Search notes and filenames").fill("TeSt-CaRd");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Matching memories" })).toBeVisible();
   await page.getByRole("button", { name: /SYNTHETIC garden workshop note/ }).click();
@@ -44,7 +51,10 @@ test("no-config local journey: import, search, original, conflict, history and r
   expect(await page.evaluate(async () => {
     const w = window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a?: object) => Promise<Record<string, unknown>> } };
     const s = await w.__TAURI_INTERNALS__.invoke("vault_status");
-    const source = await w.__TAURI_INTERNALS__.invoke("vault_source", { expectedVaultId: s.vault_id });
+    const calls = (window as unknown as { syntheticVault: { calls: { command: string; args: Record<string, unknown> }[] } }).syntheticVault.calls;
+    const focusedId = calls.slice().reverse().find(call => call.command === "vault_source")?.args.memoryId;
+    if (typeof focusedId !== "string") throw new Error("Focused source identity missing");
+    const source = await w.__TAURI_INTERNALS__.invoke("vault_source", { expectedVaultId: s.vault_id, memoryId: focusedId });
     const bytes = await (await fetch(document.querySelector("img")!.src)).arrayBuffer();
     const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b => b.toString(16).padStart(2, "0")).join("");
     return hash === source.sha256;
@@ -68,8 +78,20 @@ test("no-config local journey: import, search, original, conflict, history and r
   await expect(page.getByRole("heading", { name: "Revision 3", exact: true })).toBeVisible();
   await expect(page.getByText(/human:obsidian/)).toBeVisible(); await accessible(page); await screenshot(page, info, "history");
   await page.getByRole("button", { name: "Back to note" }).click(); await page.getByRole("button", { name: "Back to memories" }).click();
-  await expect(page.getByLabel("Search notes and filenames")).toHaveValue("garden");
+  await expect(page.getByLabel("Search notes and filenames")).toHaveValue("TeSt-CaRd");
   await page.reload(); await expect(page.getByRole("button", { name: /SYNTHETIC retained correction/ })).toBeVisible();
+  // Optional empty annotation remains retrievable by its filename alone.
+  await page.getByRole("button", { name: "Capture", exact: true }).click();
+  await page.getByRole("button", { name: "Choose photo & save" }).click();
+  await page.getByLabel("Search notes and filenames").fill("TEST-CARD");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByRole("button", { name: /SYNTHETIC-test-card.png/ })).toBeVisible();
+  expect(await page.evaluate(async () => {
+    const invoke = (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a?: object) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke;
+    const status = await invoke("vault_status") as { vault_id: string };
+    const memories = await invoke("vault_list", { expectedVaultId: status.vault_id, query: "test-card" }) as { id: string; note: string }[];
+    return Promise.all(memories.map(async m => ({ note: m.note, revisions: (await invoke("vault_history", { expectedVaultId: status.vault_id, memoryId: m.id }) as unknown[]).length })));
+  })).toEqual(expect.arrayContaining([{ note: "SYNTHETIC retained correction", revisions: 3 }, { note: "", revisions: 1 }]));
   expect(external).toEqual([]);
   if (info.project.name === "reduced-motion") {
     expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
@@ -81,6 +103,14 @@ test("no-config local journey: import, search, original, conflict, history and r
 
 test("picker cancellation retains draft; vault switch rejects late evidence", async ({ page }) => {
   await installVaultFixture(page); await page.goto("/"); await capture(page);
+  expect(await page.evaluate(async () => {
+    const invoke = (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a?: object) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke;
+    const status = await invoke("vault_status") as { vault_id: string };
+    return Promise.all(["vault_source", "vault_history"].flatMap(command => [undefined, "unknown-memory"].map(async memoryId => {
+      try { await invoke(command, { expectedVaultId: status.vault_id, memoryId }); return "accepted"; }
+      catch { return "rejected"; }
+    })));
+  })).toEqual(["rejected", "rejected", "rejected", "rejected"]);
   await page.getByRole("button", { name: "Capture", exact: true }).click();
   await page.getByLabel("Context or note (optional)").fill("SYNTHETIC cancelled draft");
   await control(page, { cancelCapture: true }); await page.getByRole("button", { name: "Choose photo & save" }).click();
