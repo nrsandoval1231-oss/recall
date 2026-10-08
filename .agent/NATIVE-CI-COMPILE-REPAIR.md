@@ -1,0 +1,3 @@
+# Native CI compile repair
+
+Base e3998b59235a5755635232d8c2ec6fee2cc502a3. CI run37794931988 Linux native failed E0599 RequestBuilder.json (reqwest JSON feature absent), E0277 PairingStatus notDebug required by test unwrap_err. Raw ignored build/delivery/ci-native-linux.log retained. OwnerTerra native_pairing_repair, pairing.rs+completiononly; prefer explicit header/bodyserialization existingnativepattern, avoiddependencyexpansion. No secretDebugtypes. Repairtwoobservederrors; localformat/diff,refreeze,independentreview,exactnewheadCI allgates. No realnetwork/keyring/enrollment effects. Retrybudgettwo materiallydifferentrepairs.

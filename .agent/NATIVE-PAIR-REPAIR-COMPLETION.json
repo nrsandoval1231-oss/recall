@@ -1,6 +1,6 @@
 {
   "packet": "PAIR-01 native lifecycle repair",
-  "base": "ec85ba3566fcbefb462458a875c92fb7cc976b4c",
+  "base": "e3998b59235a5755635232d8c2ec6fee2cc502a3",
   "owned_files": [
     "apps/desktop/src-tauri/src/pairing.rs",
     "apps/desktop/src-tauri/src/reading_commands.rs",
@@ -21,7 +21,7 @@
   "validation": {
     "rustfmt": "PASS: rustfmt.exe --edition 2021 --check --config skip_children=true pairing.rs",
     "diff_check": "PASS: git diff --check",
-    "cargo_test": "UNKNOWN: cargo.exe is unavailable in this environment; Linux and Windows Cargo check/test remain required in CI."
+    "cargo_test": "CI previously failed at e3998b5 with RequestBuilder::json unavailable and PairingStatus missing Debug. This repair replaces json with explicit JSON Content-Type/body serialization and derives Debug; Cargo is unavailable locally, so follow-up Linux and Windows CI cargo check/test remains required."
   },
   "unknown": [
     "No real keyring credential was set, read or removed during this repair.",

@@ -14,13 +14,14 @@
   "build_seconds": "UNKNOWN",
   "validation_seconds": "UNKNOWN; command durations separately retained",
   "audit_seconds": "UNKNOWN",
-  "repair_count": 5,
+  "repair_count": 6,
   "repair_attribution": [
     "evaluation style normalization",
     "pairing missing preflight/provider/UI/format requirements",
     "native lifecycle specialist after explicit builder uncertainty",
     "independent review split-keyring credential-loss repair",
-    "second native review signature and active-preparation guard"
+    "second native review signature and active-preparation guard",
+    "native CI optionalJSON and publicstatusDebug compile failures"
   ],
   "tokens": "UNKNOWN; not measured",
   "elapsed_to_accepted": "UNKNOWN; independent acceptance pending",

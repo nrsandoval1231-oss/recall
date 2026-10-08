@@ -41,7 +41,7 @@ struct Bound {
 struct Revocation {
     confirmed: bool,
 }
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PairingStatus {
     state: String,
     device_id: Option<String>,
@@ -139,9 +139,12 @@ impl PairingTransport for HttpsTransport {
         let url = pinned_origin(&pending.origin)?
             .join(&format!("v1/device-pairings/{invitation}/claim"))
             .map_err(|_| "Pairing service is unavailable")?;
+        let body = serde_json::to_string(&serde_json::json!({"secret": &pending.secret}))
+            .map_err(|_| "Pairing service is unavailable")?;
         let response = client()?
             .post(url)
-            .json(&serde_json::json!({"secret": pending.secret}))
+            .header("Content-Type", "application/json")
+            .body(body)
             .send()
             .map_err(|_| "Pairing outcome is unknown; check connection status to recover")?;
         if response.status().is_success() {
