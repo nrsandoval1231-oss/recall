@@ -365,3 +365,184 @@ fn malformed_revision_counter_returns_error_instead_of_panicking() {
     event.expected_revision = u64::MAX;
     assert!(v.event_valid(&event).is_err());
 }
+
+#[test]
+fn oversized_neighbor_does_not_disable_healthy_evidence() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let damaged = v
+        .capture(&op(), "synthetic.png", &photo(), "damaged")
+        .unwrap();
+    let healthy = v
+        .capture(&op(), "synthetic.png", &photo(), "healthy")
+        .unwrap();
+    fs::write(v.note_path(&damaged.id), vec![b'x'; MAX_JSON as usize + 1]).unwrap();
+    assert_eq!(v.list("healthy").unwrap()[0].id, healthy.id);
+    assert_eq!(v.source(&healthy.id).unwrap().bytes, photo());
+    assert!(v
+        .list("")
+        .unwrap()
+        .iter()
+        .find(|m| m.id == damaged.id)
+        .unwrap()
+        .conflict
+        .is_some());
+    assert!(v.source(&damaged.id).is_err());
+}
+fn fill_directory(path: &Path, count: usize) {
+    for n in 0..count {
+        fs::write(path.join(format!("synthetic-capacity-{n}")), b"").unwrap();
+    }
+}
+#[test]
+fn full_journal_refuses_new_capture_before_writing_and_keeps_receipts() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let old = op();
+    let m = v
+        .capture(&old, "synthetic.png", &photo(), "healthy")
+        .unwrap();
+    fill_directory(&v.path("_meta/journal"), MAX_RECORDS - 1);
+    let new = op();
+    assert!(v.capture(&new, "synthetic.png", &photo(), "new").is_err());
+    assert!(!v.source_path(&new).exists());
+    assert!(!v.journal_path(&new).exists());
+    assert_eq!(
+        v.capture(&old, "synthetic.png", &photo(), "healthy")
+            .unwrap()
+            .id,
+        m.id
+    );
+    assert_eq!(v.list("healthy").unwrap()[0].id, m.id);
+}
+#[test]
+fn full_retention_directories_refuse_capture_without_orphaning_source() {
+    for directory in ["Sources", "_meta/commits", "Memories", "History"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        fill_directory(&v.path(directory), MAX_RECORDS);
+        let operation = op();
+        assert!(
+            v.capture(&operation, "synthetic.png", &photo(), "new")
+                .is_err(),
+            "{directory}"
+        );
+        assert!(!v.source_path(&operation).exists(), "{directory}");
+        assert!(!v.journal_path(&operation).exists(), "{directory}");
+    }
+}
+#[test]
+fn full_preserved_directory_refuses_correction_before_changing_note() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let before = fs::read(v.note_path(&m.id)).unwrap();
+    fill_directory(&v.path("_meta/preserved"), MAX_RECORDS);
+    let operation = op();
+    assert!(v.correct(&m.id, 1, &operation, "draft").is_err());
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), before);
+    assert!(!v.journal_path(&operation).exists());
+    assert_eq!(v.list("base").unwrap()[0].revision, 1);
+}
+#[test]
+fn external_reconciliation_at_capacity_retains_disk_and_prior_history() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    fill_directory(&v.path("_meta/journal"), MAX_RECORDS - 1);
+    let edited = fs::read_to_string(v.note_path(&m.id))
+        .unwrap()
+        .replace("base", "external");
+    fs::write(v.note_path(&m.id), &edited).unwrap();
+    assert!(v.list("").unwrap()[0].conflict.is_some());
+    assert_eq!(fs::read_to_string(v.note_path(&m.id)).unwrap(), edited);
+    assert_eq!(v.history(&m.id).unwrap().len(), 1);
+}
+
+#[test]
+fn oversized_duplicate_header_still_blocks_ambiguous_evidence() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let mut duplicate = fs::read(v.note_path(&m.id)).unwrap();
+    duplicate.resize(MAX_JSON as usize + 1, b'x');
+    fs::write(v.path("Memories/duplicate.md"), duplicate).unwrap();
+    assert!(v.list("").unwrap()[0].conflict.is_some());
+    assert!(v.source(&m.id).is_err());
+}
+#[test]
+fn history_crash_stages_count_against_future_correction_capacity() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let history_dir = v.history_path(&m.id, 1).parent().unwrap().to_path_buf();
+    for _ in 0..MAX_RECORDS - 1 {
+        fs::write(
+            history_dir.join(format!("synthetic.stage-{}", Uuid::new_v4())),
+            b"",
+        )
+        .unwrap();
+    }
+    let operation = op();
+    assert!(v.correct(&m.id, 1, &operation, "draft").is_err());
+    assert!(!v.journal_path(&operation).exists());
+    assert_eq!(v.history(&m.id).unwrap().len(), 1);
+    assert_eq!(v.list("base").unwrap()[0].revision, 1);
+}
+#[test]
+fn capacity_reserves_staging_headroom_at_last_writable_slot() {
+    let f = Fixture::new();
+    let v = f.vault();
+    fill_directory(&v.path("_meta/commits"), MAX_RECORDS - 2);
+    let operation = op();
+    let m = v
+        .capture(&operation, "synthetic.png", &photo(), "base")
+        .unwrap();
+    assert_eq!(
+        entries(&v.path("_meta/commits")).unwrap().len(),
+        MAX_RECORDS - 1
+    );
+    let refused = op();
+    assert!(v
+        .capture(&refused, "synthetic.png", &photo(), "new")
+        .is_err());
+    assert!(!v.source_path(&refused).exists());
+    assert_eq!(
+        v.capture_receipt(&operation, "base").unwrap().unwrap().id,
+        m.id
+    );
+    assert_eq!(v.list("base").unwrap()[0].id, m.id);
+}
+#[test]
+fn recovery_at_capacity_keeps_pending_draft_and_does_not_publish_partial_note() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let operation = op();
+    v.correct(&m.id, 1, &operation, "draft").unwrap();
+    fs::remove_file(v.done_path(&operation)).unwrap();
+    fs::remove_file(v.history_path(&m.id, 2)).unwrap();
+    fs::remove_file(v.note_path(&m.id)).unwrap();
+    fill_directory(&v.path("Memories"), MAX_RECORDS);
+    assert!(v.correct(&m.id, 1, &operation, "draft").is_err());
+    assert!(!v.note_path(&m.id).exists());
+    assert!(v.backup_path(&operation).exists());
+    assert!(v.journal_path(&operation).exists());
+}
+#[test]
+fn serialized_metadata_size_is_checked_before_original_is_written() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let operation = op();
+    assert!(v
+        .capture(
+            &operation,
+            "synthetic.png",
+            &photo(),
+            &"\u{1}".repeat(MAX_NOTE)
+        )
+        .is_err());
+    assert!(!v.source_path(&operation).exists());
+    assert!(!v.journal_path(&operation).exists());
+    assert!(v.list("").unwrap().is_empty());
+}

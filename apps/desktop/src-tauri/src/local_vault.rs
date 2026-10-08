@@ -168,6 +168,27 @@ fn read(path: &Path, max: u64) -> Result<Vec<u8>> {
     }
     Ok(bytes)
 }
+/// Inspect only the stable identity header of neighbors. Their size/content is
+/// validated independently when reading that memory, never charged to this one.
+fn identity_prefix(path: &Path, len: usize) -> Result<Vec<u8>> {
+    safe(path)?;
+    let mut opts = OpenOptions::new();
+    opts.read(true);
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.custom_flags(0x20000);
+    }
+    let file = opts.open(path).map_err(fail)?;
+    if !file.metadata().map_err(fail)?.is_file() {
+        return Err("Invalid note file".into());
+    }
+    let mut bytes = Vec::with_capacity(len);
+    file.take(len as u64)
+        .read_to_end(&mut bytes)
+        .map_err(fail)?;
+    Ok(bytes)
+}
 fn sync_dir(path: &Path) -> Result<()> {
     safe(path)?;
     #[cfg(unix)]
@@ -533,8 +554,87 @@ impl Vault {
         }
         Ok(conflicts)
     }
-    fn finish(&self, e: &Event) -> Result<()> {
+    /// Reserve every directory's worst-case publication footprint before any
+    /// part of a new operation is written. Immutable publication briefly needs
+    /// both stage and destination entries; retained crash stages count too.
+    fn preflight_capacity(&self, e: &Event) -> Result<()> {
         self.event_valid(e)?;
+        if json(e)?.len() as u64 > MAX_JSON {
+            return Err("Revision metadata exceeds size limit".into());
+        }
+        let extension = e
+            .memory
+            .source_name
+            .rsplit('.')
+            .next()
+            .ok_or("Missing source extension")?;
+        let source = self.path(&format!("Sources/{}.{extension}", e.memory.id));
+        let history = self.history_path(&e.memory.id, e.memory.revision);
+        let history_dir = history.parent().ok_or("Missing history directory")?;
+        let mut additions: BTreeMap<PathBuf, usize> = BTreeMap::new();
+        for path in [
+            source,
+            self.journal_path(&e.operation_id),
+            self.done_path(&e.operation_id),
+            history.clone(),
+        ] {
+            safe(&path)?;
+            let count = if path.try_exists().map_err(fail)? {
+                0
+            } else {
+                2
+            };
+            *additions
+                .entry(path.parent().ok_or("Missing parent")?.to_path_buf())
+                .or_default() += count;
+        }
+        additions.insert(
+            self.path("History"),
+            usize::from(!history_dir.try_exists().map_err(fail)?),
+        );
+        let note = self.note_path(&e.memory.id);
+        let backup = self.backup_path(&e.operation_id);
+        safe(&note)?;
+        safe(&backup)?;
+        let note_exists = note.try_exists().map_err(fail)?;
+        let publish_note = e.kind != "external"
+            && read(&note, MAX_JSON).ok().as_deref() != Some(e.markdown.as_bytes());
+        additions.insert(
+            self.path("Memories"),
+            if publish_note {
+                if note_exists {
+                    1
+                } else {
+                    2
+                }
+            } else {
+                0
+            },
+        );
+        additions.insert(
+            self.path("_meta/preserved"),
+            usize::from(publish_note && note_exists && !backup.try_exists().map_err(fail)?),
+        );
+        for (directory, additional) in additions {
+            safe(&directory)?;
+            let current = if directory.try_exists().map_err(fail)? {
+                entries(&directory)?.len()
+            } else {
+                0
+            };
+            if current
+                .checked_add(additional)
+                .is_none_or(|total| total > MAX_RECORDS)
+            {
+                return Err(
+                    "Vault retention capacity reached; no new operation was written".into(),
+                );
+            }
+        }
+        Ok(())
+    }
+    fn finish(&self, e: &Event) -> Result<()> {
+        self.preflight_capacity(e)?;
         self.verify_source(&e.memory)?;
         let hp = self.history_path(&e.memory.id, e.memory.revision);
         let dir = hp.parent().ok_or("Missing parent")?;
@@ -606,6 +706,7 @@ impl Vault {
         Ok(())
     }
     fn commit(&self, e: &Event) -> Result<VaultMemory> {
+        self.preflight_capacity(e)?;
         immutable(&self.journal_path(&e.operation_id), &json(e)?)?;
         self.finish(e)?;
         Ok(e.memory.clone())
@@ -686,10 +787,6 @@ impl Vault {
             }
             return Ok(e.memory);
         }
-        immutable(
-            &self.path(&format!("Sources/{operation_id}.{extension}")),
-            bytes,
-        )?;
         let now = timestamp();
         let memory = VaultMemory {
             id: operation_id.into(),
@@ -714,6 +811,11 @@ impl Vault {
             previous_markdown: None,
             memory,
         };
+        self.preflight_capacity(&e)?;
+        immutable(
+            &self.path(&format!("Sources/{operation_id}.{extension}")),
+            bytes,
+        )?;
         self.commit(&e)
     }
     fn reconciled(&self, memory_id: &str) -> Result<VaultMemory> {
@@ -726,8 +828,11 @@ impl Vault {
         let marker = format!("<!-- Recall memory {memory_id} | ");
         for candidate in entries(&self.path("Memories"))? {
             if candidate != np && candidate.extension().and_then(|s| s.to_str()) == Some("md") {
-                let bytes = read(&candidate, MAX_JSON)?;
-                if bytes.starts_with(marker.as_bytes()) {
+                // An unreadable neighbor has its own diagnostic. A bounded prefix
+                // still detects duplicate IDs even when that file is oversized.
+                if identity_prefix(&candidate, marker.len())
+                    .is_ok_and(|bytes| bytes == marker.as_bytes())
+                {
                     m.conflict=Some("Renamed or duplicate memory note; restore one original filename before reconciling".into());
                     return Ok(m);
                 }
