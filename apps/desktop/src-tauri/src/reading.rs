@@ -247,12 +247,20 @@ fn normalized(s: &str) -> String {
         .join(" ")
 }
 fn evidence(v: &Value, min: usize, max: usize, source: &str, transcript: &str) -> Result<()> {
+    proposed_evidence(v, min, max, source)?;
+    for ev in v.as_array().unwrap() {
+        ensure(normalized(transcript).contains(&normalized(ev["quote"].as_str().unwrap())))?;
+    }
+    Ok(())
+}
+// Uncertainty may describe an illegible region absent from the transcription. It
+// remains a source-bound, unreviewed proposal, never supporting evidence for facts.
+fn proposed_evidence(v: &Value, min: usize, max: usize, source: &str) -> Result<()> {
     for ev in array(v, min, max)? {
         keys(ev, &["page_id", "quote"])?;
         ensure(ev["page_id"] == source)?;
         let quote = string(&ev["quote"], 1, 3000)?;
-        let quote = normalized(quote);
-        ensure(!quote.is_empty() && normalized(transcript).contains(&quote))?;
+        ensure(!normalized(quote).is_empty())?;
     }
     Ok(())
 }
@@ -401,7 +409,7 @@ fn extraction(ex: &Value, req: &ReadingRequest) -> Result<()> {
             ],
         )?;
         string(&u["description"], 1, 2000)?;
-        evidence(&u["evidence"], 1, 10, &req.binding.source_id, transcript)?;
+        proposed_evidence(&u["evidence"], 1, 10, &req.binding.source_id)?;
     }
     Ok(())
 }
@@ -544,6 +552,84 @@ mod normalization_contract_tests {
                 case["accepted"].as_bool().unwrap(),
                 "{case}"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod selected_contract_tests {
+    use super::*;
+
+    fn cases() -> Vec<Value> {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../packages/contracts/fixtures/local-reading-selected-contract.json"
+        ))
+        .unwrap();
+        fixture["cases"].as_array().unwrap().clone()
+    }
+
+    #[test]
+    fn selected_actual_service_receipts_are_consumable() {
+        for case in cases() {
+            let request: ReadingRequest = serde_json::from_value(case["request"].clone()).unwrap();
+            let receipt: ReadingReceipt = serde_json::from_value(case["response"].clone()).unwrap();
+            receipt
+                .validate(&request)
+                .unwrap_or_else(|error| panic!("{}: {error}", case["name"]));
+            if let Some(result) = receipt.result {
+                let machine = MachineReading { request, result };
+                machine.validate().unwrap();
+                assert_eq!(machine.result.review_state, "unreviewed");
+                assert_eq!(
+                    machine.result.extraction["uncertainties"],
+                    case["provider_output"]["uncertainties"]
+                );
+                assert_eq!(machine.transcription(), "Synthetic note: 12?");
+            } else {
+                assert_eq!(receipt.state, "failed");
+                assert_eq!(receipt.error_code.as_deref(), Some("INVALID_EXTRACTION"));
+            }
+        }
+    }
+
+    #[test]
+    fn selected_uncertainty_exception_keeps_fact_quote_and_binding_defenses() {
+        let case = cases().remove(0);
+        assert_eq!(case["name"], "uncertainty_quote");
+        let request: ReadingRequest = serde_json::from_value(case["request"].clone()).unwrap();
+        let receipt: ReadingReceipt = serde_json::from_value(case["response"].clone()).unwrap();
+        receipt.validate(&request).unwrap();
+        for change in [
+            "summary",
+            "statement",
+            "blank",
+            "unicode_blank",
+            "source",
+            "digest",
+            "reference",
+            "id",
+        ] {
+            let mut altered = receipt.clone();
+            let ex = &mut altered.result.as_mut().unwrap().extraction;
+            match change {
+                "summary" => ex["summary_evidence"][0]["quote"] = "illegible margin".into(),
+                "statement" => {
+                    ex["statements"][0]["evidence"][0]["quote"] = "illegible margin".into()
+                }
+                "blank" => ex["uncertainties"][0]["evidence"][0]["quote"] = " \t\n".into(),
+                "unicode_blank" => {
+                    ex["uncertainties"][0]["evidence"][0]["quote"] = "\u{00a0}\u{001c}".into()
+                }
+                "source" => {
+                    ex["uncertainties"][0]["evidence"][0]["page_id"] =
+                        uuid::Uuid::nil().to_string().into()
+                }
+                "digest" => ex["input_manifest_sha256"] = "0".repeat(64).into(),
+                "reference" => ex["statements"][0]["subject_mention_id"] = "m99".into(),
+                "id" => ex["statements"][0]["local_id"] = format!("s{}", "1".repeat(128)).into(),
+                _ => unreachable!(),
+            }
+            assert!(altered.validate(&request).is_err(), "{change}");
         }
     }
 }

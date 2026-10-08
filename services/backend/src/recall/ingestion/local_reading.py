@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import re
+import unicodedata
 import uuid
 import warnings
 from collections.abc import Iterator
@@ -24,10 +25,11 @@ from ..domain.manifest import find_schema_path, load_schema
 from ..errors import ApiError, forbidden, hash_mismatch, idempotency_conflict, not_found, unsupported_media, validation
 from .images import TRANSFORM_VERSION, DerivativeError, make_derivative
 from .provider import InterpretRequest, PageImage, Provider, ProviderError, ProviderResult
-from .validate import InvalidExtraction, validate_extraction
+from .validate import InvalidExtraction, Validated, validate_extraction
 from .worker import MAX_INTERPRET_OUTPUT_TOKENS, MAX_INTERPRET_TEXT_INPUT_TOKENS, MAX_VISUAL_TOKENS_PER_PAGE
 
 MAX_RESULT_BYTES = 900_000  # JSONB expansion and the binding still fit a 1 MiB HTTP response.
+MAX_LOCAL_ID_CHARS = 128  # Selected-photo contract, including mention references; native uses this bound.
 MEDIA_FORMATS = {
     "image/jpeg": {"JPEG", "MPO"},
     "image/png": {"PNG"},
@@ -128,6 +130,39 @@ def validate_storage_strings(value: Any) -> None:
     elif isinstance(value, list):
         for item in value:
             validate_storage_strings(item)
+
+
+def validate_selected_extraction(
+    raw: str, *, schema: dict[str, Any], capture_id: str, fingerprint: str, pages: dict[str, int]
+) -> Validated:
+    """Selected-photo consumer constraints; do not change legacy-cloud normalization."""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        raise InvalidExtraction(["output is not valid JSON"]) from None
+    # Bound IDs before normalization can drop an item or include its ID in a review note.
+    if isinstance(data, dict):
+        for kind in ("mentions", "statements", "action_suggestions"):
+            items = data.get(kind)
+            if isinstance(items, list):
+                for item in items:
+                    if isinstance(item, dict):
+                        for key in ("local_id", "subject_mention_id", "object_mention_id", "assignee_mention_id"):
+                            value = item.get(key)
+                            if isinstance(value, str) and len(value) > MAX_LOCAL_ID_CHARS:
+                                raise InvalidExtraction(["selected-photo local ID exceeds 128 characters"])
+    validated = validate_extraction(raw, schema=schema, capture_id=capture_id, fingerprint=fingerprint, pages=pages)
+    ex = validated.extraction
+    for uncertainty in ex["uncertainties"]:
+        for ev in uncertainty["evidence"]:
+            # Uncertainty may describe an illegible region outside the transcript, but
+            # a blank purported quotation is unusable even as a proposed uncertainty.
+            if not unicodedata.normalize("NFKC", ev["quote"]).strip():
+                raise InvalidExtraction(["uncertainty evidence is blank"])
+    if ex["summary"] is None and ex["summary_evidence"]:
+        ex["summary_evidence"] = []
+        validated.note("UNUSED_SUMMARY_EVIDENCE", "summary evidence dropped: no summary was proposed")
+    return validated
 
 
 class LocalReadingService:
@@ -281,7 +316,7 @@ class LocalReadingService:
             validate_storage_strings(result.text)
             if len(result.text.encode()) > MAX_RESULT_BYTES:
                 raise InvalidExtraction(["output too large"])
-            validated = validate_extraction(
+            validated = validate_selected_extraction(
                 result.text,
                 schema=self.schema,
                 capture_id=binding["memory_id"],

@@ -259,7 +259,7 @@ For `complete`, `result` has exactly these fields:
 | `model_id` | The exact configured model ID reported by the provider; mismatches fail closed with an unknown hold |
 | `input_manifest_sha256` | Digest defined below |
 | `derivative` | Object with `sha256` (lowercase hex64), `transform_version: "jpeg-rgb-exif-orient-v1"`, `media_type: "image/jpeg"` |
-| `extraction` | Normalized output validated by `validate_extraction` against [`extraction.schema.json`](../packages/contracts/extraction.schema.json), schema version `1.1` |
+| `extraction` | Normalized output validated by `validate_extraction` against [`extraction.schema.json`](../packages/contracts/extraction.schema.json), schema version `1.1`, plus the selected-photo rules below |
 | `validation_notes` | Array of objects containing string `code` and string `detail`; deterministic normalization/review notes, never executable instructions |
 | `review_state` | Always `"unreviewed"`, even when schema validation succeeds |
 
@@ -271,6 +271,29 @@ All accepted binding values supplied by the native client are ASCII. The extract
 `binding.source_id` and `ordinal: 1`. All extraction evidence references must resolve to that page. The native
 adapter rechecks every binding, current revision/source bytes, vault session, active state and cancellation
 before journaling the machine proposal. Normalized results containing NUL or unpaired Unicode surrogates are rejected as `INVALID_EXTRACTION` before storage; text is never silently rewritten to fit. Schema/reference validation is not proof of pixel-level reading truth.
+
+Selected-photo normalization and native consumption share these additional rules; the legacy-cloud extraction
+validator and schema retain their existing behavior:
+
+- Mention, statement and action `local_id` values, and all mention references, are at most **128 characters**,
+  including the `m`, `s` or `a` prefix. The service checks this before normalization, including items that would
+  otherwise be dropped. Oversized IDs return terminal `failed` / `INVALID_EXTRACTION`, with known usage settled.
+- Evidence for summaries, mentions, statements and actions must match the transcription under the existing
+  Unicode NFKC/casefold/whitespace normalization. Unsupported proposals are dropped by the service; native
+  still rejects unmatched supporting quotes. If `summary` is null, the service clears unused `summary_evidence`
+  and records `UNUSED_SUMMARY_EVIDENCE` when there was evidence to clear.
+- Uncertainty records remain as proposed, including their source references and wording. Their evidence may
+  describe an illegible region absent from the transcription (for example, `illegible margin`). This is
+  **proposed uncertainty, never a verified supporting quotation for a fact or summary**. Native accepts this
+  narrow exception only for `uncertainties`; source binding, evidence shape/length, reference and digest checks
+  still apply. A quote that is empty after NFKC and whitespace normalization is rejected as
+  `INVALID_EXTRACTION` before completion, and native rejects it too. Transcription and uncertainty are not
+  silently removed to make a receipt consumable; every complete result remains `unreviewed`.
+
+The shared [selected-photo fixtures](../packages/contracts/fixtures/local-reading-selected-contract.json)
+contain actual protected-route/JSONB receipts from synthetic images and provider output. Backend tests
+reproduce each receipt, identical POST replay and GET recovery, one provider call and one settled usage row;
+native tests consume those exact complete or intentionally failed receipts and check negative defenses.
 
 | Receipt state | HTTP status | `result` / `error_code` | Meaning |
 | --- | --- | --- | --- |

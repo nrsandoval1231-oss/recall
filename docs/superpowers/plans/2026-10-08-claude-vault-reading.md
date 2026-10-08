@@ -62,4 +62,6 @@
 - [x] Extend browser synthetic journeys, run meaningful real-browser checks and save synthetic screenshots/evidence; no live model quality claim.
 - [x] Update canonical documents with Claude primary and exact implemented/disabled/remaining boundaries; preserve historic evidence and proposed QR choice.
 - [x] Run relevant suites, lint/typecheck/build and commit.
-- [ ] Independent Task 3 and whole-branch final review, then all exact-head CI jobs after opening stacked draft PR; repair verified failures, never merge/deploy.
+- [x] Independent Task 3 review and scoped repair/rereview; whole-branch review at `ef73706` identified I1 plus minor M1–M3.
+- [x] One consolidated final repair: align proposed uncertainty/null-summary evidence across service/native, enforce the selected-photo 128-character local-ID limit before completion, share actual service receipts with replay/accounting/native regressions, and return focus after consent dismissal (I1/M2/M3).
+- [ ] Scoped independent rereview of the consolidated repair and all exact-final-head CI jobs for draft PR #13; never merge/deploy. M1 terminal-session registry retirement is explicitly deferred: preserve the bounded fail-closed cap/restart behavior.

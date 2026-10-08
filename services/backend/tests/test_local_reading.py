@@ -13,7 +13,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import Env, sha, synthetic_image
+from conftest import REPO_ROOT, Env, sha, synthetic_image
 from fake_provider import FakeProvider, faithful_extraction, outage, refusal
 from recall.api.app import create_app
 from recall.errors import forbidden
@@ -77,6 +77,48 @@ def post(client: TestClient, binding: dict[str, Any], body: bytes, **headers: st
             **headers,
         },
     )
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads((REPO_ROOT / "packages/contracts/fixtures/local-reading-selected-contract.json").read_text())["cases"],
+    ids=lambda case: case["name"],
+)
+def test_selected_contract_actual_service_receipts_replay_and_account_once(reading: Any, env: Env, case: Any) -> None:
+    client, grant, fake, _, original = reading
+    binding = case["request"]["binding"]
+    grant.vault = uuid.UUID(binding["vault_id"])
+    assert sha(original) == binding["source_sha256"]
+    fake.interpret_script = [json.dumps(case["provider_output"])]
+    response = post(client, binding, original)
+    assert response.status_code == 200 and response.json() == case["response"]
+    assert post(client, binding, original).json() == case["response"]
+    recovered = client.get(
+        f"/v1/local-readings/{binding['operation_id']}", headers={"Authorization": "Bearer synthetic-device-only"}
+    )
+    assert recovered.status_code == 200 and recovered.json() == case["response"]
+    assert len(fake.interpret_calls) == 1
+    with env.db.tx(grant.user) as tx:
+        assert tx.one("select status from embedding_reservations")["status"] == "completed"
+        assert tx.all("select model_id,input_tokens,output_tokens from ai_usage") == [
+            {"model_id": "fake-model", "input_tokens": 1000, "output_tokens": 500}
+        ]
+        assert tx.one("select result from local_reading_receipts")["result"] == case["response"]["result"]
+    result = response.json()["result"]
+    if case["name"] in {"uncertainty_quote", "null_summary_quote", "max_local_ids", "unsupported_fact_summary"}:
+        assert response.json()["state"] == "complete" and result["review_state"] == "unreviewed"
+        assert result["extraction"]["pages"] == case["provider_output"]["pages"]
+        assert result["extraction"]["uncertainties"] == case["provider_output"]["uncertainties"]
+        if case["name"] in {"null_summary_quote", "unsupported_fact_summary"}:
+            assert result["extraction"]["summary"] is None and result["extraction"]["summary_evidence"] == []
+        if case["name"] == "unsupported_fact_summary":
+            assert result["extraction"]["statements"] == []
+        if case["name"] == "max_local_ids":
+            for kind in ("mentions", "statements", "action_suggestions"):
+                assert len(result["extraction"][kind][0]["local_id"]) == 128
+    else:
+        assert response.json()["state"] == "failed" and response.json()["error_code"] == "INVALID_EXTRACTION"
+        assert result is None
 
 
 def test_default_denial_before_consuming_photo(env: Env) -> None:

@@ -71,3 +71,18 @@ test("revision-zero native diagnostic keeps a copyable draft and reload route un
 test("delayed original remains readable after an uncertain reread", async ({ page }) => {
   await control(page, { readingEnabled: true }); await open(page); await send(page); await expect(page.getByRole("img", { name: "Original photo for comparison" })).toBeVisible(); await page.getByRole("button", { name: "Back to memories" }).click(); await control(page, { delaySource: true, unknownReading: true }); await open(page); await expect(page.getByText("Loading the original photo…", { exact: true })).toBeVisible(); await send(page); await expect(page.getByText("Reading status: unknown", { exact: true })).toBeVisible(); await page.evaluate(() => (window as unknown as { syntheticVault: { releaseSource: () => void } }).syntheticVault.releaseSource()); await expect(page.getByRole("img", { name: "Original photo for comparison" })).toBeVisible(); await expect(page.getByText("Loading the original photo…", { exact: true })).toHaveCount(0); await accessible(page);
 });
+
+test("keyboard consent dismissal returns focus to the reading trigger without dispatch", async ({ page }) => {
+  await control(page, { readingEnabled: true }); await open(page);
+  const trigger = page.getByRole("button", { name: "Read this photo with Claude", exact: true });
+  await trigger.focus(); await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Send this photo for a reading?" })).toBeFocused();
+  await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: "Send this photo to Claude", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab"); await expect(page.getByRole("button", { name: "Keep it local", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter"); await expect(trigger).toBeFocused();
+  await expect(page.getByRole("region", { name: "Claude reading consent" })).toHaveCount(0);
+  expect(await calls(page, "vault_read_photo")).toHaveLength(0);
+  // Returning focus also lets a keyboard user reopen consent without searching the page.
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Send this photo for a reading?" })).toBeFocused();
+});

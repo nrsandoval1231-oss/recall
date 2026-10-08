@@ -1,0 +1,1372 @@
+{
+  "description": "SYNTHETIC ONLY. Exact protected POST /v1/local-readings responses persisted through real PostgreSQL; fake provider, generated JPEG original. Backend tests reproduce every receipt, POST replay, GET recovery and one-call known usage. Native tests consume these exact responses.",
+  "cases": [
+    {
+      "name": "uncertainty_quote",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-000000000064",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "7f20e9ab50764cd1db4b97e262262d11a31344f6220bf0cd9b3d56e10a51e37f",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "illegible margin"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-000000000064",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "complete",
+        "result": {
+          "model_id": "fake-model",
+          "provider": "anthropic",
+          "derivative": {
+            "sha256": "b233f30be24a8ed4f80df0cce57ae45524759019a15cd8c7d872957bac2cc0c0",
+            "media_type": "image/jpeg",
+            "transform_version": "jpeg-rgb-exif-orient-v1"
+          },
+          "extraction": {
+            "pages": [
+              {
+                "ordinal": 1,
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "legibility": "clear",
+                "transcription": "Synthetic note: 12?"
+              }
+            ],
+            "summary": "Notes beginning: Synthetic note: 12?",
+            "mentions": [],
+            "capture_id": "33333333-3333-4333-8333-333333333333",
+            "statements": [
+              {
+                "kind": "observation",
+                "text": "Synthetic note: 12?",
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "local_id": "s1",
+                "predicate": "notes",
+                "value_text": "12",
+                "temporal_text": null,
+                "epistemic_state": "uncertain",
+                "attribution_text": null,
+                "object_mention_id": null,
+                "subject_mention_id": null
+              }
+            ],
+            "uncertainties": [
+              {
+                "kind": "other",
+                "evidence": [
+                  {
+                    "quote": "illegible margin",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "description": "Marked uncertain on the page: Synthetic note: 12?"
+              }
+            ],
+            "schema_version": "1.1",
+            "summary_evidence": [
+              {
+                "quote": "Synthetic note: 12?",
+                "page_id": "33333333-3333-4333-8333-333333333333"
+              }
+            ],
+            "action_suggestions": [],
+            "input_manifest_sha256": "7f20e9ab50764cd1db4b97e262262d11a31344f6220bf0cd9b3d56e10a51e37f"
+          },
+          "review_state": "unreviewed",
+          "validation_notes": [],
+          "input_manifest_sha256": "7f20e9ab50764cd1db4b97e262262d11a31344f6220bf0cd9b3d56e10a51e37f"
+        },
+        "error_code": null
+      }
+    },
+    {
+      "name": "null_summary_quote",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-000000000065",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "9d75981b4c5314ab94310536a68c217746351ab020983d695864c2d187727bec",
+        "summary": null,
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "illegible margin"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-000000000065",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "complete",
+        "result": {
+          "model_id": "fake-model",
+          "provider": "anthropic",
+          "derivative": {
+            "sha256": "b233f30be24a8ed4f80df0cce57ae45524759019a15cd8c7d872957bac2cc0c0",
+            "media_type": "image/jpeg",
+            "transform_version": "jpeg-rgb-exif-orient-v1"
+          },
+          "extraction": {
+            "pages": [
+              {
+                "ordinal": 1,
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "legibility": "clear",
+                "transcription": "Synthetic note: 12?"
+              }
+            ],
+            "summary": null,
+            "mentions": [],
+            "capture_id": "33333333-3333-4333-8333-333333333333",
+            "statements": [
+              {
+                "kind": "observation",
+                "text": "Synthetic note: 12?",
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "local_id": "s1",
+                "predicate": "notes",
+                "value_text": "12",
+                "temporal_text": null,
+                "epistemic_state": "uncertain",
+                "attribution_text": null,
+                "object_mention_id": null,
+                "subject_mention_id": null
+              }
+            ],
+            "uncertainties": [
+              {
+                "kind": "other",
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "description": "Marked uncertain on the page: Synthetic note: 12?"
+              }
+            ],
+            "schema_version": "1.1",
+            "summary_evidence": [],
+            "action_suggestions": [],
+            "input_manifest_sha256": "9d75981b4c5314ab94310536a68c217746351ab020983d695864c2d187727bec"
+          },
+          "review_state": "unreviewed",
+          "validation_notes": [
+            {
+              "code": "UNUSED_SUMMARY_EVIDENCE",
+              "detail": "summary evidence dropped: no summary was proposed"
+            }
+          ],
+          "input_manifest_sha256": "9d75981b4c5314ab94310536a68c217746351ab020983d695864c2d187727bec"
+        },
+        "error_code": null
+      }
+    },
+    {
+      "name": "blank_uncertainty",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-000000000066",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "662fc83e7cfe5f8994774ad026bf3071a7b6b16d6248e406de0b6b59a59c84d7",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": " \t\n"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-000000000066",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "unicode_blank_uncertainty",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-000000000067",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "26df1c77da1d58929b536bd60c0e9d1977de8effeab0874abcf7f45089666363",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "\u00a0\u001c"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-000000000067",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "max_local_ids",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-000000000068",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "7462516ecec5e9977e980bddb155adcec67d8129a1aaf6684c83952a308e4af7",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [
+          {
+            "local_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "topic",
+            "raw_text": "Synthetic note",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "statements": [
+          {
+            "local_id": "s1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "observation",
+            "subject_mention_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [
+          {
+            "local_id": "a1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "action",
+            "text": "Synthetic note: 12?",
+            "assignee_mention_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "due_text": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-000000000068",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "complete",
+        "result": {
+          "model_id": "fake-model",
+          "provider": "anthropic",
+          "derivative": {
+            "sha256": "b233f30be24a8ed4f80df0cce57ae45524759019a15cd8c7d872957bac2cc0c0",
+            "media_type": "image/jpeg",
+            "transform_version": "jpeg-rgb-exif-orient-v1"
+          },
+          "extraction": {
+            "pages": [
+              {
+                "ordinal": 1,
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "legibility": "clear",
+                "transcription": "Synthetic note: 12?"
+              }
+            ],
+            "summary": "Notes beginning: Synthetic note: 12?",
+            "mentions": [
+              {
+                "kind": "topic",
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "local_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+                "raw_text": "Synthetic note"
+              }
+            ],
+            "capture_id": "33333333-3333-4333-8333-333333333333",
+            "statements": [
+              {
+                "kind": "observation",
+                "text": "Synthetic note: 12?",
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "local_id": "s1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+                "predicate": "notes",
+                "value_text": "12",
+                "temporal_text": null,
+                "epistemic_state": "uncertain",
+                "attribution_text": null,
+                "object_mention_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+                "subject_mention_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+              }
+            ],
+            "uncertainties": [
+              {
+                "kind": "other",
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "description": "Marked uncertain on the page: Synthetic note: 12?"
+              }
+            ],
+            "schema_version": "1.1",
+            "summary_evidence": [
+              {
+                "quote": "Synthetic note: 12?",
+                "page_id": "33333333-3333-4333-8333-333333333333"
+              }
+            ],
+            "action_suggestions": [
+              {
+                "kind": "action",
+                "text": "Synthetic note: 12?",
+                "due_text": null,
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "local_id": "a1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+                "assignee_mention_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+              }
+            ],
+            "input_manifest_sha256": "7462516ecec5e9977e980bddb155adcec67d8129a1aaf6684c83952a308e4af7"
+          },
+          "review_state": "unreviewed",
+          "validation_notes": [],
+          "input_manifest_sha256": "7462516ecec5e9977e980bddb155adcec67d8129a1aaf6684c83952a308e4af7"
+        },
+        "error_code": null
+      }
+    },
+    {
+      "name": "long_mention_id",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-000000000069",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "4a9d8559fb62a31148a3e424f0c3452e72e17b5e6690a3b4ebd5e9dd2413dd58",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [
+          {
+            "local_id": "m11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "topic",
+            "raw_text": "Synthetic note",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": "m11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": "m11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-000000000069",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "long_statement_id",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-00000000006a",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "1f723506116f8279376b3332c895ac60a67a77461a37e3e908047e90f604cc73",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-00000000006a",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "long_action_id",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-00000000006b",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "fa291fde4f0d5a0b61586104809d1fc6962c4a991be8f3b9aa5f693742e43bda",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [
+          {
+            "local_id": "a11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "action",
+            "text": "Synthetic note: 12?",
+            "assignee_mention_id": null,
+            "due_text": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-00000000006b",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "long_reference",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-00000000006c",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "2a8b861c3ac617646c15eb6bd3ba0f03587e87502bc100ba7861ca39281393a6",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [
+          {
+            "local_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "topic",
+            "raw_text": "Synthetic note",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": "m11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": "m1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-00000000006c",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "unsupported_fact_summary",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-00000000006d",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "fcf8502f41046d86710d47e854dcdee2bf45f75c30f6b7e2382123ea7b95e6a6",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "illegible margin"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "illegible margin"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-00000000006d",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "complete",
+        "result": {
+          "model_id": "fake-model",
+          "provider": "anthropic",
+          "derivative": {
+            "sha256": "b233f30be24a8ed4f80df0cce57ae45524759019a15cd8c7d872957bac2cc0c0",
+            "media_type": "image/jpeg",
+            "transform_version": "jpeg-rgb-exif-orient-v1"
+          },
+          "extraction": {
+            "pages": [
+              {
+                "ordinal": 1,
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "legibility": "clear",
+                "transcription": "Synthetic note: 12?"
+              }
+            ],
+            "summary": null,
+            "mentions": [],
+            "capture_id": "33333333-3333-4333-8333-333333333333",
+            "statements": [],
+            "uncertainties": [
+              {
+                "kind": "other",
+                "evidence": [
+                  {
+                    "quote": "Synthetic note: 12?",
+                    "page_id": "33333333-3333-4333-8333-333333333333"
+                  }
+                ],
+                "description": "Marked uncertain on the page: Synthetic note: 12?"
+              }
+            ],
+            "schema_version": "1.1",
+            "summary_evidence": [],
+            "action_suggestions": [],
+            "input_manifest_sha256": "fcf8502f41046d86710d47e854dcdee2bf45f75c30f6b7e2382123ea7b95e6a6"
+          },
+          "review_state": "unreviewed",
+          "validation_notes": [
+            {
+              "code": "SUMMARY_UNSUPPORTED",
+              "detail": "summary dropped: it says more than the cited page lines"
+            },
+            {
+              "code": "STATEMENT_UNSUPPORTED",
+              "detail": "statement s1 dropped: evidence is not verbatim on the page"
+            }
+          ],
+          "input_manifest_sha256": "fcf8502f41046d86710d47e854dcdee2bf45f75c30f6b7e2382123ea7b95e6a6"
+        },
+        "error_code": null
+      }
+    },
+    {
+      "name": "wrong_uncertainty_source",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-00000000006e",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "2e48d921052b381d88a5d40f6d5607b2290cab909da13604b7d445a61a09211a",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "00000000-0000-0000-0000-00000000004d",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-00000000006e",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "wrong_digest",
+      "request": {
+        "binding": {
+          "schema_version": "1.0",
+          "operation_id": "00000000-0000-0000-0000-00000000006f",
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "expected_revision": 1,
+          "captured_at": "2026-10-08T12:00:00Z"
+        },
+        "media_type": "image/jpeg"
+      },
+      "provider_output": {
+        "schema_version": "1.1",
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "summary": "Notes beginning: Synthetic note: 12?",
+        "summary_evidence": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "quote": "Synthetic note: 12?"
+          }
+        ],
+        "pages": [
+          {
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "ordinal": 1,
+            "transcription": "Synthetic note: 12?",
+            "legibility": "clear"
+          }
+        ],
+        "mentions": [],
+        "statements": [
+          {
+            "local_id": "s1",
+            "kind": "observation",
+            "subject_mention_id": null,
+            "predicate": "notes",
+            "text": "Synthetic note: 12?",
+            "value_text": "12",
+            "epistemic_state": "uncertain",
+            "attribution_text": null,
+            "temporal_text": null,
+            "object_mention_id": null,
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ],
+        "action_suggestions": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "description": "Marked uncertain on the page: Synthetic note: 12?",
+            "evidence": [
+              {
+                "page_id": "33333333-3333-4333-8333-333333333333",
+                "quote": "Synthetic note: 12?"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "22222222-2222-4222-8222-222222222222",
+          "memory_id": "33333333-3333-4333-8333-333333333333",
+          "source_id": "33333333-3333-4333-8333-333333333333",
+          "captured_at": "2026-10-08T12:00:00Z",
+          "operation_id": "00000000-0000-0000-0000-00000000006f",
+          "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+          "schema_version": "1.0",
+          "expected_revision": 1
+        },
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    }
+  ]
+}

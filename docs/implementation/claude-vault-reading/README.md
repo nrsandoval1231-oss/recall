@@ -26,6 +26,8 @@ Same-ID recovery GET may lead to one identical POST after 404, only after fresh 
 
 ## Evidence by layer
 
+The following table records the earlier Task 3 delivery evidence. Fresh cross-layer verification for the consolidated final repair is recorded below.
+
 | Layer | Evidence | Acceptance boundary |
 | --- | --- | --- |
 | Backend, independently reviewed `6e81987` | Separately run full pytest: 267 passed, no skips; Ruff/mypy passed. Actual synthetic protected HTTP/SQL and SDK stream fixtures cover authorization-before-body, binding/validation, duplicate/in-flight recovery, Unicode output, expiry and known/unknown charge accounting. | No paid/live Claude call or production enablement. Not rerun for this renderer-only task. |
@@ -70,7 +72,28 @@ Fresh scoped verification:
 - `RECALL_CHROMIUM=/usr/bin/chromium npm run test:local-vault -- reading.spec.ts`: **16 passed**, desktop/reduced-motion, no skips. Includes copyable draft/reload/repair with the real diagnostic shape and a delayed original after an unknown reread, plus all prior reading journeys and Axe/viewport checks.
 - Root `npm run typecheck`, `npm run lint`, and `git diff --check`: passed. No new screenshots or unchanged broad backend/native/client/browser suites were rerun for this scoped repair; the earlier full-delivery evidence remains historical.
 
-The Minor keyboard-focus return finding remains recorded for final review; this repair addresses the two Important cases. No native/backend/contract/provisioning behavior changed. Scoped independent rereview remains required.
+At this earlier repair, the Minor keyboard-focus return finding remained open for final review; the consolidated repair below now addresses it. This earlier repair addressed the two Important cases. No native/backend/contract/provisioning behavior changed. Scoped independent rereview remains required.
+
+## Consolidated whole-branch review repair over `ef73706`
+
+Whole-branch review found that a completed backend receipt could be permanently rejected by native: the shared validator retains non-verbatim uncertainty proposals and unused evidence when the summary is null, while native required every quote to match the transcription. The selected-photo contract now preserves the uncertainty proposal and its original wording/source references. Native permits a non-verbatim quote only within uncertainty, never as supporting evidence for facts or summaries. Source, digest, reference, shape, length and nonblank checks remain enforced. The selected service clears evidence attached to a null summary with a review note and rejects blank uncertainty evidence before completion. The original transcription and uncertainty are retained in complete results; attribution remains unreviewed. The legacy-cloud validator/schema are unchanged.
+
+The selected service also enforces native's 128-character local-ID/mention-reference limit before normalization or completion, including items that would otherwise be dropped. Oversized IDs and unusable blank uncertainty return an intentional terminal `failed` / `INVALID_EXTRACTION` receipt with known provider usage settled. POST replay and GET recovery return that same consumable receipt without another call. This is not an automatic refund or a claim that all native event-size limits disappeared.
+
+Twelve [shared synthetic cases](../../../packages/contracts/fixtures/local-reading-selected-contract.json) contain exact receipts generated through the protected HTTP route and real PostgreSQL/JSONB using a synthetic JPEG and fake provider. The backend regression reproduces every complete/failed response, POST replay, GET recovery, exactly one provider call, one completed reservation and one usage row (1,000 input / 500 output tokens). Cases include non-verbatim uncertainty, null-summary evidence, ordinary/Unicode blank quotes, the 128/129-character ID boundary across mentions/statements/actions and references, unsupported fact/summary quotes, wrong source references and wrong digest. Native consumes those exact responses and separately rejects tampered factual/summary quotes, blank uncertainty, source/digest/reference mismatches and oversized IDs. No live SDK/provider accuracy is inferred from this fixture.
+
+Consent dismissal now returns keyboard focus to **Read this photo with Claude**. The actual Chromium regression exercises Enter → consent heading → Tab to Send → Tab to Keep it local → Enter → focused trigger, verifies zero reading dispatches, and reopens consent with Enter. Correction-panel focus behavior is outside this small repair.
+
+Fresh checks after the consolidated implementation:
+
+- `PATH=/workspace/recall-tools/pg/usr/lib/postgresql/17/bin:$PATH LD_LIBRARY_PATH=/workspace/recall-tools/pg/usr/lib/x86_64-linux-gnu services/backend/.venv/bin/pytest services/backend/tests/test_local_reading.py -q`: **68 passed**, no skips.
+- Same environment, `services/backend/.venv/bin/pytest services/backend/tests -q`: **279 passed**, no skips. Ruff over backend source/tests and mypy over all 46 backend source files passed.
+- With the documented native environment, `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib`: **154 passed**, zero failures/ignored; `cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check` passed.
+- `npm test`: **260 passed**, all 22 files (desktop 143), no skips.
+- `RECALL_CHROMIUM=/usr/bin/chromium npm run test:local-vault -- reading.spec.ts`: **18 passed**, desktop/reduced-motion, no skips. No screenshots were regenerated; all historical images remain preserved.
+- Root `npm run lint`, `npm run typecheck`, `npm run build --workspace @recall/desktop`, and `git diff --check`: passed. This local build does not establish installed-device or exact-final-head CI acceptance.
+
+M1 is explicitly deferred: cancelled/terminal native session registrations can exhaust the bounded 128-entry registry; the existing clear fail-closed error and restart workaround remain. This repair makes no registry retirement or session-safety redesign. Independent scoped final rereview and exact-final-head draft PR #13 CI are still pending coordinator gates. Default authorization/connection remains disabled; no credentials, grants, enrollment, live/private calls, production changes, merge or deployment occurred.
 
 ## Synthetic screenshots
 
