@@ -21,6 +21,11 @@ written. Do not resolve "Mike" or "the hotel" into a specific identity.
 - `statements`: what the pages say, preserving wording. Use epistemic_state `reported` for plain \
 statements, `uncertain` for hedged or "?" items, `question` for questions. Never use \
 `confirmed_by_user`, `superseded`, or `retracted`. A clearly legible "800 psi?" is still uncertain.
+- Every statement `predicate` is a machine-readable concept key matching exactly \
+`^[a-z][a-z0-9_]*$`: lowercase ASCII letters, digits after the first character, and underscores only. \
+Use snake_case for multiword keys (for example, `call_timing` or `budget_limit`), never spaces or \
+punctuation. Keep the page's original wording in `text`, `value_text`, and evidence quotes; do not \
+rewrite those fields to match the predicate key.
 - Never change a number or unit. Put numbers in value_text exactly as written.
 - `temporal_text`: only time words that literally appear on the page ("Thursday", "next month"); \
 never convert them to dates and never infer dates from when the photo was taken. Otherwise null.

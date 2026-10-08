@@ -1,0 +1,43 @@
+{
+  "packet": "DIAG-02-R1",
+  "status": "IMPLEMENTED_UNREVIEWED",
+  "started_utc": "UNKNOWN",
+  "finished_utc": "UNKNOWN",
+  "repository": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall",
+  "branch": "implement/owner-device-pairing",
+  "base_sha": "c9d29c9729b4d81268043f5aa935cb2d57c8ba27",
+  "head_sha": "c9d29c9729b4d81268043f5aa935cb2d57c8ba27",
+  "changed_files": [
+    "services/backend/src/recall/ingestion/prompts.py",
+    "services/backend/tests/test_anthropic_adapter.py",
+    "services/backend/tests/test_validate.py",
+    "docs/implementation/claude-evaluation/README.md",
+    ".agent/DIAG-02-REPAIR-COMPLETION.json"
+  ],
+  "implementation": [
+    "Interpretation system prompt now states the exact lowercase ASCII snake_case predicate rule, gives call_timing and budget_limit examples, and directs original wording to remain in text, value_text, and evidence quotes.",
+    "Adapter request test proves the prompt constraint is included in the actual outbound system message.",
+    "Validator regressions prove representative space/punctuation predicates still hard-fail with SCHEMA_INVALID and the original predicate/value is not normalized; valid snake_case controls retain source text, value_text, and uncertainty unchanged.",
+    "Documentation records the demonstrated provider-schema prompt gap and the bounded offline repair; schema and validator were not changed."
+  ],
+  "validation": [
+    {
+      "command": "uv run --project services/backend ruff check services/backend/src/recall/ingestion/prompts.py services/backend/tests/test_validate.py services/backend/tests/test_anthropic_adapter.py",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run --project services/backend ruff format --check services/backend/src/recall/ingestion/prompts.py services/backend/tests/test_validate.py services/backend/tests/test_anthropic_adapter.py",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run --project services/backend pytest services/backend/tests/test_validate.py services/backend/tests/test_anthropic_adapter.py -q",
+      "result": "PASS: 35 passed."
+    }
+  ],
+  "uncertainties": [
+    "The prompt repair has not been live-retested; no third paid batch is authorized.",
+    "Controller offline replay of both retained raw outputs and the in-memory predicate-only experiment remain pending; transformed output is not accepted live evidence."
+  ],
+  "external_actions": "No keys read, network/provider calls, paid requests, journal or raw-capture mutations, commits, or pushes.",
+  "controller_handoff": "Controller replays the two immutable raw outputs offline, then performs the specified in-memory predicate-only experiment. Keep the live-quality gate open pending separate authorization and evidence."
+}

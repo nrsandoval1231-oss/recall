@@ -99,6 +99,10 @@ def test_interpret_request_shape_and_success() -> None:
     image = next(c for c in content if c["type"] == "image")
     assert image["source"]["media_type"] == "image/jpeg" and image["source"]["type"] == "base64"
     assert "DATA" in body["system"][0]["text"] and "cache_control" not in body["system"][0]
+    prompt = body["system"][0]["text"]
+    assert "^[a-z][a-z0-9_]*$" in prompt
+    assert "`call_timing`" in prompt and "`budget_limit`" in prompt
+    assert "Keep the page's original wording in `text`, `value_text`, and evidence quotes" in prompt
     assert req.headers["x-api-key"] == "test-key-not-real"
 
 

@@ -147,6 +147,42 @@ def test_structural_problems_are_hard_failures() -> None:
         run(bad)
 
 
+@pytest.mark.parametrize("predicate", ["call timing", "budget limit", "call-timing"])
+def test_space_or_punctuation_predicates_remain_hard_schema_rejections(predicate: str) -> None:
+    bad = proposal(
+        "Call timing and budget limit",
+        statements=[stmt("Call timing is morning", "Call timing", predicate=predicate)],
+    )
+
+    with pytest.raises(InvalidExtraction) as caught:
+        run(bad)
+
+    assert caught.value.code == "SCHEMA_INVALID"
+    assert len(caught.value.problems) == 1
+    assert predicate in caught.value.problems[0]
+    assert "does not match" in caught.value.problems[0]
+    assert bad["statements"][0]["predicate"] == predicate
+
+
+@pytest.mark.parametrize("predicate", ["call_timing", "budget_limit", "x1"])
+def test_snake_case_predicate_control_passes_without_changing_source_values(predicate: str) -> None:
+    text = "Call timing is morning?"
+    statement = stmt(
+        text,
+        text,
+        state="uncertain",
+        predicate=predicate,
+        value_text="morning?",
+    )
+
+    validated = run(proposal(text, statements=[statement]))
+
+    assert validated.extraction["statements"][0]["predicate"] == predicate
+    assert validated.extraction["statements"][0]["text"] == text
+    assert validated.extraction["statements"][0]["value_text"] == "morning?"
+    assert validated.extraction["statements"][0]["epistemic_state"] == "uncertain"
+
+
 def test_invalid_extraction_diagnostic_code_is_allowlisted() -> None:
     error = InvalidExtraction(["SYNTHETIC_PRIVATE_DETAIL"], "SYNTHETIC_PRIVATE_CODE")
 

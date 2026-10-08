@@ -122,3 +122,22 @@ uv run --project services/backend pytest services/backend/tests/test_claude_batc
 
 This approval applies only to these synthetic fixtures and does not establish
 handwriting accuracy or broader product acceptance.
+
+The retained DIAG-02 outputs isolated a producer-side mismatch: the local
+schema requires statement predicates to match `^[a-z][a-z0-9_]*$`, while the
+provider's structured-output schema omits unsupported regex keywords. The
+interpretation prompt now states this rule explicitly and gives snake_case
+examples such as `call_timing` and `budget_limit`. Original wording remains in
+the statement text/value and evidence quotes. Local schema validation remains
+the hard boundary; predicate normalization and schema relaxation are not used.
+This offline prompt repair has not been live-retested, and no additional paid
+batch is authorized by this result.
+
+The approved run completed exactly two calls on `c9d29c9`: both were rejected
+with `SCHEMA_INVALID` for space-containing predicates. Known token usage estimates
+were $0.026542 and $0.060188, totaling $0.086730 (not an invoice). Full holds
+remained $1.379136. The original journal hash remained unchanged. Both raw
+outputs reproduce their failures offline. A controller-only in-memory experiment
+changing only predicate spaces to underscores passed validation for both with
+transcriptions unchanged; transformed output is diagnostic evidence only.
+The prompt change still requires fresh live evidence before claiming success.
