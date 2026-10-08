@@ -47,6 +47,18 @@ REQUIRED_TABLES = {
 OPTIONAL_TABLES = {"search_chunk_embeddings"}
 
 
+def api_memberships(connection: Any) -> set[str]:
+    return {
+        row["parent_role"]
+        for row in connection.execute(
+            "select parent.rolname as parent_role from pg_auth_members membership "
+            "join pg_roles member on member.oid=membership.member "
+            "join pg_roles parent on parent.oid=membership.roleid "
+            "where member.rolname=current_user"
+        )
+    }
+
+
 def fail() -> None:
     # Never include setting values, provider identifiers, paths, or database errors.
     raise SystemExit("Inference preflight failed; verify the private activation, role, and recovery records.")
@@ -231,15 +243,7 @@ try:
         }
         if not expected_ledger or actual_ledger != expected_ledger:
             fail()
-        memberships = {
-            row[0]
-            for row in conn.execute(
-                "select parent.rolname from pg_auth_members membership "
-                "join pg_roles member on member.oid=membership.member "
-                "join pg_roles parent on parent.oid=membership.roleid "
-                "where member.rolname=current_user"
-            )
-        }
+        memberships = api_memberships(conn)
         if memberships != {"recall_app"}:
             fail()
         relations = conn.execute(

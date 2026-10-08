@@ -171,6 +171,21 @@ def test_audit_dict_rows_use_named_membership_aliases() -> None:
     assert namespace["api_memberships"](connection) == {"recall_app"}  # type: ignore[operator]
 
 
+def test_preflight_dict_rows_use_named_membership_aliases() -> None:
+    path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "preflight.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    helper = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "api_memberships")
+    namespace: dict[str, object] = {}
+    exec(compile(ast.Module(body=[helper], type_ignores=[]), str(path), "exec"), namespace)
+
+    class DictRowConnection:
+        def execute(self, statement: str):  # type: ignore[no-untyped-def]
+            assert "as parent_role" in statement
+            return iter(({"parent_role": "recall_app"},))
+
+    assert namespace["api_memberships"](DictRowConnection()) == {"recall_app"}  # type: ignore[operator]
+
+
 def test_restore_checksum_refusal_sets_external_hold(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     archive = tmp_path / "backup.age"
     archive.write_bytes(b"corrupted-synthetic-backup")
