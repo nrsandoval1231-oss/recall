@@ -7,6 +7,7 @@ type Selected = VaultStatus & { root: string; vault_id: string; vault_identity: 
 function isSelected(s: VaultStatus): s is Selected { return Boolean(s.root && s.vault_id && s.vault_identity); }
 type Intent = { operationId: string; note: string };
 type CorrectionIntent = Intent & { expectedRevision: number };
+type HomeView = { q: string; removed: boolean; resetQuery: boolean };
 type Decision = { kind: "remove" | "restore"; operationId: string; expectedRevision: number; expectedState: "active" | "missing" };
 function eligible(m: VaultMemory) { return m.revision > 0 && m.state === "active" && !m.conflict; }
 function decidable(m: VaultMemory) { return m.revision > 0 && (m.state === "missing" || eligible(m)); }
@@ -84,6 +85,8 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
   const epoch = useRef(0);
   const listRequest = useRef(0);
   const hasLoaded = useRef(false);
+  const renderedView = useRef<HomeView>({ q: "", removed: false, resetQuery: false });
+  const requestedView = useRef<HomeView>(renderedView.current);
   const homeFocus = useRef<HTMLInputElement>(null);
   // Ref is updated during render so late work cannot land between a switch and effect cleanup.
   const context = useRef({ generation, active }); context.current = { generation, active };
@@ -91,13 +94,20 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
   useEffect(() => { alive.current = true; return () => { alive.current = false; epoch.current++; }; }, []);
   function guard() { const e = epoch.current; const g = generation; return () => alive.current && context.current.active && context.current.generation === g && epoch.current === e; }
   async function refresh(q: string, showRemoved = removed, rebuild = false, resetQuery = false) {
+    requestedView.current = { q, removed: showRemoved, resetQuery };
     const valid = guard(); const request = ++listRequest.current; setLoading(true); setError(""); if (rebuild) setNotice("");
     try {
       const rows = rebuild ? await vault.rebuild(selected.vault_id, true) : await vault.list(selected.vault_id, showRemoved ? "" : q, showRemoved);
-      if (valid() && request === listRequest.current) { hasLoaded.current = true; setItems(project(rows, showRemoved, q)); setRemoved(showRemoved); setSearched(q); if (resetQuery) setQuery(q); setStale(false); if (rebuild) setNotice("Local keyword search rebuilt from validated vault records."); }
+      if (valid() && request === listRequest.current) { renderedView.current = requestedView.current = { q, removed: showRemoved, resetQuery: false }; hasLoaded.current = true; setItems(project(rows, showRemoved, q)); setRemoved(showRemoved); setSearched(q); if (resetQuery) setQuery(q); setStale(false); if (rebuild) setNotice("Local keyword search rebuilt from validated vault records."); }
     }
     catch (e) { if (valid() && request === listRequest.current) { setStale(hasLoaded.current); setError(message(e)); } }
     finally { if (valid() && request === listRequest.current) setLoading(false); }
+  }
+  function publishMemory(m: VaultMemory) {
+    // An accepted current state supersedes every list snapshot requested before it.
+    listRequest.current++; setLoading(false);
+    const view = renderedView.current;
+    setItems(rows => project(rows.map(r => r.id === m.id ? m : r), view.removed, view.q));
   }
   useEffect(() => {
     try { const restored = restore(selected); setPending(restored); if (restored) { setDraft(restored.note); setCaptureOpen(true); } setIntentReady(true); }
@@ -105,7 +115,7 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
   }, [selected]);
   useEffect(() => {
     epoch.current++; setBusy(false);
-    if (active) void refresh(searched, removed);
+    if (active) { const view = requestedView.current; void refresh(view.q, view.removed, false, view.resetQuery); }
     // Selection changes invalidate every in-flight operation; vault and selected are fixed by the keyed session.
   }, [generation, active]);
   async function capture() {
@@ -116,7 +126,7 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
       const saved = await vault.capture(selected.vault_id, intent.operationId, intent.note);
       if (!valid()) return;
       localStorage.removeItem(intentKey(selected)); setPending(null);
-      if (saved) { setDraft(""); setCaptureOpen(false); setNotice(receipt(saved, "capture")); setItems(rows => rows.filter(r => r.id !== saved.id)); await refresh(searched, removed); }
+      if (saved) { setDraft(""); setCaptureOpen(false); setNotice(receipt(saved, "capture")); publishMemory(saved); const view = requestedView.current; await refresh(view.q, view.removed, false, view.resetQuery); }
       else setNotice("Photo selection cancelled. Your note is still here.");
     } catch (e) { if (valid()) setError(message(e)); }
     finally { if (valid()) setBusy(false); }
@@ -126,7 +136,7 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
     catch (e) { setError(message(e)); }
   }
   function back() { setFocus(null); requestAnimationFrame(() => homeFocus.current?.focus()); }
-  if (focus) return <MemoryFocus active={active} generation={generation} key={focus.id} vault={vault} selected={selected} initial={focus} snapshotStale={stale} decision={decisions[focus.id] ?? null} setDecision={d => setDecisions(previous => ({ ...previous, [focus.id]: d }))} onBack={back} onSaved={m => { setFocus(m); setItems(rows => project(rows.map(r => r.id === m.id ? m : r), removed, searched)); }} />;
+  if (focus) return <MemoryFocus active={active} generation={generation} key={focus.id} vault={vault} selected={selected} initial={focus} snapshotStale={stale} decision={decisions[focus.id] ?? null} setDecision={d => setDecisions(previous => ({ ...previous, [focus.id]: d }))} onBack={back} onSaved={m => { publishMemory(m); setFocus(m); }} />;
   return <div className="local-home" hidden={!active}>
     <section className="local-intro"><p className="local-eyebrow">Your Memory Surface</p><h1>What would you like to remember?</h1><p>Find your way back to a note, and the original behind it.</p></section>
     <form hidden={removed} className="local-search local-glass" onSubmit={e => { e.preventDefault(); void refresh(query); }}><label htmlFor="local-search">Search notes and filenames</label><div className="local-row"><input ref={homeFocus} id="local-search" value={query} onChange={e => setQuery(e.target.value)} placeholder="A word you remember…" /><button type="submit">Search</button></div><p className="local-muted">Local keyword search of your notes and filenames. Handwriting in photos is not searched.</p></form>
@@ -200,7 +210,7 @@ function MemoryFocus({ vault, selected, initial, onBack, onSaved, active, genera
   }
   async function reload() {
     const valid = guard(); setBusy(true); setError(""); setRefreshed(false); setAcknowledged(false);
-    try { const result = await vault.list(selected.vault_id, "", true); if (!valid()) return; const latest = result.find(m => m.id === memory.id); if (!latest || !eligible(latest)) throw new Error(latest?.conflict || "This memory is unavailable. Your correction is retained."); setMemory(latest); setUnverified(false); setRefreshed(true); }
+    try { const result = await vault.list(selected.vault_id, "", true); if (!valid()) return; const latest = result.find(m => m.id === memory.id); if (!latest) throw new Error("This memory is unavailable. Your correction is retained."); setMemory(latest); setUnverified(false); onSaved(latest); if (!eligible(latest)) throw new Error(latest.conflict || "This memory is unavailable. Your correction is retained."); setRefreshed(true); }
     catch (err) { if (valid()) setError(message(err)); }
     finally { if (valid()) setBusy(false); }
   }
@@ -234,6 +244,6 @@ function MemoryFocus({ vault, selected, initial, onBack, onSaved, active, genera
     {view === "remove" && <section className="local-review" aria-label="Confirm removal"><h2>Remove this memory from Recall?</h2><p>Your original photo, Markdown files and history remain in the vault. This removes the memory from active recall and search. There is no in-app undo.</p>{decision && <p>The submitted removal uses revision {decision.expectedRevision} and {decision.expectedState} state. Retry keeps the same operation.</p>}<div className="local-actions"><button disabled={busy || (!decision && !decidable(memory))} onClick={() => void lifecycle("remove")}>{decision ? "Retry same removal" : "Confirm removal"}</button><button disabled={busy} onClick={() => navigate("note")}>Cancel removal</button>{decision && <button disabled={busy} onClick={() => void reloadDecision()}>Reload current state</button>}</div>{decisionReviewed && <><p>Current state · {memory.state} · revision {memory.revision}</p><button disabled={busy || !decidable(memory)} onClick={newDecision}>Review a new removal decision</button><button disabled={busy} onClick={() => { newDecision(); navigate("note"); }}>Keep current state &amp; close decision</button></>}</section>}
     {view === "original" && <>{url && <figure className="local-artifact"><img src={url} alt="Original photo" onLoad={() => setDecoded(true)} onError={() => { clearOriginal(); setError("Original unavailable: this image could not be decoded. Its bytes are not proof of a readable photo."); }} />{decoded && <figcaption>Original bytes unchanged · hash checked by this device. This does not verify the note’s claims.</figcaption>}</figure>}</>}
     {view === "history" && <><p className="local-muted">Recorded revisions of human notes. These times record edits, not the events described.</p><ol className="local-history">{history.map(h => <li key={h.revision}><h2>Revision {h.revision}</h2><p className="local-note">{h.note || "No note added."}</p><small>{h.kind} · {h.origin} · {h.recorded_at}</small></li>)}</ol></>}
-    {view === "correct" && <><p>Your original photo and earlier notes remain in the vault.</p>{needsReview && <section className="local-review"><h2>Review the latest note</h2><p>Your draft is retained. Reload the current vault note before choosing how to resolve this attempt.</p><button disabled={busy} onClick={() => void reload()}>Reload latest note</button>{refreshed && <><h3>Current note · revision {memory.revision}</h3><p className="local-note">{memory.note || "No note added."}</p><label><input type="checkbox" checked={acknowledged} onChange={e => { setAcknowledged(e.target.checked); if (e.target.checked) setPending(null); }} />I reviewed the latest note</label></>}</section>}<label htmlFor="correction">Your correction</label><textarea id="correction" value={draft} readOnly={Boolean(pending)} onChange={e => setDraft(e.target.value)} /><div className="local-actions"><button className="local-primary" disabled={busy || !eligible(memory) || (needsReview && (!refreshed || !acknowledged))} onClick={() => void correct()}>Save correction</button></div></>}
+    {view === "correct" && <><p>Your original photo and earlier notes remain in the vault.</p>{needsReview && <section className="local-review"><h2>Review the latest note</h2><p>Your draft is retained. Reload the current vault note before choosing how to resolve this attempt.</p><p className="local-muted">{stateLabel(memory)}</p><button disabled={busy} onClick={() => void reload()}>Reload latest note</button>{refreshed && <><h3>Current note · revision {memory.revision}</h3><p className="local-note">{memory.note || "No note added."}</p><label><input type="checkbox" checked={acknowledged} onChange={e => { setAcknowledged(e.target.checked); if (e.target.checked) setPending(null); }} />I reviewed the latest note</label></>}</section>}<label htmlFor="correction">Your correction</label><textarea id="correction" value={draft} readOnly={Boolean(pending)} onChange={e => setDraft(e.target.value)} /><div className="local-actions"><button className="local-primary" disabled={busy || !eligible(memory) || (needsReview && (!refreshed || !acknowledged))} onClick={() => void correct()}>Save correction</button></div></>}
   </section>;
 }
