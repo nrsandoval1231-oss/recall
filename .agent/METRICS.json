@@ -1,6 +1,11 @@
 {
   "lane": "full_security",
-  "models": {"builder": "named Luna low", "architect": "named Sol medium", "native_specialist": "named Terra medium", "independent_reviewer": "pending"},
+  "models": {
+    "builder": "named Luna low",
+    "architect": "named Sol medium",
+    "native_specialist": "named Terra medium",
+    "independent_reviewer": "named Sol medium candidate_review"
+  },
   "config_identity": "UNKNOWN; role declarations observed, configuration load not independently diagnosed",
   "utc_start": "UNKNOWN",
   "first_explicit_utc_observation": "2026-10-08T13:38:08Z",
@@ -9,8 +14,13 @@
   "build_seconds": "UNKNOWN",
   "validation_seconds": "UNKNOWN; command durations separately retained",
   "audit_seconds": "UNKNOWN",
-  "repair_count": 3,
-  "repair_attribution": ["evaluation style normalization", "pairing missing preflight/provider/UI/format requirements", "native lifecycle specialist after explicit builder uncertainty"],
+  "repair_count": 4,
+  "repair_attribution": [
+    "evaluation style normalization",
+    "pairing missing preflight/provider/UI/format requirements",
+    "native lifecycle specialist after explicit builder uncertainty",
+    "independent review split-keyring credential-loss repair"
+  ],
   "tokens": "UNKNOWN; not measured",
   "elapsed_to_accepted": "UNKNOWN; independent acceptance pending",
   "speed_comparison": "NONE"

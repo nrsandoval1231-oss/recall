@@ -13,3 +13,9 @@ Credential state: no authorized Anthropic key located. Owner configured root ign
 Candidate lesson (not promoted): run mutable-state/schema validation after builder handoff to avoid partial-file probes. Metric: attributable gate failures decrease; reversibility: retain development probes but never label them frozen acceptance. Evidence above supports candidate only, not a measured speed claim.
 
 Timing/model/config: first explicit clock observation2026-10-08 13:38:08 UTC; earlier start and planning duration UNKNOWN. Named Luna low and Sol medium per roles; actual token usage/config load UNKNOWN. No elapsed-to-accepted yet.
+
+## Independent review repair
+
+Frozen5496881 independent Sol verdict FIX: partial pending-keyring loss could falsely report disconnection with a surviving active bearer. Issued separate native-only Terra repair, preserve credential and UNKNOWN until server revocation. Native runtime regressions require CI. No broader boundary changes.
+
+Full local validation for5496881: backend Ruff,86-file formatting,mypy48 pass; pytest298pass9skip in121.67s (1live,8missing localpgvector). Initial full run stalled and was interrupted, UNKNOWN; materially different verbose rerun with60s faulthandler completed. Client lint/typecheck264unit pass, web/desktop builds pass,UI42/localvault34 pass. Format/diff pass. No live requests or charges.

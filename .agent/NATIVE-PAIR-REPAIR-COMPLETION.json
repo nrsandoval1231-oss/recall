@@ -1,6 +1,6 @@
 {
   "packet": "PAIR-01 native lifecycle repair",
-  "base": "a17c2402ee5778a4015c50934bb91c7a59359dfe",
+  "base": "549688100d34fe795fac386bb889a7b11feea3fc",
   "owned_files": [
     "apps/desktop/src-tauri/src/pairing.rs",
     "apps/desktop/src-tauri/src/reading_commands.rs",
@@ -13,17 +13,18 @@
     "Production transport is HTTPS-only, proxy-disabled, redirect-disabled and bounded; pending 32-byte secret, device, vault and origin remain native keyring material.",
     "Claim is recoverable through authenticated status; status validates exact device, vault and photo_inference scope before writing the protected reading credential.",
     "Disconnect confirms server revocation before keyring removal; local read/write/removal and network ambiguity retain UNKNOWN or local material rather than asserting disconnect.",
+    "Status and disconnect inspect both pending and active protected entries. A missing or malformed pending entry with a valid active vault credential is server-validated before recovery or revocation; inconsistent or unreadable material remains UNKNOWN and retains local credentials.",
     "Selected-photo capability and dispatch use server-confirmed pairing on spawn_blocking before creating a reading intent, retaining existing reading fingerprint and revision fencing.",
-    "Synthetic core tests cover lost claim response, restart recovery, scope/device/vault mismatch, keyring read/write/removal failures, offline disconnect retention, idempotent confirmation and late-status/disconnect serialization."
+    "Synthetic core tests cover lost claim response, restart recovery, scope/device/vault mismatch, keyring read/write/removal failures, offline disconnect retention, idempotent confirmation, late-status/disconnect serialization, and active-credential recovery/revocation with absent or malformed pending material."
   ],
   "validation": {
-    "rustfmt": "PASS: rustfmt.exe --edition 2021 --check --config skip_children=true pairing.rs reading_commands.rs lib.rs",
+    "rustfmt": "PASS: rustfmt.exe --edition 2021 --check --config skip_children=true pairing.rs",
     "diff_check": "PASS: git diff --check",
     "cargo_test": "UNKNOWN: cargo.exe is unavailable in this environment; Linux and Windows Cargo check/test remain required in CI."
   },
   "unknown": [
     "No real keyring credential was set, read or removed during this repair.",
     "No provider call, device enrollment, deployment, commit, push or merge occurred.",
-    "Native compile and test execution remain unverified locally because Cargo is unavailable."
+    "The new active-credential synthetic regressions were authored but not executed locally because Cargo is unavailable; CI must compile and run them."
   ]
 }

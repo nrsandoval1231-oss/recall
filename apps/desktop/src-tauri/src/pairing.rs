@@ -21,6 +21,14 @@ struct Pending {
     secret: String,
     origin: String,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ActiveConnection {
+    schema_version: String,
+    vault_id: String,
+    origin: String,
+    credential: String,
+}
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -191,20 +199,62 @@ fn validate_bound(vault: &str, pending: &Pending, bound: &Bound) -> Result<()> {
     }
     Ok(())
 }
-fn load_pending(store: &impl PairingStore, vault: &str) -> Result<Option<Pending>> {
+enum PendingMaterial {
+    Absent,
+    Valid(Pending),
+    Corrupt,
+}
+fn inspect_pending(store: &impl PairingStore, vault: &str) -> Result<PendingMaterial> {
     let Some(raw) = store.load(&pending_key(vault))? else {
-        return Ok(None);
+        return Ok(PendingMaterial::Absent);
     };
-    let pending: Pending =
-        serde_json::from_str(&raw).map_err(|_| "Pending pairing data is unavailable")?;
+    let Ok(pending) = serde_json::from_str::<Pending>(&raw) else {
+        return Ok(PendingMaterial::Corrupt);
+    };
     if pending.vault_id != vault
         || Uuid::parse_str(&pending.device_id).is_err()
         || hex::decode(&pending.secret).map_or(true, |bytes| bytes.len() != 32)
         || pinned_origin(&pending.origin).is_err()
     {
-        return Err("Pending pairing data is unavailable".into());
+        return Ok(PendingMaterial::Corrupt);
     }
-    Ok(Some(pending))
+    Ok(PendingMaterial::Valid(pending))
+}
+fn load_pending(store: &impl PairingStore, vault: &str) -> Result<Option<Pending>> {
+    match inspect_pending(store, vault)? {
+        PendingMaterial::Absent => Ok(None),
+        PendingMaterial::Valid(pending) => Ok(Some(pending)),
+        PendingMaterial::Corrupt => Err("Pending pairing data is unavailable".into()),
+    }
+}
+fn load_active(store: &impl PairingStore, vault: &str) -> Result<Option<ActiveConnection>> {
+    let Some(raw) = store.load(vault)? else {
+        return Ok(None);
+    };
+    let active: ActiveConnection =
+        serde_json::from_str(&raw).map_err(|_| "Protected pairing data is unavailable")?;
+    if active.schema_version != "1.0"
+        || active.vault_id != vault
+        || Uuid::parse_str(vault).is_err()
+        || pinned_origin(&active.origin).is_err()
+        || hex::decode(&active.credential).map_or(true, |bytes| bytes.len() != 32)
+    {
+        return Err("Protected pairing data is unavailable".into());
+    }
+    Ok(Some(active))
+}
+fn active_pending(active: &ActiveConnection, bound: &Bound) -> Pending {
+    Pending {
+        device_id: bound.device_id.clone(),
+        vault_id: active.vault_id.clone(),
+        secret: active.credential.clone(),
+        origin: active.origin.clone(),
+    }
+}
+fn matching_active(pending: &Pending, active: &ActiveConnection) -> bool {
+    pending.vault_id == active.vault_id
+        && pending.origin.trim_end_matches('/') == active.origin.trim_end_matches('/')
+        && pending.secret == active.credential
 }
 fn save_connection(store: &impl PairingStore, vault: &str, pending: &Pending) -> Result<()> {
     #[derive(Serialize)]
@@ -307,14 +357,52 @@ impl<S: PairingStore, T: PairingTransport> PairingCore<'_, S, T> {
             .gate
             .lock()
             .map_err(|_| "Pairing lifecycle unavailable")?;
-        let pending = match load_pending(self.store, vault) {
-            Ok(pending) => pending,
-            // A read failure cannot establish absence. Preserve UNKNOWN rather
-            // than treating a temporarily inaccessible credential as detached.
-            Err(_) => return Ok(pairing_status("unknown", vault, None, None)),
+        let pending = inspect_pending(self.store, vault);
+        let active = load_active(self.store, vault);
+        let (pending, active) = match (pending, active) {
+            (Ok(pending), Ok(active)) => (pending, active),
+            // A read or parse failure cannot establish absence. Preserve UNKNOWN
+            // rather than treating inaccessible material as detached.
+            _ => return Ok(pairing_status("unknown", vault, None, None)),
         };
-        let Some(pending) = pending else {
-            return Ok(pairing_status("disconnected", vault, None, None));
+        let pending = match (pending, active) {
+            (PendingMaterial::Absent, None) => {
+                return Ok(pairing_status("disconnected", vault, None, None))
+            }
+            (PendingMaterial::Corrupt, None) => {
+                return Ok(pairing_status("unknown", vault, None, None))
+            }
+            (PendingMaterial::Valid(pending), None) => pending,
+            (PendingMaterial::Valid(pending), Some(active))
+                if matching_active(&pending, &active) =>
+            {
+                pending
+            }
+            (PendingMaterial::Valid(_), Some(_)) => {
+                return Ok(pairing_status("unknown", vault, None, None))
+            }
+            // A valid active credential is independently server-confirmed below;
+            // the missing/corrupt pending entry is never silently removed.
+            (PendingMaterial::Absent | PendingMaterial::Corrupt, Some(active)) => {
+                let bound = match self.transport.status(&Pending {
+                    device_id: String::new(),
+                    vault_id: active.vault_id.clone(),
+                    secret: active.credential.clone(),
+                    origin: active.origin.clone(),
+                }) {
+                    Ok(bound) if bound.vault_id == vault && bound.scope == "photo_inference" => {
+                        bound
+                    }
+                    _ => return Ok(pairing_status("unknown", vault, None, None)),
+                };
+                let recovered = active_pending(&active, &bound);
+                return Ok(pairing_status(
+                    "connected",
+                    vault,
+                    Some(&recovered),
+                    Some(bound.scope),
+                ));
+            }
         };
         match self.transport.status(&pending).and_then(|bound| {
             validate_bound(vault, &pending, &bound)?;
@@ -338,8 +426,31 @@ impl<S: PairingStore, T: PairingTransport> PairingCore<'_, S, T> {
             .gate
             .lock()
             .map_err(|_| "Pairing lifecycle unavailable")?;
-        let Some(pending) = load_pending(self.store, vault)? else {
-            return Ok(pairing_status("disconnected", vault, None, None));
+        let pending = inspect_pending(self.store, vault);
+        let active = load_active(self.store, vault);
+        let (pending, active) = match (pending, active) {
+            (Ok(pending), Ok(active)) => (pending, active),
+            _ => return Err("Pairing state is unknown; use the owner revocation CLI and retain local credentials".into()),
+        };
+        let pending = match (pending, active) {
+            (PendingMaterial::Absent, None) => return Ok(pairing_status("disconnected", vault, None, None)),
+            (PendingMaterial::Corrupt, None) => return Err("Pairing state is unknown; use the owner revocation CLI and retain local credentials".into()),
+            (PendingMaterial::Valid(pending), None) => pending,
+            (PendingMaterial::Valid(pending), Some(active)) if matching_active(&pending, &active) => pending,
+            (PendingMaterial::Valid(_), Some(_)) => return Err("Pairing state is inconsistent; use the owner revocation CLI and retain local credentials".into()),
+            (PendingMaterial::Absent | PendingMaterial::Corrupt, Some(active)) => {
+                let candidate = Pending {
+                    device_id: String::new(),
+                    vault_id: active.vault_id.clone(),
+                    secret: active.credential.clone(),
+                    origin: active.origin.clone(),
+                };
+                let bound = self.transport.status(&candidate).map_err(|_| "Pairing state is unknown; use the owner revocation CLI and retain local credentials")?;
+                if bound.vault_id != vault || bound.scope != "photo_inference" {
+                    return Err("Pairing state is inconsistent; use the owner revocation CLI and retain local credentials".into());
+                }
+                active_pending(&active, &bound)
+            }
         };
         if !self.transport.revoke(&pending)? {
             return Err("Revocation outcome is unknown; local credentials were retained".into());
@@ -523,6 +634,20 @@ mod tests {
             )
             .unwrap();
     }
+    fn seed_active(store: &impl PairingStore, vault: &str) {
+        store
+            .save(
+                vault,
+                &serde_json::json!({
+                    "schema_version": "1.0",
+                    "vault_id": vault,
+                    "origin": "https://approved.example",
+                    "credential": "00".repeat(32)
+                })
+                .to_string(),
+            )
+            .unwrap();
+    }
     #[test]
     fn lost_claim_response_recovers_by_authenticated_status() {
         let vault = vault();
@@ -591,6 +716,61 @@ mod tests {
             .state,
             "connected"
         );
+    }
+    #[test]
+    fn active_connection_recovers_when_pending_is_absent_or_malformed_without_secret_loss() {
+        for malformed in [false, true] {
+            let vault = vault();
+            let store = MemoryStore::default();
+            seed_active(&store, &vault);
+            if malformed {
+                store.save(&pending_key(&vault), "not-json").unwrap();
+            }
+            let before = store.load(&vault).unwrap();
+            let gate = Mutex::new(());
+            let net = transport(&vault);
+            let status = PairingCore {
+                store: &store,
+                transport: &net,
+                gate: &gate,
+            }
+            .status(&vault)
+            .unwrap();
+            assert_eq!(status.state, "connected");
+            assert_eq!(store.load(&vault).unwrap(), before);
+            if malformed {
+                assert_eq!(
+                    store.load(&pending_key(&vault)).unwrap().as_deref(),
+                    Some("not-json")
+                );
+            }
+        }
+    }
+    #[test]
+    fn active_connection_disconnect_validates_then_revokes_when_pending_is_absent_or_malformed() {
+        for malformed in [false, true] {
+            let vault = vault();
+            let store = MemoryStore::default();
+            seed_active(&store, &vault);
+            if malformed {
+                store.save(&pending_key(&vault), "not-json").unwrap();
+            }
+            let gate = Mutex::new(());
+            let net = transport(&vault);
+            assert_eq!(
+                PairingCore {
+                    store: &store,
+                    transport: &net,
+                    gate: &gate,
+                }
+                .disconnect(&vault)
+                .unwrap()
+                .state,
+                "disconnected"
+            );
+            assert!(store.load(&vault).unwrap().is_none());
+            assert!(store.load(&pending_key(&vault)).unwrap().is_none());
+        }
     }
     #[test]
     fn keyring_failures_and_offline_disconnect_retention_are_unknown() {

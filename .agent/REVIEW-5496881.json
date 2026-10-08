@@ -1,0 +1,11 @@
+{
+  "candidate": "549688100d34fe795fac386bb889a7b11feea3fc",
+  "base": "a17c2402ee5778a4015c50934bb91c7a59359dfe",
+  "reviewer": "independent named Sol medium candidate_review",
+  "verdict": "FIX",
+  "finding": "Native status and disconnect ignored surviving active connection when pending keyring entry was absent, allowing false disconnected status without server revocation.",
+  "direction": "CORRECT",
+  "repair_packet": "NATIVE-SPLIT-CREDENTIAL-REPAIR.md",
+  "native_execution": "PENDING exact-head CI",
+  "live_provider": "BLOCKED incompatible OpenAI key; no requests or spend"
+}
