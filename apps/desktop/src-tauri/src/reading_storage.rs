@@ -460,20 +460,27 @@ impl Vault {
     }
     /// Resolve only an uncommitted cancelled generated publication. All original
     /// journals/backups and any displaced draft remain immutable retained evidence.
-    pub(super) fn rollback_cancelled_reading(&self, e: &Event) -> Result<()> {
+    pub(super) fn rollback_cancelled_reading(&self, e: &Event) -> Result<bool> {
         self.event_valid(e)?;
         if e.kind != "machine_reading"
             || !self.cancelled(&e.operation_id)?
             || self.history_has_reading(&e.operation_id)?
         {
-            return Ok(());
+            return Ok(false);
+        }
+        let resolution = self.reading_file(&e.operation_id, "cancelled-resolved")?;
+        if resolution.exists() {
+            if read(&resolution, 64)? != self.cancelled_event_digest(e)?.as_bytes() {
+                return Err("Cancelled reading resolution changed".into());
+            }
+            return Ok(true);
         }
         let last = self
             .records(&e.memory.id)?
             .pop()
             .ok_or("Missing rollback authority")?;
         if last.memory.revision != e.expected_revision {
-            return Ok(());
+            return self.finish_cancelled_resolution(e, None);
         }
         if e.parent_sha256 != Some(self.parent_hash(&e.memory.id, e.expected_revision)?)
             || e.previous_markdown.as_ref() != Some(&last.markdown)
@@ -504,7 +511,7 @@ impl Vault {
             None
         };
         if current.as_deref() == Some(base) {
-            return Ok(());
+            return self.finish_cancelled_resolution(e, Some(base));
         }
         if !backup.exists()
             || (current.is_some() && current.as_deref() != Some(e.markdown.as_bytes()))
@@ -529,7 +536,39 @@ impl Vault {
         {
             return Err("Concurrent editor draft retained during cancellation".into());
         }
-        Ok(())
+        self.finish_cancelled_resolution(e, Some(base))
+    }
+    fn cancelled_event_digest(&self, e: &Event) -> Result<String> {
+        let bytes = read(&self.journal_path(&e.operation_id), MAX_JSON)?;
+        let retained: Event = serde_json::from_slice(&bytes).map_err(fail)?;
+        if json(&retained)? != json(e)? {
+            return Err("Cancelled journal changed during resolution".into());
+        }
+        Ok(hash(&bytes))
+    }
+    /// This durable marker is the cancellation cleanup commit point. Once it
+    /// exists, the old draft is inert: ordinary later note edits/renames belong
+    /// to normal reconciliation, not to an already finished rollback.
+    fn finish_cancelled_resolution(&self, e: &Event, base: Option<&[u8]>) -> Result<bool> {
+        let path = self.reading_file(&e.operation_id, "cancelled-resolved")?;
+        boundary!("rollback_before_resolution", &path);
+        if let Some(base) = base {
+            let note = self.event_note_path(e)?;
+            let backup = self.backup_path(&e.operation_id);
+            let displaced = self.reading_file(&e.operation_id, "cancelled-publication.md")?;
+            if self.inventory(&e.memory.id, e.note_path.as_deref())? != Some(note.clone())
+                || read(&note, MAX_JSON)? != base
+                || (backup.exists() && read(&backup, MAX_JSON)? != base)
+                || (displaced.exists() && read(&displaced, MAX_JSON)? != e.markdown.as_bytes())
+            {
+                return Err(
+                    "Concurrent editor draft retained before cancellation resolution".into(),
+                );
+            }
+        }
+        immutable(&path, self.cancelled_event_digest(e)?.as_bytes())?;
+        boundary!("rollback_after_resolution", &path);
+        Ok(true)
     }
     fn history_has_reading(&self, operation: &str) -> Result<bool> {
         let path = self.journal_path(operation);

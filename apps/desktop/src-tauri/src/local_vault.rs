@@ -901,9 +901,13 @@ impl Vault {
                     if e.kind == "machine_reading"
                         && read(&history, MAX_JSON).ok() != Some(read(&p, MAX_JSON)?)
                     {
-                        if let Err(error) = self.rollback_cancelled_reading(&e) {
-                            conflicts.insert(e.memory.id.clone(), error);
-                            continue;
+                        match self.rollback_cancelled_reading(&e) {
+                            Ok(true) => continue, // Durably resolved cancellation is inert.
+                            Ok(false) => (),
+                            Err(error) => {
+                                conflicts.insert(e.memory.id.clone(), error);
+                                continue;
+                            }
                         }
                         // A newer authoritative event may occupy this revision; an abandoned
                         // machine proposal must not poison that human revision as a fork.

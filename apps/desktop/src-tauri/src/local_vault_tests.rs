@@ -2636,3 +2636,167 @@ fn reading_cancel_resolves_before_and_after_note_backup_move() {
         assert_eq!(reopened.source(&m.id).unwrap().bytes, photo());
     }
 }
+
+#[test]
+fn rereview_cancelled_rollback_stays_inert_after_later_obsidian_annotation() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let fault = FaultGuard::set(|point, _| {
+        if point == "before_history" {
+            Err("INJECTED partial publication".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+    drop(fault);
+    assert_eq!(
+        v.cancel_reading(&req.binding.operation_id).unwrap().state,
+        "cancelled"
+    );
+    assert_eq!(f.vault().list("base").unwrap().len(), 1);
+    fs::write(
+        v.note_path(&m.id),
+        markdown(&m).replace("base", "later human annotation"),
+    )
+    .unwrap();
+    let rows = f.vault().list("later human annotation").unwrap();
+    assert_eq!(
+        rows.len(),
+        1,
+        "completed cancellation must not block later normal human reconciliation"
+    );
+    assert_eq!(rows[0].note, "later human annotation");
+    assert!(rows[0].reading.is_none());
+}
+#[test]
+fn rereview_unpublished_cancelled_draft_does_not_poison_unique_rename() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let fault = FaultGuard::set(|point, _| {
+        if point == "before_note" {
+            Err("INJECTED before publication".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+    drop(fault);
+    assert_eq!(
+        v.cancel_reading(&req.binding.operation_id).unwrap().state,
+        "cancelled"
+    );
+    fs::rename(v.note_path(&m.id), v.path("Memories/later-rename.md")).unwrap();
+    let rows = f.vault().list("base").unwrap();
+    assert_eq!(
+        rows.len(),
+        1,
+        "an unpublished cancelled draft must not poison a later unique rename"
+    );
+    assert_eq!(rows[0].state, "active");
+}
+#[test]
+fn reading_cancel_resolution_marker_survives_crash_and_subsequent_normal_lifecycle() {
+    for point in ["rollback_before_resolution", "rollback_after_resolution"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+        let fault = FaultGuard::set(|p, _| {
+            if p == "before_history" {
+                Err("INJECTED generated publication".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+        drop(fault);
+        let journal = fs::read(v.journal_path(&req.binding.operation_id)).unwrap();
+        let fault = FaultGuard::set(move |p, _| {
+            if p == point {
+                Err("INJECTED resolution marker interruption".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.cancel_reading(&req.binding.operation_id).is_err());
+        drop(fault);
+        // Before the commit point, recovery finishes the validated rollback. After
+        // it, a later edit must work without any preliminary list/rebuild.
+        if point == "rollback_before_resolution" {
+            assert_eq!(f.vault().list("base").unwrap().len(), 1);
+        }
+        fs::write(
+            v.note_path(&m.id),
+            markdown(&m).replace("base", "later human annotation"),
+        )
+        .unwrap();
+        let current = f
+            .vault()
+            .list("later human annotation")
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(current.revision, 2);
+        assert!(current.reading.is_none());
+        fs::rename(v.note_path(&m.id), v.path("Memories/later-rename.md")).unwrap();
+        assert_eq!(
+            f.vault().list("later human").unwrap()[0]
+                .note_path
+                .as_deref(),
+            Some("later-rename.md")
+        );
+        let corrected = v.correct(&m.id, 2, &op(), "normal correction").unwrap();
+        assert_eq!(corrected.revision, 3);
+        let next = v.prepare_reading(&m.id, 3, &op()).unwrap();
+        let read = v.accept_reading(&next, &reading_response(&next)).unwrap();
+        assert_eq!(read.revision, 4);
+        assert_eq!(
+            v.remove(&m.id, 4, &op(), "active").unwrap().state,
+            "deleted"
+        );
+        let neighbor = v
+            .capture(&op(), "synthetic.png", &photo(), "fresh neighbor")
+            .unwrap();
+        assert_eq!(f.vault().list("fresh neighbor").unwrap()[0].id, neighbor.id);
+        assert_eq!(fs::read(v.source_path(&m.id)).unwrap(), photo());
+        assert_eq!(
+            fs::read(v.journal_path(&req.binding.operation_id)).unwrap(),
+            journal
+        );
+        assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+    }
+}
+#[test]
+fn reading_human_edit_before_resolution_marker_remains_a_preserved_conflict() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let fault = FaultGuard::set(|p, _| {
+        if p == "before_history" {
+            Err("INJECTED generated publication".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+    drop(fault);
+    let note = v.note_path(&m.id);
+    let draft = markdown(&m).replace("base", "concurrent human");
+    let expected = draft.clone();
+    let fault = FaultGuard::set(move |p, _| {
+        if p == "rollback_before_resolution" {
+            fs::write(&note, &draft).unwrap();
+        }
+        Ok(())
+    });
+    assert!(v.cancel_reading(&req.binding.operation_id).is_err());
+    drop(fault);
+    assert_eq!(f.vault().list("").unwrap()[0].state, "conflict");
+    assert_eq!(fs::read_to_string(v.note_path(&m.id)).unwrap(), expected);
+}
