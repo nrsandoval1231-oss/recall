@@ -26,8 +26,26 @@ from recall.pairing import create_invitation, digest
 
 
 @pytest.mark.skipif(shutil.which("docker") is None, reason="requires Docker Compose CLI for offline config resolution")
-def test_do_ops_compose_resolves_tmpfs_as_single_mount() -> None:
-    root = Path(__file__).resolve().parents[3] / "infra" / "do-inference"
+def test_do_ops_compose_resolves_tmpfs_as_single_mount(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    source_root = Path(__file__).resolve().parents[3]
+    root = tmp_path / "fixture" / "infra" / "do-inference"
+    source = source_root / "infra" / "do-inference"
+    root.mkdir(parents=True)
+    shutil.copy2(source / "compose.yml", root / "compose.yml")
+    shutil.copytree(source / "examples", root / "examples")
+    shutil.copytree(source / "ops", root / "ops")
+    dockerfile = root.parents[1] / "services" / "backend" / "Dockerfile"
+    dockerfile.parent.mkdir(parents=True)
+    shutil.copy2(source_root / "services" / "backend" / "Dockerfile", dockerfile)
+    prepared = subprocess.run(
+        [sys.executable, str(root / "ops" / "prepare-config.py")],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert prepared.returncode == 0, prepared.stderr
     resolved = subprocess.run(
         [
             "docker",
