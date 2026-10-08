@@ -6,9 +6,9 @@ import { DesktopEntry } from "../entry";
 import type { LocalVault, VaultMemory, VaultStatus } from "../platform/local-vault";
 
 const selected: VaultStatus = { root: "/synthetic/vault", vault_id: "session-a", vault_identity: "manifest-a" };
-const memory: VaultMemory = { id: "m1", revision: 1, note: "Synthetic garden note", source_name: "synthetic.png", source_sha256: "hash", captured_at: "2026-10-08T12:00:00Z", updated_at: "2026-10-08T12:00:00Z", conflict: null };
+const memory: VaultMemory = { id: "m1", revision: 1, note: "Synthetic garden note", source_name: "synthetic.png", source_sha256: "hash", captured_at: "2026-10-08T12:00:00Z", updated_at: "2026-10-08T12:00:00Z", conflict: null, state: "active", note_path: "renamed-garden.md" };
 function vault(over: Partial<LocalVault> = {}): LocalVault {
-  return { available: true, status: vi.fn(async () => selected), select: vi.fn(async () => selected), capture: vi.fn(async () => memory), list: vi.fn(async () => [memory]), correct: vi.fn(async (_s, _id, _r, _op, note) => ({ ...memory, note, revision: 2 })), source: vi.fn(async () => ({ bytes: [137,80,78,71], mime_type: "image/png", sha256: "hash" })), history: vi.fn(async () => [{ revision: 1, note: memory.note, recorded_at: memory.captured_at, origin: "human:recall" }]), ...over };
+  return { available: true, status: vi.fn(async () => selected), select: vi.fn(async () => selected), capture: vi.fn(async () => memory), list: vi.fn(async () => [memory]), correct: vi.fn(async (_s, _id, _r, _op, note) => ({ ...memory, note, revision: 2 })), source: vi.fn(async () => ({ bytes: [137,80,78,71], mime_type: "image/png", sha256: "hash" })), history: vi.fn(async () => [{ revision: 1, note: memory.note, recorded_at: memory.captured_at, origin: "human:recall" as const, kind: "capture" as const }]), rebuild: vi.fn(async () => [memory]), restoreNote: vi.fn(async () => ({ ...memory, revision: 2 })), remove: vi.fn(async () => ({ ...memory, state: "deleted" as const, revision: 2 })), ...over };
 }
 const mount = (v: LocalVault) => render(<DesktopEntry vault={v} search="" />);
 beforeEach(() => { localStorage.clear(); URL.createObjectURL = vi.fn(() => "blob:synthetic"); URL.revokeObjectURL = vi.fn(); });
@@ -229,7 +229,7 @@ it.each(["original", "history"])("ignores late %s after cancelling vault selecti
   let finish!: () => void;
   mount(vault({ select: async () => null,
     source: () => new Promise(resolve => { finish = () => resolve({ bytes: [1], mime_type: "image/png", sha256: "hash" }); }),
-    history: () => new Promise(resolve => { finish = () => resolve([{ revision: 1, note: "Late historical note", recorded_at: memory.captured_at, origin: "human:recall" }]); }),
+    history: () => new Promise(resolve => { finish = () => resolve([{ revision: 1, note: "Late historical note", recorded_at: memory.captured_at, origin: "human:recall" as const, kind: "capture" as const }]); }),
   }));
   await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
   await userEvent.click(screen.getByRole("button", { name: kind === "original" ? "View original" : "History" }));
@@ -237,4 +237,141 @@ it.each(["original", "history"])("ignores late %s after cancelling vault selecti
   await act(async () => finish());
   expect(await screen.findByRole("button", { name: "Correct note" })).toBeTruthy();
   expect(screen.queryByText("Late historical note")).toBeNull(); expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+const missing: VaultMemory = { ...memory, state: "missing", note_path: null, conflict: "Managed Markdown is missing" };
+const deleted: VaultMemory = { ...memory, state: "deleted", revision: 2 };
+async function openMemory() { await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ })); }
+it("displays the resolved renamed Markdown basename", async () => {
+  mount(vault()); await openMemory(); expect(screen.getByText("renamed-garden.md")).toBeTruthy();
+});
+it("missing diagnostic allows explicit restore and removal but blocks evidence and correction", async () => {
+  const v = vault({ list: async () => [missing] }); mount(v); await openMemory();
+  expect(screen.getByText("Markdown note missing · decision needed")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "View original" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Correct note" }) as HTMLButtonElement).disabled).toBe(true);
+  await userEvent.click(screen.getByRole("button", { name: "Restore missing note" }));
+  expect(await screen.findByText("Note restored in vault · This device only")).toBeTruthy();
+  expect(v.restoreNote).toHaveBeenCalledWith("session-a", "m1", 1, expect.any(String));
+});
+it.each(["active", "missing"] as const)("removal of %s requires explicit confirmation and cancellation writes nothing", async state => {
+  const v = vault({ list: async () => [state === "missing" ? missing : memory] }); mount(v); await openMemory();
+  await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" }));
+  expect(screen.getByText(/original photo, Markdown files and history remain/)).toBeTruthy();
+  expect(screen.getByText(/no in-app undo/)).toBeTruthy(); expect(v.remove).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Cancel removal" })); expect(v.remove).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+  expect(await screen.findByText("Removed from Recall · files retained")).toBeTruthy();
+  expect(v.remove).toHaveBeenCalledWith("session-a", "m1", 1, expect.any(String), state);
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" }));
+  expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull();
+});
+it("removed history is inspectable with a retained pending diagnostic and never active search evidence", async () => {
+  const v = vault({ list: vi.fn(async (_id, _q, include) => include ? [{ ...deleted, conflict: "Pending draft retained" }] : []), history: async () => [{ revision: 2, note: memory.note, recorded_at: memory.updated_at, origin: "human:recall", kind: "remove" }] });
+  mount(v); await userEvent.click(await screen.findByRole("button", { name: "Removed items" })); await openMemory();
+  expect((screen.getByRole("button", { name: "History" }) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByRole("button", { name: "View original" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "Restore missing note" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "History" })); expect(await screen.findByText(/remove · human:recall/)).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: "Back to note" })); await userEvent.click(screen.getByRole("button", { name: "Back to memories" }));
+  expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); expect(v.list).toHaveBeenCalledWith("session-a", "", true);
+});
+it.each([{ ...memory, state: "conflict" as const, conflict: "Duplicate ID" }, { ...missing, revision: 0 }])("ambiguous or invalid committed records disable lifecycle mutations", async m => {
+  mount(vault({ list: async () => [m] })); await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note|Memory needs attention/ }));
+  expect((screen.getByRole("button", { name: "Remove from Recall" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: "Restore missing note" })).toBeNull();
+});
+it("failed rebuild keeps previous rows visibly stale then successful rebuild replaces them", async () => {
+  const rebuild = vi.fn().mockRejectedValueOnce(new Error("Malformed journal")).mockResolvedValue([{ ...memory, note: "Rebuilt note" }]);
+  mount(vault({ rebuild })); await screen.findByRole("button", { name: /Synthetic garden note/ });
+  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" }));
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Malformed journal");
+  expect(screen.getByRole("button", { name: /Synthetic garden note/ })).toBeTruthy(); expect(screen.getByText(/Previously loaded results · not currently verified/)).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" }));
+  expect(await screen.findByRole("button", { name: /Rebuilt note/ })).toBeTruthy(); expect(screen.queryByText(/Previously loaded results/)).toBeNull();
+  expect(rebuild).toHaveBeenCalledWith("session-a", true);
+});
+it("back preserves keyword query and rebuild uses canonical results without reintroducing removed rows", async () => {
+  const v = vault({ rebuild: async () => [memory, deleted, { ...memory, id: "other", note: "Other", note_path: "other.md", source_name: "other.png" }] });
+  mount(v); await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "garden"); await userEvent.click(screen.getByRole("button", { name: "Search" })); await openMemory();
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden");
+  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByRole("button", { name: /Synthetic garden note/ }); expect(screen.queryByRole("button", { name: /^Other/ })).toBeNull();
+});
+it("failed removal retries frozen decision; fresh review creates a new revision/state intent", async () => {
+  const remove = vi.fn().mockRejectedValueOnce(new Error("Lost receipt")).mockRejectedValueOnce(new Error("Still unavailable")).mockResolvedValue(deleted);
+  const list = vi.fn().mockResolvedValueOnce([memory]).mockResolvedValue([missing]);
+  mount(vault({ list, remove })); await openMemory(); await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" })); await userEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+  await screen.findByText("Lost receipt"); await userEvent.click(screen.getByRole("button", { name: "Retry same removal" })); await screen.findByText("Still unavailable"); expect(remove.mock.calls[1]).toEqual(remove.mock.calls[0]);
+  await userEvent.click(screen.getByRole("button", { name: "Reload current state" })); await screen.findByText("Current state · missing · revision 1");
+  await userEvent.click(screen.getByRole("button", { name: "Review a new removal decision" })); await userEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+  await screen.findByText("Removed from Recall · files retained"); expect(remove.mock.calls[2]![3]).not.toBe(remove.mock.calls[0]![3]); expect(remove.mock.calls[2]![4]).toBe("missing");
+});
+it.each(["capture", "correct", "restore"])("%s receipt reports current deleted state without active-save claim", async kind => {
+  const v = vault({ capture: async () => deleted, correct: async () => deleted, restoreNote: async () => deleted, list: async () => [kind === "restore" ? missing : memory] }); mount(v);
+  if (kind === "capture") { await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); }
+  else { await openMemory(); await userEvent.click(screen.getByRole("button", { name: kind === "correct" ? "Correct note" : "Restore missing note" })); if (kind === "correct") await userEvent.click(screen.getByRole("button", { name: "Save correction" })); }
+  expect(await screen.findByText(/already removed · files retained/)).toBeTruthy(); expect(screen.queryByText("Note restored in vault · This device only")).toBeNull();
+});
+it.each(["cancel", "fail"])("tentative selection %s preserves removal confirmation without submitting", async outcome => {
+  const v = vault({ select: async () => { if (outcome === "fail") throw new Error("Selection failed"); return null; } }); mount(v); await openMemory(); await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" })); expect(await screen.findByRole("button", { name: "Confirm removal" })).toBeTruthy(); expect(v.remove).not.toHaveBeenCalled();
+});
+it.each(["remove", "restore", "rebuild"])("ignores late %s response after vault switch", async kind => {
+  let finish!: () => void; const delayed = () => new Promise<VaultMemory>(resolve => { finish = () => resolve(deleted); });
+  const v = vault({ list: vi.fn(async s => s === "session-a" ? [kind === "restore" ? missing : memory] : []), remove: delayed, restoreNote: delayed, rebuild: () => new Promise(resolve => { finish = () => resolve([memory]); }), select: async () => ({ root: "/synthetic/b", vault_id: "session-b", vault_identity: "manifest-b" }) }); mount(v);
+  if (kind === "rebuild") await userEvent.click(await screen.findByRole("button", { name: "Rebuild local search" }));
+  else { await openMemory(); await userEvent.click(screen.getByRole("button", { name: kind === "remove" ? "Remove from Recall" : "Restore missing note" })); if (kind === "remove") await userEvent.click(screen.getByRole("button", { name: "Confirm removal" })); }
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" })); await screen.findByText("/synthetic/b"); await act(async () => finish()); expect(screen.queryByText(/already removed|Removed from Recall/)).toBeNull(); expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull();
+});
+it("failed switch to removed preserves active query and rows; failed return preserves removed mode", async () => {
+  const list = vi.fn().mockResolvedValueOnce([memory]).mockResolvedValueOnce([memory]).mockRejectedValueOnce(new Error("Removed list unavailable")).mockResolvedValueOnce([deleted]).mockRejectedValueOnce(new Error("Active list unavailable"));
+  mount(vault({ list })); await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "garden"); await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await screen.findByText("Removed list unavailable"); expect(screen.getByRole("heading", { name: "Matching memories" })).toBeTruthy(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden"); expect(screen.getByRole("button", { name: /Synthetic garden note/ })).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await screen.findByRole("heading", { name: "Removed items" });
+  await userEvent.click(screen.getByRole("button", { name: "All memories / refresh" })); await screen.findByText("Active list unavailable"); expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden");
+});
+it("pending removal survives back to memories and retains operation identity", async () => {
+  const remove = vi.fn().mockRejectedValueOnce(new Error("Lost acknowledgment")).mockResolvedValue(deleted); mount(vault({ remove })); await openMemory();
+  await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" })); await userEvent.click(screen.getByRole("button", { name: "Confirm removal" })); await screen.findByText("Lost acknowledgment");
+  await userEvent.click(screen.getByRole("button", { name: "Cancel removal" })); await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); await openMemory();
+  await userEvent.click(screen.getByRole("button", { name: "Retry same removal" })); await screen.findByText("Removed from Recall · files retained"); expect(remove.mock.calls[1]).toEqual(remove.mock.calls[0]);
+});
+it.each(["remove", "restore"])("interrupted %s after cancelled selection retains exact decision for retry", async kind => {
+  let finish!: () => void;
+  const mutation = vi.fn().mockImplementationOnce(() => new Promise<VaultMemory>(resolve => { finish = () => resolve(deleted); })).mockResolvedValue(deleted);
+  mount(vault({ list: async () => [kind === "restore" ? missing : memory], remove: mutation, restoreNote: mutation, select: async () => null })); await openMemory();
+  await userEvent.click(screen.getByRole("button", { name: kind === "restore" ? "Restore missing note" : "Remove from Recall" })); if (kind === "remove") await userEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" })); await act(async () => finish()); expect(screen.queryByText("Removed from Recall · files retained")).toBeNull();
+  await userEvent.click(await screen.findByRole("button", { name: kind === "remove" ? "Retry same removal" : "Retry same restore" })); await screen.findByText(kind === "remove" ? "Removed from Recall · files retained" : "This memory is already removed · files retained"); expect(mutation.mock.calls[1]).toEqual(mutation.mock.calls[0]);
+});
+it.each(["capture", "correct", "restore"])("%s receipts with current missing/conflict state do not report an active save", async kind => {
+  const result = kind === "correct" ? { ...memory, state: "conflict" as const, conflict: "Retained pending conflict" } : missing;
+  mount(vault({ list: async () => [kind === "restore" ? missing : memory], capture: async () => result, correct: async () => result, restoreNote: async () => result }));
+  if (kind === "capture") { await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); }
+  else { await openMemory(); await userEvent.click(screen.getByRole("button", { name: kind === "restore" ? "Restore missing note" : "Correct note" })); if (kind === "correct") await userEvent.click(screen.getByRole("button", { name: "Save correction" })); }
+  await screen.findByText(/Current memory (has a missing Markdown note|needs attention)/); expect(screen.queryByText(/Correction saved|Note restored/)).toBeNull();
+});
+it("opening stale rows keeps their unverified state visible until a validated mutation", async () => {
+  mount(vault({ rebuild: async () => { throw new Error("Rebuild failed"); } })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByText("Rebuild failed"); await openMemory();
+  expect(screen.getByText("Previously loaded memory · current state not verified")).toBeTruthy();
+});
+it("a failed decision can retain current terminal state after reload and inspect its history", async () => {
+  const list = vi.fn().mockResolvedValueOnce([memory]).mockResolvedValue([deleted]);
+  mount(vault({ list, remove: async () => { throw new Error("Old operation unavailable"); } })); await openMemory();
+  await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" })); await userEvent.click(screen.getByRole("button", { name: "Confirm removal" })); await screen.findByText("Old operation unavailable");
+  await userEvent.click(screen.getByRole("button", { name: "Reload current state" })); await screen.findByText("Current state · deleted · revision 2");
+  await userEvent.click(screen.getByRole("button", { name: "Keep current state & close decision" })); await userEvent.click(screen.getByRole("button", { name: "History" })); expect(await screen.findByText(/capture · human:recall/)).toBeTruthy();
+});
+it("out-of-order list responses cannot replace the latest chosen mode", async () => {
+  let finish!: (rows: VaultMemory[]) => void;
+  const list = vi.fn().mockResolvedValueOnce([memory]).mockImplementationOnce(() => new Promise<VaultMemory[]>(resolve => { finish = resolve; })).mockResolvedValueOnce([memory]);
+  mount(vault({ list })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await userEvent.click(screen.getByRole("button", { name: "All memories / refresh" })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await act(async () => finish([deleted])); expect(screen.getByRole("heading", { name: "Recent memory" })).toBeTruthy(); expect(screen.queryByRole("heading", { name: "Removed items" })).toBeNull();
+});
+it("initial read failure does not claim previously loaded results or an empty vault", async () => {
+  mount(vault({ list: async () => { throw new Error("Vault unreadable"); } })); await screen.findByText("Vault unreadable"); expect(screen.queryByText(/Previously loaded results/)).toBeNull(); expect(screen.queryByText("Nothing captured yet")).toBeNull();
+});
+it("a failed later rebuild clears the earlier rebuild success receipt", async () => {
+  const rebuild = vi.fn().mockResolvedValueOnce([memory]).mockRejectedValueOnce(new Error("New rebuild failed")); mount(vault({ rebuild })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByText("Local keyword search rebuilt from validated vault records.");
+  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByText("New rebuild failed"); expect(screen.queryByText("Local keyword search rebuilt from validated vault records.")).toBeNull();
 });

@@ -36,8 +36,8 @@ export async function installVaultFixture(page: Page) {
       if (args.expectedVaultId !== state.status.vault_id) throw new Error("Stale vault session");
       if (command === "vault_capture") {
         if (control.cancelCapture) { control.cancelCapture = false; return null; }
-        const m: VaultMemory = { id: crypto.randomUUID(), revision: 1, note: String(args.note), source_name: "SYNTHETIC-test-card.png", source_sha256: (await original()).sha256, captured_at: now, updated_at: now, conflict: null };
-        state.memories.push(m); state.history[m.id] = [{ revision: 1, note: m.note, recorded_at: now, origin: "human:recall" }]; save(); return m;
+        const m: VaultMemory = { id: crypto.randomUUID(), revision: 1, note: String(args.note), source_name: "SYNTHETIC-test-card.png", source_sha256: (await original()).sha256, captured_at: now, updated_at: now, conflict: null, state: "active", note_path: "synthetic.md" };
+        state.memories.push(m); state.history[m.id] = [{ revision: 1, note: m.note, recorded_at: now, origin: "human:recall", kind: "capture" }]; save(); return m;
       }
       if (command === "vault_list") {
         const terms = String(args.query).toLowerCase().split(/\s+/).filter(Boolean);
@@ -49,10 +49,10 @@ export async function installVaultFixture(page: Page) {
         const m = memory!;
         if (control.conflict) {
           control.conflict = false; m.note = "SYNTHETIC external Obsidian edit"; m.revision++;
-          state.history[m.id]!.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:obsidian" }); save(); throw new Error("Revision conflict: review latest note");
+          state.history[m.id]!.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:obsidian", kind: "external" }); save(); throw new Error("Revision conflict: review latest note");
         }
         if (args.expectedRevision !== m.revision) throw new Error("Revision conflict");
-        m.note = String(args.note); m.revision++; state.history[m.id]!.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:recall" }); save(); return m;
+        m.note = String(args.note); m.revision++; state.history[m.id]!.push({ revision: m.revision, note: m.note, recorded_at: now, origin: "human:recall", kind: "correct" }); save(); return m;
       }
       if (command === "vault_history") return state.history[memory!.id];
       if (command === "vault_source") {

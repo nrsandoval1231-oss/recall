@@ -21,3 +21,17 @@ it("browser adapter refuses native persistence without invoking any command", as
   const vault = new NativeLocalVault(); expect(vault.available).toBe(false);
   await expect(vault.status()).rejects.toThrow("desktop app"); expect(invoke).not.toHaveBeenCalled();
 });
+
+it("lifecycle commands preserve exact revision, state, operation identity and includeDeleted authorization", async () => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+  const vault = new NativeLocalVault();
+  await vault.list("session", "", true); await vault.rebuild("session", true);
+  await vault.restoreNote("session", "memory", 4, "restore-op");
+  await vault.remove("session", "memory", 4, "remove-op", "missing");
+  expect(vi.mocked(invoke).mock.calls).toEqual([
+    ["vault_list", { expectedVaultId: "session", query: "", includeDeleted: true }],
+    ["vault_rebuild", { expectedVaultId: "session", includeDeleted: true }],
+    ["vault_restore_note", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 4, operationId: "restore-op" }],
+    ["vault_remove", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 4, operationId: "remove-op", expectedState: "missing" }],
+  ]);
+});
