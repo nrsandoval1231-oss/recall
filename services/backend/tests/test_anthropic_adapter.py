@@ -15,7 +15,7 @@ from recall.ingestion.provider import AnswerRequest, InterpretRequest, PageImage
 from recall.retrieval.ask import ANSWER_SCHEMA
 
 
-def sse(text: str, stop_reason: str = "end_turn") -> bytes:
+def sse(text: str, stop_reason: str = "end_turn", model_id: str | None = "claude-opus-5-5") -> bytes:
     events = [
         (
             "message_start",
@@ -25,7 +25,7 @@ def sse(text: str, stop_reason: str = "end_turn") -> bytes:
                     "id": "msg_test",
                     "type": "message",
                     "role": "assistant",
-                    "model": "claude-opus-5-5",
+                    **({"model": model_id} if model_id is not None else {}),
                     "content": [],
                     "stop_reason": None,
                     "stop_sequence": None,
@@ -155,3 +155,15 @@ def test_provider_schema_inlines_refs_and_keeps_shape() -> None:
     assert "$defs" not in out and out["properties"]["schema_version"] == {"enum": ["1.1"]}
     ev = out["properties"]["summary_evidence"]["items"]
     assert ev["required"] == ["page_id", "quote"] and ev["additionalProperties"] is False
+
+
+@pytest.mark.parametrize("stop", ["refusal", "max_tokens"])
+@pytest.mark.parametrize("model_id", ["claude-opus-5-5", "different-model", None])
+def test_billed_errors_preserve_actual_model_metadata(stop: str, model_id: str | None) -> None:
+    provider = make(
+        lambda r: httpx2.Response(200, headers={"content-type": "text/event-stream"}, content=sse("{}", stop, model_id))
+    )
+    with pytest.raises(ProviderError) as caught:
+        provider.interpret(REQUEST)
+    assert caught.value.usage == (1234, 77)
+    assert caught.value.model_id == model_id

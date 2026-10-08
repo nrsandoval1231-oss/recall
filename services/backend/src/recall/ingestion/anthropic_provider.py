@@ -101,10 +101,20 @@ class AnthropicProvider:
         except anthropic.APIConnectionError:
             raise ProviderError("PROVIDER_UNAVAILABLE", "provider unreachable", retryable=True) from None
         usage = (message.usage.input_tokens or 0, message.usage.output_tokens or 0)
+        reported_model = getattr(message, "model", None)
+        error_model = reported_model if isinstance(reported_model, str) else None
         if message.stop_reason == "refusal":
-            raise ProviderError("PROVIDER_REFUSED", "the provider declined this content", retryable=False, usage=usage)
+            raise ProviderError(
+                "PROVIDER_REFUSED",
+                "the provider declined this content",
+                retryable=False,
+                usage=usage,
+                model_id=error_model,
+            )
         if message.stop_reason == "max_tokens":
-            raise ProviderError("OUTPUT_TRUNCATED", "provider output was truncated", retryable=False, usage=usage)
+            raise ProviderError(
+                "OUTPUT_TRUNCATED", "provider output was truncated", retryable=False, usage=usage, model_id=error_model
+            )
         text = "".join(str(getattr(block, "text", "")) for block in message.content if block.type == "text")
         return ProviderResult(
             text=text, model_id=getattr(message, "model", self._model), input_tokens=usage[0], output_tokens=usage[1]

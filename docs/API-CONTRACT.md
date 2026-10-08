@@ -270,7 +270,7 @@ All accepted binding values supplied by the native client are ASCII. The extract
 `binding.memory_id`; `input_manifest_sha256` equals this digest; its only page has `page_id` equal to
 `binding.source_id` and `ordinal: 1`. All extraction evidence references must resolve to that page. The native
 adapter rechecks every binding, current revision/source bytes, vault session, active state and cancellation
-before journaling the machine proposal. Schema/reference validation is not proof of pixel-level reading truth.
+before journaling the machine proposal. Normalized results containing NUL or unpaired Unicode surrogates are rejected as `INVALID_EXTRACTION` before storage; text is never silently rewritten to fit. Schema/reference validation is not proof of pixel-level reading truth.
 
 | Receipt state | HTTP status | `result` / `error_code` | Meaning |
 | --- | --- | --- | --- |
@@ -298,7 +298,7 @@ return the existing receipt; changed valid input with the same key fails. There 
 invocation per admitted operation, no repair call, no SDK transport retry and no refusal fallback for this
 flow. Existing cloud provider behavior is unchanged. The shared ledger reserves the existing conservative
 24,784 input / 64,000 output token bounds with configured pricing; no model, price or budget is chosen here.
-Usage is settled only when model/usage match that bound. An uncertain call retains its reservation for
+Usage is settled only when model/usage match that bound, including the provider-reported model on billed refusal/truncation errors; missing or mismatched error model metadata retains an unknown hold. An uncertain call retains its reservation for
 operator reconciliation; no automatic refund or retry is promised.
 
 After a lost response or native restart, recover by GET. A 404 allows repeating the **same** POST operation;

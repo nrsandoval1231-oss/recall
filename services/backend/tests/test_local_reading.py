@@ -148,7 +148,7 @@ def test_stream_size_bound(reading: Any) -> None:
     ("step", "state", "code", "reserved"),
     [
         ("not JSON", "failed", "INVALID_EXTRACTION", False),
-        (refusal(), "failed", "PROVIDER_REFUSED", False),
+        (refusal(), "unknown", "PROVIDER_OUTCOME_UNKNOWN", True),
         (outage(), "unknown", "PROVIDER_OUTCOME_UNKNOWN", True),
         (TimeoutError("sensitive provider details"), "unknown", "PROVIDER_OUTCOME_UNKNOWN", True),
     ],
@@ -486,7 +486,9 @@ def test_invalid_error_usage_keeps_unknown_budget_hold(reading: Any, env: Env, u
     from recall.ingestion.provider import ProviderError
 
     client, grant, fake, binding, original = reading
-    fake.interpret_script = [ProviderError("PROVIDER_REFUSED", "synthetic", retryable=False, usage=usage)]
+    fake.interpret_script = [
+        ProviderError("PROVIDER_REFUSED", "synthetic", retryable=False, usage=usage, model_id="fake-model")
+    ]
     response = post(client, binding, original)
     assert response.json()["state"] == "unknown"
     with env.db.tx(grant.user) as tx:
@@ -518,3 +520,94 @@ def test_binding_requires_rfc3339_captured_time(reading: Any) -> None:
     response = post(client, {**binding, "captured_at": "2026-10-08X12:00:00Z"}, original)
     assert response.status_code == 422
     assert not fake.interpret_calls
+
+
+@pytest.mark.parametrize("bad", ["\x00", "\ud800", "\udfff"])
+@pytest.mark.parametrize("field", ["transcription", "uncertainty"])
+def test_jsonb_incompatible_model_strings_fail_terminally_with_usage(
+    reading: Any, env: Env, bad: str, field: str
+) -> None:
+    client, grant, fake, binding, original = reading
+
+    def invalid(request: Any) -> str:
+        output = faithful_extraction(request, ["Synthetic note?"])
+        if field == "transcription":
+            output["pages"][0]["transcription"] += bad
+        else:
+            output["uncertainties"][0]["description"] += bad
+        return json.dumps(output)
+
+    fake.interpret_script = [invalid]
+    with TestClient(client.app, raise_server_exceptions=False) as http:
+        response = post(http, binding, original)
+    expected = {
+        "schema_version": "1.0",
+        "binding": binding,
+        "state": "failed",
+        "result": None,
+        "error_code": "INVALID_EXTRACTION",
+    }
+    assert response.status_code == 200 and response.json() == expected
+    assert post(client, binding, original).json() == expected
+    assert (
+        client.get(
+            f"/v1/local-readings/{binding['operation_id']}", headers={"Authorization": "Bearer synthetic-device-only"}
+        ).json()
+        == expected
+    )
+    assert len(fake.interpret_calls) == 1
+    with env.db.tx(grant.user) as tx:
+        assert tx.one("select status from embedding_reservations")["status"] == "completed"
+        assert tx.all("select model_id,input_tokens,output_tokens from ai_usage") == [
+            {"model_id": "fake-model", "input_tokens": 1000, "output_tokens": 500}
+        ]
+        assert tx.one("select result from local_reading_receipts")["result"] is None
+
+
+@pytest.mark.parametrize("stop", ["refusal", "max_tokens"])
+@pytest.mark.parametrize("model_id", ["fake-model", "different-model", None])
+def test_sdk_billed_error_model_controls_settlement(reading: Any, env: Env, stop: str, model_id: str | None) -> None:
+    import anthropic
+    import httpx2
+
+    from recall.ingestion.anthropic_provider import AnthropicProvider
+    from test_anthropic_adapter import sse
+
+    client, grant, fake, binding, original = reading
+    wire_calls = []
+
+    def response(request: Any) -> Any:
+        wire_calls.append(request)
+        return httpx2.Response(200, headers={"content-type": "text/event-stream"}, content=sse("{}", stop, model_id))
+
+    with anthropic.Anthropic(
+        api_key="synthetic-not-real", max_retries=0, http_client=httpx2.Client(transport=httpx2.MockTransport(response))
+    ) as sdk:
+        adapter = AnthropicProvider(
+            api_key="synthetic-not-real", model_id="fake-model", effort="high", refusal_fallback=False, client=sdk
+        )
+        fake.interpret = adapter.interpret
+        result = post(client, binding, original)
+        matching = model_id == "fake-model"
+        expected = {
+            "schema_version": "1.0",
+            "binding": binding,
+            "state": "failed" if matching else "unknown",
+            "result": None,
+            "error_code": (
+                ("PROVIDER_REFUSED" if stop == "refusal" else "OUTPUT_TRUNCATED")
+                if matching
+                else "PROVIDER_OUTCOME_UNKNOWN"
+            ),
+        }
+        assert result.status_code == (200 if matching else 202)
+        assert result.json() == expected
+        assert post(client, binding, original).json() == expected
+    assert len(wire_calls) == 1
+    with env.db.tx(grant.user) as tx:
+        assert tx.one("select status from embedding_reservations")["status"] == (
+            "completed" if matching else "reserved"
+        )
+        assert tx.all("select model_id,input_tokens,output_tokens from ai_usage") == (
+            [{"model_id": "fake-model", "input_tokens": 1234, "output_tokens": 77}] if matching else []
+        )

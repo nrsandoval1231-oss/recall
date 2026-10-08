@@ -39,11 +39,16 @@ class ProviderResult:
 
 
 class ProviderError(Exception):
-    def __init__(self, code: str, message: str, *, retryable: bool, usage: tuple[int, int] = (0, 0)) -> None:
+    def __init__(
+        self, code: str, message: str, *, retryable: bool, usage: tuple[int, int] = (0, 0), model_id: str | None = None
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.retryable = retryable
         self.usage = usage  # tokens billed even though the call failed (e.g. refusal, truncation)
+        # Optional actual provider metadata, never inferred from requested configuration.
+        # Legacy consumers keep their existing accounting behavior; local reading requires this identity.
+        self.model_id = model_id
 
 
 class Provider(Protocol):

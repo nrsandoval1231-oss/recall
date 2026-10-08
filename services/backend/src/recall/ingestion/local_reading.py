@@ -112,6 +112,24 @@ def valid_usage(input_tokens: int, output_tokens: int) -> bool:
     )
 
 
+def validate_storage_strings(value: Any) -> None:
+    """Reject unsupported text; never silently rewrite an untrusted reading to fit JSONB."""
+    if isinstance(value, str):
+        if "\x00" in value:
+            raise InvalidExtraction(["output contains unsupported characters"])
+        try:
+            value.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            raise InvalidExtraction(["output contains unsupported characters"]) from None
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            validate_storage_strings(key)
+            validate_storage_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            validate_storage_strings(item)
+
+
 class LocalReadingService:
     def __init__(self, db: Database, settings: Settings, authorizer: DeviceAuthorizer, provider: Provider | None):
         self.db, self.settings, self.authorizer, self.provider = db, settings, authorizer, provider
@@ -280,16 +298,18 @@ class LocalReadingService:
                 "validation_notes": validated.notes,
                 "review_state": "unreviewed",
             }
+            validate_storage_strings(payload)
             if len(json.dumps(payload).encode()) > MAX_RESULT_BYTES:
                 payload = None
                 raise InvalidExtraction(["normalized output too large"])
         except ApiError:
             state, error = "failed", "AUTHORIZATION_CHANGED"
-        except InvalidExtraction:
+        except (InvalidExtraction, UnicodeError):
+            payload = None
             state, error = "failed", "INVALID_EXTRACTION"
         except ProviderError as exc:
-            if exc.usage != (0, 0) and valid_usage(*exc.usage):
-                result = ProviderResult("", self.settings.ai_model_id or "", *exc.usage)
+            if exc.model_id == self.settings.ai_model_id and exc.model_id is not None and valid_usage(*exc.usage):
+                result = ProviderResult("", exc.model_id, *exc.usage)
                 state, error = (
                     "failed",
                     exc.code if exc.code in {"PROVIDER_REFUSED", "OUTPUT_TRUNCATED"} else "PROVIDER_FAILED",
