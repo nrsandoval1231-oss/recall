@@ -390,8 +390,10 @@ def test_synthetic_inference_receipt_survives_restart_and_revoke() -> None:
         ai_api_key="synthetic-ci-key-not-a-credential",
         ai_input_usd_per_mtok=1,
         ai_output_usd_per_mtok=1,
-        ai_daily_budget_usd=0,
-        ai_monthly_budget_usd=0,
+        # The deployed synthetic runtime remains zero-budget. This host-side fake-provider
+        # receipt test alone needs one bounded positive reservation to exercise recovery.
+        ai_daily_budget_usd=1,
+        ai_monthly_budget_usd=1,
     )
     app_db = Database(app_dsn)
     app_db.open()
@@ -420,7 +422,8 @@ def test_synthetic_inference_receipt_survives_restart_and_revoke() -> None:
     with TestClient(app) as client:
         assert client.post(f"/v1/device-pairings/{invitation}/claim", json={"secret": bearer}).status_code == 200
         first = client.post("/v1/local-readings", content=original, headers=photo_headers)
-        assert first.status_code == 200 and first.json()["state"] == "complete"
+        assert first.status_code == 200, first.json()
+        assert first.json()["state"] == "complete", first.json()
         receipt = client.get(f"/v1/local-readings/{binding['operation_id']}", headers=headers)
         assert receipt.json() == first.json()
     app_db.close()
