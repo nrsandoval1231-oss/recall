@@ -1990,3 +1990,338 @@ fn review_unique_rename_with_unrelated_old_bound_occupant_preserves_both_files()
     );
     assert!(!v.note_path(&m.id).exists());
 }
+
+// Claude reading regression fixtures are synthetic, never live provider traffic.
+fn reading_response(work: &crate::reading::ReadingRequest) -> crate::reading::ReadingReceipt {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../packages/contracts/fixtures/local-reading-synthetic.json"
+    ))
+    .unwrap();
+    let mut response = fixture["response"].clone();
+    response["binding"] = serde_json::to_value(&work.binding).unwrap();
+    response["result"]["input_manifest_sha256"] = work.digest().unwrap().into();
+    response["result"]["extraction"]["input_manifest_sha256"] = work.digest().unwrap().into();
+    response["result"]["extraction"]["capture_id"] = work.binding.memory_id.clone().into();
+    let old = "33333333-3333-4333-8333-333333333333";
+    let encoded = serde_json::to_string(&response)
+        .unwrap()
+        .replace(old, &work.binding.source_id);
+    serde_json::from_str(&encoded).unwrap()
+}
+#[test]
+fn reading_machine_and_human_are_separate_durable_searchable_and_original_is_immutable() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v
+        .capture(&op(), "synthetic.png", &photo(), "annotation")
+        .unwrap();
+    let original = v.source(&m.id).unwrap().bytes;
+    let work = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let receipt = reading_response(&work);
+    let read = v.accept_reading(&work, &receipt).unwrap();
+    assert_eq!(read.revision, 2);
+    assert_eq!(read.note, "annotation");
+    assert_eq!(
+        read.reading.as_ref().unwrap().effective_text(),
+        "Synthetic note: 12?"
+    );
+    assert_eq!(v.accept_reading(&work, &receipt).unwrap().revision, 2);
+    let corrected = v
+        .correct_reading(&m.id, 2, &op(), "Human uncertainty 13?")
+        .unwrap();
+    assert_eq!(
+        corrected.reading.as_ref().unwrap().effective_text(),
+        "Human uncertainty 13?"
+    );
+    let next = v.prepare_reading(&m.id, 3, &op()).unwrap();
+    v.accept_reading(&next, &reading_response(&next)).unwrap();
+    let reopened = f.vault();
+    assert_eq!(reopened.list("Human uncertainty").unwrap().len(), 1);
+    assert!(reopened.list("Synthetic note").unwrap().is_empty());
+    assert_eq!(
+        reopened.history(&m.id).unwrap()[1]
+            .reading
+            .as_ref()
+            .unwrap()
+            .machine
+            .transcription(),
+        "Synthetic note: 12?"
+    );
+    assert_eq!(reopened.source(&m.id).unwrap().bytes, original);
+    assert_eq!(
+        decode::<Manifest>(&v.path("_meta/manifest.json"))
+            .unwrap()
+            .format,
+        "recall-local-vault-v3"
+    );
+}
+#[test]
+fn reading_cancellation_restart_and_stale_completion_never_promote() {
+    for reason in [
+        "cancel",
+        "annotation",
+        "delete",
+        "external",
+        "source",
+        "rename",
+    ] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v
+            .capture(&op(), "synthetic.png", &photo(), "annotation")
+            .unwrap();
+        let work = v.prepare_reading(&m.id, 1, &op()).unwrap();
+        match reason {
+            "cancel" => {
+                v.cancel_reading(&work.binding.operation_id).unwrap();
+            }
+            "annotation" => {
+                v.correct(&m.id, 1, &op(), "changed").unwrap();
+            }
+            "delete" => {
+                v.remove(&m.id, 1, &op(), "active").unwrap();
+            }
+            "external" => {
+                fs::write(
+                    v.note_path(&m.id),
+                    markdown(&m).replace("annotation", "external"),
+                )
+                .unwrap();
+            }
+            "rename" => {
+                fs::rename(v.note_path(&m.id), v.path("Memories/renamed.md")).unwrap();
+            }
+            "source" => {
+                fs::write(v.path(&format!("Sources/{}.png", m.id)), photo().repeat(2)).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            f.vault()
+                .accept_reading(&work, &reading_response(&work))
+                .is_err(),
+            "{reason}"
+        );
+        assert!(v
+            .history(&m.id)
+            .unwrap()
+            .iter()
+            .all(|h| h.reading.is_none()));
+    }
+}
+#[test]
+fn reading_generated_blocks_cannot_be_relabelled_by_external_edit() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v
+        .capture(&op(), "synthetic.png", &photo(), "annotation")
+        .unwrap();
+    let work = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    v.accept_reading(&work, &reading_response(&work)).unwrap();
+    let path = v.note_path(&m.id);
+    let disk = fs::read_to_string(&path).unwrap();
+    fs::write(
+        &path,
+        disk.replace("Unreviewed machine reading", "Human verified reading"),
+    )
+    .unwrap();
+    assert_eq!(v.list("").unwrap()[0].state, "conflict");
+    assert!(v.list("Synthetic").unwrap().is_empty());
+}
+#[test]
+fn reading_pending_journal_requires_explicit_recovery_and_cancel_survives_restart() {
+    for cancel in [false, true] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let work = v.prepare_reading(&m.id, 1, &op()).unwrap();
+        let response = reading_response(&work);
+        let fault = FaultGuard::set(|point, _| {
+            if point == "before_note" {
+                Err("INJECTED reading publication interruption".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.accept_reading(&work, &response).is_err());
+        drop(fault);
+        if cancel {
+            v.cancel_reading(&work.binding.operation_id).unwrap();
+        }
+        let rows = f.vault().list("base").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].reading.is_none());
+        assert_eq!(v.history(&m.id).unwrap().len(), 1);
+        if cancel {
+            assert!(v.accept_reading(&work, &response).is_err());
+        } else {
+            assert_eq!(v.accept_reading(&work, &response).unwrap().revision, 2);
+        }
+    }
+}
+#[test]
+fn reading_vault_switch_cancels_old_intent_and_old_session_cancel_never_touches_new_vault() {
+    let first = Fixture::new();
+    let second = Fixture::new();
+    let settings = Fixture::new();
+    let state = LocalVaultState::new(settings.0.join("settings.json"));
+    let token = state.select_path(&first.0).unwrap().vault_id.unwrap();
+    let m = state
+        .with(&token, |v| {
+            v.capture(&op(), "synthetic.png", &photo(), "base")
+        })
+        .unwrap();
+    let (old, req) = state.begin_reading(&token, &m.id, 1, &op()).unwrap();
+    state.select_path(&second.0).unwrap();
+    assert_eq!(
+        state
+            .cancel_session_reading(&token, &req.binding.operation_id)
+            .unwrap()
+            .state,
+        "cancelled"
+    );
+    assert!(old.accept_reading(&req, &reading_response(&req)).is_err());
+    assert!(second.vault().list("").unwrap().is_empty());
+    assert!(state
+        .with(&token, |v| v.accept_reading(&req, &reading_response(&req)))
+        .is_err());
+}
+#[test]
+fn reading_retry_dispatch_is_get_only_and_empty_correction_still_overrides() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    assert_eq!(v.reading_dispatch(&req).unwrap().unwrap(), photo());
+    assert!(f.vault().reading_dispatch(&req).unwrap().is_none());
+    assert!(v
+        .prepare_reading(&m.id, 2, &req.binding.operation_id)
+        .is_err());
+    v.accept_reading(&req, &reading_response(&req)).unwrap();
+    let corrected = v.correct_reading(&m.id, 2, &op(), "").unwrap();
+    assert_eq!(corrected.reading.unwrap().effective_text(), "");
+    assert!(v.list("12?").unwrap().is_empty());
+    assert!(v.reading_operations(&m.id).unwrap()[0].may_have_been_sent);
+}
+#[test]
+fn reading_v3_fence_preserves_v1_v2_raw_history_and_human_annotation_edits() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let (memory, _, v1) = legacy_fixture(&v);
+    v.correct(&memory, 2, &op(), "v2 annotation").unwrap();
+    let v2 = fs::read(v.history_path(&memory, 3)).unwrap();
+    let manifest = fs::read(v.path("_meta/manifest.json")).unwrap();
+    let request = v.prepare_reading(&memory, 3, &op()).unwrap();
+    v.accept_reading(&request, &reading_response(&request))
+        .unwrap();
+    for (i, raw) in v1.iter().chain(std::iter::once(&v2)).enumerate() {
+        assert_eq!(
+            fs::read(v.history_path(&memory, i as u64 + 1)).unwrap(),
+            *raw
+        );
+    }
+    assert_eq!(
+        fs::read(v.path("_meta/manifest-v2.json")).unwrap(),
+        manifest
+    );
+    let path = v.note_path(&memory);
+    let disk = fs::read_to_string(&path)
+        .unwrap()
+        .replace("v2 annotation", "Obsidian annotation");
+    fs::write(&path, disk).unwrap();
+    let current = f.vault().list("Obsidian").unwrap().pop().unwrap();
+    assert_eq!(current.revision, 5);
+    assert!(current.reading.is_some());
+    let old_writer_formats = [FORMAT, FORMAT_V2];
+    assert!(!old_writer_formats.contains(
+        &decode::<Manifest>(&v.path("_meta/manifest.json"))
+            .unwrap()
+            .format
+            .as_str()
+    ));
+    let mut injected: Event = decode(&v.history_path(&memory, 4)).unwrap();
+    injected.format = FORMAT_V2.into();
+    assert!(v.event_valid(&injected).is_err());
+}
+#[test]
+fn reading_partial_markdown_publication_stays_diagnostic_until_explicit_recovery() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let request = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let response = reading_response(&request);
+    let fault = FaultGuard::set(|point, _| {
+        if point == "before_history" {
+            Err("INJECTED partial reading".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&request, &response).is_err());
+    drop(fault);
+    let rows = f.vault().list("").unwrap();
+    assert_eq!(rows[0].state, "conflict");
+    assert!(rows[0].reading.is_none());
+    assert_eq!(v.accept_reading(&request, &response).unwrap().revision, 2);
+}
+#[test]
+fn reading_machine_proposal_cannot_change_annotation_or_human_correction_in_history() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let first = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    v.accept_reading(&first, &reading_response(&first)).unwrap();
+    v.correct_reading(&m.id, 2, &op(), "human correction")
+        .unwrap();
+    let next = v.prepare_reading(&m.id, 3, &op()).unwrap();
+    v.accept_reading(&next, &reading_response(&next)).unwrap();
+    let prior: Event = decode(&v.history_path(&m.id, 3)).unwrap();
+    let mut next: Event = decode(&v.history_path(&m.id, 4)).unwrap();
+    next.memory.reading.as_mut().unwrap().human_correction = None;
+    assert!(v.reading_transition(&prior, &next).is_err());
+    next.memory.reading = prior.memory.reading.clone();
+    next.memory.note = "fake human annotation".into();
+    assert!(v.reading_transition(&prior, &next).is_err());
+}
+#[test]
+fn reading_cancel_can_arrive_before_prepare_and_is_durable() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let operation = op();
+    assert_eq!(v.cancel_reading(&operation).unwrap().state, "cancelled");
+    assert!(f.vault().prepare_reading(&m.id, 1, &operation).is_err());
+    assert!(v.reading_operations(&m.id).unwrap().is_empty());
+    assert_eq!(v.list("base").unwrap().len(), 1);
+}
+#[test]
+fn reading_explicit_null_field_cannot_smuggle_extensions_into_legacy_history() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let mut raw: serde_json::Value = decode(&v.history_path(&m.id, 1)).unwrap();
+    raw["memory"]["reading"] = serde_json::Value::Null;
+    assert!(serde_json::from_value::<Event>(raw).is_err());
+}
+#[test]
+fn reading_abandoned_machine_draft_does_not_poison_later_human_revision() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let response = reading_response(&req);
+    let fault = FaultGuard::set(|point, _| {
+        if point == "before_note" {
+            Err("INJECTED pending reading".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&req, &response).is_err());
+    drop(fault);
+    v.correct(&m.id, 1, &op(), "fresh human annotation")
+        .unwrap();
+    assert_eq!(v.list("fresh human").unwrap().len(), 1);
+    assert!(v.accept_reading(&req, &response).is_err());
+    assert_eq!(v.list("fresh human").unwrap().len(), 1);
+}

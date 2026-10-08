@@ -1,6 +1,8 @@
-//! Local human annotations and immutable evidence. No network or model calls.
+//! Vault-authoritative annotations, separate readings, and immutable evidence.
+//! Transport is outside this locked filesystem boundary.
 //! Journals and revision records are retained; Markdown publication backups are
 //! retained too, so an editor holding the old inode cannot lose its draft.
+use crate::reading::Reading;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -16,6 +18,7 @@ use uuid::Uuid;
 type Result<T> = std::result::Result<T, String>;
 const FORMAT: &str = "recall-local-vault-v1";
 const FORMAT_V2: &str = "recall-local-vault-v2";
+const FORMAT_V3: &str = "recall-local-vault-v3";
 const MAX_PHOTO: u64 = 25 * 1024 * 1024;
 const MAX_NOTE: usize = 256 * 1024;
 const MAX_JSON: u64 = 2 * 1024 * 1024;
@@ -35,6 +38,8 @@ pub struct VaultMemory {
     pub id: String,
     pub revision: u64,
     pub note: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reading: Option<Reading>,
     pub source_sha256: String,
     pub source_name: String,
     pub captured_at: String,
@@ -53,6 +58,8 @@ pub struct VaultSource {
 pub struct VaultRevision {
     pub revision: u64,
     pub note: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reading: Option<Reading>,
     pub recorded_at: String,
     pub origin: String,
     pub kind: String,
@@ -101,11 +108,22 @@ mod event_memory {
         id: String,
         revision: u64,
         note: String,
+        #[serde(
+            default,
+            deserialize_with = "present_reading",
+            skip_serializing_if = "Option::is_none"
+        )]
+        reading: Option<Reading>,
         source_sha256: String,
         source_name: String,
         captured_at: String,
         updated_at: String,
         conflict: Option<String>,
+    }
+    fn present_reading<'de, D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> std::result::Result<Option<Reading>, D::Error> {
+        Reading::deserialize(d).map(Some)
     }
     pub fn serialize<S: serde::Serializer>(
         m: &VaultMemory,
@@ -115,6 +133,7 @@ mod event_memory {
             id: m.id.clone(),
             revision: m.revision,
             note: m.note.clone(),
+            reading: m.reading.clone(),
             source_sha256: m.source_sha256.clone(),
             source_name: m.source_name.clone(),
             captured_at: m.captured_at.clone(),
@@ -131,6 +150,7 @@ mod event_memory {
             id: m.id,
             revision: m.revision,
             note: m.note,
+            reading: m.reading,
             source_sha256: m.source_sha256,
             source_name: m.source_name,
             captured_at: m.captured_at,
@@ -428,7 +448,29 @@ fn image_type(bytes: &[u8]) -> Result<&'static str> {
     }
 }
 fn markdown(m: &VaultMemory) -> String {
-    format!("<!-- Recall memory {} | human annotation, not OCR -->\n[Original photo](../Sources/{}.{})\n\n{}",m.id,m.id,m.source_name.rsplit('.').next().unwrap_or("png"),m.note)
+    let base = format!("<!-- Recall memory {} | human annotation, not OCR -->\n[Original photo](../Sources/{}.{})\n\n",m.id,m.id,m.source_name.rsplit('.').next().unwrap_or("png"));
+    let Some(reading) = &m.reading else {
+        return format!("{base}{}", m.note);
+    };
+    fn literal(s: &str) -> String {
+        s.lines().map(|line| format!("    {line}\n")).collect()
+    }
+    let machine = &reading.machine;
+    let mut out = format!("{base}## Unreviewed machine reading\n\n{}\nProvider and model:\n\n{}\nOriginal SHA-256:\n\n{}\n", literal(machine.transcription()), literal(&format!("{} / {}",machine.result.provider,machine.result.model_id)),literal(&machine.request.binding.source_sha256));
+    out.push_str("### Reading uncertainty\n\n");
+    if let Some(uncertainties) = machine.result.extraction["uncertainties"].as_array() {
+        for u in uncertainties {
+            out.push_str(&literal(u["description"].as_str().unwrap_or("")));
+        }
+    }
+    if let Some(human) = &reading.human_correction {
+        out.push_str(&format!(
+            "\n## Human reading correction\n\n{}",
+            literal(human)
+        ));
+    }
+    out.push_str(&format!("\n## Human annotation\n\n{}", m.note));
+    out
 }
 fn payload(
     kind: &str,
@@ -486,7 +528,7 @@ impl Vault {
             rename(&staging, &recall)?;
         }
         let manifest: Manifest = decode(&recall.join("_meta/manifest.json"))?;
-        if ![FORMAT, FORMAT_V2].contains(&manifest.format.as_str()) {
+        if ![FORMAT, FORMAT_V2, FORMAT_V3].contains(&manifest.format.as_str()) {
             return Err("Unsupported or legacy Recall subtree".into());
         }
         id(&manifest.vault_id)?;
@@ -528,7 +570,7 @@ impl Vault {
     fn validate(&self) -> Result<()> {
         safe(&self.root)?;
         let m: Manifest = decode(&self.path("_meta/manifest.json"))?;
-        if ![FORMAT, FORMAT_V2].contains(&m.format.as_str()) || m.vault_id != self.id {
+        if ![FORMAT, FORMAT_V2, FORMAT_V3].contains(&m.format.as_str()) || m.vault_id != self.id {
             return Err("Selected vault identity changed".into());
         }
         for d in [
@@ -568,7 +610,7 @@ impl Vault {
         let path = self.path("_meta/manifest.json");
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
-        if manifest.format == FORMAT_V2 {
+        if [FORMAT_V2, FORMAT_V3].contains(&manifest.format.as_str()) {
             return Ok(());
         }
         immutable(&self.path("_meta/manifest-v1.json"), &bytes)?;
@@ -659,19 +701,33 @@ impl Vault {
         id(&e.memory.id)?;
         id(&e.operation_id)?;
         note_valid(&e.memory.note)?;
-        if ![FORMAT, FORMAT_V2].contains(&e.format.as_str())
+        if ![FORMAT, FORMAT_V2, FORMAT_V3].contains(&e.format.as_str())
             || (e.format == FORMAT
                 && (e.note_path.is_some()
                     || e.expected_state.is_some()
                     || !["capture", "correct", "external"].contains(&e.kind.as_str())))
+            || (e.format != FORMAT_V3
+                && (e.memory.reading.is_some()
+                    || ["machine_reading", "reading_correction"].contains(&e.kind.as_str())))
             || e.vault_id != self.id
             || e.memory.revision == 0
             || e.memory.revision > MAX_RECORDS as u64
             || e.expected_revision.checked_add(1) != Some(e.memory.revision)
             || e.memory.conflict.is_some()
-            || !["capture", "correct", "external", "restore", "remove"].contains(&e.kind.as_str())
+            || ![
+                "capture",
+                "correct",
+                "external",
+                "restore",
+                "remove",
+                "machine_reading",
+                "reading_correction",
+            ]
+            .contains(&e.kind.as_str())
             || e.origin
-                != if e.kind == "external" {
+                != if e.kind == "machine_reading" {
+                    "machine:anthropic"
+                } else if e.kind == "external" {
                     "human:obsidian"
                 } else {
                     "human:recall"
@@ -692,7 +748,7 @@ impl Vault {
         if let Some(name) = &e.note_path {
             basename(name)?;
         }
-        if e.format == FORMAT_V2 && e.note_path.is_none() {
+        if e.format != FORMAT && e.note_path.is_none() {
             return Err("Missing bound note basename".into());
         }
         if (e.kind == "remove") != e.expected_state.is_some()
@@ -700,7 +756,14 @@ impl Vault {
                 .as_deref()
                 .is_some_and(|state| !["active", "missing"].contains(&state))
             || (["capture", "restore"].contains(&e.kind.as_str()) && e.previous_markdown.is_some())
-            || (["correct", "external"].contains(&e.kind.as_str()) && e.previous_markdown.is_none())
+            || ([
+                "correct",
+                "external",
+                "machine_reading",
+                "reading_correction",
+            ]
+            .contains(&e.kind.as_str())
+                && e.previous_markdown.is_none())
             || (e.kind == "capture" && e.operation_id != e.memory.id)
             || (e.kind == "remove"
                 && (e.expected_state.as_deref() == Some("active")) != e.previous_markdown.is_some())
@@ -718,6 +781,10 @@ impl Vault {
         if e.kind == "remove" {
             expected = hash(&json(&(expected, &e.expected_state))?);
         }
+        if e.format == FORMAT_V3 {
+            expected = hash(&json(&(expected, &e.memory.reading))?);
+        }
+        self.reading_event_valid(e)?;
         if expected != e.payload_sha256 {
             return Err("Revision payload hash mismatch".into());
         }
@@ -786,6 +853,7 @@ impl Vault {
                 return Err("Retained journal and history bytes differ".into());
             }
             if let Some(prev) = out.last() {
+                self.reading_transition(prev, &e)?;
                 if e.parent_sha256 != Some(self.parent_hash(memory_id, index as u64)?)
                     || e.memory.source_sha256 != prev.memory.source_sha256
                     || e.memory.source_name != prev.memory.source_name
@@ -826,7 +894,29 @@ impl Vault {
                 Ok(e)
             });
             match decoded {
-                Ok(e) => groups.entry(e.memory.id.clone()).or_default().push(e),
+                Ok(e) => {
+                    // A machine draft needs fresh explicit session authorization after interruption.
+                    // Never turn selection/restart or cancellation into automatic result promotion.
+                    let history = self.history_path(&e.memory.id, e.memory.revision);
+                    if e.kind == "machine_reading"
+                        && read(&history, MAX_JSON).ok() != Some(read(&p, MAX_JSON)?)
+                    {
+                        // A newer authoritative event may occupy this revision; an abandoned
+                        // machine proposal must not poison that human revision as a fork.
+                        if !history.exists() {
+                            let current = read(&self.event_note_path(&e)?, MAX_JSON).ok();
+                            let previous = e.previous_markdown.as_ref().map(|s| s.as_bytes());
+                            if current.as_deref() != previous
+                                && (current.as_deref() == Some(e.markdown.as_bytes())
+                                    || self.backup_path(&e.operation_id).exists())
+                            {
+                                conflicts.insert(e.memory.id.clone(),"Interrupted reading publication; explicitly recover or resolve preserved files".into());
+                            }
+                        }
+                        continue;
+                    }
+                    groups.entry(e.memory.id.clone()).or_default().push(e)
+                }
                 Err(error) => {
                     // Damaged metadata stays visible without disabling healthy identities.
                     let memory_id = decode::<serde_json::Value>(&p)
@@ -993,7 +1083,9 @@ impl Vault {
             return Err("Competing committed revision".into());
         }
         self.records_inner(&e.memory.id, false)?;
-        if e.format == FORMAT_V2 {
+        if e.format == FORMAT_V3 {
+            self.fence_v3()?;
+        } else if e.format == FORMAT_V2 {
             self.fence_v2()?;
         }
         boundary!("before_receipt", &self.done_path(&e.operation_id));
@@ -1015,9 +1107,11 @@ impl Vault {
             return self.repair_receipt(e, &bytes);
         }
         self.verify_source(&e.memory)?;
+        self.reading_publish_allowed(e)?;
         if e.expected_revision > 0 {
             let records = self.records(&e.memory.id)?;
             let last = records.last().ok_or("Missing parent")?;
+            self.reading_transition(last, e)?;
             if last.kind == "remove"
                 || last.memory.revision != e.expected_revision
                 || e.parent_sha256 != Some(self.parent_hash(&e.memory.id, e.expected_revision)?)
@@ -1037,7 +1131,9 @@ impl Vault {
         {
             return Err("Capture history already exists".into());
         }
-        if e.format == FORMAT_V2 {
+        if e.format == FORMAT_V3 {
+            self.fence_v3()?;
+        } else if e.format == FORMAT_V2 {
             self.fence_v2()?;
         }
         let dir = hp.parent().ok_or("Missing parent")?;
@@ -1137,8 +1233,16 @@ impl Vault {
         Ok(())
     }
     fn commit(&self, e: &Event) -> Result<VaultMemory> {
+        let mut normalized = e.clone();
+        if e.memory.reading.is_some() && e.format != FORMAT_V3 {
+            normalized.format = FORMAT_V3.into();
+            normalized.payload_sha256 = hash(&json(&(&e.payload_sha256, &e.memory.reading))?);
+        }
+        let e = &normalized;
         self.preflight_capacity(e)?;
-        if e.format == FORMAT_V2 {
+        if e.format == FORMAT_V3 {
+            self.fence_v3()?;
+        } else if e.format == FORMAT_V2 {
             self.fence_v2()?;
         }
         immutable(&self.journal_path(&e.operation_id), &json(e)?)?;
@@ -1260,6 +1364,7 @@ impl Vault {
             id: operation_id.into(),
             revision: 1,
             note: note.into(),
+            reading: None,
             source_sha256: source_hash,
             source_name: name.into(),
             captured_at: now.clone(),
@@ -1388,6 +1493,7 @@ impl Vault {
                     id: memory_id.into(),
                     revision: 0,
                     note: String::new(),
+                    reading: None,
                     source_sha256: String::new(),
                     source_name: String::new(),
                     captured_at: String::new(),
@@ -1401,6 +1507,12 @@ impl Vault {
                 continue;
             }
             let note = m.note.to_lowercase();
+            let reading = m
+                .reading
+                .as_ref()
+                .map(|r| r.effective_text())
+                .unwrap_or("")
+                .to_lowercase();
             let filename = m.source_name.to_lowercase();
             let note_filename = m.note_path.as_deref().unwrap_or("").to_lowercase();
             if terms.is_empty()
@@ -1408,6 +1520,7 @@ impl Vault {
                     && m.conflict.is_none()
                     && terms.iter().all(|term| {
                         note.contains(term)
+                            || reading.contains(term)
                             || filename.contains(term)
                             || note_filename.contains(term)
                     }))
@@ -1424,6 +1537,7 @@ impl Vault {
                     id: memory_id,
                     revision: 0,
                     note: String::new(),
+                    reading: None,
                     source_sha256: String::new(),
                     source_name: String::new(),
                     captured_at: String::new(),
@@ -1637,6 +1751,7 @@ impl Vault {
             .map(|e| VaultRevision {
                 revision: e.memory.revision,
                 note: e.memory.note,
+                reading: e.memory.reading,
                 recorded_at: e.memory.updated_at,
                 origin: e.origin,
                 kind: e.kind,
@@ -1654,6 +1769,7 @@ struct Selected {
 pub struct LocalVaultState {
     selected: Mutex<Option<Selected>>,
     settings: PathBuf,
+    reading_sessions: Mutex<BTreeMap<(String, String), Vault>>,
 }
 impl LocalVaultState {
     pub fn new(settings: PathBuf) -> Self {
@@ -1675,6 +1791,7 @@ impl LocalVaultState {
         Self {
             selected: Mutex::new(selected),
             settings,
+            reading_sessions: Mutex::new(BTreeMap::new()),
         }
     }
     pub fn status(&self) -> Result<VaultStatus> {
@@ -1716,6 +1833,16 @@ impl LocalVaultState {
             vault_id: Some(v.id.clone()),
             vault_identity: Some(v.id.clone()),
         };
+        // Cancel registered requests in their original vault before replacing the session.
+        // Network work holds neither this mutex nor a vault lock.
+        if let Some(old) = selected.as_ref() {
+            for ((session, operation), vault) in self.reading_sessions.lock().map_err(fail)?.iter()
+            {
+                if session == &old.token {
+                    vault.cancel_reading(operation)?;
+                }
+            }
+        }
         // Preserve the previous settings until a fully flushed replacement exists.
         let temp = self
             .settings
@@ -1760,6 +1887,10 @@ impl LocalVaultState {
         })
     }
 }
+
+#[path = "reading_storage.rs"]
+mod reading_storage;
+pub use reading_storage::ReadingOperation;
 
 #[cfg(test)]
 #[path = "local_vault_tests.rs"]

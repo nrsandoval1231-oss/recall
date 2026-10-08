@@ -35,3 +35,26 @@ it("lifecycle commands preserve exact revision, state, operation identity and in
     ["vault_remove", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 4, operationId: "remove-op", expectedState: "missing" }],
   ]);
 });
+
+it("reading commands bind selected scope and operation without renderer bytes, origins or credentials", async () => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+  const vault = new NativeLocalVault();
+  await vault.readingCapability("session"); await vault.readingOperations("session", "memory");
+  await vault.readPhoto("session", "memory", 4, "read-op"); await vault.recoverReading("session", "read-op");
+  await vault.cancelReading("old-session", "read-op"); await vault.correctReading("session", "memory", 5, "correction-op", "");
+  expect(vi.mocked(invoke).mock.calls).toEqual([
+    ["vault_reading_capability", { expectedVaultId: "session" }],
+    ["vault_reading_operations", { expectedVaultId: "session", memoryId: "memory" }],
+    ["vault_read_photo", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 4, operationId: "read-op" }],
+    ["vault_recover_reading", { expectedVaultId: "session", operationId: "read-op" }],
+    ["vault_cancel_reading", { expectedVaultId: "old-session", operationId: "read-op" }],
+    ["vault_correct_reading", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 5, operationId: "correction-op", text: "" }],
+  ]);
+});
+
+it("an empty human reading correction takes precedence over machine text", async () => {
+  const { effectiveReading } = await import("./local-vault");
+  const reading = { human_correction: "", machine: { result: { extraction: { pages: [{ transcription: "machine" }] } } } };
+  expect(effectiveReading({ reading } as Parameters<typeof effectiveReading>[0])).toBe("");
+  expect(effectiveReading({})).toBe("");
+});

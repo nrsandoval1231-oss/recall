@@ -1,6 +1,9 @@
 mod local_vault;
 mod managed_export;
 mod persistence;
+mod reading;
+mod reading_commands;
+mod reading_transport;
 mod secrets;
 
 use managed_export::ManagedExportState;
@@ -326,6 +329,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            reading_commands::vault_reading_capability,
+            reading_commands::vault_reading_operations,
+            reading_commands::vault_read_photo,
+            reading_commands::vault_recover_reading,
+            reading_commands::vault_cancel_reading,
+            reading_commands::vault_correct_reading,
             vault_status,
             vault_select,
             vault_capture,
