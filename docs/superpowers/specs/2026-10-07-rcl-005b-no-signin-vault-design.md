@@ -1,6 +1,6 @@
 # RCL-005B — No-sign-in Obsidian memory spine
 
-Date: 2026-10-07. Status: **Local-only foundation authorized for implementation; pairing/relay remain proposed.**
+Date: 2026-10-07. Status reconciled: 2026-10-08. **Bounded local desktop foundation and lifecycle implemented on the review branches; full RCL-005B remains open. Pairing/relay remain proposed.**
 
 Subsequent owner direction: “Ok keep going until the product is finished”. The bounded [local-only implementation plan](../plans/2026-10-07-local-vault-foundation.md) carries this design forward with tests and independent review; routine stage approval is not required for that scope. QR association remains unanswered. No operational permission is implied. The proposal text below retains the full target and excluded future stages.
 
@@ -26,9 +26,11 @@ Recommend the second approach, built in bounded stages: local vault round trip f
 
 ## 3. Current versus proposed
 
-Current code commits authoritative memory/history to PostgreSQL and originals to private object storage. Native export is one-way and preserves direct edits as conflicts; it does not ingest them. Browser pilot uses Supabase email auth and encrypted server sessions. The status ledger records deployments and failed email delivery, not successful no-sign-in use. Existing authentication and data remain intact during this design work.
+At this proposal's original baseline, authoritative memory/history lived in PostgreSQL and originals in private object storage. That remains the legacy cloud path: its native export is one-way and preserves direct edits as conflicts rather than ingesting them. Browser/mobile and explicit desktop legacy mode retain Supabase email auth. Historical deployment and email-delivery evidence must remain intact; it does not establish the no-sign-in target.
 
-Proposed: a native vault adapter commits durable memory before promoting retrieval projections. SQLite stores rebuildable local indexes plus non-rebuildable pending operations until acknowledged. PostgreSQL/pgvector may support optional jobs and search projections, but a complete vault must recover memory without the old database. Credentials, device membership and revocation state are separate protected operational state; importing a vault cannot import permission to a network service.
+The newer local desktop review branches implement a bounded no-sign-in path: select a vault, import an original image, optionally annotate it, browse/search annotations, inspect the original/history, correct supported note bodies, reconcile direct Obsidian body edits and flat renames, explicitly restore missing notes, and logically remove memories with retained tombstones. New local records are vault-authoritative. No existing cloud records have been migrated. See the [foundation evidence](../../implementation/local-vault/README.md) and [lifecycle evidence](../../implementation/local-vault-lifecycle/README.md) for test and platform limits. This is not full semantic memory reconstruction, automatic photo understanding, grounded Ask, phone synchronization or installed-device acceptance.
+
+Remaining full target: extend the native vault commitment boundary to semantic memory and its retrieval projections. SQLite may store rebuildable local indexes plus non-rebuildable pending operations until acknowledged; the bounded annotation search currently rebuilds directly from validated vault files. PostgreSQL/pgvector may support optional jobs and search projections, but a complete vault must recover memory without the old database. Credentials, device membership and revocation state are separate protected operational state; importing a vault cannot import permission to a network service.
 
 ## 4. Components and trust boundaries
 
@@ -50,7 +52,7 @@ Proposed QR flow: an already trusted owner device presents a short-lived, single
 
 ## 6. Vault representation and durable commitment
 
-Proposed version-1 managed subtree, within the user-selected Obsidian vault:
+Conceptual full-target managed subtree, within the user-selected Obsidian vault (not an on-disk version-1 contract):
 
 ```text
 Recall/
@@ -61,6 +63,8 @@ Recall/
   _meta/manifest.json
   _meta/commits/<commit-id>.json
 ```
+
+The implemented bounded adapter uses a different, versioned layout: flat `Recall/Sources/<uuid>.<type>` originals, `Recall/Memories/<uuid>.md` notes (including supported flat renames), per-memory `Recall/History/<uuid>/<revision>.json` revisions, and metadata under `Recall/_meta`. [ARCHITECTURE](../../ARCHITECTURE.md#implemented-local-desktop-subset) describes that current contract. The conceptual tree above does not authorize rewriting it; future semantic/schema changes need explicit compatibility and recovery design.
 
 Markdown supplies readable text, stable IDs and relative evidence/entity links. Structured history records schema version, operation/device IDs, parent revisions, source IDs/hashes, actor attribution, uncertainty, correction precedence, event/recorded time, temporal validity, supersession and tombstones. Commit manifests list exact paths, lengths and hashes. Identity follows IDs, not filenames. Sensitive credentials and private keys never enter this tree. A content hash detects corruption; it does not establish owner authorization.
 
@@ -113,6 +117,6 @@ Do not migrate private data under this proposal. After design/plan approval and 
 
 Required future evidence: fresh install without network/account; phone-first force-close recovery; desktop-off/Wi-Fi-off retry; original hash equality; interrupted multi-file commit recovery; direct Obsidian edits and concurrent revisions; duplicate IDs and malicious paths; stale correction/reprocessing; historical/latest citations; tombstone replay; complete projection rebuild; expired/replayed pairing invitations; wrong-workspace access; revocation and recovery; browser limits; migration parity and both rollback boundaries. Use synthetic fixtures for repository evidence; real device/private corpus acceptance remains separately authorized.
 
-Documentation checks do not prove these behaviors. The current change supplies only reviewed requirements and a proposed architecture.
+Documentation checks do not prove these behaviors. This design supplies requirements and a proposed full architecture; the linked implementation evidence covers only the bounded local subset. Its tests do not establish the remaining phone, pairing, relay, semantic reconstruction or migration acceptance criteria.
 
-**Smallest unresolved product decision:** is a one-time owner-approved QR device association acceptable, provided there is no account, password or email-link sign-in, including first use? Pending that answer, continue the now-authorized local-only implementation plan. Pairing, relay and operational migration remain outside that work.
+**Smallest unresolved product decision:** is a one-time owner-approved QR device association acceptable, provided there is no account, password or email-link sign-in, including first use? Local-only use remains viable independently of that answer. Pairing, relay and operational migration remain outside the bounded local implementation and this documentation review.

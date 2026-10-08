@@ -215,7 +215,7 @@ The new local desktop foundation commits original images, human notes and append
 
 Target local-only capture, vault reading/correction and local search must work without a remote account or network service. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
 
-Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish this bounded implementation from the full target; QR pairing remains unanswered and unimplemented. See [acceptance evidence](implementation/local-vault/README.md).
+Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish this bounded implementation from the full target; QR pairing remains unanswered and unimplemented. See [foundation acceptance evidence](implementation/local-vault/README.md) and [lifecycle acceptance evidence](implementation/local-vault-lifecycle/README.md).
 
 ## 15. Product roadmap
 

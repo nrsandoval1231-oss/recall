@@ -89,7 +89,7 @@ In the legacy cloud code, Postgres records accepted interpretation/history and o
 | Worker | Separate process from the same Python package | Durable jobs survive request completion; no in-process-only background processing |
 | Memory spine (required target) | Obsidian vault | Local desktop implements original images, human notes/history and supported direct-body-edit reconciliation; full semantic reconstruction, phone synchronization and legacy migration remain open |
 | Supporting cloud state | Managed PostgreSQL with pgvector | Operational services and rebuildable retrieval projections; currently authoritative until vault migration |
-| Current identity/storage | Supabase Auth and private Storage | Existing email-auth baseline only; target local use has no remote account and proposed synchronization authenticates paired devices |
+| Legacy cloud identity/storage | Supabase Auth and private Storage | Existing email-auth baseline only; local desktop use has no remote account and proposed synchronization authenticates paired devices |
 | Local state | Vault files by default; SQLite in legacy cloud mode | Local notes/originals/history and validated in-memory keyword view; legacy SQLite cache, full-text search, pending operations and export manifests |
 | AI | One multimodal provider/model plus one embedding model | Evaluate on handwriting first; no router, agent framework, or speculative model menu |
 
