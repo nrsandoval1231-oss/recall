@@ -1,6 +1,6 @@
 {
   "packet": "PAIR-01 native lifecycle repair",
-  "base": "549688100d34fe795fac386bb889a7b11feea3fc",
+  "base": "ec85ba3566fcbefb462458a875c92fb7cc976b4c",
   "owned_files": [
     "apps/desktop/src-tauri/src/pairing.rs",
     "apps/desktop/src-tauri/src/reading_commands.rs",
@@ -14,8 +14,9 @@
     "Claim is recoverable through authenticated status; status validates exact device, vault and photo_inference scope before writing the protected reading credential.",
     "Disconnect confirms server revocation before keyring removal; local read/write/removal and network ambiguity retain UNKNOWN or local material rather than asserting disconnect.",
     "Status and disconnect inspect both pending and active protected entries. A missing or malformed pending entry with a valid active vault credential is server-validated before recovery or revocation; inconsistent or unreadable material remains UNKNOWN and retains local credentials.",
+    "Prepare and claim fail closed whenever an active protected credential exists, and reject corrupt pending material even without an active entry; neither path can overwrite a prior bearer or create a second grant.",
     "Selected-photo capability and dispatch use server-confirmed pairing on spawn_blocking before creating a reading intent, retaining existing reading fingerprint and revision fencing.",
-    "Synthetic core tests cover lost claim response, restart recovery, scope/device/vault mismatch, keyring read/write/removal failures, offline disconnect retention, idempotent confirmation, late-status/disconnect serialization, and active-credential recovery/revocation with absent or malformed pending material."
+    "Synthetic core tests cover lost claim response, restart recovery, scope/device/vault mismatch, keyring read/write/removal failures, offline disconnect retention, idempotent confirmation, late-status/disconnect serialization, active-credential recovery/revocation, and prepare/claim refusal with active, absent, or malformed pending material."
   ],
   "validation": {
     "rustfmt": "PASS: rustfmt.exe --edition 2021 --check --config skip_children=true pairing.rs",

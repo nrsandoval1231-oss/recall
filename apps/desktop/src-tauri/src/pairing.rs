@@ -220,13 +220,6 @@ fn inspect_pending(store: &impl PairingStore, vault: &str) -> Result<PendingMate
     }
     Ok(PendingMaterial::Valid(pending))
 }
-fn load_pending(store: &impl PairingStore, vault: &str) -> Result<Option<Pending>> {
-    match inspect_pending(store, vault)? {
-        PendingMaterial::Absent => Ok(None),
-        PendingMaterial::Valid(pending) => Ok(Some(pending)),
-        PendingMaterial::Corrupt => Err("Pending pairing data is unavailable".into()),
-    }
-}
 fn load_active(store: &impl PairingStore, vault: &str) -> Result<Option<ActiveConnection>> {
     let Some(raw) = store.load(vault)? else {
         return Ok(None);
@@ -305,25 +298,32 @@ impl<S: PairingStore, T: PairingTransport> PairingCore<'_, S, T> {
         if Uuid::parse_str(vault).is_err() {
             return Err("Select a valid vault first".into());
         }
-        let pending = if let Some(existing) = load_pending(self.store, vault)? {
-            existing
-        } else {
-            let mut secret_bytes = [0_u8; 32];
-            getrandom::fill(&mut secret_bytes)
-                .map_err(|_| "The operating system could not generate pairing material")?;
-            let pending = Pending {
-                device_id: Uuid::new_v4().to_string(),
-                vault_id: vault.into(),
-                secret: hex::encode(secret_bytes),
-                origin: configured_origin()?.to_string(),
-            };
-            self.store
-                .save(
-                    &pending_key(vault),
-                    &serde_json::to_string(&pending).map_err(|_| "Cannot save pairing material")?,
-                )
-                .map_err(|_| "The device keyring is unavailable; pairing was not prepared")?;
-            pending
+        let pending_material = inspect_pending(self.store, vault)?;
+        if load_active(self.store, vault)?.is_some() {
+            return Err("An active pairing exists; recover status or disconnect before preparing a new device".into());
+        }
+        let pending = match pending_material {
+            PendingMaterial::Valid(existing) => existing,
+            PendingMaterial::Corrupt => return Err("Pending pairing data is unavailable".into()),
+            PendingMaterial::Absent => {
+                let mut secret_bytes = [0_u8; 32];
+                getrandom::fill(&mut secret_bytes)
+                    .map_err(|_| "The operating system could not generate pairing material")?;
+                let pending = Pending {
+                    device_id: Uuid::new_v4().to_string(),
+                    vault_id: vault.into(),
+                    secret: hex::encode(secret_bytes),
+                    origin: configured_origin()?.to_string(),
+                };
+                self.store
+                    .save(
+                        &pending_key(vault),
+                        &serde_json::to_string(&pending)
+                            .map_err(|_| "Cannot save pairing material")?,
+                    )
+                    .map_err(|_| "The device keyring is unavailable; pairing was not prepared")?;
+                pending
+            }
         };
         Ok(pairing_status(
             "pending_owner_approval",
@@ -337,10 +337,19 @@ impl<S: PairingStore, T: PairingTransport> PairingCore<'_, S, T> {
             .gate
             .lock()
             .map_err(|_| "Pairing lifecycle unavailable")?;
+        let pending_material = inspect_pending(self.store, vault)?;
+        if load_active(self.store, vault)?.is_some() {
+            return Err("An active pairing exists; recover status or disconnect before claiming another invitation".into());
+        }
         let invitation =
             Uuid::parse_str(invitation).map_err(|_| "Enter a valid owner invitation ID")?;
-        let pending = load_pending(self.store, vault)?
-            .ok_or("Prepare this device before entering an invitation")?;
+        let pending = match pending_material {
+            PendingMaterial::Valid(pending) => pending,
+            PendingMaterial::Absent => {
+                return Err("Prepare this device before entering an invitation".into())
+            }
+            PendingMaterial::Corrupt => return Err("Pending pairing data is unavailable".into()),
+        };
         self.transport.claim(&pending, &invitation)?;
         let bound = self.transport.status(&pending)?;
         validate_bound(vault, &pending, &bound)?;
@@ -419,7 +428,7 @@ impl<S: PairingStore, T: PairingTransport> PairingCore<'_, S, T> {
         }
     }
     fn confirmed_active(&self, vault: &str) -> bool {
-        matches!(self.status(), Ok(PairingStatus { state, .. }) if state == "connected")
+        matches!(self.status(vault), Ok(PairingStatus { state, .. }) if state == "connected")
     }
     fn disconnect(&self, vault: &str) -> Result<PairingStatus> {
         let _guard = self
@@ -771,6 +780,50 @@ mod tests {
             assert!(store.load(&vault).unwrap().is_none());
             assert!(store.load(&pending_key(&vault)).unwrap().is_none());
         }
+    }
+    #[test]
+    fn prepare_and_claim_refuse_active_connection_without_overwriting_old_grant() {
+        for malformed in [false, true] {
+            let vault = vault();
+            let store = MemoryStore::default();
+            seed_active(&store, &vault);
+            if malformed {
+                store.save(&pending_key(&vault), "not-json").unwrap();
+            }
+            let active_before = store.load(&vault).unwrap();
+            let pending_before = store.load(&pending_key(&vault)).unwrap();
+            let gate = Mutex::new(());
+            let net = transport(&vault);
+            let core = PairingCore {
+                store: &store,
+                transport: &net,
+                gate: &gate,
+            };
+            assert!(core.prepare(&vault).is_err());
+            assert!(core.claim(&vault, &Uuid::new_v4().to_string()).is_err());
+            assert_eq!(store.load(&vault).unwrap(), active_before);
+            assert_eq!(store.load(&pending_key(&vault)).unwrap(), pending_before);
+        }
+    }
+    #[test]
+    fn prepare_and_claim_refuse_corrupt_pending_without_replacing_it() {
+        let vault = vault();
+        let store = MemoryStore::default();
+        store.save(&pending_key(&vault), "not-json").unwrap();
+        let gate = Mutex::new(());
+        let net = transport(&vault);
+        let core = PairingCore {
+            store: &store,
+            transport: &net,
+            gate: &gate,
+        };
+        assert!(core.prepare(&vault).is_err());
+        assert!(core.claim(&vault, &Uuid::new_v4().to_string()).is_err());
+        assert_eq!(
+            store.load(&pending_key(&vault)).unwrap().as_deref(),
+            Some("not-json")
+        );
+        assert!(store.load(&vault).unwrap().is_none());
     }
     #[test]
     fn keyring_failures_and_offline_disconnect_retention_are_unknown() {
