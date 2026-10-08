@@ -1,8 +1,33 @@
 # Developer setup and real-device acceptance (RCL-001)
 
-## Current-system procedures, not target onboarding
+## Local-only desktop foundation
 
-Sign-in and provider setup below verify the existing implementation only. The target requires no account/password/email-link sign-in, including first use; local-only use needs no remote account. See the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md), whose device-pairing choice and written architecture await approval. Do not bypass existing private API authentication or change deployed configuration to simulate this target.
+Requires Node 22+, npm, Rust 1.89+ and Tauri platform prerequisites. Windows needs MSVC/Windows SDK and WebView2; Linux needs GTK/WebKit development libraries listed below. From the repository root:
+
+```bash
+npm ci
+npm run tauri -w @recall/desktop -- dev
+```
+
+No API, Supabase, AI key, account, `.env`, or cloud configuration is needed. Choose/create a disposable vault folder through the native picker, Capture one synthetic PNG/JPEG/WebP with an optional human note, then search words from that note/filename. View original, correct the note, review History, close/restart and reopen. To exercise a direct Obsidian edit, change only the Markdown body (preserve header and source link), refresh, and review the new human revision. Cancelled folder/photo pickers preserve drafts. A correction racing a direct edit requires Reload latest note and explicit review before saving again.
+
+`npm run dev -w @recall/desktop` runs only the browser preview: it cannot persist a native vault. `npm run build -w @recall/desktop` builds renderer assets; `npm run tauri -w @recall/desktop -- build` builds the native bundle. CI is configured to emit an unsigned Windows installer artifact with seven-day retention and no cloud variables. It is not a signed release or proof of installation acceptance.
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npx playwright install chromium
+npm run test:ui
+npm run test:local-vault
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+```
+
+Set `RECALL_CHROMIUM=/path/to/chromium` to use a system browser. The separate local suite injects a synthetic Tauri boundary only in tests; Rust tests separately prove filesystem behavior. See [evidence and limits](implementation/local-vault/README.md). Human-note/filename search is not OCR, handwriting interpretation or AI. No local phone sync, QR, deletion/tombstone workflow, real-data migration or full semantic rebuild is included. Failed correction drafts survive the current focus session and cancelled vault selection, but not application restart or deliberate memory/vault exit. Pending import intents persist for explicit retry. Corrupt intent/metadata and publication conflicts can require owner-managed recovery; never delete recovery files to conceal an error.
+
+## Legacy cloud procedures, not local onboarding
+
+Sign-in and provider setup below verify the existing implementation only. The target requires no account/password/email-link sign-in, including first use; local-only use needs no remote account. See the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md), whose local-only subset is authorized and implemented; device pairing remains unresolved. Do not bypass existing private API authentication or change deployed configuration to simulate this target.
 
 ## V1 deployment, recovery and acceptance
 
@@ -30,7 +55,7 @@ Instructions only. Product scope lives in [PRD](PRD.md); evidence lives in [ACCE
 ## Install
 
 ```bash
-npm install                       # workspaces: packages/*, apps/*
+npm ci                            # workspaces: packages/*, apps/*
 cd services/backend && uv sync    # uses uv.lock
 ```
 

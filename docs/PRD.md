@@ -211,11 +211,11 @@ Evaluation includes both Paul-style difficult handwriting and general-domain cas
 
 The Obsidian vault is the required durable memory spine. Human-readable Markdown and links coexist with immutable original attachments and versioned structured provenance/history, so memory remains owned and usable outside Recall. PostgreSQL/pgvector provide supporting transactional services, authorization, synchronization and rebuildable memory/search projections; SQLite is a cache/outbox. Neither an LLM nor a database-only record replaces vault-backed memory.
 
-The existing code is still PostgreSQL-authoritative with one-way managed Markdown export. Vault-first commitment, direct vault-edit reconciliation and projection recovery are required migration work, not current capabilities. Precise vault schema and cross-device transport must be specified and validated before implementation; no paid Obsidian Sync service or community plugin is assumed.
+The new local desktop foundation commits original images, human notes and append-only revisions to a selected vault and reconciles supported Markdown body edits. Its keyword view rebuilds from validated vault files. Existing cloud memory remains PostgreSQL-authoritative with one-way managed export; full semantic projection recovery and migration remain open. Cross-device transport is not implemented; no paid Obsidian Sync service or community plugin is assumed.
 
 Target local-only capture, vault reading/correction and local search must work without a remote account or network service. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
 
-Existing clients still use Supabase email auth. The [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) compares local-only and paired local-first approaches; neither the proposed QR flow nor the written architecture has been approved or implemented.
+Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish this bounded implementation from the full target; QR pairing remains unanswered and unimplemented. See [acceptance evidence](implementation/local-vault/README.md).
 
 ## 15. Product roadmap
 

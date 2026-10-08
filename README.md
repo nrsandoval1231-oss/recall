@@ -1,6 +1,6 @@
 # Recall
 
-**Required product target:** no account, password, or email-link sign-in, including first use. Private local use needs no remote account. Secure owner-approved device association is still required for private cross-device use; one-time QR pairing is proposed and awaits the owner’s answer. This is not implemented: existing clients still use Supabase email authentication. See the [RCL-005B design proposal](docs/superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
+**Required product target:** no account, password, or email-link sign-in, including first use. Private local use needs no remote account. Secure owner-approved device association is still required for private cross-device use; one-time QR pairing is proposed and awaits the owner’s answer. The desktop now defaults to a local-only vault foundation with no sign-in or cloud configuration. The browser/mobile and opt-in legacy desktop flows retain Supabase authentication. See the [RCL-005B design proposal](docs/superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
 
 **Your life remembers itself.**
 
@@ -20,6 +20,8 @@ Example: “What was the name of that guy Sarah introduced me to last summer who
 
 ## Current status
 
+The local desktop loop is choose vault → import PNG/JPEG/WebP → search human notes/filenames → inspect original → correct/review history. See [run instructions](docs/DEVELOPMENT.md#local-only-desktop-foundation) and [synthetic verification and limits](docs/implementation/local-vault/README.md). It does not read handwriting or generate answers. Installed Windows acceptance remains open.
+
 **RCL-001 (Trusted Capture) and RCL-002 (First Useful Recall) have automated implementation evidence. The status ledger records deployed pilot infrastructure and a browser adapter; real signed-in cross-device acceptance and live handwriting quality remain open.** RCL-002 adds opt-in AI reading of captures, keyword retrieval, and cited answers that abstain without evidence. The V1 build adds canonical entities and temporal claims, user corrections, hybrid retrieval, SQLite/offline sync, portable exports, managed Markdown, deletion, and backup/restore. See [V1 implementation status](docs/V1-STATUS.md) for current evidence and limitations.
 
 What exists: Expo iPhone app, Tauri/React Windows app, FastAPI backend, Postgres schema with RLS, private-storage adapters, shared sync/API/token packages. See [DEVELOPMENT](docs/DEVELOPMENT.md) to run it and [ACCEPTANCE](docs/ACCEPTANCE.md) ("RCL-001 evidence") for exactly what was and was not verified.
@@ -30,7 +32,7 @@ This repository is public. Every checked-in example must remain synthetic. Never
 
 Obsidian is the required memory spine, not an optional export destination. The user-owned vault holds durable memory notes, relationships, original attachments and the provenance/history needed to preserve meaning over time. Recall adds low-friction capture, LLM-assisted understanding, grounded retrieval and the Memory Surface over that foundation. Users do not need to organize folders or maintain a taxonomy.
 
-**Implementation gap:** current code still commits authoritative memory to PostgreSQL and offers one-way managed Markdown export. Bidirectional vault integration, recoverable vault commits and reconstruction of database projections from the vault are required work; they are not implemented. See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
+**Local foundation:** new desktop captures commit originals, human notes and retained revisions to a selected vault, reconcile supported direct Markdown body edits and rebuild local keyword retrieval from validated files. This is a usable local desktop foundation candidate, not full RCL-005B: existing cloud memory remains PostgreSQL-authoritative. Semantic projection reconstruction, migration, phone synchronization, deletion/tombstones and local AI are not implemented. See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
 
 ## Product layers
 

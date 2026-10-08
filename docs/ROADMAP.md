@@ -2,7 +2,7 @@
 
 Version: 0.5 | Dependency-ordered, not delivery-date promises
 
-The existing pilot uses the Cloudflare browser adapter for iPhone photo capture and Windows retrieval; native clients remain preserved. [V1-STATUS](V1-STATUS.md) records deployment of the older email-authenticated pilot. Deployment of the newer canonical Memory Surface is not established by its [local/fixture evidence](implementation/memory-surface/README.md), and real signed-in cross-device acceptance remains open. The next work is review of the proposed local-first RCL-005B design below, not further email-sign-in rollout; QR pairing and written-design approval remain pending.
+The existing pilot uses the Cloudflare browser adapter for iPhone photo capture and Windows retrieval; native clients remain preserved. [V1-STATUS](V1-STATUS.md) records deployment of the older email-authenticated pilot. Deployment of the newer canonical Memory Surface is not established by its [local/fixture evidence](implementation/memory-surface/README.md), and real signed-in cross-device acceptance remains open. The authorized local-only RCL-005B foundation is implemented for desktop; platform acceptance and the remaining full-spine work are open. QR pairing remains unanswered.
 
 ## Required architecture decision
 
@@ -72,9 +72,9 @@ Exit: the vertical slice runs against real Recall contracts/data, remains source
 
 ## RCL-005B — Required Obsidian memory spine
 
-Status: **written design proposed; awaiting approval; not implemented**.
+Status: **bounded local desktop foundation implemented; full RCL-005B and installed-device acceptance OPEN**.
 
-[Review the RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Product requirement: no account/password/email-link sign-in, including first use. Private local-only use needs no remote account. Cross-device private use still needs secure owner-approved device association; one-time QR pairing is an unresolved proposal. Approve the written design before an implementation plan, then review that plan and select execution before product code. Historical email-auth acceptance is not the new target.
+[Review the RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Product requirement: no account/password/email-link sign-in, including first use. Private local-only use needs no remote account. Cross-device private use still needs secure owner-approved device association; one-time QR pairing is an unresolved proposal. Subsequent owner direction authorized the [local-only plan](superpowers/plans/2026-10-07-local-vault-foundation.md), implemented with independent reviews and [synthetic evidence](implementation/local-vault/README.md). Phone transport, pairing, semantic reconstruction, deletion/tombstones and migration remain excluded. Historical email-auth acceptance is not the new target.
 
 Make an Obsidian vault the user-owned durable memory spine while retaining Recall's Memory Surface and universal memory model. Specify the versioned vault schema, workspace association, authorized browser/mobile bridge, direct-edit reconciliation and migration/rollback before changing storage authority. Keep PostgreSQL/jobs/authorization and SQLite where useful as supporting services/projections, not exclusive owners of semantic memory.
 

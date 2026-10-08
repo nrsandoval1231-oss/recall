@@ -1,10 +1,10 @@
 # Recall architecture
 
-## No-sign-in target and design gate
+## No-sign-in target and local foundation
 
 No account/password/email-link sign-in is permitted in the target, including first use. Private local-only use needs no remote account. Recommend a local vault adapter and rebuildable local search first, with optional owner-paired private synchronization. Pairing is device authorization, not remembered account login; the one-time QR interaction is explicitly unresolved. Public private-data APIs must continue authenticating and authorizing requests.
 
-The [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) develops this canonical architecture for review, not a competing approved architecture. Current database authority, deployed email authentication and existing API contracts remain in place until a separately approved implementation and verified migration. No runtime/configuration change accompanies these docs.
+The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) now has an authorized bounded local-only implementation. Desktop defaults to a native selected-vault adapter; cloud entry is lazy-loaded only with `?mode=legacy-cloud`. Existing cloud database authority, deployed email authentication and API contracts remain intact; no real-data migration or deployment occurred.
 
 ## Required target: Obsidian as the memory spine
 
@@ -29,11 +29,17 @@ Capture -> durable original/outbox -> authorized, recoverable vault commit
                               grounded Memory Surface
 ```
 
-Vault association is required per workspace. Local capture may precede vault availability, but vault-pending state must remain explicit. Obsidian itself need not be running for an authorized adapter to access the vault; integration must not require a paid sync subscription or community plugin. Browser/mobile access needs a scoped vault bridge or replica transport, not unrestricted filesystem access. The [RCL-005B design proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) specifies a reviewable transport and conflict approach; it is not approved or implemented.
+Vault association is required per workspace. Local capture may precede vault availability, but vault-pending state must remain explicit. Obsidian itself need not be running for an authorized adapter to access the vault; integration must not require a paid sync subscription or community plugin. Browser/mobile access needs a scoped vault bridge or replica transport, not unrestricted filesystem access. The [RCL-005B design proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) specifies a reviewable transport and conflict approach; its local foundation is implemented, while phone transport/pairing remains proposed.
 
 Migration must prove journaled crash-safe writes, versioned/idempotent operations, direct-edit ingestion, conflict preservation, immutable evidence, authorization, deletion/tombstone reconciliation and recovery of semantic/search projections from the vault. Preserve current contracts and data until migration and rollback are verified. A one-way export does not meet acceptance.
 
-## Current V1 implementation — pre-migration
+## Implemented local desktop subset
+
+`local_vault.rs` owns native folder/photo pickers and exposes narrow status/select/capture/list/correct/source/history commands. Every selected-vault command requires the ephemeral `expectedVaultId`; the stable `vault_identity` only namespaces pending import intents. Renderer paths cannot authorize access. New memory authority is `Recall/Sources/<uuid>.<type>`, `Recall/Memories/<uuid>.md`, append-only `Recall/History/<uuid>/<revision>.json`, and versioned manifest/journal/commit metadata under `Recall/_meta`. Retained publication backups support conflict diagnosis. No entity/AI or cloud domain model is replaced.
+
+Native validation checks source hashes, full history and metadata before search/evidence eligibility. Cooperating writers lock the vault; staged create-only publication, flushes, receipts and retained prior versions support retry/restart. Direct body edits become `human:obsidian` revisions on refresh. Stale corrections require explicit reload/review. Missing/renamed/duplicate/header-modified notes, damaged originals and conflicted pending publication remain diagnostics; some require manual recovery. Local search is human-note/filename keyword matching, not OCR or semantic reconstruction. See [evidence and durability limits](implementation/local-vault/README.md).
+
+## Legacy cloud V1 implementation — pre-migration
 
 The active pilot client is a responsive React web app served by a Cloudflare Worker. The Worker holds encrypted HttpOnly session cookies, validates the Supabase email callback, and proxies only the fixed Recall API origin. Browser tokens are removed from callback URLs before network redemption. Canonical PostgreSQL, private originals, and the Python API/worker remain unchanged. Browser IndexedDB is a workspace-scoped original-draft outbox, not the native SQLite cache or an offline generative service. Pending drafts survive logout and have explicit confirmed removal controls. Deployment and live browser acceptance are tracked separately in V1-STATUS.
 
@@ -46,7 +52,7 @@ See [V1-STATUS](V1-STATUS.md) for verification boundaries; proposed future capab
 
 Version: 0.2 | 2026-10-07 | Obsidian target required; database baseline below describes current implementation
 
-## 1. Current implementation ownership and topology
+## 1. Legacy cloud implementation ownership and topology
 
 ```text
 Expo mobile ------------------+

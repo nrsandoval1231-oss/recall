@@ -1,11 +1,15 @@
 # Recall acceptance and evaluation
 
-## No-sign-in target acceptance — OPEN
+## Local desktop foundation evidence — bounded; platform acceptance OPEN
+
+The authorized implementation supplies a no-sign-in desktop vault loop for new local captures. [Local verification evidence](implementation/local-vault/README.md) separates 72 real-disk Rust tests from rendered synthetic Tauri-boundary journeys and installed-device gates. Neither mock commands nor an unsigned Windows CI artifact prove installed native acceptance. Full RCL-005B, migration, phone association/transport and live AI remain open.
+
+## Full no-sign-in target acceptance — OPEN
 
 - Fresh install with no account/session/network: create/select a local Obsidian vault, save and reopen exact originals, edit/correct and search locally without account/password/email-link sign-in. A remembered login fails this criterion.
 - Phone-first capture survives restart before association; desktop-off and Wi-Fi-off capture survives retries and later vault acknowledgment without duplicate memory. Browser durability/eviction and filesystem permission behavior must be tested separately; browser drafts alone do not establish native vault acceptance.
 - If the owner accepts pairing, prove explicit device approval, expired/replayed/wrong-device invitation rejection, revocation, loss/recovery and denial of unauthenticated private network access. QR is proposed, not accepted.
-- Validate vault round trip, projection rebuild, conflicts and migration/rollback against the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). These gates have not been run; historical provider sign-in tests below remain baseline evidence only.
+- Validate vault round trip, projection rebuild, conflicts and migration/rollback against the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Bounded local checks are recorded above; complete cross-device/migration gates have not been run. Historical provider sign-in tests below remain baseline evidence only.
 
 Version: 0.3 | Automated evidence and OPEN live gates
 

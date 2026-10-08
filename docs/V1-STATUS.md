@@ -1,16 +1,20 @@
 # Recall V1 implementation and acceptance
 
-## No-sign-in requirement — OPEN, October 7
+## Local desktop foundation — implemented candidate, October 8
 
-The owner requires no account/password/email-link sign-in, including first use. Local-only use must need no remote account; private cross-device use still needs secure owner-approved association. QR pairing is only proposed. The [written RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) awaits review; no runtime, deployed authentication, or storage authority changes have been made. Existing email-flow attempts and deployment evidence below are historical/current evidence and are deliberately retained. Recovering email quota or remembering a session would not satisfy the new requirement.
+The owner requires no account/password/email-link sign-in, including first use. Local-only use must need no remote account; private cross-device use still needs secure owner-approved association. QR pairing is only proposed. Subsequent owner direction authorized the [local-only plan](superpowers/plans/2026-10-07-local-vault-foundation.md). Desktop now defaults to no-sign-in vault capture/search/evidence/correction/history, without cloud configuration. Deployed authentication and legacy cloud authority are unchanged. Existing email-flow attempts and deployment evidence below are historical/current evidence and are deliberately retained. Recovering email quota or remembering a session would not satisfy the new requirement.
 
 This is the implementation ledger for the V1 build from accepted baseline `92b4c33aafda412f89d745f38b87858f2d4b2837`. A PASS below means deterministic implementation evidence, not live product quality. Physical devices, live infrastructure and model quality have separate gates.
 
 ## Required architecture gap — Obsidian spine
 
-The October 7 product direction requires Obsidian as the user-owned durable memory spine. **This is not implemented:** current memory remains PostgreSQL-authoritative, with a one-way native Markdown exporter. Vault commitment, direct-edit reconciliation, versioned history/provenance and projection reconstruction are required migration work in RCL-005B. Existing tests and canonical-browser acceptance do not establish vault-spine acceptance. Preserve current behavior until migration is specified and verified.
+The October 7 product direction requires Obsidian as the user-owned durable memory spine. The bounded new local desktop adapter implements vault commitment, human revision history and supported direct-body-edit reconciliation. Existing cloud memory remains PostgreSQL-authoritative, with a one-way native Markdown exporter. Full semantic projection reconstruction, deletion/tombstones, phone transport and migration remain open in RCL-005B. Existing tests and canonical-browser acceptance do not establish vault-spine acceptance. Preserve legacy data and privacy contracts until migration is specified and verified.
 
 ## What works
+
+### Local desktop foundation, October 8
+
+Native and renderer tasks were independently reviewed and repaired through `2210d1f`. Native Linux synthetic filesystem suite: 72 passed. Root client suite at that head: 186 passed. Separate browser-injected Tauri boundary journeys and current delivery checks are recorded in [local foundation evidence](implementation/local-vault/README.md). CI is now configured to build an unsigned Windows installer without cloud variables; producing an artifact does not prove installed Windows acceptance. No installed native UI, iPhone, live AI, real-data migration, release or deployment is claimed.
 
 ### Canonical browser Memory Surface, October 7
 
@@ -20,7 +24,7 @@ The first canonical browser slice implements sparse Home, Ask reconstruction, re
 
 The user selected a Cloudflare web app after native email sign-in failures. `apps/web` implements browser email-link callbacks, encrypted server session cookies, durable scoped photo drafts, retry-safe uploads, recent captures, Ask, and hash-verified cited originals. Root verification: 125 client tests passed, including 20 web tests; root lint/typecheck and web production build passed. Actual Wrangler runtime returned 200 for the app/callback with CSP and same-origin resource policy; private unauthenticated routes returned 401/no-store; foreign-origin login POST returned 403; arbitrary proxy routes returned 404. No email was sent by these probes.
 
-Cloudflare `recall-web` is deployed at https://recall-web.nicksandoval201121.workers.dev with its server session secret; Supabase Site URL and scoped callback allowlist are saved. Hosted runtime probes confirmed app/callback 200 and private unauthenticated routes 401/no-store. Real signed-in browser upload/source access remains pending. AI processing remains disabled in production. Existing Supabase email quota was exhausted during earlier sign-in attempts; web deployment does not remove that provider limit. Native implementation below remains preserved. This records the older browser pilot, not deployment of the newer canonical Memory Surface; the next work is RCL-005B design review, with pairing and written-design approval still pending.
+Cloudflare `recall-web` is deployed at https://recall-web.nicksandoval201121.workers.dev with its server session secret; Supabase Site URL and scoped callback allowlist are saved. Hosted runtime probes confirmed app/callback 200 and private unauthenticated routes 401/no-store. Real signed-in browser upload/source access remains pending. AI processing remains disabled in production. Existing Supabase email quota was exhausted during earlier sign-in attempts; web deployment does not remove that provider limit. Native implementation below remains preserved. This records the older browser pilot, not deployment of the newer canonical Memory Surface; the local-only foundation now proceeds under owner authorization; pairing remains unanswered.
 
 Live owner sign-in attempted at 23:35 CDT failed: Supabase auth logs record HTTP 429 `over_email_send_rate_limit` for the hosted callback. This confirms provider delivery rejection, not signed-in acceptance. No further email probes were sent during diagnosis. Custom SMTP or quota recovery would address the existing email flow only; it is not the proposed next step and cannot satisfy the new no-sign-in requirement.
 

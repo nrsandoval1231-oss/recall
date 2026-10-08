@@ -12,11 +12,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tests/e2e/tsconfig.json && tsc -p tests/ui/tsconfig.json",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tests/e2e/tsconfig.json && tsc -p tests/ui/tsconfig.json && tsc -p tests/local-vault/tsconfig.json",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "test:ui": "playwright test -c tests/ui/playwright.config.ts"
+    "test:ui": "playwright test -c tests/ui/playwright.config.ts",
+    "test:local-vault": "playwright test -c tests/local-vault/playwright.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
