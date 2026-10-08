@@ -58,7 +58,7 @@ Versioned record updates require `If-Match` with the current revision/version. A
 | `POST /exports` / `GET /exports/{id}` | Portable snapshot and artifact status | 005 |
 | `DELETE /captures/{id}` | Explicit owner deletion; invalidate derived content and emit tombstones | 005 |
 
-Current auth sign-in/token refresh use the selected provider, not custom password endpoints. This pre-migration contract does not satisfy the new no-sign-in target. Proposed paired-device authentication needs separately reviewed versioned contracts; no pairing endpoint or anonymous private-data access is introduced here. Administrative quota/consent controls are settings-only capabilities, not a public arbitrary configuration-write endpoint.
+Current auth sign-in/token refresh use the selected provider, not custom password endpoints. This pre-migration contract does not satisfy the new no-sign-in target. PAIR-01 adds a separately gated capability-authenticated, inference-only device claim/status/revoke contract; private data routes remain scoped and authenticated. Administrative quota/consent controls are settings-only capabilities, not a public arbitrary configuration-write endpoint.
 
 ## Capture manifest
 
@@ -180,8 +180,9 @@ These are the exact, tested semantics of the packet-001 routes. Where they refin
 
 This optional route reads one explicitly selected vault original with Claude. It creates **no** cloud capture,
 source object, memory or search projection. The local vault remains authoritative. The production authorizer
-is default-deny: ordinary cloud login tokens do not enable this route. No enrollment, credential creation,
-account UX or production configuration is supplied by this packet.
+is default-deny: ordinary cloud login tokens do not enable this route. PAIR-01 adds a default-disabled,
+capability-authenticated claim endpoint for a single-use owner invitation; it adds no public invitation
+creation or general enrollment API.
 
 The native adapter uses a fixed HTTPS service origin and an opaque, inference-only device credential held in
 OS-protected storage. The server's injected `DeviceAuthorizer.verify` must verify current revocation and exact
@@ -189,6 +190,12 @@ vault scope, and map to an **existing** operational user/workspace/device. The s
 current workspace membership without provisioning. It verifies the device before reading any request body,
 again before dispatch, and again before returning a POST or GET receipt. The renderer never receives the
 credential, chooses an origin, or supplies a filesystem path.
+
+With RECALL_DEVICE_PAIRING_ENABLED=true, POST /v1/device-pairings/{invitation_id}/claim accepts only a
+32-byte device secret in a body capped at 4 KiB. The invitation ID alone cannot claim. GET
+/v1/device-pairings/status resolves claim outcomes using the device bearer. DELETE /v1/device-pairings
+revokes that bearer idempotently. Native requests use the same fixed HTTPS origin, disable redirects and
+proxies, and verify the exact device, vault and photo_inference scope before saving the connection.
 
 ### Request
 

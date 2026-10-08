@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { effectiveReading, type LocalVault, type ReadingCapability, type ReadingOperation, type VaultMemory, type VaultReading } from "../platform/local-vault";
+import { effectiveReading, type LocalVault, type PairingStatus, type ReadingCapability, type ReadingOperation, type VaultMemory, type VaultReading } from "../platform/local-vault";
 
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 const eligible = (m: VaultMemory) => m.revision > 0 && m.state === "active" && !m.conflict;
@@ -21,6 +21,9 @@ type Props = { vault: LocalVault; session: string; memory: VaultMemory; active: 
 type Correction = { operationId: string; revision: number; text: string };
 export function PhotoReading({ vault, session, memory, active, visible, generation, blocked, onSaved }: Props) {
   const [capability, setCapability] = useState<ReadingCapability | null>(null);
+  const [pairing, setPairing] = useState<PairingStatus | null>(null);
+  const [invitationId, setInvitationId] = useState("");
+  const [pairingBusy, setPairingBusy] = useState(false);
   const [operationsReady, setOperationsReady] = useState(false);
   const [operation, setOperation] = useState<ReadingOperation | null>(null);
   const [panel, setPanel] = useState<"reading" | "consent" | "correct">("reading");
@@ -42,14 +45,14 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
   const alive = useRef(true);
   const currentOperation = useRef<ReadingOperation | null>(null);
   const transport = useRef(false);
-  const current = useRef({ active, visible, generation, memoryId: memory.id, revision: memory.revision, sourceHash: memory.source_sha256, state: memory.state }); current.current = { active, visible, generation, memoryId: memory.id, revision: memory.revision, sourceHash: memory.source_sha256, state: memory.state };
+  const current = useRef({ active, visible, generation, session, memoryId: memory.id, revision: memory.revision, sourceHash: memory.source_sha256, state: memory.state }); current.current = { active, visible, generation, session, memoryId: memory.id, revision: memory.revision, sourceHash: memory.source_sha256, state: memory.state };
   const artifact = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const readingTrigger = useRef<HTMLButtonElement>(null);
   const returnConsentFocus = useRef(false);
   const draftRevision = useRef<number | null>(null);
   function storeOperation(op: ReadingOperation | null) { currentOperation.current = op; setOperation(op); }
-  function guard() { const e = epoch.current; const g = generation; return () => alive.current && current.current.active && current.current.visible && current.current.generation === g && epoch.current === e; }
+  function guard() { const e = epoch.current; const g = generation; const id = memory.id; const vaultSession = session; return () => alive.current && current.current.active && current.current.visible && current.current.generation === g && current.current.memoryId === id && current.current.session === vaultSession && epoch.current === e; }
   function releaseSource() { sourceRequest.current++; if (artifact.current) URL.revokeObjectURL(artifact.current); artifact.current = null; setSource(null); setDecoded(false); }
   function cancelOnExit() {
     const op = currentOperation.current;
@@ -62,6 +65,7 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
   useEffect(() => { alive.current = true; return () => { alive.current = false; epoch.current++; localRequest.current++; cancelOnExit(); if (artifact.current) URL.revokeObjectURL(artifact.current); }; }, []);
   useLayoutEffect(() => {
     epoch.current++; localRequest.current++; setWorking(false); setCancelling(false);
+    setPairingBusy(false); setPairing(null); setInvitationId("");
     if (!active || !visible) {
       cancelOnExit(); releaseSource();
       if (correction) { setNeedsReview(true); setReviewReady(false); setReviewed(false); }
@@ -75,7 +79,65 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
       if (!valid() || request !== localRequest.current) return;
       setCapability(cap); storeOperation(ops.find(unfinished) ?? ops.at(-1) ?? null); setOperationsReady(true);
     }, e => { if (valid() && request === localRequest.current) { setError(message(e)); setCapability({ enabled: false, explanation: "Reading availability could not be checked. Local capture and search remain available." }); } });
+    if (vault.pairingStatus) void vault.pairingStatus(session).then(result => {
+      if (valid() && request === localRequest.current) setPairing(result);
+    }, () => {
+      if (valid() && request === localRequest.current) setPairing({ state: "unknown", device_id: null, vault_id: "", fingerprint: null, scope: null });
+    });
   }, [active, visible, generation, session, memory.id]);
+  async function preparePairing() {
+    if (!vault.pairingPrepare || pairingBusy) return;
+    const valid = guard();
+    setPairingBusy(true); setError("");
+    try { const result = await vault.pairingPrepare(session); if (valid()) setPairing(result); }
+    catch (e) { if (valid()) setError(`Pairing status is unknown: ${message(e)}`); }
+    finally { if (valid()) setPairingBusy(false); }
+  }
+  async function checkPairingStatus() {
+    if (!vault.pairingStatus || pairingBusy) return;
+    const valid = guard(); const request = ++localRequest.current;
+    setPairingBusy(true); setError("");
+    try {
+      const result = await vault.pairingStatus(session);
+      if (!valid() || request !== localRequest.current) return;
+      setPairing(result);
+      if (result.state === "connected") {
+        const cap = await vault.readingCapability(session);
+        if (valid() && request === localRequest.current) setCapability(cap);
+      }
+    } catch (e) {
+      if (valid() && request === localRequest.current) {
+        setPairing({ state: "unknown", device_id: null, vault_id: "", fingerprint: null, scope: null });
+        setError(`Pairing status is unknown: ${message(e)}`);
+      }
+    } finally { if (valid() && request === localRequest.current) setPairingBusy(false); }
+  }
+  async function claimPairing() {
+    if (!vault.pairingClaim || !invitationId.trim() || pairingBusy) return;
+    const valid = guard();
+    setPairingBusy(true); setError("");
+    try {
+      const result = await vault.pairingClaim(session, invitationId.trim());
+      if (valid()) {
+        setPairing(result); setInvitationId("");
+        const cap = await vault.readingCapability(session);
+        if (valid()) setCapability(cap);
+      }
+    } catch (e) {
+      if (valid()) {
+        setError(`Pairing may have completed. Check connection status before retrying: ${message(e)}`);
+        try { const result = await vault.pairingStatus?.(session); if (result && valid()) { setPairing(result); if (result.state === "connected") { const cap = await vault.readingCapability(session); if (valid()) setCapability(cap); } } } catch { /* preserve UNKNOWN */ }
+      }
+    } finally { if (valid()) setPairingBusy(false); }
+  }
+  async function disconnectPairing() {
+    if (!vault.pairingDisconnect || pairingBusy) return;
+    const valid = guard();
+    setPairingBusy(true); setError("");
+    try { const result = await vault.pairingDisconnect(session); if (valid()) { setPairing(result); const cap = await vault.readingCapability(session); if (valid()) setCapability(cap); } }
+    catch (e) { if (valid()) setError(`Disconnect status is unknown: ${message(e)}`); }
+    finally { if (valid()) setPairingBusy(false); }
+  }
   useEffect(() => {
     if (!active || !visible || !memory.reading || !eligible(memory)) { releaseSource(); return; }
     // Reading transport may change its own epoch while these source bytes remain current.
@@ -147,7 +209,15 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
   const canRead = eligible(memory) && !blocked && capability?.enabled && operationsReady && !working && !cancelling && !pending;
   return <section hidden={!visible || !active} className="local-photo-reading" aria-label="Photo reading">
     {notice && operation?.state !== "committed" && <p role="status">{notice}</p>}{error && <p role="alert" className="local-error">{error}</p>}
-    {capability && !capability.enabled && <p className="local-muted">Claude reading is not connected on this device. {capability.explanation} Your photos, notes and local search remain available.</p>}
+    {capability && !capability.enabled && <section className="local-muted" aria-label="Private photo reading connection"><p>Claude reading is not connected on this device. Your photos, notes and local search remain available.</p>
+      {vault.pairingPrepare && <><button disabled={pairingBusy} onClick={() => void preparePairing()}>Prepare this device for owner approval</button>
+        {pairing?.state === "pending_owner_approval" && <><p>Device {pairing.device_id} · vault {pairing.vault_id} · photo inference only</p><p>Device fingerprint: <strong>{pairing.fingerprint}</strong></p><label htmlFor="pairing-invitation">Owner invitation ID</label><input id="pairing-invitation" value={invitationId} onChange={e => setInvitationId(e.target.value)} autoComplete="off" /><button disabled={pairingBusy || !invitationId.trim()} onClick={() => void claimPairing()}>Connect this device</button><button disabled={pairingBusy} onClick={() => void checkPairingStatus()}>Check pairing status</button></>}
+        {pairing?.state === "unknown" && <><p role="status">Connection status is unknown. Check status or disconnect this device to recover safely.</p><button disabled={pairingBusy} onClick={() => void checkPairingStatus()}>Check pairing status</button><button disabled={pairingBusy} onClick={() => void disconnectPairing()}>Confirm disconnect or discard pending pairing</button></>}
+        {pairing?.state === "pending_owner_approval" && <button disabled={pairingBusy} onClick={() => void disconnectPairing()}>Discard pending pairing</button>}
+      </>}
+      <p>{capability.explanation}</p>
+    </section>}
+    {capability?.enabled && pairing?.state === "connected" && <p><span>Connected for photo inference on this device.</span> <button disabled={pairingBusy} onClick={() => void disconnectPairing()}>Disconnect device</button></p>}
     {operation && <section className="local-reading-operation" aria-label="Reading status"><p role="status">{working && panel !== "correct" ? "Reading this photo with Claude…" : operation.state === "cancelled" ? "Cancelled locally" : operation.state === "committed" ? notice || "Reading saved in your vault." : `Reading status: ${operation.state}`}</p>{operation.state === "committed" ? <p className="local-muted">This photo was processed with Claude. Your original remains in the local vault.</p> : operation.may_have_been_sent && <p className="local-muted">This photo may already have been sent to the private service and Claude. Cancellation cannot promise to stop processing or a charge.</p>}{operation.error_code && <p className="local-muted">{operation.error_code}</p>}
       {pending && <><p className="local-muted">Retry or recovery may resend this photo if the service has no receipt, using the same operation. In-flight or unknown provider work is not submitted again. A retained complete receipt can be saved locally without another upload.</p><div className="local-actions"><button disabled={working || cancelling || blocked || (operation.state !== "ready" && !capability?.enabled) || !operationsReady} onClick={() => void read(true)}>Retry or recover reading</button><button disabled={cancelling} onClick={() => void cancel()}>{cancelling ? "Cancelling…" : "Cancel reading"}</button></div></>}
     </section>}

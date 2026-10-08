@@ -1,0 +1,106 @@
+{
+  "packet": "PAIR-01",
+  "base_sha": "a17c2402ee5778a4015c50934bb91c7a59359dfe",
+  "branch": "implement/owner-device-pairing",
+  "result": "IMPLEMENTED_SYNTHETIC_CANDIDATE_REVIEW_PENDING",
+  "changed_files": [
+    ".gitattributes",
+    ".env.example",
+    "apps/desktop/src-tauri/Cargo.lock",
+    "apps/desktop/src-tauri/Cargo.toml",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src-tauri/src/pairing.rs",
+    "apps/desktop/src-tauri/src/reading_commands.rs",
+    "apps/desktop/src/local/PhotoReading.tsx",
+    "apps/desktop/src/local/photo-reading.test.tsx",
+    "apps/desktop/src/platform/local-vault.ts",
+    "docs/API-CONTRACT.md",
+    "docs/ARCHITECTURE.md",
+    "docs/PRD.md",
+    "docs/ROADMAP.md",
+    "docs/SECURITY-AND-OPERATIONS.md",
+    "docs/UX-SPEC.md",
+    "docs/V1-STATUS.md",
+    "docs/implementation/owner-device-pairing/README.md",
+    "infra/README.md",
+    "infra/check-pilot-secrets.sh",
+    "infra/pilot.activation.reviewed.env.example",
+    "services/backend/migrations/0009_device_pairing.sql",
+    "services/backend/src/recall/api/app.py",
+    "services/backend/src/recall/config.py",
+    "services/backend/src/recall/pairing.py",
+    "services/backend/src/recall/pairing_cli.py",
+    "services/backend/tests/test_backup.py",
+    "services/backend/tests/test_local_reading.py",
+    "services/backend/tests/test_migrations.py",
+    "services/backend/tests/test_pairing.py",
+    "services/backend/tests/test_pilot_preflight.py"
+  ],
+  "implementation": [
+    "Owner-only invitation and lost-device revocation bind an existing owner/workspace to exact device/vault and inference-only scope. Server invitations/grants store SHA-256 secret hashes only; membership and revocation are checked on each protected request.",
+    "Native lifecycle uses protected keyring material, compile-time HTTPS origin binding, serialized claim/status/disconnect, server-status recovery and fail-closed UNKNOWN behavior. Native synthetic failure/race tests were authored by the specialist, but are not locally executed.",
+    "Pairing-enabled server configuration now constructs the real local Anthropic adapter with retries/refusal fallback disabled; a synthetic end-to-end DB grant claim and photo route test exercises production authorizer wiring without network dispatch.",
+    "Renderer controls expose only device fingerprint, invitation ID, pairing status and recovery actions. Status replies and errors are guarded by the active view epoch.",
+    "Pilot preflight remains default-denied. Provider activation requires a new explicit production-owner approval separate from the USD 5 synthetic evaluation authorization, exact reviewed owner/workspace/device/vault/origin/scope, and API/worker model, pricing and daily/monthly budget matches. No lifetime or request-count cap is claimed.",
+    "Workspace erasure revokes paired grants; backup schema version follows migration 0009. Product, API, security, UX, operator and current status documentation were reconciled."
+  ],
+  "validation": [
+    {
+      "command": "services/backend/.venv/Scripts/python.exe -m pytest services/backend/tests/test_pairing.py services/backend/tests/test_migrations.py -q",
+      "exit_code": 0,
+      "result": "16 passed"
+    },
+    {
+      "command": "$env:PATH = 'C:\\Program Files\\PostgreSQL\\18\\bin;' + $env:PATH; services/backend/.venv/Scripts/python.exe -m pytest services/backend/tests/test_local_reading.py -k pairing_enabled_runtime services/backend/tests/test_pairing.py -q",
+      "exit_code": 0,
+      "result": "1 passed, 70 deselected"
+    },
+    {
+      "command": "$env:PATH = 'C:\\Program Files\\Git\\usr\\bin;' + 'C:\\Program Files\\PostgreSQL\\18\\bin;' + $env:PATH; services/backend/.venv/Scripts/python.exe -m pytest services/backend/tests/test_pilot_preflight.py -q",
+      "exit_code": 0,
+      "result": "10 passed; POSIX shell and utility directory supplied to the test subprocess"
+    },
+    {
+      "command": "$short = 'C:\\t-pair01-20261008'; services/backend/.venv/Scripts/python.exe -m pytest services/backend/tests/test_backup.py -q --basetemp $short",
+      "exit_code": 0,
+      "result": "3 passed; used a new short temporary root after Windows path-length failure in the default pytest temp path"
+    },
+    {
+      "command": "npm test --workspace @recall/desktop -- src/local/photo-reading.test.tsx",
+      "exit_code": 0,
+      "result": "29 passed"
+    },
+    {
+      "command": "npm run typecheck",
+      "exit_code": 0,
+      "result": "All workspace and browser/e2e TypeScript checks passed"
+    },
+    {
+      "command": "services/backend/.venv/Scripts/ruff.exe check <changed backend Python paths>; services/backend/.venv/Scripts/ruff.exe format --check <changed backend Python paths>",
+      "exit_code": 0,
+      "result": "All checks passed; 9 files already formatted"
+    },
+    {
+      "command": "services/backend/.venv/Scripts/python.exe -m mypy --strict services/backend/src/recall/api/app.py services/backend/src/recall/pairing.py services/backend/src/recall/pairing_cli.py",
+      "exit_code": 0,
+      "result": "Success: no issues found in 3 source files"
+    },
+    {
+      "command": "build/tools/rustfmt/rustfmt-1.99.0-x86_64-pc-windows-msvc/rustfmt-preview/bin/rustfmt.exe --check --edition 2021 --config skip_children=true apps/desktop/src-tauri/src/pairing.rs apps/desktop/src-tauri/src/reading_commands.rs apps/desktop/src-tauri/src/lib.rs",
+      "exit_code": 0,
+      "result": "Rust formatting passed after native specialist handoff"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "Passed; Git reported expected Windows LF-to-CRLF working-copy notices on unrelated text files. Preflight shell is LF-only and covered by .gitattributes."
+    }
+  ],
+  "unknowns": [
+    "Cargo test/check was not run because Cargo/Rust is unavailable locally. Native specialist authored synthetic restart, lost-response, keyring-failure, scope-mismatch and disconnect-serialization tests; exact-head CI must compile and execute them.",
+    "Controller frozen-candidate full gates and independent Sol review remain pending; this artifact does not grade or certify the candidate.",
+    "No real owner activation record, provider credential/request, pairing invitation, device enrollment, deployment, spend, installer use or merge occurred.",
+    "Production activation needs a separate new explicit owner action. Daily/monthly application budgets are not represented as lifetime spend or request-count caps."
+  ],
+  "timing_and_tokens": "UTC phase durations and token usage UNKNOWN; not measured."
+}

@@ -507,6 +507,76 @@ def test_local_provider_disables_sdk_retry_and_refusal_fallback(monkeypatch: Any
     constructed[0]._client.close()
 
 
+def test_pairing_enabled_runtime_uses_database_grant_and_local_provider(monkeypatch: Any, env: Env) -> None:
+    from recall.ingestion.anthropic_provider import AnthropicProvider
+    from recall.pairing import digest
+
+    owner = env.user()
+    assert owner.register_device().status_code == 201
+    with env.db.tx(owner.id) as tx:
+        workspace_id = tx.workspace_id
+    settings = env.settings.model_copy(update={**AI, "device_pairing_enabled": True})
+    with env.db.tx(owner.id) as tx:
+        tx.run(
+            "insert into ai_consents(workspace_id,enabled,policy_version,decided_by,provider) "
+            "values(%s,true,%s,%s,'anthropic')",
+            (workspace_id, settings.ai_policy_version, owner.id),
+        )
+
+    secret = "ab" * 32
+    device_id, vault_id = uuid.uuid4(), uuid.uuid4()
+    with psycopg.connect(env.owner_dsn) as conn:
+        invitation_id = conn.execute(
+            "select invitation_id from recall_device_pair_invite(%s,%s,%s,%s,%s,%s)",
+            (owner.id, workspace_id, device_id, vault_id, digest(secret), 600),
+        ).fetchone()[0]
+
+    fake = FakeProvider()
+    fake.interpret_script = [lambda request: json.dumps(faithful_extraction(request, ["Synthetic paired reading"]))]
+    constructed: list[AnthropicProvider] = []
+    real_init = AnthropicProvider.__init__
+
+    def observe_init(self: Any, **kwargs: Any) -> None:
+        real_init(self, **kwargs)
+        self.interpret = fake.interpret
+        constructed.append(self)
+
+    monkeypatch.setattr(AnthropicProvider, "__init__", observe_init)
+    app = create_app(settings, database=env.db, store=env.store, provider=FakeProvider())
+    original = synthetic_image()
+    binding = {
+        "schema_version": "1.0",
+        "operation_id": str(uuid.uuid4()),
+        "vault_id": str(vault_id),
+        "memory_id": str(uuid.uuid4()),
+        "source_id": str(uuid.uuid4()),
+        "source_sha256": sha(original),
+        "expected_revision": 1,
+        "captured_at": "2026-10-08T12:00:00Z",
+    }
+    with TestClient(app) as client:
+        claim = client.post(f"/v1/device-pairings/{invitation_id}/claim", json={"secret": secret})
+        assert claim.status_code == 200
+        assert claim.json() == {"device_id": str(device_id), "vault_id": str(vault_id), "scope": "photo_inference"}
+        response = client.post(
+            "/v1/local-readings",
+            content=original,
+            headers={
+                "Authorization": f"Bearer {secret}",
+                "Content-Type": "image/jpeg",
+                "X-Recall-Reading": json.dumps(binding),
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["state"] == "complete"
+    assert len(constructed) == 1
+    assert len(fake.interpret_calls) == 1
+    assert constructed[0]._client.max_retries == 0
+    assert constructed[0]._fallback is False
+    constructed[0]._client.close()
+
+
 def test_shared_native_wire_fixture_matches_actual_http_response(reading: Any) -> None:
     import base64
 

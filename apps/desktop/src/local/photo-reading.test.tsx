@@ -25,6 +25,69 @@ it("requires selected-photo consent and keeps disconnected local capture usable"
   await screen.findByText(/Claude reading is not connected/); expect((screen.getByRole("button", { name: "Read this photo with Claude" }) as HTMLButtonElement).disabled).toBe(true); expect(v.readPhoto).not.toHaveBeenCalled();
   await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); await userEvent.click(screen.getByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); expect(await screen.findByRole("button", { name: /Synthetic annotation/ })).toBeTruthy(); expect(screen.queryByText(/email|sign in/i)).toBeNull();
 });
+it("recovers a lost claim acknowledgement through authenticated status", async () => {
+  const connected = { state: "connected" as const, device_id: "device-a", vault_id: "manifest-a", fingerprint: "f".repeat(64), scope: "photo_inference" as const };
+  const pending = { ...connected, state: "pending_owner_approval" as const };
+  const v = vault({
+    readingCapability: vi.fn().mockResolvedValueOnce({ enabled: false, explanation: "Not connected" }).mockResolvedValue({ enabled: true, explanation: "Connected" }),
+    pairingStatus: vi.fn().mockResolvedValueOnce({ ...pending, state: "disconnected" as const }).mockResolvedValue(connected),
+    pairingPrepare: async () => pending,
+    pairingClaim: async () => { throw new Error("connection reset"); },
+  });
+  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  await userEvent.type(screen.getByLabelText("Owner invitation ID"), "00000000-0000-4000-8000-000000000099");
+  await userEvent.click(screen.getByRole("button", { name: "Connect this device" }));
+  expect(await screen.findByText("Connected for photo inference on this device.")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Read this photo with Claude" }) as HTMLButtonElement).disabled).toBe(false);
+});
+it("does not apply a delayed pairing status after switching vaults", async () => {
+  let finish!: (value: { state: "connected"; device_id: string; vault_id: string; fingerprint: string; scope: "photo_inference" }) => void;
+  const pending = { state: "pending_owner_approval" as const, device_id: "device-a", vault_id: "manifest-a", fingerprint: "f".repeat(64), scope: "photo_inference" as const };
+  const disconnected = { ...pending, state: "disconnected" as const };
+  const status = vi.fn().mockResolvedValueOnce(disconnected).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValue(disconnected);
+  const v = vault({
+    readingCapability: async () => ({ enabled: false, explanation: "Not connected" }),
+    pairingStatus: status,
+    pairingPrepare: async () => pending,
+    select: async () => ({ root: "/synthetic/b", vault_id: "session-b", vault_identity: "manifest-b" }),
+    list: async s => s === "session-a" ? [memory] : [],
+  });
+  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  await userEvent.click(screen.getByRole("button", { name: "Check pairing status" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
+  await act(async () => finish({ ...pending, state: "connected" }));
+  expect(screen.queryByText("Connected for photo inference on this device.")).toBeNull();
+});
+it("reports a failed pairing status check as unknown", async () => {
+  const pending = { state: "pending_owner_approval" as const, device_id: "device-a", vault_id: "manifest-a", fingerprint: "f".repeat(64), scope: "photo_inference" as const };
+  const v = vault({
+    readingCapability: async () => ({ enabled: false, explanation: "Not connected" }),
+    pairingStatus: vi.fn().mockResolvedValueOnce({ ...pending, state: "disconnected" as const }).mockRejectedValueOnce(new Error("connection reset")),
+    pairingPrepare: async () => pending,
+  });
+  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  await userEvent.click(screen.getByRole("button", { name: "Check pairing status" }));
+  expect(await screen.findByText("Pairing status is unknown: connection reset")).toBeTruthy();
+  expect(screen.getByText(/Connection status is unknown/)).toBeTruthy();
+});
+it("ignores a delayed pairing reply after switching vaults", async () => {
+  let finish!: (value: { state: "connected"; device_id: string; vault_id: string; fingerprint: string; scope: "photo_inference" }) => void;
+  const pending = { state: "pending_owner_approval" as const, device_id: "device-a", vault_id: "manifest-a", fingerprint: "f".repeat(64), scope: "photo_inference" as const };
+  const v = vault({
+    readingCapability: async () => ({ enabled: false, explanation: "Not connected" }),
+    pairingStatus: async () => ({ ...pending, state: "disconnected" as const }),
+    pairingPrepare: async () => pending,
+    pairingClaim: () => new Promise(resolve => { finish = resolve; }),
+    select: async () => ({ root: "/synthetic/b", vault_id: "session-b", vault_identity: "manifest-b" }),
+    list: async s => s === "session-a" ? [memory] : [],
+  });
+  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  await userEvent.type(screen.getByLabelText("Owner invitation ID"), "00000000-0000-4000-8000-000000000099");
+  await userEvent.click(screen.getByRole("button", { name: "Connect this device" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
+  await act(async () => finish({ ...pending, state: "connected" }));
+  expect(screen.queryByText("Connected for photo inference on this device.")).toBeNull();
+});
 it("never uploads on focus or consent cancellation and shows an attributed uncertain reading beside original", async () => {
   const v = vault(); mount(v); await open(); await consent(); expect(v.readPhoto).not.toHaveBeenCalled(); await userEvent.click(screen.getByRole("button", { name: "Keep it local" })); expect(v.readPhoto).not.toHaveBeenCalled();
   await send(); expect(await screen.findByRole("heading", { name: "Unreviewed machine reading" })).toBeTruthy(); expect(screen.getByText("SYNTHETIC seedlings 12?")).toBeTruthy(); expect(screen.getByText(/question mark is unresolved/)).toBeTruthy(); expect(screen.getByText(/synthetic-claude/)).toBeTruthy();

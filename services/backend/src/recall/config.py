@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     ai_daily_budget_usd: float | None = Field(None, validation_alias="RECALL_AI_DAILY_BUDGET_USD")
     ai_monthly_budget_usd: float | None = Field(None, validation_alias="RECALL_AI_MONTHLY_BUDGET_USD")
     ai_image_max_edge: int = Field(2000, validation_alias="AI_IMAGE_MAX_EDGE")
+    device_pairing_enabled: bool = Field(False, validation_alias="RECALL_DEVICE_PAIRING_ENABLED")
     max_processing_attempts: int = Field(3, validation_alias="RECALL_MAX_PROCESSING_ATTEMPTS")
     worker_database_url: str | None = Field(None, validation_alias="RECALL_WORKER_DATABASE_URL")
     worker_lease_seconds: int = Field(900, validation_alias="RECALL_WORKER_LEASE_SECONDS")

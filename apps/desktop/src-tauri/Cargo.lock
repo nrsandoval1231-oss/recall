@@ -3113,6 +3113,7 @@ name = "recall-desktop"
 version = "0.1.0"
 dependencies = [
  "caseless",
+ "getrandom 0.4.3",
  "hex",
  "keyring",
  "reqwest",

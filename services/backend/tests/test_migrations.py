@@ -37,6 +37,8 @@ TABLES = [
     "change_events",
     "identity_operations",
     "local_reading_receipts",
+    "device_pair_invitations",
+    "device_pair_grants",
 ]
 
 MIGRATIONS = [
@@ -48,6 +50,7 @@ MIGRATIONS = [
     "0006_portability.sql",
     "0007_provider_budget_reservations.sql",
     "0008_local_readings.sql",
+    "0009_device_pairing.sql",
 ]
 
 
@@ -130,6 +133,10 @@ def test_every_table_has_forced_rls_and_the_app_role_cannot_delete(fresh: tuple[
                 assert not conn.execute(
                     "select has_table_privilege('recall_app', %s, %s)", (table, privilege)
                 ).fetchone()[0], (table, privilege)  # type: ignore[index]
+        for table in ("device_pair_invitations", "device_pair_grants"):
+            assert not conn.execute("select has_table_privilege('recall_app', %s, 'INSERT')", (table,)).fetchone()[0], (
+                table
+            )
         assert conn.execute("select rolsuper, rolbypassrls from pg_roles where rolname='recall_app'").fetchone() == (
             False,
             False,
@@ -152,6 +159,118 @@ def test_api_role_least_privilege_check(pg_cluster: PgCluster) -> None:
                 bad.assert_least_privilege()
         finally:
             bad.close()
+
+
+def test_pairing_invitation_is_owner_bound_single_use_and_revocable(fresh: tuple[str, str, str]) -> None:
+    owner, _, admin = fresh
+    migrate(owner)
+    user, device, vault = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    with psycopg.connect(admin, autocommit=True) as setup:
+        ids = _seed(setup)
+        setup.execute(
+            "insert into workspace_members(workspace_id,user_id,role) values(%s,%s,'owner')", (ids["ws"], user)
+        )
+    with psycopg.connect(owner, autocommit=True) as conn:
+        invitation, expires = conn.execute(
+            "select * from recall_device_pair_invite(%s,%s,%s,%s,%s,600)",
+            (user, ids["ws"], device, vault, "a" * 64),
+        ).fetchone()
+        assert expires is not None
+        with pytest.raises(psycopg.errors.RaiseException, match="pair invitation unavailable"):
+            conn.execute("select * from recall_device_pair_claim(%s,%s)", (invitation, "b" * 64))
+        claimed = conn.execute("select * from recall_device_pair_claim(%s,%s)", (invitation, "a" * 64)).fetchone()
+        assert claimed == (device, vault, "photo_inference")
+        assert conn.execute("select * from recall_device_pair_auth(%s)", ("a" * 64,)).fetchone() == (
+            user,
+            ids["ws"],
+            device,
+            vault,
+        )
+        with pytest.raises(psycopg.errors.RaiseException, match="pair invitation unavailable"):
+            conn.execute("select * from recall_device_pair_claim(%s,%s)", (invitation, "a" * 64))
+        assert conn.execute("select recall_device_pair_revoke(%s)", ("a" * 64,)).fetchone()[0]
+        assert conn.execute("select * from recall_device_pair_auth(%s)", ("a" * 64,)).fetchone() is None
+        assert conn.execute("select recall_device_pair_revoke(%s)", ("a" * 64,)).fetchone()[0]
+        invitation2 = conn.execute(
+            "select invitation_id from recall_device_pair_invite(%s,%s,%s,%s,%s,600)",
+            (user, ids["ws"], device, vault, "d" * 64),
+        ).fetchone()[0]
+        conn.execute("select * from recall_device_pair_claim(%s,%s)", (invitation2, "d" * 64))
+        assert conn.execute(
+            "select recall_device_pair_owner_revoke(%s,%s,%s,%s)",
+            (user, ids["ws"], device, vault),
+        ).fetchone()[0]
+        assert conn.execute("select * from recall_device_pair_auth(%s)", ("d" * 64,)).fetchone() is None
+
+
+def test_concurrent_pair_claim_consumes_invitation_once(fresh: tuple[str, str, str]) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    owner, _, admin = fresh
+    migrate(owner)
+    user, device, vault = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    with psycopg.connect(admin, autocommit=True) as setup:
+        ids = _seed(setup)
+        setup.execute(
+            "insert into workspace_members(workspace_id,user_id,role) values(%s,%s,'owner')", (ids["ws"], user)
+        )
+    with psycopg.connect(owner, autocommit=True) as conn:
+        invitation = conn.execute(
+            "select invitation_id from recall_device_pair_invite(%s,%s,%s,%s,%s,600)",
+            (user, ids["ws"], device, vault, "c" * 64),
+        ).fetchone()[0]
+
+    def claim_once() -> bool:
+        try:
+            with psycopg.connect(owner, autocommit=True) as conn:
+                row = conn.execute("select * from recall_device_pair_claim(%s,%s)", (invitation, "c" * 64)).fetchone()
+                return row == (device, vault, "photo_inference")
+        except psycopg.Error:
+            return False
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(lambda _: claim_once(), range(2)))
+    assert sorted(outcomes) == [False, True]
+
+
+def test_pairing_invitation_rejects_non_owner_and_wrong_workspace(fresh: tuple[str, str, str]) -> None:
+    owner, _, admin = fresh
+    migrate(owner)
+    user = uuid.uuid4()
+    with psycopg.connect(admin, autocommit=True) as setup:
+        ids = _seed(setup)
+        setup.execute(
+            "insert into workspace_members(workspace_id,user_id,role) values(%s,%s,'member')", (ids["ws"], user)
+        )
+    with (
+        psycopg.connect(owner, autocommit=True) as conn,
+        pytest.raises(psycopg.errors.RaiseException, match="owner workspace binding"),
+    ):
+        conn.execute(
+            "select * from recall_device_pair_invite(%s,%s,%s,%s,%s,600)",
+            (user, ids["ws"], uuid.uuid4(), uuid.uuid4(), "b" * 64),
+        )
+
+
+def test_pairing_invitation_expiration_is_enforced_at_claim(fresh: tuple[str, str, str]) -> None:
+    owner, _, admin = fresh
+    migrate(owner)
+    user, device, vault = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    with psycopg.connect(admin, autocommit=True) as setup:
+        ids = _seed(setup)
+        setup.execute(
+            "insert into workspace_members(workspace_id,user_id,role) values(%s,%s,'owner')", (ids["ws"], user)
+        )
+    with psycopg.connect(owner, autocommit=True) as conn:
+        invitation = conn.execute(
+            "select invitation_id from recall_device_pair_invite(%s,%s,%s,%s,%s,600)",
+            (user, ids["ws"], device, vault, "e" * 64),
+        ).fetchone()[0]
+        conn.execute(
+            "update device_pair_invitations set expires_at=now()-interval '1 second' where id=%s", (invitation,)
+        )
+        with pytest.raises(psycopg.errors.RaiseException, match="pair invitation unavailable"):
+            conn.execute("select * from recall_device_pair_claim(%s,%s)", (invitation, "e" * 64))
 
 
 def _seed(conn: psycopg.Connection) -> dict[str, uuid.UUID]:  # type: ignore[type-arg]

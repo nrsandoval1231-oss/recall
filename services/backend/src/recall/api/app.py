@@ -29,6 +29,7 @@ from ..domain.memories import MemoryService
 from ..errors import ApiError, payload_too_large, unauthenticated, unsupported_media, validation
 from ..ingestion.local_reading import DenyDeviceAuthorizer, DeviceAuthorizer, LocalReadingService
 from ..ingestion.provider import Provider
+from ..pairing import DatabaseDeviceAuthorizer, pairing_routes
 from ..storage import ObjectStore
 from ..storage.factory import build_object_store
 from ..sync.routes import register_routes as register_sync_routes
@@ -94,7 +95,11 @@ def create_app(
             effort=settings.ai_effort,
             refusal_fallback=settings.ai_refusal_fallback,
         )
-    if local_reading_provider is None and local_reading_authorizer is not None and settings.ai_configured:
+    if (
+        local_reading_provider is None
+        and (local_reading_authorizer is not None or settings.device_pairing_enabled)
+        and settings.ai_configured
+    ):
         from ..ingestion.anthropic_provider import AnthropicProvider
 
         assert settings.ai_api_key and settings.ai_model_id
@@ -105,8 +110,9 @@ def create_app(
             refusal_fallback=False,
             max_retries=0,
         )
+    pair_authorizer = DatabaseDeviceAuthorizer(db) if settings.device_pairing_enabled else DenyDeviceAuthorizer()
     local_readings = LocalReadingService(
-        db, settings, local_reading_authorizer or DenyDeviceAuthorizer(), local_reading_provider
+        db, settings, local_reading_authorizer or pair_authorizer, local_reading_provider
     )
     memories = MemoryService(db, settings, provider)
     entities = EntityService(db, settings)
@@ -410,6 +416,8 @@ def create_app(
         return _json(memories.update_action(who.user_id, action_id, key, if_match, body))
 
     register_local_reading_routes(app, local_readings)
+    if settings.device_pairing_enabled:
+        pairing_routes(app, db)
     register_sync_routes(app, db, settings, service, memories, principal)
     register_export_routes(app, db, object_store, principal)
     register_deletion_routes(app, db, principal)

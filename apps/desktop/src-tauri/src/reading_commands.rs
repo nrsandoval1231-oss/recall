@@ -16,13 +16,22 @@ pub struct ReadingOutcome {
     memory: Option<VaultMemory>,
 }
 #[tauri::command]
-pub fn vault_reading_capability(
+pub async fn vault_reading_capability(
     state: tauri::State<'_, LocalVaultState>,
     expected_vault_id: String,
 ) -> Result<ReadingCapability, String> {
-    state.with(&expected_vault_id,|v| {
-        let enabled=ProtectedConnection::read(&v.id).ok().flatten().is_some();
-        Ok(ReadingCapability {enabled,explanation:if enabled {"Read this selected photo with Claude. The photo is sent to your connected private service."} else {"Claude photo reading is not connected. Your local originals, notes and search remain available."}.into()})
+    let vault = state.with(&expected_vault_id, |v| Ok(v.id.clone()))?;
+    let enabled =
+        tauri::async_runtime::spawn_blocking(move || crate::pairing::confirmed_active(&vault))
+            .await
+            .map_err(|_| "Pairing status check failed")?;
+    Ok(ReadingCapability {
+        enabled,
+        explanation: if enabled {
+            "Read this selected photo with Claude. The photo is sent to your connected private service.".into()
+        } else {
+            "Claude photo reading is not connected or its status could not be confirmed. Your local originals, notes and search remain available.".into()
+        },
     })
 }
 #[tauri::command]
@@ -62,10 +71,16 @@ pub async fn vault_read_photo(
     expected_revision: u64,
     operation_id: String,
 ) -> Result<ReadingOutcome, String> {
-    // Fail closed before creating intent if this device has no existing connection.
-    state.with(&expected_vault_id, |v| {
-        ProtectedConnection::read(&v.id)?.ok_or("Claude photo reading is not connected".into())
-    })?;
+    // Confirm server-side authority before intent. The pairing lifecycle is
+    // serialized separately; no vault lock survives this network check.
+    let vault_id = state.with(&expected_vault_id, |v| Ok(v.id.clone()))?;
+    let active =
+        tauri::async_runtime::spawn_blocking(move || crate::pairing::confirmed_active(&vault_id))
+            .await
+            .map_err(|_| "Pairing status check failed")?;
+    if !active {
+        return Err("Claude photo reading is not connected".into());
+    }
     let (vault, request) = state.begin_reading(
         &expected_vault_id,
         &memory_id,

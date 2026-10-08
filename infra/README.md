@@ -29,6 +29,7 @@ cp api.env.example api.env
 cp worker.env.example worker.env
 cp pilot.https.env.example pilot.https.env
 # Fill only the reviewed values in the three ignored files.
+# Keep AI keys/model and pairing disabled by default; do not create the activation record yet.
 sh check-pilot-secrets.sh
 docker compose -f pilot.compose.yml -f pilot.https.compose.yml config --quiet
 docker compose -f pilot.compose.yml -f pilot.https.compose.yml up --build -d
@@ -39,7 +40,9 @@ The base API remains available only on `127.0.0.1:8000`; Caddy reaches it over t
 
 The overlay enables [Docker IPv6 networking](https://docs.docker.com/engine/daemon/ipv6/) because the Supabase direct database endpoint resolves to IPv6. The host also needs a working IPv6 address/default route. Caddy 2.11.7 is pinned to the registry digest verified during provisioning. Verify container-to-database connectivity separately from host connectivity. Disabled public signups, private bucket readiness, authenticated client access and a restore drill remain deployment acceptance checks.
 
-Before launch, verify that the API and worker database URLs use the reviewed non-owner, non-BYPASSRLS roles, that `RECALL_SIGNING_SECRET` and storage credentials are populated, and that the hostname resolves to the host. Leave AI provider/model/key and embedding key values empty until the owner records explicit consent, budget, and provider review; the preflight script rejects those values.
+Before launch, verify that the API and worker database URLs use the reviewed non-owner, non-BYPASSRLS roles, that `RECALL_SIGNING_SECRET` and storage credentials are populated, and that the hostname resolves to the host. The normal preflight accepts AI/pairing-disabled configuration only. It rejects any populated AI key/model/price or enabled pairing unless `pilot.activation.reviewed.env` is present and complete. This record requires a new, explicit production-owner approval, independent of the separate USD 5 synthetic evaluation authorization. It records the exact existing owner, workspace, device and vault; consent version; provider account, model and prices; daily/monthly runtime budgets; `inference-only` scope; and pairing HTTPS origin equal to `https://RECALL_PILOT_HOSTNAME`. The recorded model, prices and budgets must exactly match API/worker settings. These daily/monthly runtime budgets are not a lifetime spend or request-count cap; the preflight does not claim such a cap. Embedding activation remains outside this pilot.
+
+An owner may create the private record only after a separate new production-activation approval and recording its reference in the operator's change record. Start from `pilot.activation.reviewed.env.example`, copy it to the ignored `pilot.activation.reviewed.env`, and fill it together with the reviewed API/worker AI settings and `RECALL_DEVICE_PAIRING_ENABLED=true`; then run the preflight again. The file is a consistency gate, not cryptographic proof of approval, and the shell check does not enable the runtime by itself. No activation record or provider credential is included in this repository. This packet creates no such record, enables no setting, and authorizes no real invitation, provider request or spend. Never copy synthetic test values from `services/backend/tests/test_pilot_preflight.py` into a deployment.
 
 To stop the pilot without deleting its certificate state:
 

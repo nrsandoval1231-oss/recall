@@ -1,5 +1,6 @@
 mod local_vault;
 mod managed_export;
+mod pairing;
 mod persistence;
 mod reading;
 mod reading_commands;
@@ -329,6 +330,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            pairing::vault_pairing_prepare,
+            pairing::vault_pairing_claim,
+            pairing::vault_pairing_status,
+            pairing::vault_pairing_disconnect,
             reading_commands::vault_reading_capability,
             reading_commands::vault_reading_operations,
             reading_commands::vault_read_photo,

@@ -64,7 +64,7 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 9. Complexity stays behind the glass.
 10. Obsidian is the required, user-owned memory spine. Recall adds intelligence and experience over portable vault memory; Obsidian is not merely an export adapter.
 11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.
-12. No account, password, or email-link sign-in, including first use. Remembered login does not satisfy this requirement. Local-only use is private without a remote account; cross-device private use requires secure owner-approved device association. One-time QR pairing remains proposed, not approved.
+12. No account, password, or email-link sign-in, including first use. Remembered login does not satisfy this requirement. Local-only use is private without a remote account; cross-device private use requires secure owner-approved device association. Manual one-device photo-inference pairing is authorized in PAIR-01; one-time QR pairing remains proposed, not approved.
 13. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
 ## 6. Memory layers
@@ -193,7 +193,7 @@ Deferred:
 | EXP-01 | Required Obsidian memory spine; portable vault, structured history and originals |
 | PRIV-01 | Workspace isolation and owner control |
 | PRIV-02 | No account/password/email-link sign-in, including first use; no remote account for local-only use |
-| PRIV-03 | Secure owner-approved association for cross-device private access; QR method pending decision |
+| PRIV-03 | Secure owner-approved association for cross-device private access; bounded photo-inference pairing implemented, QR method pending decision |
 | OPS-01 | Backup, restore, deletion, independently readable export |
 
 ## 13. Success
@@ -217,7 +217,7 @@ The new local desktop foundation commits original images, human notes and append
 
 Local-only capture, saved vault reading/correction and local keyword search work without a remote account or network service. Generating a new Claude reading uses a separately consented private service connection, disabled by default pending owner-approved provisioning. Cancellation prevents uncommitted local promotion; it cannot promise to stop a sent request or reverse a charge. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
 
-Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish this bounded implementation from the full target; QR pairing remains unanswered and unimplemented. See [foundation acceptance evidence](implementation/local-vault/README.md) and [lifecycle acceptance evidence](implementation/local-vault-lifecycle/README.md).
+Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish this bounded implementation from the full target; PAIR-01 adds a manual single-device photo-inference connection, while QR pairing remains unanswered and unimplemented. See [foundation acceptance evidence](implementation/local-vault/README.md) and [lifecycle acceptance evidence](implementation/local-vault-lifecycle/README.md).
 
 ## 15. Product roadmap
 

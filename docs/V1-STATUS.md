@@ -1,5 +1,11 @@
 # Recall V1 implementation and acceptance
 
+## Owner-approved device pairing — PAIR-01 implementation candidate, October 8
+
+The owner authorized a manual, single-device, photo-inference-only association; this supersedes the earlier proposed/not-approved status for QR pairing only. The implementation candidate adds an operator-created short-lived invitation, hash-only server grant, native keyring-backed secret, origin-pinned claim/status/revoke, and minimal renderer controls. It does not enable the service, create a real invitation, or change legacy auth. Activation remains default-denied and now requires a new explicit production-owner approval record independent of the USD 5 synthetic-evaluation authorization. QR association remains proposed and unimplemented.
+
+Focused synthetic development evidence: backend pairing/migration tests 16 passed, pairing-enabled DB-grant-to-photo route 1 passed, reviewed-activation preflight 10 passed, and backup tests 3 passed with a short Windows temporary root. PhotoReading UI tests 29 passed; workspace typecheck, changed-file Ruff lint/format, strict mypy and portable Rust formatting passed. Native Cargo test/check is unavailable on this Windows workspace and must be proven by exact-head CI. Native keyring/transport failure-injection and serialization-race coverage remains a specialist/review gate; no acceptance claim is made until those tests, full frozen gates and independent review pass. No real invitation, provider request, spend, deployment, enrollment, installation or merge occurred.
+
 ## Local desktop foundation — implemented candidate, October 8
 
 The owner requires no account/password/email-link sign-in, including first use. Local-only use must need no remote account; private cross-device use still needs secure owner-approved association. QR pairing is only proposed. Subsequent owner direction authorized the [local-only plan](superpowers/plans/2026-10-07-local-vault-foundation.md). Desktop now defaults to no-sign-in vault capture/search/evidence/correction/history, without cloud configuration. Deployed authentication and legacy cloud authority are unchanged. Existing email-flow attempts and deployment evidence below are historical/current evidence and are deliberately retained. Recovering email quota or remembering a session would not satisfy the new requirement.
