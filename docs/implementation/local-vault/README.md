@@ -1,8 +1,10 @@
-# Local desktop vault foundation — synthetic verification
+# Local desktop vault foundation — historical PR11 evidence
 
 October 8, 2026. This is a usable local desktop foundation candidate under the authorized [implementation plan](../../superpowers/plans/2026-10-07-local-vault-foundation.md), not completion of RCL-005B or installed-device acceptance. [Run the native application](../../DEVELOPMENT.md#local-only-desktop-foundation) with `npm ci` and `npm run tauri -w @recall/desktop -- dev`; no cloud configuration or sign-in is needed.
 
-## What is implemented
+PR11 baseline `650e9eae6878b46673d81411789d02e9388077a0` subsequently passed [CI run 37708945255](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255) and produced unsigned [artifact 11521925107](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255/artifacts/11521925107). Retained delivered ZIP reference: `file_0000000099f081f599ed9c8fa1be3aa9`. This establishes foundation CI/artifact delivery, not installed-device acceptance. The [lifecycle slice evidence](../local-vault-lifecycle/README.md) records newer rename/restore/logical-removal/rebuild behavior separately. Counts, screenshots and foundation limitations below are preserved historical evidence.
+
+## What the foundation implemented
 
 Native picker-selected vault and single PNG/JPEG/WebP import; immutable originals with hashes; stable memory IDs; human notes and retained revision history; validated local keyword search; original evidence view; expected-revision corrections; supported direct Markdown body edits reconciled on refresh; durable capture receipts and pending import retry. The sparse Memory Surface provides reversible focus, evidence, history and explicit conflict review. Browser preview states that native persistence is unavailable. Legacy cloud entry requires deliberate `?mode=legacy-cloud` opt-in and retains its authentication/privacy contracts.
 
@@ -33,7 +35,7 @@ Against reviewed product head `2210d1f31a8c4e96cddb9535e8c731c569668224` plus th
 - `RECALL_CHROMIUM=/usr/bin/chromium npm run test:ui`: all 42 existing browser checks passed, none skipped.
 - `git diff --check`: passed.
 
-Initial local-suite run passed five checks and failed the reduced-motion media assertion because the new harness used an unsupported top-level Playwright option. Correcting the harness to `contextOptions` plus explicit `emulateMedia` fixed it; this was not a product regression. No product changes were needed in this delivery task. All five screenshots below were visually inspected for readable layout, source/synthetic labeling and conflict-review state. At that delivery step native tests were not repeated for documentation/test-only changes. The final review repair below supersedes the earlier native count. Exact-head CI and final independent review are still delivery gates.
+Initial local-suite run passed five checks and failed the reduced-motion media assertion because the new harness used an unsupported top-level Playwright option. Correcting the harness to `contextOptions` plus explicit `emulateMedia` fixed it; this was not a product regression. No product changes were needed in this delivery task. All five screenshots below were visually inspected for readable layout, source/synthetic labeling and conflict-review state. At that delivery step native tests were not repeated for documentation/test-only changes. The final review repair below supersedes the earlier native count. Those foundation gates subsequently completed for PR11 at the exact head/run above; the lifecycle slice has its own separate pending exact-head gates.
 
 ## Final review repair verification
 
@@ -59,7 +61,7 @@ Generated with `RECALL_SCREENSHOTS=1 npm run test:local-vault`. These are synthe
 - [Retained correction and explicit conflict review](synthetic-conflict.png)
 - [Human revision history](synthetic-history.png)
 
-## Remaining acceptance and limitations
+## Foundation acceptance and limitations at PR11
 
 Installed Windows/native dialog integration, iPhone, actual power loss, full-volume disk exhaustion and platform-specific durability remain open. The Linux graphical smoke attempt did not reach native UI acceptance: the workspace-local WebKit runtime expected child helpers at a compiled `/usr` path. Chromium screenshots are not a substitute. Interrupted commits were reconstructed with real files in Rust tests rather than a process-kill/power-loss matrix. Windows write-through rename/flushed-file behavior still needs hardware/platform acceptance.
 
@@ -67,4 +69,4 @@ Selected-path validation rejects observed symlink/reparse components; Linux fina
 
 Missing/renamed/duplicate/header-modified notes are diagnosed, not silently recreated or fully ingested as renames. Corrupt history/originals cannot become valid citations/search results. Unidentifiable malformed journals can block recovery globally. Directory-capacity refusal preserves originals/history; there is no silent eviction. Publication conflicts and corrupt renderer import intents may require owner-managed recovery. Correction drafts survive failures and cancelled/failed tentative vault selection within the focus session; deliberate memory/vault exit or application restart discards that in-memory correction. Pending import intents are persisted separately for explicit retry.
 
-No local deletion/tombstones, source-reimport resolution, full semantic projection reconstruction, phone capture changes, sync/relay, QR pairing, credentials/grants, live AI, legacy-data migration, public release or deployment is included. QR remains unanswered. The CI Windows installer is configured as an unsigned artifact with seven-day retention; exact-head build/upload verification remains pending. Complete RCL-005B and migration/rollback gates remain open.
+No local deletion/tombstones, source-reimport resolution, full semantic projection reconstruction, phone capture changes, sync/relay, QR pairing, credentials/grants, live AI, legacy-data migration, public release or deployment is included. QR remains unanswered. The unsigned PR11 installer was built and uploaded in the exact-head run cited above with seven-day CI retention; keep the separately delivered ZIP reference because CI artifacts can expire. The later lifecycle slice is not validated by that old installer. Complete RCL-005B and migration/rollback gates remain open.

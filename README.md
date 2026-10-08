@@ -32,7 +32,7 @@ This repository is public. Every checked-in example must remain synthetic. Never
 
 Obsidian is the required memory spine, not an optional export destination. The user-owned vault holds durable memory notes, relationships, original attachments and the provenance/history needed to preserve meaning over time. Recall adds low-friction capture, LLM-assisted understanding, grounded retrieval and the Memory Surface over that foundation. Users do not need to organize folders or maintain a taxonomy.
 
-**Local foundation:** new desktop captures commit originals, human notes and retained revisions to a selected vault, reconcile supported direct Markdown body edits and rebuild local keyword retrieval from validated files. This is a usable local desktop foundation candidate, not full RCL-005B: existing cloud memory remains PostgreSQL-authoritative. Semantic projection reconstruction, migration, phone synchronization, deletion/tombstones and local AI are not implemented. See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
+**Local foundation:** new desktop captures commit originals, human notes and retained revisions to a selected vault, reconcile supported direct Markdown body edits and rebuild local keyword retrieval from validated files. This is a usable local desktop foundation candidate, not full RCL-005B: existing cloud memory remains PostgreSQL-authoritative. The [lifecycle slice](docs/implementation/local-vault-lifecycle/README.md) adds same-folder renames, explicit missing-note restore, retained logical removal and annotation-search rebuild. Nested moves, secure purge/undelete, semantic reconstruction, migration, phone synchronization and local AI remain open. See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
 
 ## Product layers
 
@@ -41,7 +41,7 @@ Obsidian is the required memory spine, not an optional export destination. The u
 | Original sources | Immutable evidence: photos first; later voice, screenshots, files, links, text, and other authorized inputs |
 | Obsidian vault | Required user-owned memory spine: notes, links, original attachments and versioned provenance/history |
 | PostgreSQL + pgvector | Supporting operational state, authorization, synchronization and rebuildable memory/search projections; currently authoritative in the pre-migration implementation |
-| Desktop SQLite | Rebuildable offline cache and durable pending operations |
+| Legacy cloud desktop SQLite | Rebuildable offline cache and durable pending operations; default local desktop reads validated vault files |
 | AI | Interpretation, extraction, retrieval synthesis, and proposals; never canonical truth |
 | Portability/integrations | Vault-compatible Markdown, structured history and originals; other tools are adapters to the Obsidian-backed memory |
 

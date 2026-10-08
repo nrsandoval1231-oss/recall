@@ -105,7 +105,7 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
   }
   function publishMemory(m: VaultMemory) {
     // An accepted current state supersedes every list snapshot requested before it.
-    listRequest.current++; setLoading(false);
+    listRequest.current++; setLoading(false); setNotice("");
     const view = renderedView.current;
     setItems(rows => project(rows.map(r => r.id === m.id ? m : r), view.removed, view.q));
   }
@@ -126,7 +126,7 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
       const saved = await vault.capture(selected.vault_id, intent.operationId, intent.note);
       if (!valid()) return;
       localStorage.removeItem(intentKey(selected)); setPending(null);
-      if (saved) { setDraft(""); setCaptureOpen(false); setNotice(receipt(saved, "capture")); publishMemory(saved); const view = requestedView.current; await refresh(view.q, view.removed, false, view.resetQuery); }
+      if (saved) { setDraft(""); setCaptureOpen(false); publishMemory(saved); setNotice(receipt(saved, "capture")); const view = requestedView.current; await refresh(view.q, view.removed, false, view.resetQuery); }
       else setNotice("Photo selection cancelled. Your note is still here.");
     } catch (e) { if (valid()) setError(message(e)); }
     finally { if (valid()) setBusy(false); }

@@ -6,7 +6,7 @@ The existing pilot uses the Cloudflare browser adapter for iPhone photo capture 
 
 ## Required architecture decision
 
-Obsidian is the required memory spine. Existing database-authoritative capture/retrieval and one-way Markdown export are the pre-migration baseline. RCL-005B below is a mandatory dependency for claiming the architecture fulfills this vision; completed earlier packets do not prove vault integration.
+Obsidian is the required memory spine. Legacy cloud database-authoritative capture/retrieval and one-way Markdown export are the pre-migration baseline; new local desktop records are vault-authoritative. RCL-005B below is a mandatory dependency for claiming the architecture fulfills this vision; completed earlier packets do not prove vault integration.
 
 ## Foundation
 
@@ -74,7 +74,7 @@ Exit: the vertical slice runs against real Recall contracts/data, remains source
 
 Status: **bounded local desktop foundation implemented; full RCL-005B and installed-device acceptance OPEN**.
 
-[Review the RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Product requirement: no account/password/email-link sign-in, including first use. Private local-only use needs no remote account. Cross-device private use still needs secure owner-approved device association; one-time QR pairing is an unresolved proposal. Subsequent owner direction authorized the [local-only plan](superpowers/plans/2026-10-07-local-vault-foundation.md), implemented with independent reviews and [synthetic evidence](implementation/local-vault/README.md). Phone transport, pairing, semantic reconstruction, deletion/tombstones and migration remain excluded. Historical email-auth acceptance is not the new target.
+[Review the RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Product requirement: no account/password/email-link sign-in, including first use. Private local-only use needs no remote account. Cross-device private use still needs secure owner-approved device association; one-time QR pairing is an unresolved proposal. Subsequent owner direction authorized the [local-only plan](superpowers/plans/2026-10-07-local-vault-foundation.md), implemented with independent reviews and [synthetic evidence](implementation/local-vault/README.md). The separately authorized [lifecycle plan](superpowers/plans/2026-10-08-local-vault-lifecycle.md) now adds flat renames, missing-note restore, retained tombstones and annotation-search rebuild, with [bounded evidence](implementation/local-vault-lifecycle/README.md). Phone transport, pairing, secure purge/undelete, semantic reconstruction and migration remain excluded. Historical email-auth acceptance is not the new target.
 
 Make an Obsidian vault the user-owned durable memory spine while retaining Recall's Memory Surface and universal memory model. Specify the versioned vault schema, workspace association, authorized browser/mobile bridge, direct-edit reconciliation and migration/rollback before changing storage authority. Keep PostgreSQL/jobs/authorization and SQLite where useful as supporting services/projections, not exclusive owners of semantic memory.
 

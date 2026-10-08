@@ -2,15 +2,15 @@
 
 ## Start here
 
-Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository starts as documentation and a scaffold, not an existing working app.
+Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository includes an implemented local desktop foundation and a separate legacy cloud baseline; read current status and acceptance evidence before making capability claims.
 
 Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. Mobile and desktop are one product. Obsidian is the required, user-owned memory spine. Recall supplies capture, intelligence and the Memory Surface over that vault. Do not rebuild a general productivity suite.
 
 ## Non-negotiable invariants
 
-- Product target: no account/password/email-link sign-in, including first use. Local-only use requires no remote account. Cross-device private access still requires secure owner-approved device association; QR pairing is proposed, not approved. Never satisfy this requirement by removing authentication from public private-data APIs. The owner subsequently authorized continuing the local-first no-sign-in design through implementation without routine stage-by-stage approval questions. Execute the bounded local-only foundation plan with review/tests; QR pairing remains proposed and excluded. This does not authorize production auth/access changes, migration of real data, merge or deployment.
+- Product target: no account/password/email-link sign-in, including first use. Local-only use requires no remote account. Cross-device private access still requires secure owner-approved device association; QR pairing is proposed, not approved. Never satisfy this requirement by removing authentication from public private-data APIs. The owner subsequently authorized continuing the local-first no-sign-in design through implementation without routine stage-by-stage approval questions. Execute the bounded local-only foundation and authorized lifecycle plans with review/tests; QR pairing remains proposed and excluded. This does not authorize production auth/access changes, migration of real data, merge or deployment.
 
-- Target authority is the Obsidian vault: portable memory notes, links, original attachments and versioned provenance/history. PostgreSQL/pgvector and SQLite support operations, authorization, indexing, synchronization and caches; they must not become the sole owner of memory. The current implementation remains database-authoritative until the documented vault migration is implemented and verified. Do not claim that migration is complete or remove existing integrity/privacy guarantees.
+- Target authority is the Obsidian vault: portable memory notes, links, original attachments and versioned provenance/history. PostgreSQL/pgvector and SQLite support operations, authorization, indexing, synchronization and caches; they must not become the sole owner of memory. New local desktop records are vault-authoritative. Legacy cloud records remain database-authoritative and unmigrated until the documented migration is implemented and verified. Do not claim that migration is complete or remove existing integrity/privacy guarantees.
 - All private records and queries are workspace-scoped. Check authorization before retrieval, model context construction, source access, and mutation.
 - Never commit real captures, client data, credentials, local databases, vault exports, or private test corpora. Synthetic fixtures must be clearly marked.
 - Save original bytes durably before AI processing. Report local-only, uploaded, processed, and failed states honestly.

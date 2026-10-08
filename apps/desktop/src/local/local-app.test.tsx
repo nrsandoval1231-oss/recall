@@ -427,3 +427,20 @@ it("capture follow-up failure retains the prior view after a newer requested vie
   mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await screen.findByText("Removed view unavailable");
   await act(async () => finishCapture({ ...memory, id: "new-capture" })); await waitFor(() => expect(screen.queryByText("Reading your vault…")).toBeNull()); expect(screen.getByText("Removed view unavailable")).toBeTruthy(); expect(screen.getByRole("heading", { name: "Recent memory" })).toBeTruthy(); expect(screen.getByRole("button", { name: /Synthetic garden note/ })).toBeTruthy(); expect(screen.getByText(/Previously loaded results · not currently verified/)).toBeTruthy(); expect(list.mock.calls.at(-1)).toEqual(["session-a", "", true]);
 });
+
+it("authoritative removal clears the earlier capture success notice from home", async () => {
+  let current = memory;
+  mount(vault({ list: async () => [current], remove: async () => { current = { ...memory, state: "deleted", revision: 2 }; return current; } }));
+  await userEvent.click(await screen.findByRole("button", { name: "Capture" }));
+  await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" }));
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Saved in vault · This device only"));
+  await userEvent.click(screen.getByRole("button", { name: /Synthetic garden note/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
+  await screen.findByText("Removed from Recall · files retained");
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" }));
+  expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Removed items" }));
+  await screen.findByRole("button", { name: /Synthetic garden note/ });
+  expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+});

@@ -44,25 +44,29 @@ Self-review: all new behavior is covered below; storage/renderer names must matc
 
 **Contract:** extend renderer memory DTO with `state: active|missing|deleted|conflict` and optional `note_path` (display-only relative basename); keep `conflict` diagnostics. Revision DTO adds `kind`. Existing list returns active/missing/conflict records by default; add `includeDeleted: boolean` default false to command/adapter. `vault_rebuild(expectedVaultId,includeDeleted)` is a thin entry point over the same locked empty-query list boundary, with no separate index. New `vault_restore_note(expectedVaultId,memoryId,expectedRevision,operationId)` and `vault_remove(expectedVaultId,memoryId,expectedRevision,operationId,expectedState)` return the current memory DTO. `expectedState` is `active|missing` and is part of removal idempotency, so a missing-note confirmation cannot remove a file that reappeared before the click. Every request uses native-selected scope and current inventory. Existing capture/correct retries validate historical payload but return current authoritative state; no stale success after deletion. Write the exact native/TS-facing contract in the task report before UI work.
 
-- [ ] Add failing synthetic disk tests for unique rename + edit/correction/reopen, duplicate/header/path rejection, missing restore and stale restore, retained removal and idempotency, stale receipt/replay/fork protection, v1 byte/hash compatibility and interrupted version fence, deterministic reconstruction from a copied complete vault.
-- [ ] Add a test-only scoped fault seam at real write/flush/publication boundaries; demonstrate interrupted capture/correct/restore/remove and injected ENOSPC/read-only errors without acknowledging partial work. Preserve healthy neighbors and user bytes. Do not add environment-controlled production fault modes.
-- [ ] Implement versioned records, safe inventory/lifecycle commands, ordered recovery and retained tombstones using existing primitives. Original/hash/history validation remains mandatory; distinguish history verification from source eligibility so removed records can be diagnosed honestly.
-- [ ] Run focused RED then GREEN, full native tests/check/fmt and commit. Document every remaining recovery limitation. Independent task review and fixes precede Task2.
+- [x] Add failing synthetic disk tests for unique rename + edit/correction/reopen, duplicate/header/path rejection, missing restore and stale restore, retained removal and idempotency, stale receipt/replay/fork protection, v1 byte/hash compatibility and interrupted version fence, deterministic reconstruction from a copied complete vault.
+- [x] Add a test-only scoped fault seam at real write/flush/publication boundaries; demonstrate interrupted capture/correct/restore/remove and injected ENOSPC/read-only errors without acknowledging partial work. Preserve healthy neighbors and user bytes. Do not add environment-controlled production fault modes.
+- [x] Implement versioned records, safe inventory/lifecycle commands, ordered recovery and retained tombstones using existing primitives. Original/hash/history validation remains mandatory; distinguish history verification from source eligibility so removed records can be diagnosed honestly.
+- [x] Run focused RED then GREEN, full native tests/check/fmt and commit. Document every remaining recovery limitation. Independent task review and fixes precede Task2.
 
 ## Task2: Actual desktop lifecycle controls
 
 **Files:** `platform/local-vault.ts` and tests; `local/LocalVaultApp.tsx`, local tests/CSS as needed.
 
-- [ ] Add failing component/adapter tests for missing-note restore, explicit removal confirmation/cancel, retained deleted history, renamed filename display, rebuild success/failure keeping previous results, and vault-switch/stale-response isolation.
-- [ ] Wire Task1's exact commands. Explain removal retains original/note/history and currently has no in-app undo. Require explicit confirmation and disable actions on ambiguous/corrupt records. Show removed items through an explicit view, never as active search results. A replayed import returning deleted state must not say it newly saved an active memory.
-- [ ] Use the existing list boundary for a clearly labeled rebuild of local search; no empty success on errors or claim of semantic/AI reconstruction. Retain correction/capture draft behavior.
-- [ ] Run affected tests, root lint/typecheck/client suite and desktop build; commit. Independent review and fixes precede Task3.
+- [x] Add failing component/adapter tests for missing-note restore, explicit removal confirmation/cancel, retained deleted history, renamed filename display, rebuild success/failure keeping previous results, and vault-switch/stale-response isolation.
+- [x] Wire Task1's exact commands. Explain removal retains original/note/history and currently has no in-app undo. Require explicit confirmation and disable actions on ambiguous/corrupt records. Show removed items through an explicit view, never as active search results. A replayed import returning deleted state must not say it newly saved an active memory.
+- [x] Use the existing list boundary for a clearly labeled rebuild of local search; no empty success on errors or claim of semantic/AI reconstruction. Retain correction/capture draft behavior.
+- [x] Run affected tests, root lint/typecheck/client suite and desktop build; commit. Independent review and fixes precede Task3.
 
 ## Task3: Integrated adversarial evidence and delivery
 
 **Files:** `tests/local-vault/*`, canonical status/architecture/acceptance/development docs and implementation evidence.
 
-- [ ] Extend synthetic native-boundary browser journeys for missing/restore, confirmation/cancel/removal/history/replay and rebuild; retain no-sign-in, axe/reduced-motion and ordinary browser limitations. Distinguish these from native real-file tests.
-- [ ] Update docs to precise current vs future capabilities and preserve PR11's successful CI/artifact evidence; include remaining nested moves, secure purge/undelete, full semantic rebuild and device limitations.
+- [x] Extend synthetic native-boundary browser journeys for missing/restore, confirmation/cancel/removal/history/replay and rebuild; retain no-sign-in, axe/reduced-motion and ordinary browser limitations. Distinguish these from native real-file tests.
+- [x] Update docs to precise current vs future capabilities and preserve PR11's successful CI/artifact evidence; include remaining nested moves, secure purge/undelete, full semantic rebuild and device limitations.
 - [ ] Run affected browser/client/native checks, self-review links/formatting, commit; get independent delivery review and whole-branch adversarial review, repairing findings with regression tests.
 - [ ] Publish a separate stacked draft PR and monitor exact-head full CI plus installer upload. No merge/deploy. Report exact SHA, test counts, artifact and next unblocked requirement; retain the prior installer reference for authorized-device acceptance.
+
+## Task3 handoff boundary
+
+Native and renderer tasks passed independent rereview after fixes through `f4332324d10d81ea06a202c815c02ad8d6cc0fd8`; applicable native count is 113. [Lifecycle evidence](../../implementation/local-vault-lifecycle/README.md) records the separate browser/client checks, screenshot-driven notice repair and remaining platform limits. The combined delivery-review checkbox stays open until independent Task3 and whole-branch review complete; root owns stacked draft PR, exact-head CI and new artifact verification. Prior PR11 artifact evidence remains preserved.

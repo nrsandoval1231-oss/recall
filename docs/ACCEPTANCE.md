@@ -1,8 +1,27 @@
 # Recall acceptance and evaluation
 
-## Local desktop foundation evidence — bounded; platform acceptance OPEN
+## Historical PR11 local foundation evidence — platform acceptance OPEN
 
 The authorized implementation supplies a no-sign-in desktop vault loop for new local captures. [Local verification evidence](implementation/local-vault/README.md) separates 76 aggregate native Rust tests (including real-disk checks) from rendered synthetic Tauri-boundary journeys and installed-device gates. Neither mock commands nor an unsigned Windows CI artifact prove installed native acceptance. Full RCL-005B, migration, phone association/transport and live AI remain open.
+
+## Local lifecycle evidence — bounded; platform acceptance OPEN
+
+The lifecycle slice adds flat stable-ID renames, explicit missing-note restore, logical tombstones with retained history/files, removed-items inspection, causal current-state retry handling and annotation-search rebuild. Native Linux review evidence is 113 tests through `2672b2f`; UI review evidence is 229 root client tests through `f4332324`. [Lifecycle evidence](implementation/local-vault-lifecycle/README.md) separates these real-file/component checks from synthetic browser command-boundary journeys. Injected ENOSPC/EROFS and write/flush failures are not measurements of real disk exhaustion, read-only media or power loss. No native suite rerun is claimed for test/docs-only delivery changes.
+
+PR11 head `650e9eae6878b46673d81411789d02e9388077a0` passed [CI run 37708945255](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255) and produced unsigned [artifact 11521925107](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255/artifacts/11521925107); retained ZIP reference `file_0000000099f081f599ed9c8fa1be3aa9`. This historical success must not substitute for lifecycle exact-head CI or installed acceptance. The new lifecycle artifact reference remains pending until that CI completes.
+
+## Future installed-Windows lifecycle checklist — BLOCKED
+
+Documentation only; the authorized Windows desktop is offline. Do not use another connected desktop or touch real vaults. The prior PR11 installer/instructions were already supplied. Keep both the PR11 artifact reference above and the future lifecycle artifact reference with the measured build SHA; no duplicate installation request is implied.
+
+1. On the authorized device when available, use isolated synthetic vaults and distinct complete copies for each binary. Record Windows/WebView2/filesystem/build versions and both installer hashes. Establish PR11 v1 picker/import/restart/evidence behavior separately; that old build cannot validate new lifecycle behavior.
+2. With the lifecycle build, reopen an unchanged synthetic v1 copy and compare original/history/manifest hashes before any mutation. Then make a v2 mutation on a separate copy, inspect the retained v1 manifest, and prove the PR11 older writer refuses that v2 copy. Never downgrade or migrate real vaults.
+3. Import a visibly synthetic PNG/JPEG/WebP through native pickers, compare its hash, restart and reopen. Rename a direct Markdown child, preserve header/link, search its new basename and correct it without reverting the name. Duplicate IDs, changed headers, nested moves and occupied paths must not become valid evidence.
+4. Move a synthetic note outside the test vault, refresh to missing, explicitly restore and verify history/original hash. Separately let an editor return a note before restore/removal confirmation; stale decisions must refuse without replacing that file. Keep all synthetic copies for comparison.
+5. Cancel removal and verify no state change; confirm removal and verify files/history remain, active search/source exclude it and Removed items retains history. Restart and replay a stale synthetic import/correction receipt; the tombstone must remain terminal. No undelete or physical purge is expected.
+6. Rebuild repeatedly and after copied-vault reopen; compare eligible records/order. Check stale-row labeling on an actual failed read if safely reproducible. Record any difference from injected test outcomes without claiming power-loss, volume-exhaustion or filesystem durability acceptance unless those separate experiments were actually performed.
+
+Nested moves, secure purge/undelete, full semantic reconstruction, phone transport, QR and real-data migration remain outside this checklist/slice.
 
 ## Full no-sign-in target acceptance — OPEN
 

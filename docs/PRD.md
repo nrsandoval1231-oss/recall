@@ -132,7 +132,7 @@ Included:
 - Natural-language Ask with source-backed answers and abstention.
 - Corrections/review and suggested versus accepted actions.
 - Desktop SQLite cache/outbox and offline text search.
-- Required Obsidian vault integration with durable memory, original evidence, history and conflict-safe reconciliation of direct vault edits. The current one-way Markdown exporter is an implementation gap, not fulfillment of this requirement.
+- Required Obsidian vault integration with durable memory, original evidence, history and conflict-safe reconciliation of direct vault edits. The local desktop foundation supplies a bounded human-annotation subset; the legacy cloud one-way Markdown exporter alone does not fulfill this requirement.
 - Portable export and vault recovery.
 - Workspace isolation even during a single-user pilot.
 
@@ -211,7 +211,7 @@ Evaluation includes both Paul-style difficult handwriting and general-domain cas
 
 The Obsidian vault is the required durable memory spine. Human-readable Markdown and links coexist with immutable original attachments and versioned structured provenance/history, so memory remains owned and usable outside Recall. PostgreSQL/pgvector provide supporting transactional services, authorization, synchronization and rebuildable memory/search projections; SQLite is a cache/outbox. Neither an LLM nor a database-only record replaces vault-backed memory.
 
-The new local desktop foundation commits original images, human notes and append-only revisions to a selected vault and reconciles supported Markdown body edits. Its keyword view rebuilds from validated vault files. Existing cloud memory remains PostgreSQL-authoritative with one-way managed export; full semantic projection recovery and migration remain open. Cross-device transport is not implemented; no paid Obsidian Sync service or community plugin is assumed.
+The new local desktop foundation commits original images, human notes and append-only revisions to a selected vault and reconciles supported Markdown body edits. Its keyword view rebuilds from validated vault files, including supported flat renames and retained tombstones. Explicit missing-note restoration and logical removal preserve originals/history; logical removal is not secure purge or undelete. Existing cloud memory remains PostgreSQL-authoritative with one-way managed export; full semantic projection recovery and migration remain open. Cross-device transport is not implemented; no paid Obsidian Sync service or community plugin is assumed.
 
 Target local-only capture, vault reading/correction and local search must work without a remote account or network service. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
 
