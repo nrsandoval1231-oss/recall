@@ -524,8 +524,9 @@ def test_binding_requires_rfc3339_captured_time(reading: Any) -> None:
 
 @pytest.mark.parametrize("bad", ["\x00", "\ud800", "\udfff"])
 @pytest.mark.parametrize("field", ["transcription", "uncertainty"])
+@pytest.mark.parametrize("ascii_output", [True, False])
 def test_jsonb_incompatible_model_strings_fail_terminally_with_usage(
-    reading: Any, env: Env, bad: str, field: str
+    reading: Any, env: Env, bad: str, field: str, ascii_output: bool
 ) -> None:
     client, grant, fake, binding, original = reading
 
@@ -535,7 +536,7 @@ def test_jsonb_incompatible_model_strings_fail_terminally_with_usage(
             output["pages"][0]["transcription"] += bad
         else:
             output["uncertainties"][0]["description"] += bad
-        return json.dumps(output)
+        return json.dumps(output, ensure_ascii=ascii_output)
 
     fake.interpret_script = [invalid]
     with TestClient(client.app, raise_server_exceptions=False) as http:
@@ -611,3 +612,47 @@ def test_sdk_billed_error_model_controls_settlement(reading: Any, env: Env, stop
         assert tx.all("select model_id,input_tokens,output_tokens from ai_usage") == (
             [{"model_id": "fake-model", "input_tokens": 1234, "output_tokens": 77}] if matching else []
         )
+
+
+def test_sdk_invalid_stream_encoding_retains_unknown_hold(reading: Any, env: Env) -> None:
+    import anthropic
+    import httpx2
+
+    from recall.ingestion.anthropic_provider import AnthropicProvider
+    from test_anthropic_adapter import sse
+
+    client, grant, fake, binding, original = reading
+    wire = sse("synthetic", model_id="fake-model").replace(b'"text": "synthetic"', b'"text": "\xff"')
+    calls = []
+
+    def respond(request: Any) -> Any:
+        calls.append(request)
+        return httpx2.Response(200, headers={"content-type": "text/event-stream"}, content=wire)
+
+    with anthropic.Anthropic(
+        api_key="synthetic-not-real", max_retries=0, http_client=httpx2.Client(transport=httpx2.MockTransport(respond))
+    ) as sdk:
+        fake.interpret = AnthropicProvider(
+            api_key="synthetic-not-real", model_id="fake-model", effort="high", refusal_fallback=False, client=sdk
+        ).interpret
+        response = post(client, binding, original)
+        expected = {
+            "schema_version": "1.0",
+            "binding": binding,
+            "state": "unknown",
+            "result": None,
+            "error_code": "PROVIDER_OUTCOME_UNKNOWN",
+        }
+        assert response.status_code == 202 and response.json() == expected
+        assert post(client, binding, original).json() == expected
+        assert (
+            client.get(
+                f"/v1/local-readings/{binding['operation_id']}",
+                headers={"Authorization": "Bearer synthetic-device-only"},
+            ).json()
+            == expected
+        )
+    assert len(calls) == 1
+    with env.db.tx(grant.user) as tx:
+        assert tx.one("select status from embedding_reservations")["status"] == "reserved"
+        assert tx.one("select count(*) as n from ai_usage")["n"] == 0

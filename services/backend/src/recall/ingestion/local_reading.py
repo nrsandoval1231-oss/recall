@@ -276,6 +276,9 @@ class LocalReadingService:
             ):
                 result = None
                 raise RuntimeError("provider accounting does not match the reservation")
+            # Only an obtained, accounting-verified result can make malformed text terminal.
+            # Unicode failures inside the SDK dispatch remain unknown and keep the budget hold.
+            validate_storage_strings(result.text)
             if len(result.text.encode()) > MAX_RESULT_BYTES:
                 raise InvalidExtraction(["output too large"])
             validated = validate_extraction(
@@ -304,7 +307,7 @@ class LocalReadingService:
                 raise InvalidExtraction(["normalized output too large"])
         except ApiError:
             state, error = "failed", "AUTHORIZATION_CHANGED"
-        except (InvalidExtraction, UnicodeError):
+        except InvalidExtraction:
             payload = None
             state, error = "failed", "INVALID_EXTRACTION"
         except ProviderError as exc:
