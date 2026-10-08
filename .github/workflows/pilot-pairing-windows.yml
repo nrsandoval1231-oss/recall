@@ -1,0 +1,59 @@
+name: pilot-pairing-windows
+
+on:
+  push:
+    branches: [implement/owner-device-pairing]
+    paths:
+      - .github/workflows/pilot-pairing-windows.yml
+      - docs/implementation/owner-device-pairing/pilot-setup.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-paired-staging:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Desktop typecheck and tests
+        working-directory: apps/desktop
+        run: npm run typecheck; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm test
+      - name: Native tests and check
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --lib -- --nocapture; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; cargo check
+      - name: Build unsigned staging installer with fixed pairing origin
+        working-directory: apps/desktop
+        env:
+          RECALL_PAIRING_ORIGIN: https://recall.159-203-35-38.sslip.io
+          VITE_API_BASE_URL: ''
+          VITE_SUPABASE_URL: ''
+          VITE_SUPABASE_PUBLISHABLE_KEY: ''
+        run: npx tauri build
+      - name: Write nonsecret build provenance
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          @{
+            source_sha = $env:SOURCE_SHA
+            pairing_origin = 'https://recall.159-203-35-38.sslip.io'
+            status = 'unsigned-staging; no server activation or device grant implied'
+          } | ConvertTo-Json | Set-Content -Encoding utf8 artifact-provenance.json
+      - name: Upload paired staging installer and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: recall-windows-pairing-pilot
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+            artifact-provenance.json
+          if-no-files-found: error
+          retention-days: 7
