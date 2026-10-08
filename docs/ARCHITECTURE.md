@@ -72,21 +72,21 @@ Future adapters --------------+   + pgvector              (bounded calls)
 
 Solid implementation scope is mobile, desktop, API, worker, database, storage, cache, and export. Assistant/connectors are future adapters and must not be dependencies of the first build.
 
-In current code, Postgres records accepted interpretation/history and object storage holds originals; SQLite is a working copy/outbox and Markdown is a one-way projection. This is the pre-migration implementation, not the required target ownership. The target vault must preserve durable memory/history and support rebuilding semantic projections. AI and indexes remain replaceable derived machinery.
+In the legacy cloud code, Postgres records accepted interpretation/history and object storage holds originals; SQLite is a working copy/outbox and Markdown is a one-way projection. This is the pre-migration implementation, not the required target ownership. The target vault must preserve durable memory/history and support rebuilding semantic projections. AI and indexes remain replaceable derived machinery.
 
 ## 2. Stack decisions
 
 | Component | Decision | Reason and boundary |
 | --- | --- | --- |
 | Mobile | Expo / React Native / TypeScript, iOS first | Purpose-built camera and import flow; actual device and signed-build acceptance required |
-| Desktop | Tauri 2 / React / TypeScript, Windows first | Native file access, local SQLite, installed app, and managed vault export |
+| Desktop | Tauri 2 / React / TypeScript, Windows first | Native scoped vault access by default; legacy cloud mode retains SQLite/cache and managed export |
 | Shared clients | Contracts, generated API types, design tokens, sync protocol | Share behavior and language, not an assumption of identical React Native/DOM components |
 | API | FastAPI | Authentication, validation, domain commands, retrieval, and source authorization |
 | Worker | Separate process from the same Python package | Durable jobs survive request completion; no in-process-only background processing |
-| Memory spine (required target) | Obsidian vault | User-owned notes, links, immutable originals and versioned provenance/history; integration remains unimplemented |
+| Memory spine (required target) | Obsidian vault | Local desktop implements original images, human notes/history and supported direct-body-edit reconciliation; full semantic reconstruction, phone synchronization and legacy migration remain open |
 | Supporting cloud state | Managed PostgreSQL with pgvector | Operational services and rebuildable retrieval projections; currently authoritative until vault migration |
 | Current identity/storage | Supabase Auth and private Storage | Existing email-auth baseline only; target local use has no remote account and proposed synchronization authenticates paired devices |
-| Local state | SQLite | Cache, local full-text search, pending operations, and export manifests |
+| Local state | Vault files by default; SQLite in legacy cloud mode | Local notes/originals/history and validated in-memory keyword view; legacy SQLite cache, full-text search, pending operations and export manifests |
 | AI | One multimodal provider/model plus one embedding model | Evaluate on handwriting first; no router, agent framework, or speculative model menu |
 
 Pin supported dependency versions and lockfiles in the first executable packet. Do not hardcode a recalled "latest" model or SDK version into a production manifest. Primary documentation is indexed in [REFERENCES](REFERENCES.md).
@@ -170,4 +170,4 @@ The architecture must allow later source adapters (voice, screenshots, files, li
 
 ## 11. Rollout boundary
 
-The historical rollout started with authenticated capture through both client shells, then a source-backed answer. The next design gate is the written RCL-005B proposal; after approval, prepare an implementation plan and obtain the owner’s execution choice before product code. Finish correction, offline, export, isolation, restore, and real-device evidence before calling the full pilot ready. Paid provisioning and a public launch are separate owner-authorized actions.
+The historical rollout started with authenticated capture through both client shells, then a source-backed answer. Subsequent owner direction authorized the bounded local-only RCL-005B plan and its implementation without routine stage approvals. That desktop foundation is implemented; exact-head delivery verification and installed-device acceptance remain separate gates. Full semantic reconstruction, phone synchronization, deletion/tombstones and legacy migration remain unfinished; QR pairing is unanswered and excluded. Finish the remaining full-spine, isolation, restore and real-device evidence before calling the full pilot ready. Paid provisioning, operational migration, deployment, merge and public launch require separate owner authorization.
