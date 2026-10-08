@@ -270,6 +270,37 @@ def test_restore_hold_fsyncs_parent_after_atomic_replace(tmp_path, monkeypatch) 
     assert events.index("replace") < len(events) - 1
 
 
+@pytest.mark.parametrize(
+    ("stderr", "expected"),
+    (
+        (b"pg_restore: error: --single-transaction requires a database", "PG_RESTORE_DATABASE_TARGET_NOT_SELECTED"),
+        (b"pg_restore: error: unsupported version (1.15) in file header", "PG_RESTORE_ARCHIVE_VERSION_UNSUPPORTED"),
+        (b"ERROR: unrecognized configuration parameter \"transaction_timeout\"", "PG_RESTORE_UNSUPPORTED_PARAMETER"),
+        (b"ERROR: role \"recall_migrator\" does not exist", "PG_RESTORE_ROLE_MISSING"),
+        (b"ERROR: permission denied for schema public", "PG_RESTORE_PERMISSION_DENIED"),
+        (b"ERROR: extension \"vector\" already exists", "PG_RESTORE_EXTENSION_CONFLICT"),
+        (b"pg_restore: error: connection to server failed", "PG_RESTORE_CONNECTION_FAILED"),
+        (b"private detail must not escape", "PG_RESTORE_FAILED"),
+    ),
+)
+def test_restore_pg_failure_classifier_returns_only_fixed_codes(stderr: bytes, expected: str) -> None:
+    module = _restore_module()
+    code = module.pg_restore_failure_code(stderr)
+    assert code == expected
+    assert "private detail" not in f"pg_restore failed ({code}); recovery hold remains active."
+
+
+def test_restore_pg_command_targets_validated_database_without_destructive_flags(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    module = _restore_module()
+    dump = tmp_path / "database.dump"
+    command = module.pg_restore_command("pg_restore", dump, "recall_restore")
+    assert command == ["pg_restore", "--dbname", "recall_restore", "--exit-on-error", "--single-transaction", str(dump)]
+    assert "--clean" not in command and "--create" not in command
+    environment = module.pg_environment("postgresql://recall_operator:synthetic@restore-host:5432/recall_restore")
+    assert environment["PGHOST"] == "restore-host" and environment["PGDATABASE"] == "recall_restore"
+    assert environment["PGUSER"] == "recall_operator" and "PGPASSWORD" in environment
+
+
 def test_runtime_preflight_rejects_unapproved_example_without_echoing_settings(tmp_path) -> None:  # type: ignore[no-untyped-def]
     ops = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops"
     activation = tmp_path / "activation.json"

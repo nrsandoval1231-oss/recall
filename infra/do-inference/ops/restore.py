@@ -21,6 +21,32 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict
 
 
+def pg_restore_command(restore: str, dump: Path, database: str) -> list[str]:
+    return [restore, "--dbname", database, "--exit-on-error", "--single-transaction", str(dump)]
+
+
+def pg_restore_failure_code(stderr: bytes) -> str:
+    """Classify selected pg_restore failures without exposing command output."""
+    diagnostic = stderr.decode("utf-8", errors="replace").lower()
+    if "must specify" in diagnostic and "database" in diagnostic:
+        return "PG_RESTORE_DATABASE_TARGET_NOT_SELECTED"
+    if "single-transaction" in diagnostic and "database" in diagnostic:
+        return "PG_RESTORE_DATABASE_TARGET_NOT_SELECTED"
+    if "unsupported version" in diagnostic or "archive version" in diagnostic:
+        return "PG_RESTORE_ARCHIVE_VERSION_UNSUPPORTED"
+    if "unrecognized configuration parameter" in diagnostic:
+        return "PG_RESTORE_UNSUPPORTED_PARAMETER"
+    if "role" in diagnostic and "does not exist" in diagnostic:
+        return "PG_RESTORE_ROLE_MISSING"
+    if "permission denied" in diagnostic:
+        return "PG_RESTORE_PERMISSION_DENIED"
+    if "extension" in diagnostic and "already exists" in diagnostic:
+        return "PG_RESTORE_EXTENSION_CONFLICT"
+    if "connection to server" in diagnostic or "could not connect" in diagnostic:
+        return "PG_RESTORE_CONNECTION_FAILED"
+    return "PG_RESTORE_FAILED"
+
+
 def set_hold(path: Path) -> None:
     current = json.loads(path.read_text(encoding="utf-8"))
     if current.get("record_type") != "recall.do-inference.recovery-clearance.v1":
@@ -173,12 +199,7 @@ def main() -> int:
         if not expected_database or actual_database != expected_database:
             raise SystemExit("Restore connection is not bound to its declared target database.")
         result = subprocess.run(  # noqa: S603 -- pg_restore resolved by shutil and fixed argv
-            [
-                restore,
-                "--exit-on-error",
-                "--single-transaction",
-                str(dump),
-            ],
+            pg_restore_command(restore, dump, expected_database),
             env=pg_environment(dsn),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
@@ -186,7 +207,8 @@ def main() -> int:
             check=False,
         )
         if result.returncode:
-            raise SystemExit(f"pg_restore failed (exit {result.returncode}); recovery hold remains active.")
+            code = pg_restore_failure_code(result.stderr)
+            raise SystemExit(f"pg_restore failed ({code}); recovery hold remains active.")
         with psycopg.connect(dsn) as conn:
             versions = [row[0] for row in conn.execute("select version from schema_migrations order by version")]
             if versions != manifest.get("migration_versions"):
