@@ -152,6 +152,172 @@ def test_model_and_usage_mismatch_fails_closed() -> None:
     assert not usage_within_hold("claude-sonnet-5-5", -1, 1)
 
 
+def test_synthetic_diagnostic_capture_hash_tamper_and_size_bound(tmp_path: Path) -> None:
+    from diagnostics import MAX_RAW_BYTES, capture_raw, replay
+
+    from conftest import REPO_ROOT
+
+    case = json.loads((EVAL_DIR / "manifest.json").read_text(encoding="utf-8"))["cases"][0]
+    contract = json.loads(
+        (REPO_ROOT / "packages/contracts/fixtures/local-reading-selected-contract.json").read_text(encoding="utf-8")
+    )
+    provider_output = contract["cases"][0]["provider_output"]
+    secret_text = "SYNTHETIC_PRIVATE_SCHEMA_VALUE"
+    provider_output[secret_text] = "synthetic"
+    raw = json.dumps(provider_output)
+    record = capture_raw(
+        case_id=case["id"],
+        fixture_sha256=case["sha256"],
+        raw_output=raw,
+        capture_id="synthetic-capture",
+        fingerprint="f" * 64,
+        pages={},
+        root=tmp_path,
+    )
+    schema = json.loads((REPO_ROOT / "packages/contracts/extraction.schema.json").read_text(encoding="utf-8"))
+
+    result = replay(record, schema)
+
+    assert result["code"] == "SCHEMA_INVALID"
+    assert secret_text in json.dumps(result["issues"])
+    with pytest.raises(ValueError, match="already exists"):
+        capture_raw(
+            case_id=case["id"],
+            fixture_sha256=case["sha256"],
+            raw_output=raw,
+            capture_id="synthetic-capture",
+            fingerprint="f" * 64,
+            pages={},
+            root=tmp_path,
+        )
+    with pytest.raises(ValueError, match="not allowlisted"):
+        capture_raw(
+            case_id="unlisted-case",
+            fixture_sha256=case["sha256"],
+            raw_output=raw,
+            capture_id="synthetic-capture",
+            fingerprint="f" * 64,
+            pages={},
+            root=tmp_path,
+        )
+    with pytest.raises(ValueError, match="not allowlisted"):
+        capture_raw(
+            case_id=case["id"],
+            fixture_sha256="0" * 64,
+            raw_output=raw,
+            capture_id="synthetic-capture",
+            fingerprint="f" * 64,
+            pages={},
+            root=tmp_path,
+        )
+    with pytest.raises(ValueError, match="exceeds bound"):
+        capture_raw(
+            case_id=case["id"],
+            fixture_sha256=case["sha256"],
+            raw_output="x" * (MAX_RAW_BYTES + 1),
+            capture_id="synthetic-capture",
+            fingerprint="f" * 64,
+            pages={},
+            root=tmp_path,
+        )
+    tampered = tmp_path / "tampered.json"
+    saved = json.loads(record.read_text(encoding="utf-8"))
+    saved["raw_output"] += " "
+    tampered.write_text(json.dumps(saved), encoding="utf-8")
+    with pytest.raises(ValueError, match="output hash mismatch"):
+        replay(tampered, schema)
+
+
+def test_opt_in_capture_on_fake_provider_route_preserves_rejection_and_accounting(
+    env, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    from diagnostics import capture_validator, replay_to_file
+
+    from conftest import REPO_ROOT, sha
+    from fake_provider import FakeProvider
+    from recall.api.app import create_app
+    from recall.errors import forbidden
+    from recall.ingestion import local_reading
+    from recall.ingestion.local_reading import DeviceGrant
+    from test_recall import AI
+
+    user = env.user()
+    user.register_device()
+    with env.db.tx(user.id) as tx:
+        workspace = tx.workspace_id
+    settings = env.settings.model_copy(update=AI)
+    with env.db.tx(user.id) as tx:
+        tx.run(
+            "insert into ai_consents(workspace_id,enabled,policy_version,decided_by,provider) "
+            "values(%s,true,%s,%s,'anthropic')",
+            (workspace, settings.ai_policy_version, user.id),
+        )
+
+    class SyntheticAuthorizer:
+        vault = uuid.uuid4()
+
+        def verify(self, authorization: str | None) -> DeviceGrant:
+            if authorization != "Bearer synthetic-evaluation-only":
+                raise forbidden("Synthetic evaluation credential rejected.")
+            return DeviceGrant(user.id, workspace, user.device_id, self.vault)
+
+    case = json.loads((EVAL_DIR / "manifest.json").read_text(encoding="utf-8"))["cases"][0]
+    image = (EVAL_DIR / case["path"]).read_bytes()
+    source_hash = sha(image)
+    raw = json.dumps({"schema_version": "SYNTHETIC_PRIVATE_SCHEMA_VALUE"})
+    fake = FakeProvider()
+    fake.interpret_script = [raw, raw]
+    authorizer = SyntheticAuthorizer()
+    app = create_app(
+        settings, database=env.db, store=env.store, local_reading_authorizer=authorizer, local_reading_provider=fake
+    )
+    original = local_reading.validate_selected_extraction
+    wrapper, paths, failures = capture_validator(
+        original, case_id=case["id"], fixture_sha256=case["sha256"], root=tmp_path
+    )
+    monkeypatch.setattr(local_reading, "validate_selected_extraction", wrapper)
+    schema = json.loads((REPO_ROOT / "packages/contracts/extraction.schema.json").read_text(encoding="utf-8"))
+
+    def send() -> dict[str, object]:
+        binding = {
+            "schema_version": "1.0",
+            "operation_id": str(uuid.uuid4()),
+            "vault_id": str(authorizer.vault),
+            "memory_id": str(uuid.uuid4()),
+            "source_id": str(uuid.uuid4()),
+            "source_sha256": source_hash,
+            "expected_revision": 1,
+            "captured_at": "2026-10-08T12:00:00Z",
+        }
+        with TestClient(app) as client:
+            return client.post(
+                "/v1/local-readings",
+                content=image,
+                headers={
+                    "Authorization": "Bearer synthetic-evaluation-only",
+                    "Content-Type": "image/jpeg",
+                    "X-Recall-Reading": json.dumps(binding),
+                },
+            ).json()
+
+    first = send()
+    assert first["state"] == "failed" and first["error_code"] == "INVALID_EXTRACTION"
+    assert len(paths) == 1 and failures == []
+    wrapper2, paths2, failures2 = capture_validator(
+        original, case_id=case["id"], fixture_sha256=case["sha256"], root=tmp_path
+    )
+    monkeypatch.setattr(local_reading, "validate_selected_extraction", wrapper2)
+    finding_path = replay_to_file(paths[0], schema)
+    assert json.loads(finding_path.read_text(encoding="utf-8"))["code"] == "SCHEMA_INVALID"
+    assert paths2 == [] and failures2 == []
+    second = send()
+    assert second["state"] == "failed" and second["error_code"] == "INVALID_EXTRACTION"
+    assert paths2 == [] and failures2 == ["ValueError"]
+    with env.db.tx(user.id) as tx:
+        assert tx.one("select count(*) as n from ai_usage")["n"] == 2
+        assert tx.one("select count(*) as n from embedding_reservations where status='completed'")["n"] == 2
+
+
 def test_adapter_uses_single_attempt_no_fallback_and_full_output_ceiling() -> None:
     import anthropic
     import httpx2
@@ -356,7 +522,7 @@ def test_metrics_cover_tokens_numbers_uncertainty_blank_and_unreadable() -> None
     __import__("os").environ.get("RECALL_EVAL_LIVE") != "1",
     reason="controller must explicitly enable the one live synthetic batch",
 )
-def test_live_synthetic_selected_reading_batch(env, tmp_path):  # type: ignore[no-untyped-def]
+def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
     """Controller-only live entrypoint; use only with a compatible Anthropic key and throwaway env."""
     key = os.environ.get("AI_API_KEY", "")
     if not key.startswith("sk-ant-"):
@@ -377,6 +543,22 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path):  # type: ignore[n
         fixture_bytes[case["id"]] = image
 
     from batch import default_journal_path
+
+    diagnostics_enabled = os.environ.get("RECALL_EVAL_DIAGNOSTICS") == "1"
+    if diagnostics_enabled:
+        from diagnostics import capture_validator, default_diagnostic_dir, replay_to_file
+
+        from conftest import REPO_ROOT
+
+        diagnostic_failures: list[str] = []
+        diagnostic_paths: list[Path] = []
+        diagnostic_dir = default_diagnostic_dir()
+        diagnostic_schema = json.loads(
+            (REPO_ROOT / "packages/contracts/extraction.schema.json").read_text(encoding="utf-8")
+        )
+        from recall.ingestion import local_reading as local_reading_module
+
+        original_validator = local_reading_module.validate_selected_extraction
 
     from recall.ingestion.anthropic_provider import AnthropicProvider
 
@@ -460,6 +642,14 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path):  # type: ignore[n
                         usage_before = {
                             row["id"] for row in tx.all("select id from ai_usage where workspace_id=%s", (workspace,))
                         }
+                    if diagnostics_enabled:
+                        capture_then_validate, paths, failures = capture_validator(
+                            original_validator,
+                            case_id=case["id"],
+                            fixture_sha256=source_hash,
+                            root=diagnostic_dir,
+                        )
+                        monkeypatch.setattr(local_reading_module, "validate_selected_extraction", capture_then_validate)
                     before = time.monotonic()
                     response = client.post(
                         "/v1/local-readings",
@@ -470,6 +660,14 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path):  # type: ignore[n
                             "X-Recall-Reading": json.dumps(binding),
                         },
                     )
+                    if diagnostics_enabled:
+                        diagnostic_paths.extend(paths)
+                        diagnostic_failures.extend(failures)
+                    if diagnostics_enabled and diagnostic_paths and diagnostic_paths[-1].stem == case["id"]:
+                        try:
+                            replay_to_file(diagnostic_paths[-1], diagnostic_schema)
+                        except (OSError, ValueError, UnicodeError, KeyError, TypeError) as exc:
+                            diagnostic_failures.append(type(exc).__name__)
                     latency = time.monotonic() - before
                     try:
                         data = response.json()
@@ -530,5 +728,7 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path):  # type: ignore[n
             provider._client.close()
         journal.data["elapsed_seconds"] = round(time.monotonic() - started, 3)
         journal._write()
+        if diagnostics_enabled and diagnostic_failures:
+            pytest.fail(f"synthetic diagnostics failed: {diagnostic_failures}")
     finally:
         journal.close()

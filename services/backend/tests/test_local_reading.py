@@ -210,6 +210,22 @@ def test_failed_or_unknown_receipts_never_repeat_paid_call(
         assert (tx.one("select status from embedding_reservations")["status"] == "reserved") is reserved
 
 
+def test_rejection_diagnostic_is_classified_without_model_or_schema_text(
+    reading: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    client, _, fake, binding, original = reading
+    secret_text = "SYNTHETIC_PRIVATE_SCHEMA_VALUE"
+    fake.interpret_script = [json.dumps({"schema_version": secret_text})]
+
+    response = post(client, binding, original)
+
+    assert response.json()["state"] == "failed"
+    assert response.json()["error_code"] == "INVALID_EXTRACTION"
+    assert "selected_reading_rejected code=SCHEMA_INVALID" in caplog.text
+    assert secret_text not in caplog.text
+    assert secret_text not in response.text
+
+
 def test_concurrent_duplicate_observes_in_flight_without_provider_lock(reading: Any) -> None:
     client, _, fake, binding, original = reading
     entered, release = threading.Event(), threading.Event()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import re
 import unicodedata
 import uuid
@@ -29,6 +30,7 @@ from .validate import InvalidExtraction, Validated, validate_extraction
 from .worker import MAX_INTERPRET_OUTPUT_TOKENS, MAX_INTERPRET_TEXT_INPUT_TOKENS, MAX_VISUAL_TOKENS_PER_PAGE
 
 MAX_RESULT_BYTES = 900_000  # JSONB expansion and the binding still fit a 1 MiB HTTP response.
+_logger = logging.getLogger(__name__)
 MAX_LOCAL_ID_CHARS = 128  # Selected-photo contract, including mention references; native uses this bound.
 MEDIA_FORMATS = {
     "image/jpeg": {"JPEG", "MPO"},
@@ -118,11 +120,11 @@ def validate_storage_strings(value: Any) -> None:
     """Reject unsupported text; never silently rewrite an untrusted reading to fit JSONB."""
     if isinstance(value, str):
         if "\x00" in value:
-            raise InvalidExtraction(["output contains unsupported characters"])
+            raise InvalidExtraction(["output contains unsupported characters"], "STORAGE_TEXT_INVALID")
         try:
             value.encode("utf-8", errors="strict")
         except UnicodeEncodeError:
-            raise InvalidExtraction(["output contains unsupported characters"]) from None
+            raise InvalidExtraction(["output contains unsupported characters"], "STORAGE_TEXT_INVALID") from None
     elif isinstance(value, dict):
         for key, item in value.items():
             validate_storage_strings(key)
@@ -139,7 +141,7 @@ def validate_selected_extraction(
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        raise InvalidExtraction(["output is not valid JSON"]) from None
+        raise InvalidExtraction(["output is not valid JSON"], "INVALID_JSON") from None
     # Bound IDs before normalization can drop an item or include its ID in a review note.
     if isinstance(data, dict):
         for kind in ("mentions", "statements", "action_suggestions"):
@@ -150,7 +152,9 @@ def validate_selected_extraction(
                         for key in ("local_id", "subject_mention_id", "object_mention_id", "assignee_mention_id"):
                             value = item.get(key)
                             if isinstance(value, str) and len(value) > MAX_LOCAL_ID_CHARS:
-                                raise InvalidExtraction(["selected-photo local ID exceeds 128 characters"])
+                                raise InvalidExtraction(
+                                    ["selected-photo local ID exceeds 128 characters"], "LOCAL_ID_TOO_LONG"
+                                )
     validated = validate_extraction(raw, schema=schema, capture_id=capture_id, fingerprint=fingerprint, pages=pages)
     ex = validated.extraction
     for uncertainty in ex["uncertainties"]:
@@ -158,7 +162,7 @@ def validate_selected_extraction(
             # Uncertainty may describe an illegible region outside the transcript, but
             # a blank purported quotation is unusable even as a proposed uncertainty.
             if not unicodedata.normalize("NFKC", ev["quote"]).strip():
-                raise InvalidExtraction(["uncertainty evidence is blank"])
+                raise InvalidExtraction(["uncertainty evidence is blank"], "BLANK_UNCERTAINTY_EVIDENCE")
     if ex["summary"] is None and ex["summary_evidence"]:
         ex["summary_evidence"] = []
         validated.note("UNUSED_SUMMARY_EVIDENCE", "summary evidence dropped: no summary was proposed")
@@ -315,7 +319,7 @@ class LocalReadingService:
             # Unicode failures inside the SDK dispatch remain unknown and keep the budget hold.
             validate_storage_strings(result.text)
             if len(result.text.encode()) > MAX_RESULT_BYTES:
-                raise InvalidExtraction(["output too large"])
+                raise InvalidExtraction(["output too large"], "OUTPUT_TOO_LARGE")
             validated = validate_selected_extraction(
                 result.text,
                 schema=self.schema,
@@ -339,10 +343,13 @@ class LocalReadingService:
             validate_storage_strings(payload)
             if len(json.dumps(payload).encode()) > MAX_RESULT_BYTES:
                 payload = None
-                raise InvalidExtraction(["normalized output too large"])
+                raise InvalidExtraction(["normalized output too large"], "NORMALIZED_OUTPUT_TOO_LARGE")
         except ApiError:
             state, error = "failed", "AUTHORIZATION_CHANGED"
-        except InvalidExtraction:
+        except InvalidExtraction as exc:
+            # The exception message may contain model text, identifiers, or schema diagnostics.
+            # Emit only a stable classification; never attach the exception or its arguments.
+            _logger.warning("selected_reading_rejected code=%s", exc.code)
             payload = None
             state, error = "failed", "INVALID_EXTRACTION"
         except ProviderError as exc:

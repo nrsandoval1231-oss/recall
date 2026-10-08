@@ -145,3 +145,10 @@ def test_structural_problems_are_hard_failures() -> None:
     bad["pages"][0]["page_id"] = str(uuid.uuid4())
     with pytest.raises(InvalidExtraction):
         run(bad)
+
+
+def test_invalid_extraction_diagnostic_code_is_allowlisted() -> None:
+    error = InvalidExtraction(["SYNTHETIC_PRIVATE_DETAIL"], "SYNTHETIC_PRIVATE_CODE")
+
+    assert error.code == "INVALID_CONTENT"
+    assert "SYNTHETIC_PRIVATE_DETAIL" in str(error)

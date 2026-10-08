@@ -43,6 +43,31 @@ and output limits, selected-reading service behavior on throwaway PostgreSQL,
 usage accounting, and deterministic transcription/number/uncertainty/blank
 metrics. They make no provider network request.
 
+Selected-reading rejection receipts intentionally keep the public
+`INVALID_EXTRACTION` error. The backend emits a separate structured log
+classification such as `INVALID_JSON`, `SCHEMA_INVALID`, `PAGE_SET_INVALID`,
+`UNKNOWN_MENTION_REFERENCE`, `BLANK_UNCERTAINTY_EVIDENCE`, or
+`OUTPUT_TOO_LARGE`. When several structural faults occur together, the
+classification uses a fixed priority: envelope, page set, duplicate local ID,
+unknown mention reference, then unknown evidence page. These codes contain no source text, identifiers, exception
+messages, or schema values. The synthetic regression test confirms a schema
+rejection can be classified without logging the rejected value. The two
+historical live failures remain unattributed because the immutable journal did
+not retain their raw outputs or validator reasons; offline reproductions are
+new cases and do not identify those causes.
+
+For a separately authorized future run against the same fixed synthetic
+allowlist, set `RECALL_EVAL_DIAGNOSTICS=1` in the test process to opt in to
+test-harness capture. It verifies each fixture hash, writes bounded raw output
+and request bindings to immutable per-case files under the ignored
+`.recall-storage/claude-selected-photo-eval/diagnostics/`, then replays the
+current deterministic validator and writes a separate immutable findings file.
+The helper refuses unlisted fixtures, changed fixture hashes, oversized output,
+and replacement of existing files. This flag does not reset or change the
+single-use batch journal; the existing used journal still prevents another
+dispatch. Raw captures are synthetic test artifacts only and must never be
+enabled for production service traffic.
+
 ## Controller-owned live dispatch
 
 The builder must not dispatch a paid request. A controller may run the single

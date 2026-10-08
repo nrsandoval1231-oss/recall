@@ -1,0 +1,50 @@
+{
+  "packet": "DIAG-01",
+  "status": "COMPLETE_BOUNDED_IMPLEMENTATION",
+  "started_utc": "2026-10-08T16:02:05Z",
+  "finished_utc": "2026-10-08T16:13:53Z",
+  "repository": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall",
+  "branch": "implement/owner-device-pairing",
+  "base_sha": "fd1e7b21413fbf78455f435641259bfb222da8d9",
+  "head_sha": "fd1e7b21413fbf78455f435641259bfb222da8d9",
+  "changed_files": [
+    "services/backend/src/recall/ingestion/validate.py",
+    "services/backend/src/recall/ingestion/local_reading.py",
+    "services/backend/tests/test_validate.py",
+    "services/backend/tests/test_local_reading.py",
+    "services/backend/tests/test_claude_batch.py",
+    "tests/evaluation/claude-selected-photo/diagnostics.py",
+    "docs/implementation/claude-evaluation/README.md"
+  ],
+  "implementation": [
+    "Invalid extraction exceptions now carry allowlisted safe diagnostic codes; structural multi-error classification follows a fixed priority.",
+    "The local reading service logs only the safe classification, while preserving the public INVALID_EXTRACTION receipt, hard rejection behavior, and known-usage reservation settlement.",
+    "An opt-in test-harness helper captures bounded raw output only for fixed synthetic fixtures whose manifest hash is rechecked. It writes immutable files under the ignored .recall-storage/claude-selected-photo-eval/diagnostics path and replays the original deterministic validator into a separate immutable findings file.",
+    "A fake-provider service test verifies a synthetic schema rejection is retained/replayable and a diagnostic write failure does not change receipt or accounting behavior. No raw provider output was captured from the historical live run."
+  ],
+  "validation": [
+    {
+      "command": "uv run --project services/backend ruff format --check tests/evaluation/claude-selected-photo/diagnostics.py services/backend/tests/test_claude_batch.py services/backend/src/recall/ingestion/validate.py services/backend/src/recall/ingestion/local_reading.py services/backend/tests/test_validate.py services/backend/tests/test_local_reading.py",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run --project services/backend ruff check tests/evaluation/claude-selected-photo/diagnostics.py services/backend/tests/test_claude_batch.py services/backend/src/recall/ingestion/validate.py services/backend/src/recall/ingestion/local_reading.py services/backend/tests/test_validate.py services/backend/tests/test_local_reading.py",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run --project services/backend mypy services/backend/src/recall/ingestion/validate.py services/backend/src/recall/ingestion/local_reading.py",
+      "result": "PASS"
+    },
+    {
+      "command": "$env:LOCALAPPDATA='C:\\rdiag01-local'; $env:PATH='C:\\Program Files\\PostgreSQL\\18\\bin;C:\\Program Files\\Git\\usr\\bin;' + $env:PATH; uv run --project services/backend pytest --basetemp=C:\\rd01e services/backend/tests/test_validate.py services/backend/tests/test_local_reading.py services/backend/tests/test_claude_batch.py -q",
+      "result": "PASS: 93 passed, 1 skipped; skip is the controller-gated live synthetic batch. Fresh throwaway PostgreSQL 18 was selected through PATH."
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "live_cause": "UNKNOWN: original two INVALID_EXTRACTION outputs and validator reasons were not retained. Offline synthetic tests are new reproductions and do not attribute those historical failures.",
+  "external_actions": "No network or paid calls, no key reads, no live journal mutation, no real-data capture, no commit, and no push.",
+  "remaining_review": "Controller-owned full backend gates and independent review remain required. Historical attribution and any extraction-quality repair remain open until safe evidence establishes a cause."
+}

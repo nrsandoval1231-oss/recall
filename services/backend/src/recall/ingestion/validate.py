@@ -113,10 +113,38 @@ class _PageText:
         return " ".join(ln for ln, st in zip(self.lines, self.starts, strict=True) if st < end and st + len(ln) > idx)
 
 
+_SAFE_DIAGNOSTIC_CODES = frozenset(
+    {
+        "INVALID_CONTENT",
+        "INVALID_JSON",
+        "SCHEMA_INVALID",
+        "ENVELOPE_MISMATCH",
+        "PAGE_SET_INVALID",
+        "DUPLICATE_LOCAL_ID",
+        "UNKNOWN_MENTION_REFERENCE",
+        "UNKNOWN_EVIDENCE_PAGE",
+        "STORAGE_TEXT_INVALID",
+        "LOCAL_ID_TOO_LONG",
+        "BLANK_UNCERTAINTY_EVIDENCE",
+        "OUTPUT_TOO_LARGE",
+        "NORMALIZED_OUTPUT_TOO_LARGE",
+    }
+)
+_STRUCTURAL_DIAGNOSTIC_PRIORITY = (
+    "ENVELOPE_MISMATCH",
+    "PAGE_SET_INVALID",
+    "DUPLICATE_LOCAL_ID",
+    "UNKNOWN_MENTION_REFERENCE",
+    "UNKNOWN_EVIDENCE_PAGE",
+)
+
+
 class InvalidExtraction(Exception):
-    def __init__(self, problems: list[str]) -> None:
+    def __init__(self, problems: list[str], code: str = "INVALID_CONTENT") -> None:
         super().__init__("; ".join(problems))
         self.problems = problems
+        # Safe for operational diagnostics; `problems` can contain untrusted model text.
+        self.code = code if code in _SAFE_DIAGNOSTIC_CODES else "INVALID_CONTENT"
 
 
 @dataclass
@@ -142,39 +170,49 @@ def validate_extraction(
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        raise InvalidExtraction(["output is not valid JSON"]) from None
+        raise InvalidExtraction(["output is not valid JSON"], "INVALID_JSON") from None
     errors = sorted(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(data), key=str)
     if errors:
         raise InvalidExtraction(
-            [f"{'/'.join(map(str, e.absolute_path)) or 'root'}: {e.message[:160]}" for e in errors[:10]]
+            [f"{'/'.join(map(str, e.absolute_path)) or 'root'}: {e.message[:160]}" for e in errors[:10]],
+            "SCHEMA_INVALID",
         )
 
     problems: list[str] = []
+    diagnostic_codes: set[str] = set()
     if data["capture_id"] != capture_id:
         problems.append("capture_id does not match the envelope")
+        diagnostic_codes.add("ENVELOPE_MISMATCH")
     if data["input_manifest_sha256"] != fingerprint:
         problems.append("input_manifest_sha256 does not match the envelope")
+        diagnostic_codes.add("ENVELOPE_MISMATCH")
     got = {p["page_id"]: p["ordinal"] for p in data["pages"]}
     if got != pages or len(data["pages"]) != len(pages):
         problems.append("pages must list exactly the capture's page_ids with their ordinals, once each")
+        diagnostic_codes.add("PAGE_SET_INVALID")
     for kind in ("mentions", "statements", "action_suggestions"):
         ids = [item["local_id"] for item in data[kind]]
         if len(ids) != len(set(ids)):
             problems.append(f"{kind} local_ids are not unique")
+            diagnostic_codes.add("DUPLICATE_LOCAL_ID")
     mention_ids = {m["local_id"] for m in data["mentions"]}
     for s in data["statements"]:
         for ref in (s["subject_mention_id"], s["object_mention_id"]):
             if ref is not None and ref not in mention_ids:
                 problems.append(f"statement {s['local_id']} references unknown mention {ref}")
+                diagnostic_codes.add("UNKNOWN_MENTION_REFERENCE")
     for a in data["action_suggestions"]:
         if a["assignee_mention_id"] is not None and a["assignee_mention_id"] not in mention_ids:
             problems.append(f"action {a['local_id']} references unknown mention")
+            diagnostic_codes.add("UNKNOWN_MENTION_REFERENCE")
     for ev in _all_evidence(data):
         if ev["page_id"] not in pages:
             problems.append("evidence references a page that is not in this capture")
+            diagnostic_codes.add("UNKNOWN_EVIDENCE_PAGE")
             break
     if problems:
-        raise InvalidExtraction(problems)
+        code = next(candidate for candidate in _STRUCTURAL_DIAGNOSTIC_PRIORITY if candidate in diagnostic_codes)
+        raise InvalidExtraction(problems, code)
 
     result = Validated(extraction=copy.deepcopy(data))
     ex = result.extraction
