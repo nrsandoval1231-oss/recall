@@ -1700,3 +1700,293 @@ fn lifecycle_unattributable_journal_refuses_rebuild_without_mutating_files() {
     assert!(v.list_with_deleted("", true).is_err());
     assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), original);
 }
+
+#[test]
+fn review_fork_and_missing_old_marker_preserve_terminal_tombstone() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let capture = op();
+    let m = v
+        .capture(&capture, "synthetic.png", &photo(), "base")
+        .unwrap();
+    let removal = op();
+    v.remove(&m.id, 1, &removal, "active").unwrap();
+    let mut fork: Event = decode(&v.journal_path(&removal)).unwrap();
+    fork.operation_id = op();
+    fork.kind = "correct".into();
+    fork.expected_state = None;
+    fork.memory.note = "stale competing draft".into();
+    fork.markdown = markdown(&fork.memory);
+    fork.payload_sha256 = payload(
+        "correct",
+        &m.id,
+        1,
+        &fork.memory.note,
+        &m.source_sha256,
+        &m.source_name,
+    )
+    .unwrap();
+    v.event_valid(&fork).unwrap();
+    let fork_bytes = json(&fork).unwrap();
+    fs::write(v.journal_path(&fork.operation_id), &fork_bytes).unwrap();
+    fs::remove_file(v.done_path(&capture)).unwrap();
+    let note = fs::read(v.note_path(&m.id)).unwrap();
+    let original = fs::read(v.source_path(&m.id)).unwrap();
+    let histories: Vec<_> = (1..=2)
+        .map(|revision| fs::read(v.history_path(&m.id, revision)).unwrap())
+        .collect();
+    assert_eq!(
+        v.records_inner(&m.id, false).unwrap().last().unwrap().kind,
+        "remove"
+    );
+    for _ in 0..2 {
+        let all = f.vault().list_with_deleted("", true).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].state, "deleted");
+        assert_eq!(all[0].revision, 2);
+        assert!(all[0]
+            .conflict
+            .as_deref()
+            .unwrap()
+            .contains("Competing journal"));
+        assert!(v.list("").unwrap().is_empty());
+        assert!(v.list("base").unwrap().is_empty());
+        assert!(v.source(&m.id).is_err());
+        assert_eq!(v.history(&m.id).unwrap().last().unwrap().kind, "remove");
+        assert_eq!(
+            v.capture_receipt(&capture, "base").unwrap().unwrap().state,
+            "deleted"
+        );
+        assert_eq!(
+            v.capture(&capture, "synthetic.png", &photo(), "base")
+                .unwrap()
+                .state,
+            "deleted"
+        );
+        assert_eq!(
+            v.remove(&m.id, 1, &removal, "active").unwrap().state,
+            "deleted"
+        );
+        assert!(v
+            .correct(&m.id, 1, &fork.operation_id, "stale competing draft")
+            .is_err());
+    }
+    assert_eq!(
+        fs::read(v.done_path(&capture)).unwrap(),
+        hash(&histories[0]).as_bytes()
+    );
+    assert!(!v.done_path(&fork.operation_id).exists());
+    assert_eq!(
+        fs::read(v.journal_path(&fork.operation_id)).unwrap(),
+        fork_bytes
+    );
+    assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), note);
+    assert_eq!(fs::read(v.source_path(&m.id)).unwrap(), original);
+    for (index, bytes) in histories.iter().enumerate() {
+        assert_eq!(
+            fs::read(v.history_path(&m.id, index as u64 + 1)).unwrap(),
+            *bytes
+        );
+    }
+}
+
+#[test]
+fn review_missing_removal_rejects_reappeared_bound_renamed_path() {
+    for returned in ["matching", "changed header", "unrelated occupant"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let renamed = v.path("Memories/Known renamed note.md");
+        fs::rename(v.note_path(&m.id), &renamed).unwrap();
+        v.correct(&m.id, 1, &op(), "corrected").unwrap();
+        let body = fs::read_to_string(&renamed).unwrap();
+        assert_eq!(
+            v.records(&m.id)
+                .unwrap()
+                .last()
+                .unwrap()
+                .note_path
+                .as_deref(),
+            Some("Known renamed note.md")
+        );
+        fs::remove_file(&renamed).unwrap();
+        assert_eq!(v.list("").unwrap()[0].state, "missing");
+        let changed = match returned {
+            "matching" => body,
+            "changed header" => body.replace(
+                &format!("<!-- Recall memory {}", m.id),
+                "<!-- Edited Recall memory",
+            ),
+            _ => "UNRELATED USER-CREATED NOTE".into(),
+        };
+        fs::write(&renamed, &changed).unwrap();
+        let operation = op();
+        assert!(
+            v.remove(&m.id, 2, &operation, "missing").is_err(),
+            "{returned} must invalidate missing confirmation"
+        );
+        assert_eq!(
+            v.list("").unwrap()[0].state,
+            if returned == "matching" {
+                "active"
+            } else {
+                "conflict"
+            }
+        );
+        assert!(v.restore_note(&m.id, 2, &op()).is_err());
+        assert!(!v.journal_path(&operation).exists());
+        assert!(!v.history_path(&m.id, 3).exists());
+        assert_eq!(fs::read_to_string(&renamed).unwrap(), changed);
+        assert!(!v.note_path(&m.id).exists());
+    }
+}
+
+#[test]
+fn review_journaled_missing_removal_rechecks_occupied_bound_renamed_path() {
+    for returned in ["matching", "changed header", "unrelated occupant"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let renamed = v.path("Memories/Known renamed note.md");
+        fs::rename(v.note_path(&m.id), &renamed).unwrap();
+        v.correct(&m.id, 1, &op(), "corrected").unwrap();
+        let body = fs::read_to_string(&renamed).unwrap();
+        fs::remove_file(&renamed).unwrap();
+        let changed = match returned {
+            "matching" => body,
+            "changed header" => body.replace(
+                &format!("<!-- Recall memory {}", m.id),
+                "<!-- Edited Recall memory",
+            ),
+            _ => "UNRELATED USER-CREATED NOTE".into(),
+        };
+        let target = renamed.clone();
+        let editor_bytes = changed.clone();
+        let fault = FaultGuard::set(move |point, _| {
+            if point == "before_history" {
+                fs::write(&target, &editor_bytes).unwrap();
+            }
+            Ok(())
+        });
+        let operation = op();
+        assert!(
+            v.remove(&m.id, 2, &operation, "missing").is_err(),
+            "journaled {returned} must invalidate missing confirmation"
+        );
+        drop(fault);
+        assert!(v.journal_path(&operation).exists());
+        assert!(!v.done_path(&operation).exists());
+        assert!(!v.history_path(&m.id, 3).exists());
+        assert!(f.vault().remove(&m.id, 2, &operation, "missing").is_err());
+        assert_eq!(fs::read_to_string(&renamed).unwrap(), changed);
+        assert!(!v.note_path(&m.id).exists());
+    }
+}
+
+#[test]
+fn review_second_unique_rename_remains_eligible_and_correctable() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let first = v.path("Memories/First bound name.md");
+    let second = v.path("Memories/Second unique name.md");
+    fs::rename(v.note_path(&m.id), &first).unwrap();
+    v.correct(&m.id, 1, &op(), "first correction").unwrap();
+    fs::rename(&first, &second).unwrap();
+    let current = f.vault().list("").unwrap().remove(0);
+    assert_eq!(current.state, "active");
+    assert_eq!(current.revision, 2);
+    assert_eq!(current.note_path.as_deref(), Some("Second unique name.md"));
+    assert_eq!(
+        v.correct(&m.id, 2, &op(), "second correction")
+            .unwrap()
+            .revision,
+        3
+    );
+    assert!(fs::read_to_string(&second)
+        .unwrap()
+        .ends_with("second correction"));
+    assert!(!first.exists());
+    assert!(!v.note_path(&m.id).exists());
+}
+
+#[test]
+fn review_fork_receipt_repair_does_not_relax_chain_or_existing_hash_checks() {
+    for corrupted in ["completion hash", "journal bytes"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let capture = op();
+        let m = v
+            .capture(&capture, "synthetic.png", &photo(), "base")
+            .unwrap();
+        let removal = op();
+        v.remove(&m.id, 1, &removal, "active").unwrap();
+        let mut fork: Event = decode(&v.journal_path(&removal)).unwrap();
+        fork.operation_id = op();
+        fork.kind = "correct".into();
+        fork.expected_state = None;
+        fork.memory.note = "competing draft".into();
+        fork.markdown = markdown(&fork.memory);
+        fork.payload_sha256 = payload(
+            "correct",
+            &m.id,
+            1,
+            &fork.memory.note,
+            &m.source_sha256,
+            &m.source_name,
+        )
+        .unwrap();
+        fs::write(v.journal_path(&fork.operation_id), json(&fork).unwrap()).unwrap();
+        fs::remove_file(v.done_path(&capture)).unwrap();
+        let damaged = if corrupted == "completion hash" {
+            v.done_path(&removal)
+        } else {
+            v.journal_path(&capture)
+        };
+        fs::write(&damaged, b"CORRUPTED SYNTHETIC METADATA").unwrap();
+        let note = fs::read(v.note_path(&m.id)).unwrap();
+        assert!(v.records_inner(&m.id, false).is_err());
+        assert_eq!(
+            f.vault().list_with_deleted("", true).unwrap()[0].state,
+            "conflict"
+        );
+        assert!(!v.done_path(&capture).exists());
+        assert!(!v.done_path(&fork.operation_id).exists());
+        assert!(v.capture_receipt(&capture, "base").is_err());
+        assert!(v.source(&m.id).is_err());
+        assert_eq!(fs::read(v.note_path(&m.id)).unwrap(), note);
+        assert_eq!(fs::read(damaged).unwrap(), b"CORRUPTED SYNTHETIC METADATA");
+    }
+}
+
+#[test]
+fn review_unique_rename_with_unrelated_old_bound_occupant_preserves_both_files() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let old_bound = v.path("Memories/Previous bound name.md");
+    let resolved = v.path("Memories/Valid unique rename.md");
+    fs::rename(v.note_path(&m.id), &old_bound).unwrap();
+    v.correct(&m.id, 1, &op(), "first correction").unwrap();
+    fs::rename(&old_bound, &resolved).unwrap();
+    fs::write(&old_bound, b"UNRELATED USER-CREATED NOTE").unwrap();
+    let current = f.vault().list("").unwrap().remove(0);
+    assert_eq!(current.state, "active");
+    assert_eq!(current.revision, 2);
+    assert_eq!(current.note_path.as_deref(), Some("Valid unique rename.md"));
+    assert!(v.remove(&m.id, 2, &op(), "missing").is_err());
+    assert_eq!(
+        v.correct(&m.id, 2, &op(), "next correction")
+            .unwrap()
+            .revision,
+        3
+    );
+    assert!(fs::read_to_string(&resolved)
+        .unwrap()
+        .ends_with("next correction"));
+    assert_eq!(
+        fs::read(&old_bound).unwrap(),
+        b"UNRELATED USER-CREATED NOTE"
+    );
+    assert!(!v.note_path(&m.id).exists());
+}

@@ -596,8 +596,17 @@ impl Vault {
     }
     // Only flat Markdown children participate. Prefix discovery still catches
     // oversized duplicates; full content and safe-path validation follow.
-    fn inventory(&self, memory_id: &str) -> Result<Option<PathBuf>> {
+    fn inventory(&self, memory_id: &str, bound_name: Option<&str>) -> Result<Option<PathBuf>> {
         let canonical = self.note_path(memory_id);
+        // Stable identity discovery takes precedence over the old bound name.
+        // If no identity resolves, an occupied bound path is a conflict rather
+        // than absence, even when an editor changed its identity header.
+        let bound = bound_name
+            .map(|name| -> Result<PathBuf> {
+                basename(name)?;
+                Ok(self.path("Memories").join(name))
+            })
+            .transpose()?;
         let marker = format!("<!-- Recall memory {memory_id} | ");
         let mut candidates = Vec::new();
         let mut nested = false;
@@ -627,8 +636,16 @@ impl Vault {
                     .into(),
             );
         }
-        if candidates.is_empty() && nested {
-            return Err("Missing note with nested folders in Memories; nested moves require explicit resolution".into());
+        if candidates.is_empty() {
+            if let Some(bound) = bound {
+                safe(&bound)?;
+                if bound.try_exists().map_err(fail)? {
+                    return Err("Known note pathname is occupied with changed identity; resolve the conflict before confirming absence".into());
+                }
+            }
+            if nested {
+                return Err("Missing note with nested folders in Memories; nested moves require explicit resolution".into());
+            }
         }
         Ok(candidates.pop())
     }
@@ -824,6 +841,29 @@ impl Vault {
             }
         }
         for (memory_id, mut events) in groups {
+            // Repair only events already represented by the fully validated
+            // immutable chain. Pending forks must not prevent receipt repair,
+            // and this pass must never select or publish a competing draft.
+            if events.iter().any(|e| {
+                !self.done_path(&e.operation_id).exists()
+                    && self.history_path(&memory_id, e.memory.revision).exists()
+            }) {
+                let repaired = self.records_inner(&memory_id, false).and_then(|records| {
+                    for committed in records {
+                        if !self.done_path(&committed.operation_id).exists() {
+                            self.preflight_capacity(&committed)?;
+                            let bytes =
+                                read(&self.journal_path(&committed.operation_id), MAX_JSON)?;
+                            self.repair_receipt(&committed, &bytes)?;
+                        }
+                    }
+                    Ok(())
+                });
+                if let Err(error) = repaired {
+                    conflicts.insert(memory_id.clone(), error);
+                    continue;
+                }
+            }
             if conflicts.contains_key(&memory_id) {
                 continue;
             }
@@ -944,6 +984,23 @@ impl Vault {
         }
         Ok(())
     }
+    fn repair_receipt(&self, e: &Event, bytes: &[u8]) -> Result<()> {
+        if read(
+            &self.history_path(&e.memory.id, e.memory.revision),
+            MAX_JSON,
+        )? != bytes
+        {
+            return Err("Competing committed revision".into());
+        }
+        self.records_inner(&e.memory.id, false)?;
+        if e.format == FORMAT_V2 {
+            self.fence_v2()?;
+        }
+        boundary!("before_receipt", &self.done_path(&e.operation_id));
+        immutable(&self.done_path(&e.operation_id), hash(bytes).as_bytes())?;
+        boundary!("after_receipt", &self.done_path(&e.operation_id));
+        Ok(())
+    }
     fn finish(&self, e: &Event) -> Result<()> {
         self.preflight_capacity(e)?;
         let hp = self.history_path(&e.memory.id, e.memory.revision);
@@ -955,17 +1012,7 @@ impl Vault {
         if hp.exists() {
             // An immutable historical event can only repair its own receipt.
             // Never replay its Markdown over a later head (especially a tombstone).
-            if read(&hp, MAX_JSON)? != bytes {
-                return Err("Competing committed revision".into());
-            }
-            self.records_inner(&e.memory.id, false)?;
-            if e.format == FORMAT_V2 {
-                self.fence_v2()?;
-            }
-            boundary!("before_receipt", &self.done_path(&e.operation_id));
-            immutable(&self.done_path(&e.operation_id), hash(&bytes).as_bytes())?;
-            boundary!("after_receipt", &self.done_path(&e.operation_id));
-            return Ok(());
+            return self.repair_receipt(e, &bytes);
         }
         self.verify_source(&e.memory)?;
         if e.expected_revision > 0 {
@@ -1010,7 +1057,10 @@ impl Vault {
         }
         let np = self.event_note_path(e)?;
         boundary!("before_note", &np);
-        if self.inventory(&e.memory.id)?.is_some_and(|p| p != np) {
+        if self
+            .inventory(&e.memory.id, e.note_path.as_deref())?
+            .is_some_and(|p| p != np)
+        {
             return Err("Memory moved during publication; journal and files retained".into());
         }
         if e.kind == "remove" {
@@ -1066,7 +1116,7 @@ impl Vault {
             atomic_new(&np, e.markdown.as_bytes())?;
         }
         boundary!("before_history", &hp);
-        if self.inventory(&e.memory.id)? != Some(np.clone()) {
+        if self.inventory(&e.memory.id, e.note_path.as_deref())? != Some(np.clone()) {
             return Err("Memory moved or duplicated during publication".into());
         }
         // Check again immediately before committing. A concurrent edit remains intact.
@@ -1250,7 +1300,7 @@ impl Vault {
             return Ok(m);
         }
         self.verify_source(&m)?;
-        let np = match self.inventory(memory_id) {
+        let np = match self.inventory(memory_id, last.note_path.as_deref()) {
             Ok(Some(p)) => p,
             Ok(None) => {
                 m.state = "missing".into();
@@ -1447,7 +1497,7 @@ impl Vault {
         self.commit(&e)
     }
     fn removal_precondition(&self, e: &Event) -> Result<()> {
-        let candidate = self.inventory(&e.memory.id)?;
+        let candidate = self.inventory(&e.memory.id, e.note_path.as_deref())?;
         match e.expected_state.as_deref() {
             Some("missing") if candidate.is_none() => Ok(()),
             Some("active") if candidate.as_ref() == Some(&self.event_note_path(e)?) => {
