@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import uuid
@@ -21,6 +22,37 @@ from recall.config import Settings
 from recall.db.database import Database
 from recall.db.inference_bootstrap import bootstrap_owner
 from recall.pairing import create_invitation, digest
+
+
+@pytest.mark.skipif(shutil.which("docker") is None, reason="requires Docker Compose CLI for offline config resolution")
+def test_do_ops_compose_resolves_tmpfs_as_single_mount() -> None:
+    root = Path(__file__).resolve().parents[3] / "infra" / "do-inference"
+    resolved = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "-p",
+            "recall-do-inference-test",
+            "-f",
+            "compose.yml",
+            "--profile",
+            "maintenance",
+            "--profile",
+            "runtime",
+            "config",
+            "--format",
+            "json",
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert resolved.returncode == 0, resolved.stderr
+    services = json.loads(resolved.stdout)["services"]
+    for name in ("migrate", "bootstrap", "api"):
+        assert services[name]["tmpfs"] == ["/tmp:size=32m,mode=1777"]
 
 
 def _restore_module():  # type: ignore[no-untyped-def]
