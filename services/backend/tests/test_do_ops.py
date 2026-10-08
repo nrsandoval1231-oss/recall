@@ -115,7 +115,9 @@ def test_ci_restore_sentinel_uses_stdin_sql_for_literal_and_checks_it_before_res
     verification = 'psql -U recall_operator -d recall_restore -tAc "SELECT value FROM restore_refusal_sentinel"'
     assert setup in workflow and literal in workflow
     assert "VALUES (''preserved'')" not in workflow
-    refusal = workflow.index("if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi", workflow.index(literal))
+    refusal = workflow.index(
+        "if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi", workflow.index(literal)
+    )
     assert workflow.index(literal) < refusal < workflow.index(verification)
 
 
@@ -226,7 +228,10 @@ def test_restore_verifier_passes_target_connection_mapping_as_keywords() -> None
         and isinstance(node.func.value, ast.Name)
         and node.func.value.id == "psycopg"
         and node.func.attr == "connect"
-        and any(isinstance(argument, ast.Name) and argument.id == "restored_operator" for argument in node.args + [keyword.value for keyword in node.keywords])
+        and any(
+            isinstance(argument, ast.Name) and argument.id == "restored_operator"
+            for argument in node.args + [keyword.value for keyword in node.keywords]
+        )
     ]
     assert len(mapping_calls) == 2
     for call in mapping_calls:
@@ -328,10 +333,10 @@ def test_restore_hold_fsyncs_parent_after_atomic_replace(tmp_path, monkeypatch) 
     (
         (b"pg_restore: error: --single-transaction requires a database", "PG_RESTORE_DATABASE_TARGET_NOT_SELECTED"),
         (b"pg_restore: error: unsupported version (1.15) in file header", "PG_RESTORE_ARCHIVE_VERSION_UNSUPPORTED"),
-        (b"ERROR: unrecognized configuration parameter \"transaction_timeout\"", "PG_RESTORE_UNSUPPORTED_PARAMETER"),
-        (b"ERROR: role \"recall_migrator\" does not exist", "PG_RESTORE_ROLE_MISSING"),
+        (b'ERROR: unrecognized configuration parameter "transaction_timeout"', "PG_RESTORE_UNSUPPORTED_PARAMETER"),
+        (b'ERROR: role "recall_migrator" does not exist', "PG_RESTORE_ROLE_MISSING"),
         (b"ERROR: permission denied for schema public", "PG_RESTORE_PERMISSION_DENIED"),
-        (b"ERROR: extension \"vector\" already exists", "PG_RESTORE_EXTENSION_CONFLICT"),
+        (b'ERROR: extension "vector" already exists', "PG_RESTORE_EXTENSION_CONFLICT"),
         (b"pg_restore: error: connection to server failed", "PG_RESTORE_CONNECTION_FAILED"),
         (b"private detail must not escape", "PG_RESTORE_FAILED"),
     ),
