@@ -1,5 +1,7 @@
 # Windows pairing pilot staging worksheet
 
+> **Historical staging worksheet.** The values and activation workflow below describe the earlier paired-origin candidate and do not establish a DigitalOcean service. The current DO-only service profile and operator gates are documented in [do-inference.md](do-inference.md). Existing DigitalOcean ownership, hostname/TLS, and database readiness remain unverified; legacy Supabase ownership remains UNKNOWN. No activation, enrollment, or migration is implied.
+
 This workflow produces a separate, unsigned Windows NSIS staging installer with the compile-time pairing origin fixed to `https://recall.159-203-35-38.sslip.io`. It is triggered by pushes to `implement/owner-device-pairing` that change only this workflow or this guide, or by a maintainer's manual `workflow_dispatch`. The ordinary CI artifact `recall-windows-local-foundation` remains the local-only build. Download `recall-windows-pairing-pilot` for the paired-origin candidate; its provenance file binds the source SHA, origin and unsigned staging status. No certificate or signature is included.
 
 The origin embedded in the installer is only a destination pin. It does not establish that the service is healthy, activate pairing, create an invitation, or grant access. The server pairing feature remains disabled unless its separately reviewed activation settings are present. Do not prepare or install a real-device credential until an installed-device pairing plan has been explicitly approved. QR pairing is not included.
@@ -17,7 +19,8 @@ Complete each field from owner-controlled records and current service/provider e
 | Field | Required record / evidence | Current value |
 |---|---|---|
 | Service hostname and health | Approved HTTPS origin; live API and worker/database checks | `recall.159-203-35-38.sslip.io` is the fixed build origin; health UNKNOWN |
-| Existing owner and workspace | Verify the existing owner/workspace in the recovered owner-controlled Supabase project | UNKNOWN; owner signed in, but the existing Recall project is inaccessible under the current account and redirects to organizations; account/project recovery and verification pending |
+| Historical Supabase owner/workspace | Historical project ownership and identifiers | UNKNOWN; no verified owner identity or workspace is established by this worksheet |
+| DigitalOcean inference owner/workspace | Explicit stable owner/workspace UUIDs in a fresh, isolated DO database | Pending; no DO database or owner workspace is provisioned |
 | Device ID and vault ID | Read from the installed app's explicit pairing preparation; exact selected vault | UNKNOWN; do not derive from the vault path |
 | Vault fingerprint | Fingerprint shown by installed native app after preparing the device credential | UNKNOWN |
 | Connection scope | Explicitly approve one selected device/vault, inference-only | Proposed scope; activation approval UNKNOWN |

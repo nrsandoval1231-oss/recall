@@ -699,6 +699,9 @@ def _chunks(cap: Row, ex: dict[str, Any], source_by_page: dict[str, Row]) -> lis
 def main() -> int:
     logging.basicConfig(level=logging.INFO)
     settings = get_settings()
+    if settings.service_profile != "legacy":
+        log.error("the legacy ingestion worker cannot run with RECALL_SERVICE_PROFILE=inference")
+        return 2
     if not settings.worker_database_url:
         log.error("RECALL_WORKER_DATABASE_URL is required")
         return 2

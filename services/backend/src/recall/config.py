@@ -18,13 +18,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 
     env: str = Field("development", validation_alias="RECALL_ENV")
+    service_profile: Literal["legacy", "inference"] = Field("legacy", validation_alias="RECALL_SERVICE_PROFILE")
 
     # Database. `database_url` MUST be a non-owner role that inherits `recall_app`.
     database_url: str = Field(validation_alias="DATABASE_URL")
     migration_database_url: str | None = Field(None, validation_alias="RECALL_MIGRATION_DATABASE_URL")
 
     # Auth: validate tokens issued by the provider (Supabase Auth). Never mint tokens here.
-    auth_issuer: str = Field(validation_alias="RECALL_AUTH_ISSUER")
+    auth_issuer: str = Field("", validation_alias="RECALL_AUTH_ISSUER")
     auth_audience: str = Field("authenticated", validation_alias="RECALL_AUTH_AUDIENCE")
     auth_jwks_url: str | None = Field(None, validation_alias="RECALL_AUTH_JWKS_URL")
     # Legacy symmetric (HS256) projects only. Prefer JWKS.
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     auto_provision_workspaces: bool = Field(True, validation_alias="RECALL_AUTO_PROVISION_WORKSPACES")
 
     # HMAC key for upload capabilities and list cursors (server only).
-    signing_secret: str = Field(validation_alias="RECALL_SIGNING_SECRET")
+    signing_secret: str = Field("", validation_alias="RECALL_SIGNING_SECRET", repr=False)
 
     # Private object storage.
     storage_backend: Literal["local", "supabase"] = Field("local", validation_alias="RECALL_STORAGE_BACKEND")
@@ -135,10 +136,22 @@ class Settings(BaseSettings):
     def _validate(self) -> Settings:
         if "*" in self.cors_allow_origins:
             raise ValueError("RECALL_CORS_ORIGINS must list explicit origins, never '*'")
-        if len(self.signing_secret) < 32:
-            raise ValueError("RECALL_SIGNING_SECRET must be at least 32 characters")
-        if bool(self.auth_jwks_url) == bool(self.auth_jwt_secret):
-            raise ValueError("configure exactly one of RECALL_AUTH_JWKS_URL or RECALL_AUTH_JWT_SECRET")
+        if self.service_profile == "legacy":
+            if not self.signing_secret or len(self.signing_secret) < 32:
+                raise ValueError("RECALL_SIGNING_SECRET must be at least 32 characters")
+            if not self.auth_issuer or bool(self.auth_jwks_url) == bool(self.auth_jwt_secret):
+                raise ValueError(
+                    "configure RECALL_AUTH_ISSUER and exactly one of RECALL_AUTH_JWKS_URL or RECALL_AUTH_JWT_SECRET"
+                )
+        else:
+            if self.auth_issuer or self.auth_jwks_url or self.auth_jwt_secret or self.signing_secret:
+                raise ValueError("inference profile must not configure legacy authentication or signing")
+            if self.storage_backend != "local" or self.supabase_url or self.supabase_service_role_key:
+                raise ValueError("inference profile does not support Supabase/object storage")
+            if self.auto_provision_workspaces:
+                raise ValueError("inference profile must disable automatic workspace provisioning")
+            if not self.device_pairing_enabled:
+                raise ValueError("inference profile requires device pairing to be enabled")
         if self.auth_jwt_secret is not None and len(self.auth_jwt_secret) < 32:
             raise ValueError("RECALL_AUTH_JWT_SECRET must be at least 32 characters")
         if self.storage_backend == "supabase" and not (self.supabase_url and self.supabase_service_role_key):

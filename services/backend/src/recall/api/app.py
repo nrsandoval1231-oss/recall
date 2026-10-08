@@ -80,6 +80,8 @@ def create_app(
     local_reading_provider: Provider | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    if settings.service_profile == "inference":
+        raise RuntimeError("legacy create_app cannot run the inference profile; use create_inference_app")
     schema = load_schema(str(find_schema_path(settings)))
     db = database or Database(settings.database_url)
     object_store = store or build_object_store(settings)
