@@ -185,3 +185,56 @@ it("reports unreadable pending intent and blocks capture without hiding healthy 
   await userEvent.click(screen.getByRole("button", { name: "Capture" }));
   expect((screen.getByRole("button", { name: "Choose photo & save" }) as HTMLButtonElement).disabled).toBe(true);
 });
+it.each([['cancel', false], ['fail', false], ['cancel', true], ['fail', true]] as const)("retains correction draft when vault selection %s (conflict review: %s)", async (outcome, conflict) => {
+  const list = vi.fn().mockResolvedValueOnce([memory]).mockResolvedValue([{ ...memory, revision: 2, note: "Latest disk note" }]);
+  mount(vault({ list, select: async () => { if (outcome === "fail") throw new Error("Folder unavailable"); return null; }, correct: async () => { throw new Error("Revision conflict"); } }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Correct note" }));
+  await userEvent.clear(screen.getByLabelText("Your correction")); await userEvent.type(screen.getByLabelText("Your correction"), "Unique unsaved correction");
+  if (conflict) {
+    await userEvent.click(screen.getByRole("button", { name: "Save correction" })); await screen.findByText("Revision conflict");
+    await userEvent.click(screen.getByRole("button", { name: "Reload latest note" })); await screen.findByText("Latest disk note");
+  }
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
+  expect((await screen.findByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("Unique unsaved correction");
+  if (conflict) { expect(screen.getByText("Latest disk note")).toBeTruthy(); expect((screen.getByRole("button", { name: "Save correction" }) as HTMLButtonElement).disabled).toBe(true); }
+  if (outcome === "fail") expect(screen.getByText("Folder unavailable")).toBeTruthy();
+});
+it.each(["success", "failure"])("ignores late correction %s after cancelled vault selection and requires reconciliation", async outcome => {
+  let finish!: () => void;
+  mount(vault({ select: async () => null, correct: () => new Promise((resolve, reject) => { finish = () => outcome === "success" ? resolve({ ...memory, revision: 2, note: "Late committed result" }) : reject(new Error("Late private error")); }) }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ })); await userEvent.click(screen.getByRole("button", { name: "Correct note" }));
+  await userEvent.clear(screen.getByLabelText("Your correction")); await userEvent.type(screen.getByLabelText("Your correction"), "Retained pending correction");
+  await userEvent.click(screen.getByRole("button", { name: "Save correction" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
+  await act(async () => finish());
+  expect((await screen.findByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("Retained pending correction");
+  expect(screen.queryByText("Late committed result")).toBeNull(); expect(screen.queryByText("Late private error")).toBeNull();
+  expect((screen.getByRole("button", { name: "Save correction" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: "Reload latest note" })).toBeTruthy();
+});
+it("successful switch clears correction draft and source URLs, even when another vault has the same memory ID", async () => {
+  const select = vi.fn().mockResolvedValueOnce({ root: "/synthetic/b", vault_id: "session-b", vault_identity: "manifest-b" }).mockResolvedValueOnce({ ...selected, vault_id: "session-c" });
+  mount(vault({ select })); await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  await userEvent.click(screen.getByRole("button", { name: "View original" })); await screen.findByRole("img", { name: "Original photo" });
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" })); await screen.findByText("/synthetic/b");
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:synthetic"); expect(screen.queryByRole("img")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: /Synthetic garden note/ })); await userEvent.click(screen.getByRole("button", { name: "Correct note" }));
+  await userEvent.clear(screen.getByLabelText("Your correction")); await userEvent.type(screen.getByLabelText("Your correction"), "Private B draft");
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" })); await screen.findByText("/synthetic/vault");
+  await userEvent.click(screen.getByRole("button", { name: /Synthetic garden note/ })); await userEvent.click(screen.getByRole("button", { name: "Correct note" }));
+  expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe(memory.note);
+});
+it.each(["original", "history"])("ignores late %s after cancelling vault selection", async kind => {
+  let finish!: () => void;
+  mount(vault({ select: async () => null,
+    source: () => new Promise(resolve => { finish = () => resolve({ bytes: [1], mime_type: "image/png", sha256: "hash" }); }),
+    history: () => new Promise(resolve => { finish = () => resolve([{ revision: 1, note: "Late historical note", recorded_at: memory.captured_at, origin: "human:recall" }]); }),
+  }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  await userEvent.click(screen.getByRole("button", { name: kind === "original" ? "View original" : "History" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
+  await act(async () => finish());
+  expect(await screen.findByRole("button", { name: "Correct note" })).toBeTruthy();
+  expect(screen.queryByText("Late historical note")).toBeNull(); expect(URL.createObjectURL).not.toHaveBeenCalled();
+});

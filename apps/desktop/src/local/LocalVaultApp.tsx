@@ -78,7 +78,7 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
     catch (e) { setIntentError(message(e)); }
   }, [selected]);
   useEffect(() => {
-    epoch.current++; setBusy(false); setFocus(null);
+    epoch.current++; setBusy(false);
     if (active) void refresh("");
     // Selection changes invalidate every in-flight operation; vault and selected are fixed by the keyed session.
   }, [generation, active]);
@@ -100,9 +100,8 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
     catch (e) { setError(message(e)); }
   }
   function back() { setFocus(null); requestAnimationFrame(() => homeFocus.current?.focus()); }
-  if (!active) return null;
-  if (focus) return <MemoryFocus key={focus.id} vault={vault} selected={selected} initial={focus} onBack={back} onSaved={m => { setFocus(m); setItems(rows => rows.map(r => r.id === m.id ? m : r)); }} />;
-  return <div className="local-home">
+  if (focus) return <MemoryFocus active={active} generation={generation} key={focus.id} vault={vault} selected={selected} initial={focus} onBack={back} onSaved={m => { setFocus(m); setItems(rows => rows.map(r => r.id === m.id ? m : r)); }} />;
+  return <div className="local-home" hidden={!active}>
     <section className="local-intro"><p className="local-eyebrow">Your Memory Surface</p><h1>What would you like to remember?</h1><p>Find your way back to a note, and the original behind it.</p></section>
     <form className="local-search local-glass" onSubmit={e => { e.preventDefault(); void refresh(query); }}><label htmlFor="local-search">Search notes and filenames</label><div className="local-row"><input ref={homeFocus} id="local-search" value={query} onChange={e => setQuery(e.target.value)} placeholder="A word you remember…" /><button type="submit">Search</button></div><p className="local-muted">Local keyword search of your notes and filenames. Handwriting in photos is not searched.</p></form>
     <div className="local-actions"><button className="local-primary" onClick={() => setCaptureOpen(true)}>Capture</button><button onClick={() => { setQuery(""); void refresh(""); }}>All memories / refresh</button></div>
@@ -114,7 +113,7 @@ function VaultSurface({ vault, selected, generation, active }: { vault: LocalVau
   </div>;
 }
 
-function MemoryFocus({ vault, selected, initial, onBack, onSaved }: { vault: LocalVault; selected: Selected; initial: VaultMemory; onBack: () => void; onSaved: (m: VaultMemory) => void }) {
+function MemoryFocus({ vault, selected, initial, onBack, onSaved, active, generation }: { active: boolean; generation: number; vault: LocalVault; selected: Selected; initial: VaultMemory; onBack: () => void; onSaved: (m: VaultMemory) => void }) {
   const [memory, setMemory] = useState(initial);
   const [view, setView] = useState<"note" | "original" | "history" | "correct">("note");
   const [error, setError] = useState("");
@@ -128,37 +127,54 @@ function MemoryFocus({ vault, selected, initial, onBack, onSaved }: { vault: Loc
   const [refreshed, setRefreshed] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const epoch = useRef(0);
+  const context = useRef({ generation, active }); context.current = { generation, active };
+  function guard() {
+    const e = epoch.current; const g = generation;
+    return () => e === epoch.current && context.current.generation === g && context.current.active;
+  }
   const artifact = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   function clearOriginal() { if (artifact.current) URL.revokeObjectURL(artifact.current); artifact.current = null; setUrl(null); setDecoded(false); }
   useEffect(() => { heading.current?.focus(); return () => { epoch.current++; if (artifact.current) URL.revokeObjectURL(artifact.current); }; }, []);
-  useLayoutEffect(() => { heading.current?.focus(); }, [view]);
+  useLayoutEffect(() => { if (active) heading.current?.focus(); }, [view, active]);
+  useLayoutEffect(() => {
+    epoch.current++;
+    if (!active) {
+      clearOriginal(); setHistory([]); setBusy(false);
+      if (view === "original" || view === "history") setView("note");
+      if (busy && view === "correct") {
+        setNeedsReview(true); setRefreshed(false); setAcknowledged(false);
+        setError("Vault selection interrupted this attempt. Your draft is retained; reload the latest note to check whether it committed.");
+      }
+    }
+    // Preserve drafts and completed review state until selection actually changes the keyed vault session.
+  }, [generation, active]);
   function navigate(next: typeof view) { epoch.current++; clearOriginal(); setError(""); setBusy(false); setView(next); }
   async function original() {
-    navigate("original"); const e = epoch.current; setBusy(true);
-    try { const source = await vault.source(selected.vault_id, memory.id); if (e !== epoch.current) return; const object = URL.createObjectURL(new Blob([new Uint8Array(source.bytes)], { type: source.mime_type })); artifact.current = object; setUrl(object); }
-    catch (err) { if (e === epoch.current) { const conflict = `Original unavailable: ${message(err)}`; setError(conflict); const damaged = { ...memory, conflict }; setMemory(damaged); onSaved(damaged); } }
-    finally { if (e === epoch.current) setBusy(false); }
+    navigate("original"); const valid = guard(); setBusy(true);
+    try { const source = await vault.source(selected.vault_id, memory.id); if (!valid()) return; const object = URL.createObjectURL(new Blob([new Uint8Array(source.bytes)], { type: source.mime_type })); artifact.current = object; setUrl(object); }
+    catch (err) { if (valid()) { const conflict = `Original unavailable: ${message(err)}`; setError(conflict); const damaged = { ...memory, conflict }; setMemory(damaged); onSaved(damaged); } }
+    finally { if (valid()) setBusy(false); }
   }
   async function showHistory() {
-    navigate("history"); const e = epoch.current; setHistory([]); setBusy(true);
-    try { const result = await vault.history(selected.vault_id, memory.id); if (e === epoch.current) setHistory(result); }
-    catch (err) { if (e === epoch.current) setError(message(err)); }
-    finally { if (e === epoch.current) setBusy(false); }
+    navigate("history"); const valid = guard(); setHistory([]); setBusy(true);
+    try { const result = await vault.history(selected.vault_id, memory.id); if (valid()) setHistory(result); }
+    catch (err) { if (valid()) setError(message(err)); }
+    finally { if (valid()) setBusy(false); }
   }
   async function correct() {
-    const e = epoch.current; const intent = pending ?? { operationId: crypto.randomUUID(), note: draft }; setPending(intent); setBusy(true); setError("");
-    try { const result = await vault.correct(selected.vault_id, memory.id, memory.revision, intent.operationId, intent.note); if (e !== epoch.current) return; setMemory(result); setPending(null); setNeedsReview(false); setRefreshed(false); setAcknowledged(false); onSaved(result); navigate("note"); }
-    catch (err) { if (e === epoch.current) { setError(message(err)); setNeedsReview(true); setRefreshed(false); setAcknowledged(false); } }
-    finally { if (e === epoch.current) setBusy(false); }
+    const valid = guard(); const intent = pending ?? { operationId: crypto.randomUUID(), note: draft }; setPending(intent); setBusy(true); setError("");
+    try { const result = await vault.correct(selected.vault_id, memory.id, memory.revision, intent.operationId, intent.note); if (!valid()) return; setMemory(result); setPending(null); setNeedsReview(false); setRefreshed(false); setAcknowledged(false); onSaved(result); navigate("note"); }
+    catch (err) { if (valid()) { setError(message(err)); setNeedsReview(true); setRefreshed(false); setAcknowledged(false); } }
+    finally { if (valid()) setBusy(false); }
   }
   async function reload() {
-    const e = epoch.current; setBusy(true); setError(""); setRefreshed(false); setAcknowledged(false);
-    try { const result = await vault.list(selected.vault_id, ""); if (e !== epoch.current) return; const latest = result.find(m => m.id === memory.id); if (!latest || latest.conflict || latest.revision === 0) throw new Error(latest?.conflict || "This memory is unavailable. Your correction is retained."); setMemory(latest); setRefreshed(true); }
-    catch (err) { if (e === epoch.current) setError(message(err)); }
-    finally { if (e === epoch.current) setBusy(false); }
+    const valid = guard(); setBusy(true); setError(""); setRefreshed(false); setAcknowledged(false);
+    try { const result = await vault.list(selected.vault_id, ""); if (!valid()) return; const latest = result.find(m => m.id === memory.id); if (!latest || latest.conflict || latest.revision === 0) throw new Error(latest?.conflict || "This memory is unavailable. Your correction is retained."); setMemory(latest); setRefreshed(true); }
+    catch (err) { if (valid()) setError(message(err)); }
+    finally { if (valid()) setBusy(false); }
   }
-  return <section className={`local-focus local-glass local-${view}`}><button className="local-back" onClick={() => view === "note" ? onBack() : navigate("note")}>{view === "note" ? "Back to memories" : "Back to note"}</button><p className="local-eyebrow">{view === "original" ? "Original evidence" : view === "history" ? "Memory over time" : view === "correct" ? "Human correction" : "A moment, kept"}</p><h1 ref={heading} tabIndex={-1}>{view === "original" ? memory.source_name : view === "history" ? "Note history" : view === "correct" ? "Correct your note" : memory.revision === 0 ? "Memory needs attention" : memory.source_name}</h1>
+  return <section hidden={!active} className={`local-focus local-glass local-${view}`}><button className="local-back" onClick={() => view === "note" ? onBack() : navigate("note")}>{view === "note" ? "Back to memories" : "Back to note"}</button><p className="local-eyebrow">{view === "original" ? "Original evidence" : view === "history" ? "Memory over time" : view === "correct" ? "Human correction" : "A moment, kept"}</p><h1 ref={heading} tabIndex={-1}>{view === "original" ? memory.source_name : view === "history" ? "Note history" : view === "correct" ? "Correct your note" : memory.revision === 0 ? "Memory needs attention" : memory.source_name}</h1>
     {error && <p role="alert" className="local-error">{error}</p>}{busy && <p role="status">{view === "correct" ? "Working in your vault…" : "Reading your vault…"}</p>}
     {view === "note" && <>{memory.conflict ? <p role="alert" className="local-error">{memory.conflict}</p> : <p className="local-muted">Saved in vault · This device only</p>}{memory.revision > 0 && <><p className="local-note">{memory.note || "No note added."}</p><p className="local-muted">Your human annotation, not a verified claim from the photo.</p><p className="local-muted">Captured {memory.captured_at} · Revision {memory.revision}</p></>}<div className="local-actions"><button disabled={Boolean(memory.conflict) || memory.revision === 0} onClick={() => void original()}>View original</button><button disabled={Boolean(memory.conflict) || memory.revision === 0} onClick={() => void showHistory()}>History</button><button disabled={Boolean(memory.conflict) || memory.revision === 0} onClick={() => navigate("correct")}>Correct note</button></div></>}
     {view === "original" && <>{url && <figure className="local-artifact"><img src={url} alt="Original photo" onLoad={() => setDecoded(true)} onError={() => { clearOriginal(); setError("Original unavailable: this image could not be decoded. Its bytes are not proof of a readable photo."); }} />{decoded && <figcaption>Original bytes unchanged · hash checked by this device. This does not verify the note’s claims.</figcaption>}</figure>}</>}
