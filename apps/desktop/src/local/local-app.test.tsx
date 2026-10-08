@@ -115,7 +115,7 @@ it("removes saved/evidence claims after source validation fails", async () => {
   await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
   await userEvent.click(screen.getByRole("button", { name: "View original" })); await screen.findByRole("alert");
   await userEvent.click(screen.getByRole("button", { name: "Back to note" }));
-  expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+  expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull();
   expect((screen.getByRole("button", { name: "View original" }) as HTMLButtonElement).disabled).toBe(true);
 });
 it("keeps an import draft and valid vault after cancelling vault selection", async () => {
@@ -138,7 +138,7 @@ it("ignores late capture errors after switching vaults", async () => {
 it("diagnostic records cannot masquerade as saved memory or eligible evidence", async () => {
   mount(vault({ list: async () => [{ ...memory, revision: 0, note: "", source_name: "", conflict: "Missing original" }] }));
   await userEvent.click(await screen.findByRole("button", { name: /Memory needs attention/ }));
-  expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+  expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull();
   expect((screen.getByRole("button", { name: "View original" }) as HTMLButtonElement).disabled).toBe(true);
 });
 it("freezes failed capture text until explicitly abandoned, then uses a new operation", async () => {
@@ -251,7 +251,7 @@ it("missing diagnostic allows explicit restore and removal but blocks evidence a
   expect((screen.getByRole("button", { name: "View original" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("button", { name: "Correct note" }) as HTMLButtonElement).disabled).toBe(true);
   await userEvent.click(screen.getByRole("button", { name: "Restore missing note" }));
-  expect(await screen.findByText("Note restored in vault · This device only")).toBeTruthy();
+  expect(await screen.findByText("Note restored in vault · Stored on this device")).toBeTruthy();
   expect(v.restoreNote).toHaveBeenCalledWith("session-a", "m1", 1, expect.any(String));
 });
 it.each(["active", "missing"] as const)("removal of %s requires explicit confirmation and cancellation writes nothing", async state => {
@@ -311,7 +311,7 @@ it.each(["capture", "correct", "restore"])("%s receipt reports current deleted s
   const v = vault({ capture: async () => deleted, correct: async () => deleted, restoreNote: async () => deleted, list: async () => [kind === "restore" ? missing : memory] }); mount(v);
   if (kind === "capture") { await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); }
   else { await openMemory(); await userEvent.click(screen.getByRole("button", { name: kind === "correct" ? "Correct note" : "Restore missing note" })); if (kind === "correct") await userEvent.click(screen.getByRole("button", { name: "Save correction" })); }
-  expect(await screen.findByText(/already removed · files retained/)).toBeTruthy(); expect(screen.queryByText("Note restored in vault · This device only")).toBeNull();
+  expect(await screen.findByText(/already removed · files retained/)).toBeTruthy(); expect(screen.queryByText("Note restored in vault · Stored on this device")).toBeNull();
 });
 it.each(["cancel", "fail"])("tentative selection %s preserves removal confirmation without submitting", async outcome => {
   const v = vault({ select: async () => { if (outcome === "fail") throw new Error("Selection failed"); return null; } }); mount(v); await openMemory(); await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" }));
@@ -380,7 +380,7 @@ it("list predating successful removal cannot reintroduce its tombstone", async (
   const list = vi.fn().mockResolvedValueOnce([memory]).mockImplementationOnce(() => new Promise<VaultMemory[]>(resolve => { finishList = resolve; }));
   mount(vault({ list, select: async () => null })); await openMemory(); await userEvent.click(screen.getByRole("button", { name: "Switch vault" })); await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
   await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" })); await userEvent.click(screen.getByRole("button", { name: "Confirm removal" })); await screen.findByText("Removed from Recall · files retained"); await act(async () => finishList([memory]));
-  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull(); expect(screen.queryByText("Saved in vault · This device only")).toBeNull(); expect(screen.queryByText("Reading your vault…")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull(); expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull(); expect(screen.queryByText("Reading your vault…")).toBeNull();
 });
 it.each([deleted, missing, { ...memory, state: "conflict" as const, conflict: "Duplicate identity" }, { ...memory, state: "conflict" as const, revision: 0, note: "", source_name: "", conflict: "History unavailable" }])("correction reload publishes authoritative $state revision $revision while retaining the draft", async current => {
   const list = vi.fn().mockResolvedValueOnce([memory]).mockResolvedValue([current]); const correct = vi.fn(async () => { throw new Error("Lost correction receipt"); });
@@ -388,8 +388,8 @@ it.each([deleted, missing, { ...memory, state: "conflict" as const, conflict: "D
   await userEvent.click(screen.getByRole("button", { name: "Save correction" })); await screen.findByText("Lost correction receipt"); await userEvent.click(screen.getByRole("button", { name: "Reload latest note" }));
   await waitFor(() => expect((screen.getByRole("button", { name: "Save correction" }) as HTMLButtonElement).disabled).toBe(true)); expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("Retained review draft"); expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).readOnly).toBe(true); expect(screen.queryByLabelText("I reviewed the latest note")).toBeNull();
   expect(await screen.findByText(current.state === "deleted" ? "Removed from Recall · files retained" : current.state === "missing" ? "Markdown note missing · decision needed" : "Needs attention · evidence unavailable")).toBeTruthy();
-  await userEvent.click(screen.getByRole("button", { name: "Back to note" })); expect(screen.queryByText("Saved in vault · This device only")).toBeNull(); expect((screen.getByRole("button", { name: "View original" }) as HTMLButtonElement).disabled).toBe(true); expect((screen.getByRole("button", { name: "Correct note" }) as HTMLButtonElement).disabled).toBe(true);
-  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); if (current.state === "deleted") expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull(); else expect(screen.getByRole("button", { name: current.revision === 0 ? /Memory needs attention/ : /Synthetic garden note/ })).toBeTruthy(); expect(screen.queryByText("Saved in vault · This device only")).toBeNull(); expect(correct).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole("button", { name: "Back to note" })); expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull(); expect((screen.getByRole("button", { name: "View original" }) as HTMLButtonElement).disabled).toBe(true); expect((screen.getByRole("button", { name: "Correct note" }) as HTMLButtonElement).disabled).toBe(true);
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); if (current.state === "deleted") expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull(); else expect(screen.getByRole("button", { name: current.revision === 0 ? /Memory needs attention/ : /Synthetic garden note/ })).toBeTruthy(); expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull(); expect(correct).toHaveBeenCalledTimes(1);
 });
 it("eligible correction reload publishes the current note to home without changing the pending draft", async () => {
   const list = vi.fn().mockResolvedValueOnce([memory]).mockResolvedValue([{ ...memory, revision: 2, note: "Current authoritative note" }]);
@@ -403,7 +403,7 @@ it.each([false, true])("delayed capture preserves the latest removed view (reque
   list.mockImplementation(async (_session, _query, includeDeleted) => includeDeleted ? [deleted] : [memory]);
   mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await userEvent.click(screen.getByRole("button", { name: "Removed items" }));
   if (!pendingView) await screen.findByRole("heading", { name: "Removed items" }); await act(async () => finishCapture({ ...memory, id: "new-capture" })); await waitFor(() => expect(screen.queryByText("Reading your vault…")).toBeNull());
-  expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); expect(list.mock.calls.at(-1)).toEqual(["session-a", "", true]); expect(screen.getByText("Saved in vault · This device only")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); expect(list.mock.calls.at(-1)).toEqual(["session-a", "", true]); expect(screen.getByText("Saved in vault · Stored on this device")).toBeTruthy();
   if (pendingView) { await act(async () => finishView([deleted])); expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); }
 });
 it.each([false, true])("delayed capture preserves the latest submitted keyword query (request still pending: %s)", async pendingQuery => {
@@ -433,16 +433,16 @@ it("authoritative removal clears the earlier capture success notice from home", 
   mount(vault({ list: async () => [current], remove: async () => { current = { ...memory, state: "deleted", revision: 2 }; return current; } }));
   await userEvent.click(await screen.findByRole("button", { name: "Capture" }));
   await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" }));
-  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Saved in vault · This device only"));
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Saved in vault · Stored on this device"));
   await userEvent.click(screen.getByRole("button", { name: /Synthetic garden note/ }));
   await userEvent.click(screen.getByRole("button", { name: "Remove from Recall" }));
   await userEvent.click(screen.getByRole("button", { name: "Confirm removal" }));
   await screen.findByText("Removed from Recall · files retained");
   await userEvent.click(screen.getByRole("button", { name: "Back to memories" }));
-  expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+  expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull();
   await userEvent.click(screen.getByRole("button", { name: "Removed items" }));
   await screen.findByRole("button", { name: /Synthetic garden note/ });
-  expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+  expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull();
 });
 it.each([['remove', false], ['remove', true], ['restore', false]] as const)("lifecycle %s reload publishes revision-zero diagnostics (filtered home: %s) and retains the fixed retry", async (kind, filtered) => {
   const initial = kind === "restore" ? missing : memory;
@@ -455,11 +455,11 @@ it.each([['remove', false], ['remove', true], ['restore', false]] as const)("lif
   await screen.findByText("Interrupted lifecycle publication"); const submitted = mutation.mock.calls[0]; await userEvent.click(screen.getByRole("button", { name: "Reload current state" })); await screen.findByText("Current state could not be validated. The previous decision is retained.");
   expect(screen.getByText(diagnostic.conflict!)).toBeTruthy(); expect(screen.queryByRole("button", { name: /Review a new .* decision/ })).toBeNull();
   if (kind === "remove") await userEvent.click(screen.getByRole("button", { name: "Back to note" }));
-  expect(screen.getByRole("heading", { name: "Memory needs attention" })).toBeTruthy(); expect(screen.queryByText("Saved in vault · This device only")).toBeNull(); expect(screen.queryByText("Markdown note missing · decision needed")).toBeNull();
+  expect(screen.getByRole("heading", { name: "Memory needs attention" })).toBeTruthy(); expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull(); expect(screen.queryByText("Markdown note missing · decision needed")).toBeNull();
   for (const name of ["View original", "History", "Correct note", "Remove from Recall"]) expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.queryByRole("button", { name: "Restore missing note" })).toBeNull();
   await userEvent.click(screen.getByRole("button", { name: "Retry same " + (kind === "remove" ? "removal" : "restore") })); await screen.findByText("Interrupted lifecycle publication"); expect(mutation.mock.calls[1]).toEqual(submitted);
-  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull(); expect(screen.queryByText("Saved in vault · This device only")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); expect(screen.queryByRole("button", { name: /Synthetic garden note/ })).toBeNull(); expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull();
   if (filtered) { expect(screen.queryByRole("button", { name: /Memory needs attention/ })).toBeNull(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden"); }
   else { expect(screen.getByRole("button", { name: /Memory needs attention.*Needs attention/ })).toBeTruthy(); await userEvent.click(screen.getByRole("button", { name: /Memory needs attention/ })); expect(screen.getByRole("button", { name: "Retry same " + (kind === "remove" ? "removal" : "restore") })).toBeTruthy(); }
 });

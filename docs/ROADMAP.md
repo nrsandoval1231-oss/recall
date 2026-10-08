@@ -72,7 +72,7 @@ Exit: the vertical slice runs against real Recall contracts/data, remains source
 
 ## RCL-005B — Required Obsidian memory spine
 
-Status: **bounded local desktop foundation implemented; full RCL-005B and installed-device acceptance OPEN**.
+Status: **bounded local desktop foundation/lifecycle and selected-photo reading implemented candidates; full RCL-005B and installed-device acceptance OPEN**.
 
 [Review the RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Product requirement: no account/password/email-link sign-in, including first use. Private local-only use needs no remote account. Cross-device private use still needs secure owner-approved device association; one-time QR pairing is an unresolved proposal. Subsequent owner direction authorized the [local-only plan](superpowers/plans/2026-10-07-local-vault-foundation.md), implemented with independent reviews and [synthetic evidence](implementation/local-vault/README.md). The separately authorized [lifecycle plan](superpowers/plans/2026-10-08-local-vault-lifecycle.md) now adds flat renames, missing-note restore, retained tombstones and annotation-search rebuild, with [bounded evidence](implementation/local-vault-lifecycle/README.md). Phone transport, pairing, secure purge/undelete, semantic reconstruction and migration remain excluded. Historical email-auth acceptance is not the new target.
 
@@ -81,6 +81,8 @@ Make an Obsidian vault the user-owned durable memory spine while retaining Recal
 Build the smallest real round trip: capture -> preserved vault original and memory -> edit in Obsidian -> validated Recall understanding -> grounded Ask -> correction/history retained in vault. Do not require manual folders/tags, a community plugin, paid Obsidian Sync, or account sign-in. Stage local vault correctness before optional device pairing and transport; preserve phone drafts when the desktop is off and label relay receipt separately from vault commitment.
 
 Exit: crash-safe/idempotent vault writes, direct-edit conflicts, concurrent devices, immutable sources/hash checks, temporal/correction/tombstone preservation, revoked access and cross-workspace isolation, and reconstruction of memory/search projections from vault data. Existing users' memory must migrate with verified parity and a safe rollback; legacy Markdown export alone does not pass.
+
+The separately authorized [selected-photo Claude reading plan](superpowers/plans/2026-10-08-claude-vault-reading.md) adds full-page vision as the primary photo-reading path, explicit one-photo cloud consent, unreviewed original comparison, separate human transcription corrections, effective reading keyword search and retained provenance/history. New reads default to disconnected pending independently approved device/service provisioning. This is a bounded semantic-history extension, not completion of grounded Ask, full semantic reconstruction, phone synchronization or RCL-005B. See [reading evidence and remaining gates](implementation/claude-vault-reading/README.md); historical email-auth deployment and PR11/PR12 evidence stay preserved.
 
 ## RCL-006 — Private multi-domain pilot
 

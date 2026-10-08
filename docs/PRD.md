@@ -1,8 +1,8 @@
 # Recall — Product Requirements Document
 
-Version: 0.4 | Date: 2026-10-07 | Product owner: Nick Sandoval
+Version: 0.5 | Date: 2026-10-08 | Product owner: Nick Sandoval
 
-Status: universal product vision approved; V1 is a proposed implementation baseline, not delivered functionality.
+Status: universal product vision approved; bounded local desktop slices are implemented candidates, while full V1 product/platform acceptance remains open.
 
 ## 1. Product thesis
 
@@ -109,6 +109,8 @@ Domain concepts are projections. A generator is a thing; a client is an organiza
 ### Capture
 Photograph/import pages or enter text, optionally add a short context hint, and save. No folder, tags, title, project, or identity cleanup is required. The original becomes durable before AI processing.
 
+Claude full-page vision is the primary photo-reading path. The bounded local desktop flow reads one selected, already saved photo only after **Read this photo with Claude** and an explicit cloud-processing confirmation. The result is an **Unreviewed machine reading**, shown beside its original with uncertainty and provenance. A separate human reading correction takes precedence over later machine readings; the original and previous proposals remain in vault history. Saved effective readings are locally keyword-searchable. Service connection defaults to disabled; local capture, annotation, evidence and search require no remote account. This does not add OCR or semantic Ask. See [reading evidence and limits](implementation/claude-vault-reading/README.md).
+
 ### Ask
 Ask naturally: “Who was that transformer guy I met in Houston?”, “What did Professor Miller say about mitochondrial DNA?”, or “What was that restaurant Sarah recommended in Florence?” Recall retrieves authorized evidence, resolves context conservatively, answers with uncertainty intact, and exposes the source.
 
@@ -139,7 +141,7 @@ Included:
 Deferred:
 - Voice, screenshots/share sheet, broad file/PDF ingestion, email/calendar, browser extension.
 - Proactive pattern discovery, scheduled briefs, autonomous reminders/actions.
-- Claude/MCP and other assistant adapters.
+- Claude/MCP and other assistant adapters (distinct from the primary Claude photo-reading path).
 - Android/macOS, teams, billing, public launch.
 - Dedicated node-link graph UI, separate graph/vector databases, autonomous agents. Spatial relationship/context rendering on the canonical Memory Surface is part of the approved UX and must not require a graph database.
 - Domain-specific ERP/CMMS/CRM behavior.
@@ -213,7 +215,7 @@ The Obsidian vault is the required durable memory spine. Human-readable Markdown
 
 The new local desktop foundation commits original images, human notes and append-only revisions to a selected vault and reconciles supported Markdown body edits. Its keyword view rebuilds from validated vault files, including supported flat renames and retained tombstones. Explicit missing-note restoration and logical removal preserve originals/history; logical removal is not secure purge or undelete. Existing cloud memory remains PostgreSQL-authoritative with one-way managed export; full semantic projection recovery and migration remain open. Cross-device transport is not implemented; no paid Obsidian Sync service or community plugin is assumed.
 
-Target local-only capture, vault reading/correction and local search must work without a remote account or network service. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
+Local-only capture, saved vault reading/correction and local keyword search work without a remote account or network service. Generating a new Claude reading uses a separately consented private service connection, disabled by default pending owner-approved provisioning. Cancellation prevents uncommitted local promotion; it cannot promise to stop a sent request or reverse a charge. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
 
 Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish this bounded implementation from the full target; QR pairing remains unanswered and unimplemented. See [foundation acceptance evidence](implementation/local-vault/README.md) and [lifecycle acceptance evidence](implementation/local-vault-lifecycle/README.md).
 

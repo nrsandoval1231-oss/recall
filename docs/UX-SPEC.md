@@ -1,10 +1,18 @@
 # Recall — Canonical Experience & Visual System
 
-## First use and device access — target, not implemented
+## First use and device access — bounded desktop subset implemented
 
-The owner requires no account, password, or email-link sign-in anywhere, including first use. Open Recall, create/select an Obsidian vault with the OS folder permission, and capture locally. OS file permission is not a remote account. Do not substitute “sign in once” or remembered sessions. A phone starting alone can save local drafts before a desktop vault is associated.
+The owner requires no account, password, or email-link sign-in anywhere, including first use. Open Recall, create/select an Obsidian vault with the OS folder permission, and capture locally. OS file permission is not a remote account. Do not substitute “sign in once” or remembered sessions. The phone-first target allows local drafts before a desktop vault is associated; the phone vault bridge, association and transport are not implemented in this desktop slice.
 
 For cross-device private use, propose an owner-approved one-time QR association with a trusted device; the owner has not accepted this interaction. Until answered, label it proposed and do not build it. Local-only remains available. Show “Saved on this device,” “Waiting for vault,” “Received by relay; waiting for vault,” “Saved in vault,” and “Conflict needs review” only when supported by acknowledgments. Cloud AI and unseen originals remain unavailable offline. Existing email-auth screens are a current implementation gap, not the desired onboarding. See [RCL-005B](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
+
+### Selected-photo reading and review — bounded desktop slice
+
+The no-sign-in desktop subset saves original photos locally before optional reading. Claude full-page vision is the primary photo-reading path: **Read this photo with Claude** opens an explicit one-photo cloud-processing confirmation. Default service capability is disconnected; capture, annotation, original inspection and local search remain usable. No account/email fallback or credential configuration UI is added. The existing browser/mobile email-auth path remains a legacy target gap.
+
+An **Unreviewed machine reading** sits on readable glass beside the physical original, with uncertainty and provider/source attribution. A separate **Correct reading** action saves human transcription without rewriting the machine proposal, original or optional annotation. Human reading corrections govern current search and survive reprocessing; earlier versions retain their attribution in History. Transcription review is optional after capture, never a capture prerequisite.
+
+Pending/unknown/cancelled operations disclose possible cloud processing and cost. **Retry or recover reading** may resend the same photo/operation when the service has no receipt; recovery of admitted in-flight/unknown provider work does not submit it again. Cancellation guards local publication without promising a provider refund. Compare in two columns on desktop and stack evidence/understanding on narrower surfaces; preserve keyboard focus and reduced motion. This slice does not implement semantic Ask or full reconstruction. See [reading evidence and limits](implementation/claude-vault-reading/README.md).
 
 ## Required memory foundation
 

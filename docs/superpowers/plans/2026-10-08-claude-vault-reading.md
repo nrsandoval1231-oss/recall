@@ -34,10 +34,10 @@
 
 **Interfaces:** Produce POST `/v1/local-readings` and a bounded result/recovery contract. Define exact request/response fields in `docs/API-CONTRACT.md` for native consumption before completing. Inject device authorization which defaults to deny; derive existing operational principal/workspace without first-use provisioning. Reuse existing budget reservation and image/extraction code. Provider calls occur outside database locks. Operational receipts are scoped, bind payload, and distinguish complete/in-flight/unknown failures; no canonical cloud capture.
 
-- [ ] Write failing HTTP/domain tests for default denial before bytes, scoped authorized synthetic image, binding/hash/size failures, validated extraction, duplicate/in-flight replay, malformed/refusal/timeout responses, budget/consent and revocation.
-- [ ] Run focused tests and record initial failures.
-- [ ] Implement smallest protected service and operational receipts, with bounded request sizes and sanitized errors. Keep existing cloud routes unchanged.
-- [ ] Run focused tests, ruff and mypy; commit and report exact interface, retention, tests and residual limits.
+- [x] Write failing HTTP/domain tests for default denial before bytes, scoped authorized synthetic image, binding/hash/size failures, validated extraction, duplicate/in-flight replay, malformed/refusal/timeout responses, budget/consent and revocation.
+- [x] Run focused tests and record initial failures.
+- [x] Implement smallest protected service and operational receipts, with bounded request sizes and sanitized errors. Keep existing cloud routes unchanged.
+- [x] Run focused tests, ruff and mypy; commit and report exact interface, retention, tests and residual limits.
 
 ### Task 2: Native reading history and protected transport
 
@@ -45,11 +45,11 @@
 
 **Interfaces:** Consume task 1 HTTP contract. Produce native capability/status, explicit read/cancel or prepare/commit commands, reading correction command, and reading fields in memory/history DTOs. Renderer cannot supply paths, secrets or arbitrary URLs. Native configuration reads an existing scoped connection from protected storage only; no provisioning command. Tests may inject loopback transport without production bypass.
 
-- [ ] Write failing tests for source/revision bound unreviewed commit, retained machine proposal versus human correction, retry, stale/delete/switch/cancel, original equality, reopen/rebuild and v1/v2 compatibility/writer fence.
-- [ ] Run focused tests to establish failures.
-- [ ] Implement versioned events through existing atomic journal and receipt machinery; search effective reading and render readable provenance without conflating annotation. Keep network I/O outside vault locks; revalidate on completion.
-- [ ] Exercise actual local synthetic HTTP request/response including auth header, timeout/invalid body and redirection rejection; verify default capability disabled.
-- [ ] Run native/adapter suites, commit and report exact DTO/commands and tests.
+- [x] Write failing tests for source/revision bound unreviewed commit, retained machine proposal versus human correction, retry, stale/delete/switch/cancel, original equality, reopen/rebuild and v1/v2 compatibility/writer fence.
+- [x] Run focused tests to establish failures.
+- [x] Implement versioned events through existing atomic journal and receipt machinery; search effective reading and render readable provenance without conflating annotation. Keep network I/O outside vault locks; revalidate on completion.
+- [x] Exercise actual local synthetic HTTP request/response including auth header, timeout/invalid body and redirection rejection; verify default capability disabled.
+- [x] Run native/adapter suites, commit and report exact DTO/commands and tests.
 
 ### Task 3: Visible reading/review flow and delivery evidence
 
@@ -57,8 +57,9 @@
 
 **Interfaces:** Consume task 2 LocalVault contract; no renderer credential/provider client. Reading action applies only to selected active memory after explicit intent, with cancel/retry and source comparison. Unconfigured service displays honest explanation while local use remains available.
 
-- [ ] Write failing UI tests for explicit consent, unreviewed label, uncertainty/attribution, correction precedence, searching effective text, error/cancel/retry, navigation/vault-switch stale completions and no automatic upload.
-- [ ] Implement focused controls matching existing warm Memory Surface, optional annotation intact, no fake Ask.
-- [ ] Extend browser synthetic journeys, run meaningful real-browser checks and save synthetic screenshots/evidence; no live model quality claim.
-- [ ] Update canonical documents with Claude primary and exact implemented/disabled/remaining boundaries; preserve historic evidence and proposed QR choice.
-- [ ] Run relevant suites, lint/typecheck/build and commit. Independent final review then all exact-head CI jobs after opening stacked draft PR; repair verified failures, never merge/deploy.
+- [x] Write failing UI tests for explicit consent, unreviewed label, uncertainty/attribution, correction precedence, searching effective text, error/cancel/retry, navigation/vault-switch stale completions and no automatic upload.
+- [x] Implement focused controls matching existing warm Memory Surface, optional annotation intact, no fake Ask.
+- [x] Extend browser synthetic journeys, run meaningful real-browser checks and save synthetic screenshots/evidence; no live model quality claim.
+- [x] Update canonical documents with Claude primary and exact implemented/disabled/remaining boundaries; preserve historic evidence and proposed QR choice.
+- [x] Run relevant suites, lint/typecheck/build and commit.
+- [ ] Independent Task 3 and whole-branch final review, then all exact-head CI jobs after opening stacked draft PR; repair verified failures, never merge/deploy.

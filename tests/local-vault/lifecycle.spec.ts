@@ -50,7 +50,7 @@ test("flat renamed basename is searchable; missing note requires explicit restor
   await expect(page.getByRole("button", { name: "Restore missing note" })).toBeEnabled();
   await accessible(page); await screenshot(page, info, "missing");
   await page.getByRole("button", { name: "Restore missing note" }).click();
-  await expect(page.getByText("Note restored in vault · This device only", { exact: true })).toBeVisible();
+  await expect(page.getByText("Note restored in vault · Stored on this device", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "View original" })).toBeEnabled();
   await page.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.getByText(/restore · human:recall/)).toBeVisible();
@@ -77,7 +77,7 @@ test("removal requires confirmation; removed history survives reload and stale c
   await expect(row(page)).toHaveCount(0);
   await page.getByRole("button", { name: "Removed items", exact: true }).click();
   await expect(row(page)).toBeVisible();
-  await expect(page.getByText("Saved in vault · This device only", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Saved in vault · Stored on this device", { exact: true })).toHaveCount(0);
   await accessible(page); await screenshot(page, info, "removed");
   await row(page).click(); await page.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.getByText(/remove · human:recall/)).toBeVisible();

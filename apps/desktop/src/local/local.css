@@ -53,5 +53,18 @@ body { margin: 0; }
 .local-history li { padding: 8px 0 20px; border-bottom: 1px solid var(--line); }
 .local-history small { color: var(--muted); }
 .local-review { padding: 15px 20px; border: 1px solid #b9bfae; border-radius: 12px; margin: 25px 0; background: #edeedfa1; }
+.local-photo-reading { border-top: 1px solid var(--line); margin-top: 32px; padding-top: 10px; }
+.local-reading-comparison { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 30px; align-items: start; }
+.local-reading-understanding, .local-reading-evidence { min-width: 0; }
+.local-reading-understanding { padding: 20px; border-radius: 14px; border: 1px solid #fffdf9; background: #fafbf570; box-shadow: inset 0 1px 0 #ffffffd9; }
+.local-reading-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 18px; line-height: 1.65; }
+.local-human-reading { border-bottom: 1px solid var(--line); margin-bottom: 25px; padding-bottom: 12px; }
+.local-provenance { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; margin-top: 22px; }
+.local-provenance summary { cursor: pointer; font-size: 13px; }
+.local-uncertainties { padding-left: 20px; font-size: 14px; color: #60451e; }
+.local-reading-operation { border-left: 3px solid #788773; padding: 1px 18px; margin: 22px 0; }
+.local-reading-evidence .local-artifact { margin-top: 15px; }
+.local-reading-evidence .local-artifact img { max-height: 70vh; }
+@media (max-width: 850px) { .local-reading-comparison { grid-template-columns: minmax(0, 1fr); gap: 20px; } .local-reading-evidence { grid-row: 1; } .local-reading-understanding { padding: 16px; } }
 @media (max-width: 600px) { .local-header { gap: 12px; margin-bottom: 40px; } .local-header > span { display: none; } .local-row { flex-direction: column; } .local-search, .local-capture { padding: 20px; } .local-focus { padding: 22px; } }
 @media (prefers-reduced-motion: reduce) { .local-surface *, .local-surface *::before, .local-surface *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
