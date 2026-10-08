@@ -25,6 +25,8 @@ const MAX_RECORDS: usize = 10_000;
 pub struct VaultStatus {
     pub root: Option<String>,
     pub vault_id: Option<String>,
+    #[serde(default)]
+    pub vault_identity: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1063,11 +1065,13 @@ impl LocalVaultState {
                 Ok(VaultStatus {
                     root: Some(s.vault.root.to_string_lossy().into()),
                     vault_id: Some(s.token.clone()),
+                    vault_identity: Some(s.vault.id.clone()),
                 })
             }
             None => Ok(VaultStatus {
                 root: None,
                 vault_id: None,
+                vault_identity: None,
             }),
         }
     }
@@ -1090,6 +1094,7 @@ impl LocalVaultState {
         let status = VaultStatus {
             root: Some(v.root.to_string_lossy().into()),
             vault_id: Some(v.id.clone()),
+            vault_identity: Some(v.id.clone()),
         };
         // Preserve the previous settings until a fully flushed replacement exists.
         let temp = self

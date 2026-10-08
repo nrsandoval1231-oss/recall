@@ -546,3 +546,21 @@ fn serialized_metadata_size_is_checked_before_original_is_written() {
     assert!(!v.journal_path(&operation).exists());
     assert!(v.list("").unwrap().is_empty());
 }
+
+#[test]
+fn status_exposes_stable_identity_separate_from_selection_permission() {
+    let f = Fixture::new();
+    let settings = f.0.join("selected-settings.json");
+    let state = LocalVaultState::new(settings.clone());
+    let selected = state.select_path(&f.0).unwrap();
+    let json = serde_json::to_value(&selected).unwrap();
+    assert_eq!(json["vault_identity"], f.vault().id);
+    assert_ne!(json["vault_identity"], json["vault_id"]);
+    let restarted = LocalVaultState::new(settings);
+    let after = serde_json::to_value(restarted.status().unwrap()).unwrap();
+    assert_eq!(json["vault_identity"], after["vault_identity"]);
+    assert_ne!(json["vault_id"], after["vault_id"]);
+    assert!(restarted
+        .with(json["vault_identity"].as_str().unwrap(), |_| Ok(()))
+        .is_err());
+}
