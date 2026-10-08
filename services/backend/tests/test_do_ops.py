@@ -215,6 +215,27 @@ def test_preflight_dict_rows_use_named_membership_aliases() -> None:
     assert namespace["api_memberships"](DictRowConnection()) == {"recall_app"}  # type: ignore[operator]
 
 
+def test_restore_verifier_passes_target_connection_mapping_as_keywords() -> None:
+    path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "verify-ci-restore.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    mapping_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "psycopg"
+        and node.func.attr == "connect"
+        and any(isinstance(argument, ast.Name) and argument.id == "restored_operator" for argument in node.args + [keyword.value for keyword in node.keywords])
+    ]
+    assert len(mapping_calls) == 2
+    for call in mapping_calls:
+        assert not call.args
+        assert len(call.keywords) == 1
+        assert call.keywords[0].arg is None
+        assert isinstance(call.keywords[0].value, ast.Name) and call.keywords[0].value.id == "restored_operator"
+
+
 def test_restore_checksum_refusal_sets_external_hold(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     archive = tmp_path / "backup.age"
     archive.write_bytes(b"corrupted-synthetic-backup")

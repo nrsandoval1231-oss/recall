@@ -20,7 +20,7 @@ for key in ("host", "port", "dbname"):
     if key not in restored:
         raise AssertionError(f"restore target omits {key}")
     restored_operator[key] = restored[key]
-with psycopg.connect(restored_operator) as conn:
+with psycopg.connect(**restored_operator) as conn:
     restored_identity = conn.execute("select inet_server_addr()::text,inet_server_port(),current_database()").fetchone()
     assert restored_identity[2] == "recall_restore"
     roles = {
@@ -42,7 +42,7 @@ with psycopg.connect(restored_operator) as conn:
     assert not any(roles["recall_api"][key] for key in ("rolsuper", "rolbypassrls", "rolcreatedb", "rolcreaterole"))
     assert conn.execute("select pg_has_role('recall_api','recall_app','member')").fetchone()[0]
 
-with psycopg.connect(connections["operator"]) as source, psycopg.connect(restored_operator) as restored_conn:
+with psycopg.connect(connections["operator"]) as source, psycopg.connect(**restored_operator) as restored_conn:
     source_identity = source.execute("select inet_server_addr()::text,inet_server_port(),current_database()").fetchone()
     assert source_identity != restored_identity
     relations = restored_conn.execute(
