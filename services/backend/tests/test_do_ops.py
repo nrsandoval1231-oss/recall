@@ -106,6 +106,19 @@ def test_ci_preflight_negatives_use_supported_compose_run_and_prove_refusal_mark
     assert all(transition in workflow for transition in restored_transitions)
 
 
+def test_ci_restore_sentinel_uses_stdin_sql_for_literal_and_checks_it_before_restore() -> None:
+    workflow = (Path(__file__).resolve().parents[3] / ".github" / "workflows" / "do-inference-ops.yml").read_text(
+        encoding="utf-8"
+    )
+    setup = "psql -U recall_operator -d recall_restore -v ON_ERROR_STOP=1 <<'SQL'"
+    literal = "INSERT INTO restore_refusal_sentinel VALUES ('preserved');"
+    verification = 'psql -U recall_operator -d recall_restore -tAc "SELECT value FROM restore_refusal_sentinel"'
+    assert setup in workflow and literal in workflow
+    assert "VALUES (''preserved'')" not in workflow
+    refusal = workflow.index("if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi", workflow.index(literal))
+    assert workflow.index(literal) < refusal < workflow.index(verification)
+
+
 def test_ci_secret_writers_keep_protected_files_final_mode_and_runtime_runner_writable() -> None:
     root = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops"
     prepare = (root / "prepare-ci.py").read_text(encoding="utf-8")

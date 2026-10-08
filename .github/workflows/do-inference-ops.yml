@@ -193,7 +193,10 @@ jobs:
           api_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -aq api)"
           export RECALL_RESTORE_COMPOSE_PROJECT="$RECALL_CI_PROJECT"
           export RECALL_RESTORE_API_CONTAINER_ID="$api_id"
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -v ON_ERROR_STOP=1 -c 'CREATE TABLE restore_refusal_sentinel (value text); INSERT INTO restore_refusal_sentinel VALUES (''preserved'')'
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE restore_refusal_sentinel (value text);
+          INSERT INTO restore_refusal_sentinel VALUES ('preserved');
+          SQL
           if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi
           docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -tAc "SELECT value FROM restore_refusal_sentinel" | grep -qx preserved
           docker compose -p "$RECALL_CI_PROJECT" -f compose.yml rm -sf restore-db
