@@ -72,7 +72,7 @@ Fresh scoped verification:
 - `RECALL_CHROMIUM=/usr/bin/chromium npm run test:local-vault -- reading.spec.ts`: **16 passed**, desktop/reduced-motion, no skips. Includes copyable draft/reload/repair with the real diagnostic shape and a delayed original after an unknown reread, plus all prior reading journeys and Axe/viewport checks.
 - Root `npm run typecheck`, `npm run lint`, and `git diff --check`: passed. No new screenshots or unchanged broad backend/native/client/browser suites were rerun for this scoped repair; the earlier full-delivery evidence remains historical.
 
-At this earlier repair, the Minor keyboard-focus return finding remained open for final review; the consolidated repair below now addresses it. This earlier repair addressed the two Important cases. No native/backend/contract/provisioning behavior changed. Scoped independent rereview remains required.
+At this earlier repair, the Minor keyboard-focus return finding remained open for final review; the consolidated repair below now addresses it. This earlier repair addressed the two Important cases. No native/backend/contract/provisioning behavior changed. Scoped independent rereview passed both original failure probes and four focused browser checks.
 
 ## Consolidated whole-branch review repair over `ef73706`
 
@@ -93,7 +93,7 @@ Fresh checks after the consolidated implementation:
 - `RECALL_CHROMIUM=/usr/bin/chromium npm run test:local-vault -- reading.spec.ts`: **18 passed**, desktop/reduced-motion, no skips. No screenshots were regenerated; all historical images remain preserved.
 - Root `npm run lint`, `npm run typecheck`, `npm run build --workspace @recall/desktop`, and `git diff --check`: passed. This local build does not establish installed-device or exact-final-head CI acceptance.
 
-M1 is explicitly deferred: cancelled/terminal native session registrations can exhaust the bounded 128-entry registry; the existing clear fail-closed error and restart workaround remain. This repair makes no registry retirement or session-safety redesign. Independent scoped final rereview and exact-final-head draft PR #13 CI are still pending coordinator gates. Default authorization/connection remains disabled; no credentials, grants, enrollment, live/private calls, production changes, merge or deployment occurred.
+M1 is explicitly deferred: cancelled/terminal native session registrations can exhaust the bounded 128-entry registry; the existing clear fail-closed error and restart workaround remain. This repair makes no registry retirement or session-safety redesign. Independent scoped final rereview at `44370217a713a415e30966ab0187eeeacb0e64e9` passed spec and quality: I1/M2/M3 were addressed, with 15 backend, three native and three browser checks independently passing. [Draft PR #13](https://github.com/nrsandoval1231-oss/recall/pull/13) is the delivery record for exact-head CI and installer artifact status; earlier-head CI is not final acceptance. Default authorization/connection remains disabled; no credentials, grants, enrollment, live/private calls, production changes, merge or deployment occurred.
 
 ## Synthetic screenshots
 
