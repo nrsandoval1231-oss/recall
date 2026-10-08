@@ -59,17 +59,24 @@ jobs:
               exit 1
             fi
           }
-          cp secrets/activation_record.local "$RUNNER_TEMP/activation-record.json"
-          python3 - <<'PY'
+          original_activation="$RUNNER_TEMP/activation-record-original.json"
+          candidate_activation="$RUNNER_TEMP/activation-record-candidate.json"
+          sudo cp -- secrets/activation_record.local "$original_activation"
+          sudo chown "$(id -u):$(id -g)" "$original_activation"
+          cp -- "$original_activation" "$candidate_activation"
+          chmod 600 "$candidate_activation"
+          ACTIVATION_CANDIDATE="$candidate_activation" python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
-          path = Path("secrets/activation_record.local")
+          path = Path(os.environ["ACTIVATION_CANDIDATE"])
           record = json.loads(path.read_text())
           del record["review_id"]
           path.write_text(json.dumps(record), encoding="utf-8")
           PY
+          sudo install -o 10001 -g 10001 -m 0400 "$candidate_activation" secrets/activation_record.local
           refuse_api
-          cp "$RUNNER_TEMP/activation-record.json" secrets/activation_record.local
+          sudo install -o 10001 -g 10001 -m 0400 "$original_activation" secrets/activation_record.local
           cp secrets/runtime.env.local "$RUNNER_TEMP/runtime.env"
           sed -i 's/^RECALL_AI_DAILY_BUDGET_USD=.*/RECALL_AI_DAILY_BUDGET_USD=1/' secrets/runtime.env.local
           refuse_api

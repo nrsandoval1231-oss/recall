@@ -56,6 +56,32 @@ def test_do_ops_compose_resolves_tmpfs_as_single_mount() -> None:
         assert services[name]["tmpfs"] == ["/tmp:size=32m,mode=1777"]
 
 
+def test_ci_negative_activation_mutation_preserves_container_secret_ownership() -> None:
+    workflow = (Path(__file__).resolve().parents[3] / ".github" / "workflows" / "do-inference-ops.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'sudo cp -- secrets/activation_record.local "$original_activation"' in workflow
+    assert 'sudo chown "$(id -u):$(id -g)" "$original_activation"' in workflow
+    assert 'chmod 600 "$candidate_activation"' in workflow
+    assert 'ACTIVATION_CANDIDATE="$candidate_activation" python3' in workflow
+    assert workflow.count("sudo install -o 10001 -g 10001 -m 0400") >= 2
+    assert 'Path("secrets/activation_record.local")' not in workflow
+
+
+def test_ci_activation_candidate_becomes_runner_writable_before_mutation(tmp_path) -> None:
+    original = tmp_path / "activation-record-original.json"
+    candidate = tmp_path / "activation-record-candidate.json"
+    original.write_text('{"review_id":"synthetic"}', encoding="utf-8")
+    os.chmod(original, 0o400)
+    shutil.copyfile(original, candidate)
+    os.chmod(candidate, 0o600)
+    record = json.loads(candidate.read_text(encoding="utf-8"))
+    record.pop("review_id")
+    candidate.write_text(json.dumps(record), encoding="utf-8")
+    assert json.loads(candidate.read_text(encoding="utf-8")) == {}
+    assert json.loads(original.read_text(encoding="utf-8")) == {"review_id": "synthetic"}
+
+
 def _restore_module():  # type: ignore[no-untyped-def]
     path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "restore.py"
     spec = spec_from_file_location("do_ops_restore", path)
