@@ -1,0 +1,52 @@
+{
+  "packet": "DIAG-02",
+  "status": "IMPLEMENTED_UNREVIEWED",
+  "started_utc": "UNKNOWN",
+  "finished_utc": "UNKNOWN",
+  "repository": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall",
+  "branch": "implement/owner-device-pairing",
+  "base_sha": "e1391bf7aff349ef1ae0524a76d5981d243f0d11",
+  "head_sha": "e1391bf7aff349ef1ae0524a76d5981d243f0d11",
+  "changed_files": [
+    "tests/evaluation/claude-selected-photo/batch.py",
+    "tests/evaluation/claude-selected-photo/diagnostics.py",
+    "services/backend/tests/test_claude_batch.py",
+    "docs/implementation/claude-evaluation/README.md",
+    ".agent/DIAG-02-COMPLETION.json"
+  ],
+  "implementation": [
+    "Added fixed DIAG-02 journal path and opener for exactly numbers_uncertainty then dense_full_page, with $1.50 total cap and $0.689568 full per-case reserve.",
+    "Added diagnostic-only reservation sequencing that refuses a new reservation while prior usage is unknown or in flight; the live entrypoint settles the current case before stopping on unknown usage or diagnostic capture/replay failure.",
+    "Added a separately gated test_live_diag02_synthetic_reading_batch entrypoint with forced immutable diagnostics, exact manifest/hash/classification checks, Sonnet 5.5, zero retries, no refusal fallback, and a pre-dispatch check of the original journal SHA-256.",
+    "Added offline fixed-hash, two-case, cap, single-use, original-journal, and unknown-stop guard coverage; documented the controller run boundary."
+  ],
+  "validation": [
+    {
+      "command": "uv run --project services/backend ruff check tests/evaluation/claude-selected-photo/batch.py tests/evaluation/claude-selected-photo/diagnostics.py services/backend/tests/test_claude_batch.py",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run --project services/backend ruff format --check tests/evaluation/claude-selected-photo/batch.py tests/evaluation/claude-selected-photo/diagnostics.py services/backend/tests/test_claude_batch.py",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run --project services/backend pytest services/backend/tests/test_claude_batch.py -q",
+      "result": "PASS: 15 passed, 4 skipped; two PostgreSQL-dependent tests skipped because initdb is unavailable, original live test skipped by opt-in gate, DIAG-02 live test skipped by opt-in gate."
+    },
+    {
+      "command": "git diff --check -- docs/implementation/claude-evaluation/README.md services/backend/tests/test_claude_batch.py tests/evaluation/claude-selected-photo/batch.py tests/evaluation/claude-selected-photo/diagnostics.py",
+      "result": "PASS"
+    }
+  ],
+  "original_journal": {
+    "path": ".recall-storage/claude-selected-photo-eval/batch.json",
+    "sha256": "A65447C3FE7CC5D1E7339E9DCBCFA93F0E1C3EF9D6C35D38CD51282EC8EB6DB1",
+    "result": "unchanged"
+  },
+  "uncertainties": [
+    "Synthetic font-rendered fixtures do not establish handwriting accuracy.",
+    "DIAG-02 live paid dispatch has not been run by this builder; exact provider outcomes remain UNKNOWN."
+  ],
+  "external_actions": "No key reads, network/provider calls, paid requests, original/live journal mutations, real-data capture, enrollment, commit, or push by builder; isolated temporary journals were exercised by offline tests.",
+  "controller_handoff": "Controller can review then use RECALL_DIAG02_LIVE=1 with services/backend/tests/test_claude_batch.py::test_live_diag02_synthetic_reading_batch. Keep journal and diagnostics for evidence."
+}

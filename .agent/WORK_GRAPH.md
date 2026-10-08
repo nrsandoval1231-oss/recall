@@ -7,3 +7,5 @@
 - REAL-01 NOT AUTHORIZED: real persistent access, enrollment, deployment, private-photo tests and installed-device/cross-device acceptance require owner action-time approval.
 
 - DIAG-01 READY: safe rejection classifications and synthetic offline replay; original live cause UNKNOWN. No further paid calls.
+
+- DIAG-02 READY: owner-approved two-case USD1.50 single-use diagnostic run; packet DIAG-02.md, implementation/review before dispatch, no third batch.

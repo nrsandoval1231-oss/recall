@@ -18,6 +18,10 @@ OUTPUT_RATE = 10.0
 INPUT_HOLD = 24_784
 OUTPUT_HOLD = 64_000
 MAX_USD = 5.0
+DIAG02_CASES = ("numbers_uncertainty", "dense_full_page")
+DIAG02_INPUT_HOLD = INPUT_HOLD
+DIAG02_OUTPUT_HOLD = OUTPUT_HOLD
+DIAG02_MAX_USD = 1.50
 
 
 def default_journal_path() -> Path:
@@ -27,6 +31,28 @@ def default_journal_path() -> Path:
         / ".recall-storage"
         / "claude-selected-photo-eval"
         / "batch.json"
+    )
+
+
+def diag02_journal_path() -> Path:
+    """Separate fixed identity for the approved two-case diagnostic run."""
+    return (
+        Path(__file__).resolve().parents[3]
+        / ".recall-storage"
+        / "claude-selected-photo-eval"
+        / "diag-02-batch.json"
+    )
+
+
+def open_diag02_journal() -> BatchJournal:
+    """Open only DIAG-02's fixed identity, allowlist, holds, and cap."""
+    return BatchJournal(
+        diag02_journal_path(),
+        list(DIAG02_CASES),
+        max_usd=DIAG02_MAX_USD,
+        input_hold=DIAG02_INPUT_HOLD,
+        output_hold=DIAG02_OUTPUT_HOLD,
+        stop_on_unknown=True,
     )
 
 
@@ -47,11 +73,24 @@ def usage_within_hold(model_id: str, inputs: object, outputs: object) -> bool:
 class BatchJournal:
     """A single-use journal. A crash after reservation consumes the batch permanently."""
 
-    def __init__(self, path: Path, cases: list[str]) -> None:
+    def __init__(
+        self,
+        path: Path,
+        cases: list[str],
+        *,
+        max_usd: float = MAX_USD,
+        input_hold: int = INPUT_HOLD,
+        output_hold: int = OUTPUT_HOLD,
+        stop_on_unknown: bool = False,
+    ) -> None:
         if not cases or len(cases) != len(set(cases)):
             raise ValueError("batch must contain distinct cases")
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
+        self.max_usd = max_usd
+        self.input_hold = input_hold
+        self.output_hold = output_hold
+        self.stop_on_unknown = stop_on_unknown
         self.lock = path.with_suffix(path.suffix + ".lock").open("a+b")
         try:
             if os.name == "nt":
@@ -83,7 +122,9 @@ class BatchJournal:
         self.data: dict[str, Any] = {
             "schema_version": 1,
             "model": MODEL,
-            "max_usd": MAX_USD,
+            "max_usd": self.max_usd,
+            "input_token_hold": self.input_hold,
+            "output_token_hold": self.output_hold,
             "cases": {case: {"state": "pending"} for case in cases},
             "reserved_usd": 0.0,
             "actual_usage": [],
@@ -114,7 +155,14 @@ class BatchJournal:
         binding: dict[str, Any],
     ) -> None:
         record = self.data["cases"].get(case)
-        amount = hold_usd()
+        amount = hold_usd(self.input_hold, self.output_hold)
+        if self.stop_on_unknown and any(
+            item.get("state") in {"unknown", "in_flight"}
+            for item in self.data["cases"].values()
+        ):
+            raise RuntimeError(
+                "diagnostic batch requires known prior usage before dispatch"
+            )
         if record is None or record["state"] != "pending":
             raise RuntimeError(
                 "case is outside the fixed batch or has already been reserved"
@@ -134,14 +182,14 @@ class BatchJournal:
             raise ValueError(
                 "journal binding must match the reserved operation and fixture"
             )
-        if self.data["reserved_usd"] + amount > MAX_USD:
-            raise RuntimeError("batch USD 5.00 reserve cap would be exceeded")
+        if self.data["reserved_usd"] + amount > self.max_usd:
+            raise RuntimeError("batch reserve cap would be exceeded")
         self.data["reserved_usd"] = round(self.data["reserved_usd"] + amount, 8)
         record.update(
             state="in_flight",
             reserved_usd=amount,
-            input_token_hold=INPUT_HOLD,
-            output_token_hold=OUTPUT_HOLD,
+            input_token_hold=self.input_hold,
+            output_token_hold=self.output_hold,
             fixture_sha256=fixture_sha256,
             operation_id=operation_id,
             binding=binding,
@@ -155,6 +203,7 @@ class BatchJournal:
         state: str,
         input_tokens: int | None,
         output_tokens: int | None,
+        model_id: str = MODEL,
         response: dict[str, Any] | None = None,
     ) -> None:
         record = self.data["cases"][case]
@@ -169,7 +218,13 @@ class BatchJournal:
                 record["response"] = response
             self._write()
             return
-        if not usage_within_hold(MODEL, input_tokens, output_tokens):
+        if not (
+            model_id == MODEL
+            and type(input_tokens) is int
+            and type(output_tokens) is int
+            and 0 <= input_tokens <= self.input_hold
+            and 0 <= output_tokens <= self.output_hold
+        ):
             raise ValueError(
                 "actual provider usage is missing or exceeds its reserved model hold"
             )

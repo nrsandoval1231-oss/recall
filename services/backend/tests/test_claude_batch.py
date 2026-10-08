@@ -16,7 +16,16 @@ from fastapi.testclient import TestClient
 
 EVAL_DIR = Path(__file__).resolve().parents[3] / "tests" / "evaluation" / "claude-selected-photo"
 sys.path.insert(0, str(EVAL_DIR))
-from batch import BatchJournal, default_journal_path, hold_usd, usage_within_hold  # noqa: E402
+from batch import (  # noqa: E402
+    DIAG02_CASES,
+    DIAG02_MAX_USD,
+    BatchJournal,
+    default_journal_path,
+    diag02_journal_path,
+    hold_usd,
+    open_diag02_journal,
+    usage_within_hold,
+)
 
 FIXTURE_HASH = "a" * 64
 
@@ -142,6 +151,108 @@ def test_actual_usage_above_hold_is_rejected(tmp_path: Path) -> None:
 
 def test_live_journal_identity_is_fixed_per_user() -> None:
     assert default_journal_path().parent.name == "claude-selected-photo-eval"
+    assert diag02_journal_path() != default_journal_path()
+
+
+def test_diag02_fixed_cases_path_and_budget_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import batch
+
+    monkeypatch.setattr(batch, "diag02_journal_path", lambda: tmp_path / "diag-02-batch.json")
+    assert DIAG02_CASES == ("numbers_uncertainty", "dense_full_page")
+    per_case = hold_usd(batch.DIAG02_INPUT_HOLD, batch.DIAG02_OUTPUT_HOLD)
+    assert per_case == pytest.approx(0.689568)
+    assert 2 * per_case < DIAG02_MAX_USD < 3 * per_case
+    journal = open_diag02_journal()
+    try:
+        assert list(journal.data["cases"]) == list(DIAG02_CASES)
+        assert journal.data["max_usd"] == DIAG02_MAX_USD
+        assert journal.data["input_token_hold"] == 24_784
+        assert journal.data["output_token_hold"] == 64_000
+        assert journal.path == tmp_path / "diag-02-batch.json"
+    finally:
+        journal.close()
+    with pytest.raises(RuntimeError, match="already been used"):
+        open_diag02_journal()
+
+
+def test_diag02_manifest_hash_allowlist_is_exact() -> None:
+    manifest = json.loads((EVAL_DIR / "manifest.json").read_text(encoding="utf-8"))
+    expected = {
+        "numbers_uncertainty": "4d35d2ea2f0ee4ed08c8a94bc0b0dd34adb25471a75d26765ce7caa008ba3b59",
+        "dense_full_page": "9673aad20e56745a408c65a355ad6fb000276da1d7f7f3e9fb9b4bd4b8d130a3",
+    }
+    assert manifest["synthetic_only"] is True
+    cases = [case for case in manifest["cases"] if case["id"] in DIAG02_CASES]
+    assert [case["id"] for case in cases] == list(DIAG02_CASES)
+    assert {case["id"]: case["sha256"] for case in cases} == expected
+    assert all(
+        case["classification"] == "synthetic_font_rendered_pipeline_smoke"
+        and hashlib.sha256((EVAL_DIR / case["path"]).read_bytes()).hexdigest() == expected[case["id"]]
+        for case in cases
+    )
+
+
+def test_original_journal_hash_matches_pre_diag02_state() -> None:
+    original = default_journal_path()
+    if original.exists():
+        assert hashlib.sha256(original.read_bytes()).hexdigest().upper() == (
+            "A65447C3FE7CC5D1E7339E9DCBCFA93F0E1C3EF9D6C35D38CD51282EC8EB6DB1"
+        )
+
+
+def test_diag02_unknown_stops_available_dispatches(tmp_path: Path) -> None:
+    journal = BatchJournal(
+        tmp_path / "diag-02.json",
+        list(DIAG02_CASES),
+        max_usd=DIAG02_MAX_USD,
+        stop_on_unknown=True,
+    )
+    try:
+        case = DIAG02_CASES[0]
+        op = "00000000-0000-4000-8000-000000000021"
+        journal.reserve_before_dispatch(case, fixture_sha256=FIXTURE_HASH, operation_id=op, binding=journal_binding(op))
+        journal.settle(case, state="unknown", input_tokens=None, output_tokens=None)
+        assert journal.data["cases"][case]["state"] == "unknown"
+        with pytest.raises(RuntimeError, match="known prior usage"):
+            journal.reserve_before_dispatch(
+                DIAG02_CASES[1],
+                fixture_sha256=FIXTURE_HASH,
+                operation_id="00000000-0000-4000-8000-000000000022",
+                binding=journal_binding("00000000-0000-4000-8000-000000000022"),
+            )
+    finally:
+        journal.close()
+
+
+def test_diag02_guard_rejects_third_reservation_over_cap(tmp_path: Path) -> None:
+    journal = BatchJournal(
+        tmp_path / "cap.json",
+        [*DIAG02_CASES, "third-synthetic-case"],
+        max_usd=DIAG02_MAX_USD,
+        stop_on_unknown=True,
+    )
+    try:
+        for index, case in enumerate([*DIAG02_CASES, "third-synthetic-case"], start=31):
+            operation_id = f"00000000-0000-4000-8000-{index:012d}"
+            if index == 33:
+                with pytest.raises(RuntimeError, match="cap"):
+                    journal.reserve_before_dispatch(
+                        case,
+                        fixture_sha256=FIXTURE_HASH,
+                        operation_id=operation_id,
+                        binding=journal_binding(operation_id),
+                    )
+                break
+            journal.reserve_before_dispatch(
+                case,
+                fixture_sha256=FIXTURE_HASH,
+                operation_id=operation_id,
+                binding=journal_binding(operation_id),
+            )
+            journal.settle(case, state="complete", input_tokens=1, output_tokens=1)
+        assert journal.data["reserved_usd"] == pytest.approx(2 * 0.689568)
+    finally:
+        journal.close()
 
 
 def test_model_and_usage_mismatch_fails_closed() -> None:
@@ -518,18 +629,38 @@ def test_metrics_cover_tokens_numbers_uncertainty_blank_and_unreadable() -> None
     assert blank["blank_behavior"] is True and unreadable["unreadable_marked"] is True
 
 
-@pytest.mark.skipif(
-    __import__("os").environ.get("RECALL_EVAL_LIVE") != "1",
-    reason="controller must explicitly enable the one live synthetic batch",
-)
-def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
-    """Controller-only live entrypoint; use only with a compatible Anthropic key and throwaway env."""
+def _run_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch, *, diag02: bool = False):  # type: ignore[no-untyped-def]
+    """Shared live path behind the original and DIAG-02 fixed entrypoints."""
     key = os.environ.get("AI_API_KEY", "")
     if not key.startswith("sk-ant-"):
         pytest.fail("live mode requires a compatible sk-ant- Anthropic API key in the process environment")
     manifest = json.loads((EVAL_DIR / "manifest.json").read_text(encoding="utf-8"))
     cases = manifest["cases"]
-    expected_ids = ["numbers_uncertainty", "names_and_amount", "blank", "unreadable", "dense_full_page"]
+    expected_ids = (
+        list(DIAG02_CASES)
+        if diag02
+        else ["numbers_uncertainty", "names_and_amount", "blank", "unreadable", "dense_full_page"]
+    )
+    if diag02:
+        from batch import default_journal_path
+
+        original_journal = default_journal_path()
+        original_hash = hashlib.sha256(original_journal.read_bytes()).hexdigest().upper()
+        if original_hash != "A65447C3FE7CC5D1E7339E9DCBCFA93F0E1C3EF9D6C35D38CD51282EC8EB6DB1":
+            pytest.fail("original five-case journal identity changed")
+        if manifest.get("synthetic_only") is not True:
+            pytest.fail("DIAG-02 manifest is not marked synthetic-only")
+        expected_hashes = {
+            "numbers_uncertainty": "4d35d2ea2f0ee4ed08c8a94bc0b0dd34adb25471a75d26765ce7caa008ba3b59",
+            "dense_full_page": "9673aad20e56745a408c65a355ad6fb000276da1d7f7f3e9fb9b4bd4b8d130a3",
+        }
+        cases = [case for case in cases if case["id"] in expected_ids]
+        if len(cases) != 2 or any(
+            case["sha256"] != expected_hashes[case["id"]]
+            or case.get("classification") != "synthetic_font_rendered_pipeline_smoke"
+            for case in cases
+        ):
+            pytest.fail("DIAG-02 fixed case hashes changed")
     if [case["id"] for case in cases] != expected_ids:
         pytest.fail("fixed evaluation allowlist changed")
     fixture_bytes: dict[str, bytes] = {}
@@ -542,17 +673,17 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # t
             pytest.fail(f"fixture hash mismatch for {case['id']}")
         fixture_bytes[case["id"]] = image
 
-    from batch import default_journal_path
+    from batch import default_journal_path, open_diag02_journal
 
-    diagnostics_enabled = os.environ.get("RECALL_EVAL_DIAGNOSTICS") == "1"
+    diagnostics_enabled = diag02 or os.environ.get("RECALL_EVAL_DIAGNOSTICS") == "1"
     if diagnostics_enabled:
-        from diagnostics import capture_validator, default_diagnostic_dir, replay_to_file
+        from diagnostics import capture_validator, default_diagnostic_dir, diag02_diagnostic_dir, replay_to_file
 
         from conftest import REPO_ROOT
 
         diagnostic_failures: list[str] = []
         diagnostic_paths: list[Path] = []
-        diagnostic_dir = default_diagnostic_dir()
+        diagnostic_dir = diag02_diagnostic_dir() if diag02 else default_diagnostic_dir()
         diagnostic_schema = json.loads(
             (REPO_ROOT / "packages/contracts/extraction.schema.json").read_text(encoding="utf-8")
         )
@@ -569,7 +700,7 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # t
         probe._client.models.retrieve("claude-sonnet-5-5")
     finally:
         probe._client.close()
-    journal = BatchJournal(default_journal_path(), expected_ids)
+    journal = open_diag02_journal() if diag02 else BatchJournal(default_journal_path(), expected_ids)
     try:
         from recall.api.app import create_app
         from recall.errors import forbidden
@@ -702,6 +833,8 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # t
                                 "ground_truth": case["ground_truth"],
                             },
                         )
+                        if diag02:
+                            break
                     else:
                         metrics = score_case(case, data)
                         journal.settle(
@@ -724,6 +857,8 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # t
                     assert response.status_code == 200, (
                         f"synthetic case {case['id']} returned HTTP {response.status_code}"
                     )
+                    if diag02 and diagnostic_failures:
+                        break
         finally:
             provider._client.close()
         journal.data["elapsed_seconds"] = round(time.monotonic() - started, 3)
@@ -732,3 +867,19 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # t
             pytest.fail(f"synthetic diagnostics failed: {diagnostic_failures}")
     finally:
         journal.close()
+
+
+@pytest.mark.skipif(
+    os.environ.get("RECALL_EVAL_LIVE") != "1",
+    reason="controller must explicitly enable the original live synthetic batch",
+)
+def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    _run_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch)
+
+
+@pytest.mark.skipif(
+    os.environ.get("RECALL_DIAG02_LIVE") != "1",
+    reason="controller must explicitly enable the separately approved DIAG-02 batch",
+)
+def test_live_diag02_synthetic_reading_batch(env, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    _run_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch, diag02=True)

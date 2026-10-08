@@ -91,3 +91,34 @@ journal as evaluation evidence and review the provider receipt and usage before
 interpreting quality. The output is a bounded synthetic pipeline result only;
 it does not prove true handwriting, mobile/native integration, live production
 readiness, or cross-device acceptance.
+
+## DIAG-02: approved two-case diagnostic batch
+
+The controller-only entrypoint `test_live_diag02_synthetic_reading_batch` is
+separate from the original five-case run and requires
+`RECALL_DIAG02_LIVE=1`. It dispatches exactly `numbers_uncertainty` followed by
+`dense_full_page`, after checking their fixed manifest hashes. Diagnostics are
+forced on and saved under the ignored
+`.recall-storage/claude-selected-photo-eval/diag-02-diagnostics/` directory.
+The new single-use journal is fixed at
+`.recall-storage/claude-selected-photo-eval/diag-02-batch.json`; it never opens
+or resets the original `batch.json` journal.
+
+Each case reserves 24,784 input and 64,000 output tokens ($0.689568 at the
+verified Sonnet 5.5 rates), for a maximum two-case reservation of $1.379136
+under the $1.50 cap. There is no retry or refusal fallback. A request with an
+unknown result or missing/out-of-hold usage retains its full reservation and
+stops the batch before another case is sent. The controller must preserve the
+journal and diagnostic captures after dispatch. No third case is available in
+this entrypoint.
+
+Offline DIAG-02 guard tests do not read a key or contact the provider. For the
+authorized run, set `RECALL_DIAG02_LIVE=1` in the approved controller process
+and invoke:
+
+```powershell
+uv run --project services/backend pytest services/backend/tests/test_claude_batch.py::test_live_diag02_synthetic_reading_batch -q
+```
+
+This approval applies only to these synthetic fixtures and does not establish
+handwriting accuracy or broader product acceptance.

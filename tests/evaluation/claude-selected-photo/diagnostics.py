@@ -26,6 +26,16 @@ def default_diagnostic_dir() -> Path:
     )
 
 
+def diag02_diagnostic_dir() -> Path:
+    """Fixed ignored directory for the DIAG-02 live diagnostic captures."""
+    return (
+        EVAL_DIR.parents[2]
+        / ".recall-storage"
+        / "claude-selected-photo-eval"
+        / "diag-02-diagnostics"
+    )
+
+
 def _allowlisted_fixture(case_id: str, fixture_sha256: str) -> bool:
     manifest = json.loads((EVAL_DIR / "manifest.json").read_text(encoding="utf-8"))
     return manifest.get("synthetic_only") is True and any(
