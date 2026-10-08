@@ -172,6 +172,19 @@ jobs:
         working-directory: infra/do-inference
         run: |
           export PATH="$AGE_BIN:$PATH"
+          original_pg_dump_version="$(pg_dump --version)"
+          original_pg_restore_version="$(pg_restore --version)"
+          restore_server_version_num="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -tAc 'SHOW server_version_num')"
+          printf 'original_pg_dump_version=%s\noriginal_pg_restore_version=%s\nrestore_server_version_num=%s\n' \
+            "$original_pg_dump_version" "$original_pg_restore_version" "$restore_server_version_num"
+          export PATH="$AGE_BIN:/usr/lib/postgresql/16/bin:$PATH"
+          selected_pg_dump_version="$(pg_dump --version)"
+          selected_pg_restore_version="$(pg_restore --version)"
+          printf 'selected_pg_dump_version=%s\nselected_pg_restore_version=%s\n' \
+            "$selected_pg_dump_version" "$selected_pg_restore_version"
+          case "$selected_pg_dump_version" in 'pg_dump (PostgreSQL) 16.'*) ;; *) exit 1 ;; esac
+          case "$selected_pg_restore_version" in 'pg_restore (PostgreSQL) 16.'*) ;; *) exit 1 ;; esac
+          case "$restore_server_version_num" in 16[0-9][0-9][0-9][0-9]) ;; *) exit 1 ;; esac
           export DO_OPS_TEST_CONNECTION_FILE="$PWD/secrets/ci-test-connections.local"
           export RECALL_BACKUP_DATABASE_URL_FILE="$PWD/secrets/ci_operator_database_url.local"
           export RECALL_BACKUP_DESTINATION="$RUNNER_TEMP/recall-synthetic.age"

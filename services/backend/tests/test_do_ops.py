@@ -119,6 +119,22 @@ def test_ci_restore_sentinel_uses_stdin_sql_for_literal_and_checks_it_before_res
     assert workflow.index(literal) < refusal < workflow.index(verification)
 
 
+def test_ci_restore_records_and_pins_postgres_16_clients_before_backup() -> None:
+    workflow = (Path(__file__).resolve().parents[3] / ".github" / "workflows" / "do-inference-ops.yml").read_text(
+        encoding="utf-8"
+    )
+    original = 'original_pg_dump_version="$(pg_dump --version)"'
+    pinned_path = 'export PATH="$AGE_BIN:/usr/lib/postgresql/16/bin:$PATH"'
+    selected = 'selected_pg_dump_version="$(pg_dump --version)"'
+    backup = "uv run --project ../../services/backend python ops/backup.py"
+    assert workflow.index(original) < workflow.index(pinned_path) < workflow.index(selected) < workflow.index(backup)
+    assert "original_pg_restore_version" in workflow
+    assert "restore_server_version_num" in workflow
+    assert "'pg_dump (PostgreSQL) 16.'*" in workflow
+    assert "'pg_restore (PostgreSQL) 16.'*" in workflow
+    assert "16[0-9][0-9][0-9][0-9]" in workflow
+
+
 def test_ci_secret_writers_keep_protected_files_final_mode_and_runtime_runner_writable() -> None:
     root = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops"
     prepare = (root / "prepare-ci.py").read_text(encoding="utf-8")
