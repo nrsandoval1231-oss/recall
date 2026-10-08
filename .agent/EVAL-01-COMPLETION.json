@@ -1,0 +1,53 @@
+{
+  "packet": "EVAL-01",
+  "base_sha": "a17c2402ee5778a4015c50934bb91c7a59359dfe",
+  "result": "IMPLEMENTED_SYNTHETIC_HARNESS_NO_LIVE_DISPATCH",
+  "changed_files": [
+    "tests/evaluation/claude-selected-photo/__init__.py",
+    "tests/evaluation/claude-selected-photo/batch.py",
+    "tests/evaluation/claude-selected-photo/manifest.json",
+    "tests/evaluation/claude-selected-photo/numbers_uncertainty.jpg",
+    "tests/evaluation/claude-selected-photo/names_and_amount.jpg",
+    "tests/evaluation/claude-selected-photo/blank.jpg",
+    "tests/evaluation/claude-selected-photo/unreadable.jpg",
+    "tests/evaluation/claude-selected-photo/dense_full_page.jpg",
+    "services/backend/tests/test_claude_batch.py",
+    "docs/implementation/claude-evaluation/README.md"
+  ],
+  "validation": [
+    {
+      "command": "uv run --project services/backend ruff check services/backend/tests/test_claude_batch.py tests/evaluation/claude-selected-photo/batch.py",
+      "exit_code": 0,
+      "result": "All checks passed"
+    },
+    {
+      "command": "uv run --project services/backend ruff format --check services/backend/tests/test_claude_batch.py tests/evaluation/claude-selected-photo/batch.py",
+      "exit_code": 0,
+      "result": "2 files already formatted"
+    },
+    {
+      "command": "$env:PATH = 'C:\\Program Files\\PostgreSQL\\18\\bin;' + $env:PATH; uv run --project services/backend pytest services/backend/tests/test_claude_batch.py -q",
+      "exit_code": 0,
+      "result": "10 passed, 1 skipped"
+    }
+  ],
+  "skipped": "The explicitly gated live provider test was not invoked. No provider request or spend was made.",
+  "implemented_controls": [
+    "Fixed ignored repository-local journal identity at .recall-storage/claude-selected-photo-eval/batch.json with exclusive lock, atomic replacement, and fsync",
+    "Five fixed synthetic fixtures with validated SHA-256 allowlist; exact selected-reading binding, fixture hash, and operation ID are journaled before reservation and dispatch",
+    "Full-page font-rendered pipeline smoke coverage includes 30-line dense page, blank page, unreadable marks, numbers, names, and uncertainty; no handwriting acceptance claim",
+    "One maximum five-case batch at 24784 input and 64000 output tokens per case; maximum reserve is USD 3.44784 at USD 2/M input and USD 10/M output, under USD 5 cap",
+    "Interrupted in-flight items become UNKNOWN on inspection; full reserve is retained and all further dispatch against the journal is refused",
+    "Live path rejects incompatible key prefixes and performs a read-only model availability lookup before any billable request",
+    "Actual Anthropic SDK transport test proves max_retries=0, no refusal fallback fields, and max_tokens=64000 without network access",
+    "Live path uses the real selected-reading service with synthetic authorizer and throwaway PostgreSQL; offline test verifies success and model mismatch UNKNOWN",
+    "Actual usage is associated per operation from new usage row IDs, validates exact model and reserved token bounds, and is distinct from estimated reserve",
+    "Journal records receipt, exact binding, hashes, latency, ground truth, provider usage when valid, and deterministic transcription, number, uncertainty, blank, and unreadable metrics"
+  ],
+  "limitations": [
+    "The read-only live model availability and credential checks were not run; live dispatch remains controller-owned",
+    "The live gated test requires PostgreSQL server binaries and a throwaway test environment",
+    "No actual handwriting, mobile/native, vault-write, deployment, or overall product acceptance evidence is claimed"
+  ],
+  "builder_claim": "Handoff evidence only; independent review and integrated candidate validation remain with the controller."
+}

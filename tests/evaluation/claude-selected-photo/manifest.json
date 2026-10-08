@@ -1,0 +1,85 @@
+{
+  "synthetic_only": true,
+  "human_handwriting_acceptance": false,
+  "cases": [
+    {
+      "id": "numbers_uncertainty",
+      "path": "numbers_uncertainty.jpg",
+      "sha256": "4d35d2ea2f0ee4ed08c8a94bc0b0dd34adb25471a75d26765ce7caa008ba3b59",
+      "classification": "synthetic_font_rendered_pipeline_smoke",
+      "ground_truth": [
+        "Call Alex about 12? units",
+        "Maybe Friday, Oct 16",
+        "Do not treat 12? as certain."
+      ],
+      "expected_behavior": "transcribe visible text and preserve question-mark uncertainty"
+    },
+    {
+      "id": "names_and_amount",
+      "path": "names_and_amount.jpg",
+      "sha256": "5e236144cb7f7871706528cbee5470d1542c6ca632895a8929ffcd9bcc2085f9",
+      "classification": "synthetic_font_rendered_pipeline_smoke",
+      "ground_truth": [
+        "Meeting with Jordan Lee",
+        "Budget: $1,250",
+        "Follow up next week"
+      ],
+      "expected_behavior": "transcribe visible text and preserve question-mark uncertainty"
+    },
+    {
+      "id": "blank",
+      "path": "blank.jpg",
+      "sha256": "873db63dd9b9fd97f53532931c5b2f9ee24248ddc9671026cb777bf35edd9344",
+      "classification": "synthetic_font_rendered_pipeline_smoke",
+      "ground_truth": [],
+      "expected_behavior": "report blank page"
+    },
+    {
+      "id": "unreadable",
+      "path": "unreadable.jpg",
+      "sha256": "b45ff010ed9429c2feb961a89eb4479d427807516b4a40da1fb619f62c600cba",
+      "classification": "synthetic_font_rendered_pipeline_smoke",
+      "ground_truth": [],
+      "expected_behavior": "mark uncertainty and avoid invented text"
+    },
+    {
+      "id": "dense_full_page",
+      "path": "dense_full_page.jpg",
+      "sha256": "9673aad20e56745a408c65a355ad6fb000276da1d7f7f3e9fb9b4bd4b8d130a3",
+      "classification": "synthetic_font_rendered_pipeline_smoke",
+      "ground_truth": [
+        "PROJECT NOTES - WEEK 42",
+        "Monday, October 12, 2026",
+        "Owner: Casey Morgan",
+        "Site: North Harbor, Building 4",
+        "Call Jordan Lee before 9:30 AM",
+        "Budget limit: $12,500.00",
+        "Current estimate: 48 hours",
+        "Delivery target: Nov 3?",
+        "Room temperature: 68 F",
+        "Cable length: 120 ft",
+        "Panel rating: 225 A",
+        "Unit count: 18 or 19?",
+        "Phase 1 review - Oct 16",
+        "Phase 2 begins Nov 3",
+        "Backup date: November 10",
+        "Vendor: Northstar Electric",
+        "Contact: Priya Shah",
+        "Phone note: 555-0138",
+        "Bring the blue folder",
+        "Bring 3 signed copies",
+        "Open item: confirm permit fee",
+        "Permit estimate: $875",
+        "Do not order until approved",
+        "Check stock at Warehouse B",
+        "Expected arrival: 2-3 days",
+        "Invoice reference: INV-20481",
+        "Work window: 7:00 AM-4:30 PM",
+        "Crew size: 5 people",
+        "Verify clearance: 36 in?",
+        "No final date confirmed"
+      ],
+      "expected_behavior": "transcribe visible text and preserve question-mark uncertainty"
+    }
+  ]
+}
