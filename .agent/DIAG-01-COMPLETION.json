@@ -2,11 +2,11 @@
   "packet": "DIAG-01",
   "status": "COMPLETE_BOUNDED_IMPLEMENTATION",
   "started_utc": "2026-10-08T16:02:05Z",
-  "finished_utc": "2026-10-08T16:13:53Z",
+  "finished_utc": "2026-10-08T16:20:50Z",
   "repository": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall",
   "branch": "implement/owner-device-pairing",
   "base_sha": "fd1e7b21413fbf78455f435641259bfb222da8d9",
-  "head_sha": "fd1e7b21413fbf78455f435641259bfb222da8d9",
+  "head_sha": "82a19c4a0c01bf2bc0383351931c24025360e0e2",
   "changed_files": [
     "services/backend/src/recall/ingestion/validate.py",
     "services/backend/src/recall/ingestion/local_reading.py",
@@ -36,15 +36,16 @@
       "result": "PASS"
     },
     {
-      "command": "$env:LOCALAPPDATA='C:\\rdiag01-local'; $env:PATH='C:\\Program Files\\PostgreSQL\\18\\bin;C:\\Program Files\\Git\\usr\\bin;' + $env:PATH; uv run --project services/backend pytest --basetemp=C:\\rd01e services/backend/tests/test_validate.py services/backend/tests/test_local_reading.py services/backend/tests/test_claude_batch.py -q",
-      "result": "PASS: 93 passed, 1 skipped; skip is the controller-gated live synthetic batch. Fresh throwaway PostgreSQL 18 was selected through PATH."
-    },
-    {
       "command": "git diff --check",
       "result": "PASS"
+    },
+    {
+      "command": "$env:LOCALAPPDATA='C:\\rdiag01-local'; $env:PATH = 'C:\\Program Files\\PostgreSQL\\18\\bin;C:\\Program Files\\Git\\usr\\bin;' + $env:PATH; uv run --project services/backend pytest --basetemp=C:\\rd01h services/backend/tests/test_validate.py services/backend/tests/test_local_reading.py services/backend/tests/test_claude_batch.py -q",
+      "result": "PASS: 105 passed, 1 controller-gated live test skipped; PostgreSQL 18."
     }
   ],
   "live_cause": "UNKNOWN: original two INVALID_EXTRACTION outputs and validator reasons were not retained. Offline synthetic tests are new reproductions and do not attribute those historical failures.",
   "external_actions": "No network or paid calls, no key reads, no live journal mutation, no real-data capture, no commit, and no push.",
-  "remaining_review": "Controller-owned full backend gates and independent review remain required. Historical attribution and any extraction-quality repair remain open until safe evidence establishes a cause."
+  "remaining_review": "Controller-owned full backend gates and independent review remain required. Historical attribution and any extraction-quality repair remain open until safe evidence establishes a cause.",
+  "followup": "Added direct taxonomy coverage for JSON, schema, envelope, page set, duplicate and unknown references; selected-reading coverage for local-ID, blank uncertainty, storage text and both size bounds; poison-value log/response checks; and fixed-priority multi-fault assertion. Production code unchanged in this follow-up."
 }

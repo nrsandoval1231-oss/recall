@@ -210,20 +210,79 @@ def test_failed_or_unknown_receipts_never_repeat_paid_call(
         assert (tx.one("select status from embedding_reservations")["status"] == "reserved") is reserved
 
 
-def test_rejection_diagnostic_is_classified_without_model_or_schema_text(
-    reading: Any, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize(
+    ("fault", "expected_code"),
+    [
+        ("invalid_json", "INVALID_JSON"),
+        ("schema", "SCHEMA_INVALID"),
+        ("envelope", "ENVELOPE_MISMATCH"),
+        ("page_set", "PAGE_SET_INVALID"),
+        ("duplicate_id", "DUPLICATE_LOCAL_ID"),
+        ("unknown_mention", "UNKNOWN_MENTION_REFERENCE"),
+        ("unknown_page", "UNKNOWN_EVIDENCE_PAGE"),
+        ("long_id", "LOCAL_ID_TOO_LONG"),
+        ("blank_uncertainty", "BLANK_UNCERTAINTY_EVIDENCE"),
+        ("storage_text", "STORAGE_TEXT_INVALID"),
+        ("output_size", "OUTPUT_TOO_LARGE"),
+        ("normalized_size", "NORMALIZED_OUTPUT_TOO_LARGE"),
+    ],
+)
+def test_rejection_taxonomy_is_hard_and_does_not_leak_model_text(
+    reading: Any,
+    env: Env,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    fault: str,
+    expected_code: str,
 ) -> None:
-    client, _, fake, binding, original = reading
-    secret_text = "SYNTHETIC_PRIVATE_SCHEMA_VALUE"
-    fake.interpret_script = [json.dumps({"schema_version": secret_text})]
+    from recall.ingestion import local_reading
+
+    client, grant, fake, binding, original = reading
+    secret_text = "SYNTHETIC_PRIVATE_DIAGNOSTIC_VALUE"
+
+    def output(request: Any) -> str:
+        if fault == "invalid_json":
+            return f"not JSON {secret_text}"
+        if fault == "schema":
+            return json.dumps({"schema_version": secret_text})
+        from fake_provider import faithful_extraction
+
+        data = faithful_extraction(request, ["Synthetic note: 12?"])
+        if fault == "envelope":
+            data["capture_id"] = str(uuid.uuid4())
+        elif fault == "page_set":
+            data["pages"][0]["page_id"] = str(uuid.uuid4())
+        elif fault == "duplicate_id":
+            data["statements"].append(data["statements"][0].copy())
+        elif fault == "unknown_mention":
+            data["statements"][0]["subject_mention_id"] = "m99"
+        elif fault == "unknown_page":
+            data["statements"][0]["evidence"][0]["page_id"] = str(uuid.uuid4())
+        elif fault == "long_id":
+            data["statements"][0]["local_id"] = secret_text * 8
+        elif fault == "blank_uncertainty":
+            data["uncertainties"][0]["evidence"][0]["quote"] = " "
+        elif fault == "storage_text":
+            data["pages"][0]["transcription"] = "bad\x00text"
+        raw = json.dumps(data)
+        if fault == "normalized_size":
+            monkeypatch.setattr(local_reading, "MAX_RESULT_BYTES", len(raw.encode()) + 1)
+        return raw
+
+    if fault == "output_size":
+        monkeypatch.setattr(local_reading, "MAX_RESULT_BYTES", 1)
+    fake.interpret_script = [output]
 
     response = post(client, binding, original)
 
     assert response.json()["state"] == "failed"
     assert response.json()["error_code"] == "INVALID_EXTRACTION"
-    assert "selected_reading_rejected code=SCHEMA_INVALID" in caplog.text
+    assert f"selected_reading_rejected code={expected_code}" in caplog.text
     assert secret_text not in caplog.text
     assert secret_text not in response.text
+    with env.db.tx(grant.user) as tx:
+        assert tx.one("select count(*) as n from ai_usage")["n"] == 1
+        assert tx.one("select status from embedding_reservations")["status"] == "completed"
 
 
 def test_concurrent_duplicate_observes_in_flight_without_provider_lock(reading: Any) -> None:

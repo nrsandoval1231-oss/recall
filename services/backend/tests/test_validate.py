@@ -152,3 +152,17 @@ def test_invalid_extraction_diagnostic_code_is_allowlisted() -> None:
 
     assert error.code == "INVALID_CONTENT"
     assert "SYNTHETIC_PRIVATE_DETAIL" in str(error)
+
+
+def test_structural_diagnostic_uses_fixed_priority_for_multiple_faults() -> None:
+    bad = proposal("synthetic", statements=[stmt("synthetic", "synthetic")])
+    bad["capture_id"] = str(uuid.uuid4())
+    bad["pages"][0]["page_id"] = str(uuid.uuid4())
+    bad["statements"].append(bad["statements"][0].copy())
+    bad["statements"][0]["subject_mention_id"] = "m99"
+    bad["statements"][0]["evidence"][0]["page_id"] = str(uuid.uuid4())
+
+    with pytest.raises(InvalidExtraction) as exc_info:
+        run(bad)
+
+    assert exc_info.value.code == "ENVELOPE_MISMATCH"
