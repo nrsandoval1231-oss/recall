@@ -191,7 +191,7 @@ mod tests {
     use std::{
         fs,
         io::{Read, Write},
-        net::TcpListener,
+        net::{TcpListener, TcpStream},
         sync::{Arc, Mutex},
         thread,
         time::{Duration, Instant},
@@ -212,6 +212,50 @@ mod tests {
             let _ = fs::remove_dir_all(&self.0);
         }
     }
+    fn configure_server_socket(socket: &TcpStream) {
+        // Winsock inherits the listener's nonblocking mode; Linux accept does
+        // not. This fixture uses blocking I/O with explicit bounds on both OSes.
+        socket.set_nonblocking(false).unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        socket
+            .set_write_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+    }
+    #[test]
+    fn reading_fixture_normalizes_inherited_nonblocking_socket() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (mut accepted, _) = listener.accept().unwrap();
+        // Reproduce Winsock's inherited mode on every test platform. No bytes
+        // are sent until we have observed that the configured read waits.
+        accepted.set_nonblocking(true).unwrap();
+        configure_server_socket(&accepted);
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let reader = thread::spawn(move || {
+            started_tx.send(()).unwrap();
+            let mut byte = [0];
+            let result = accepted.read_exact(&mut byte).map(|()| byte);
+            result_tx.send(result).unwrap();
+        });
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let early = result_rx.recv_timeout(Duration::from_millis(100));
+        client.write_all(b"R").unwrap();
+        reader.join().unwrap();
+        assert!(
+            matches!(early, Err(std::sync::mpsc::RecvTimeoutError::Timeout)),
+            "fixture read must wait for request bytes: {early:?}"
+        );
+        assert_eq!(
+            result_rx
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .unwrap(),
+            *b"R"
+        );
+    }
     fn server(
         request: &ReadingRequest,
         first_state: &str,
@@ -223,7 +267,9 @@ mod tests {
         let first_state = first_state.to_string();
         let handle = thread::spawn(move || {
             let mut wires = vec![];
-            let deadline = Instant::now() + Duration::from_secs(2);
+            // Allow slow CI setup before the first connection. After responding,
+            // retain the full two-second window that detects an unexpected POST.
+            let mut deadline = Instant::now() + Duration::from_secs(10);
             while Instant::now() < deadline {
                 let (mut socket, _) = match listener.accept() {
                     Ok(v) => v,
@@ -233,12 +279,16 @@ mod tests {
                     }
                     Err(e) => panic!("{e}"),
                 };
-                socket
-                    .set_read_timeout(Some(Duration::from_secs(1)))
-                    .unwrap();
+                configure_server_socket(&socket);
                 let mut wire = vec![];
                 let mut buf = [0u8; 4096];
+                let read_deadline = Instant::now() + Duration::from_secs(5);
                 loop {
+                    let remaining = read_deadline
+                        .checked_duration_since(Instant::now())
+                        .filter(|remaining| !remaining.is_zero())
+                        .expect("fixture request exceeded its read deadline");
+                    socket.set_read_timeout(Some(remaining)).unwrap();
                     let n = socket.read(&mut buf).unwrap();
                     if n == 0 {
                         break;
@@ -293,6 +343,7 @@ mod tests {
                 if wires.len() == 2 {
                     break;
                 }
+                deadline = Instant::now() + Duration::from_secs(2);
             }
             wires
         });
