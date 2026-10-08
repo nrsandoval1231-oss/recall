@@ -55,6 +55,23 @@ FUNCTIONS = {
 }
 
 
+def api_inherits_app(connection):
+    row = connection.execute("select pg_has_role('recall_api','recall_app','member') as is_app_member").fetchone()
+    return row is not None and bool(row["is_app_member"])
+
+
+def api_memberships(connection):
+    return {
+        row["parent_role"]
+        for row in connection.execute(
+            "select parent.rolname as parent_role from pg_auth_members membership "
+            "join pg_roles member on member.oid=membership.member "
+            "join pg_roles parent on parent.oid=membership.roleid "
+            "where member.rolname='recall_api'"
+        )
+    }
+
+
 dsn = os.environ["RECALL_MIGRATION_DATABASE_URL"]
 with psycopg.connect(dsn, row_factory=dict_row) as conn:
     expected = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(MIGRATIONS.glob("*.sql"))}
@@ -142,17 +159,9 @@ with psycopg.connect(dsn, row_factory=dict_row) as conn:
         )
     ):
         raise SystemExit("migration owner is absent or has unexpected role attributes")
-    if app is None or not conn.execute("select pg_has_role('recall_api','recall_app','member')").fetchone()[0]:
+    if app is None or not api_inherits_app(conn):
         raise SystemExit("API role does not inherit recall_app")
-    memberships = {
-        row[0]
-        for row in conn.execute(
-            "select parent.rolname from pg_auth_members membership "
-            "join pg_roles member on member.oid=membership.member "
-            "join pg_roles parent on parent.oid=membership.roleid "
-            "where member.rolname='recall_api'"
-        )
-    }
+    memberships = api_memberships(conn)
     if memberships != {"recall_app"}:
         raise SystemExit("API role has unexpected role memberships")
     print("Database schema, migration ledger, roles, object ownership, functions and forced RLS verified.")

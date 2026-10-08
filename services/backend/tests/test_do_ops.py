@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import shutil
@@ -66,6 +67,29 @@ def _restore_module():  # type: ignore[no-untyped-def]
     finally:
         sys.path.pop(0)
     return module
+
+
+def test_audit_dict_rows_use_named_membership_aliases() -> None:
+    path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "audit-database.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    helpers = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name in {"api_inherits_app", "api_memberships"}
+    ]
+    assert {helper.name for helper in helpers} == {"api_inherits_app", "api_memberships"}
+    namespace: dict[str, object] = {}
+    exec(compile(ast.Module(body=helpers, type_ignores=[]), str(path), "exec"), namespace)
+
+    class DictRowConnection:
+        def execute(self, statement: str):  # type: ignore[no-untyped-def]
+            if "pg_has_role" in statement:
+                return type("Result", (), {"fetchone": lambda self: {"is_app_member": True}})()
+            return iter(({"parent_role": "recall_app"},))
+
+    connection = DictRowConnection()
+    assert namespace["api_inherits_app"](connection) is True  # type: ignore[operator]
+    assert namespace["api_memberships"](connection) == {"recall_app"}  # type: ignore[operator]
 
 
 def test_restore_checksum_refusal_sets_external_hold(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
