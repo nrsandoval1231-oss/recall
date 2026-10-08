@@ -1,0 +1,193 @@
+name: DigitalOcean inference operations
+
+on:
+  pull_request:
+    paths:
+      - "infra/do-inference/**"
+      - "services/backend/tests/test_do_ops.py"
+      - "infra/README.md"
+      - "docs/ARCHITECTURE.md"
+      - ".github/workflows/do-inference-ops.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/do-inference/**"
+      - "services/backend/tests/test_do_ops.py"
+      - "infra/README.md"
+      - "docs/ARCHITECTURE.md"
+      - ".github/workflows/do-inference-ops.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-docker-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - name: Install PostgreSQL client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+      - name: Create disposable synthetic-only secret files
+        working-directory: infra/do-inference
+        run: sudo python3 ops/prepare-ci.py
+      - name: Configure the isolated Compose project
+        working-directory: infra/do-inference
+        run: |
+          project="recall-do-inference-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf 'RECALL_CI_PROJECT=%s\n' "$project" >> "$GITHUB_ENV"
+          docker compose -p "$project" -f compose.yml config --quiet
+      - name: Build the backend runtime image
+        working-directory: infra/do-inference
+        run: docker compose -p "$RECALL_CI_PROJECT" -f compose.yml build api
+      - name: Start independent pinned PostgreSQL clusters and migrate the source only
+        working-directory: infra/do-inference
+        run: |
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile restore up -d db restore-db
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile maintenance run --rm migrate
+      - name: Assert actual container refuses review, budget, header, ledger and role-elevation mismatches
+        working-directory: infra/do-inference
+        run: |
+          refuse_api() {
+            if docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile runtime run --rm --no-deps --no-ports api; then
+              exit 1
+            fi
+          }
+          cp secrets/activation_record.local "$RUNNER_TEMP/activation-record.json"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("secrets/activation_record.local")
+          record = json.loads(path.read_text())
+          del record["review_id"]
+          path.write_text(json.dumps(record), encoding="utf-8")
+          PY
+          refuse_api
+          cp "$RUNNER_TEMP/activation-record.json" secrets/activation_record.local
+          cp secrets/runtime.env.local "$RUNNER_TEMP/runtime.env"
+          sed -i 's/^RECALL_AI_DAILY_BUDGET_USD=.*/RECALL_AI_DAILY_BUDGET_USD=1/' secrets/runtime.env.local
+          refuse_api
+          cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
+          sed -i 's/^AI_MODEL_ID=.*/AI_MODEL_ID=wrong-synthetic-model/' secrets/runtime.env.local
+          refuse_api
+          cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
+          sed -i 's/^ANTHROPIC_CUSTOM_HEADERS=.*/ANTHROPIC_CUSTOM_HEADERS=anthropic-workspace-id: wrong-synthetic-workspace/' secrets/runtime.env.local
+          refuse_api
+          cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'GRANT pg_read_all_data TO recall_api'
+          refuse_api
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'REVOKE pg_read_all_data FROM recall_api'
+          expected_checksum="$(sha256sum ../../services/backend/migrations/0001_trusted_capture.sql | cut -d ' ' -f1)"
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='tampered' WHERE version='0001_trusted_capture.sql'"
+          refuse_api
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='$expected_checksum' WHERE version='0001_trusted_capture.sql'"
+      - name: Start the preflighted API container
+        working-directory: infra/do-inference
+        run: |
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile runtime up -d api
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:8001/readyz >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Check container route allowlist and unauthorized request path
+        run: |
+          python - <<'PY'
+          import urllib.error
+          import urllib.request
+
+          def request(path, method="GET", data=None, headers=None):
+              req = urllib.request.Request("http://127.0.0.1:8001" + path, data=data, method=method, headers=headers or {})
+              try:
+                  return urllib.request.urlopen(req, timeout=5).status
+              except urllib.error.HTTPError as exc:
+                  return exc.code
+
+          assert request("/healthz") == 200
+          assert request("/openapi.json") == 404
+          assert request("/v1/captures", "GET") == 404
+          assert request("/v1/local-readings", "POST", b"synthetic-invalid-photo", {"content-type": "image/jpeg"}) == 403
+          PY
+      - name: Run fake-provider grant, photo, receipt, replay, restart and revoke checks in the test process
+        working-directory: infra/do-inference
+        run: |
+          db_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -q db)"
+          db_host="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$db_id")"
+          restore_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -q restore-db)"
+          restore_host="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$restore_id")"
+          DO_OPS_TEST_DATABASE_HOST="$db_host" uv run --project ../../services/backend python ops/write-ci-connections.py
+          printf 'DO_OPS_RESTORE_DATABASE_HOST=%s\n' "$restore_host" >> "$GITHUB_ENV"
+          DO_OPS_TEST_CONNECTION_FILE="$PWD/secrets/ci-test-connections.local" uv run --project ../../services/backend pytest ../../services/backend/tests/test_do_ops.py -q
+      - name: Prepare an ephemeral age key without retaining its identity
+        run: |
+          archive="$RUNNER_TEMP/age-v1.3.2.tar.gz"
+          curl -fsSL https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz -o "$archive"
+          echo 'cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10  '"$archive" | sha256sum --check --status
+          mkdir -p "$RUNNER_TEMP/age-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/age-bin" --strip-components=1
+          chmod 700 "$RUNNER_TEMP/age-bin/age" "$RUNNER_TEMP/age-bin/age-keygen"
+          key="$RUNNER_TEMP/age-ci-identity"
+          "$RUNNER_TEMP/age-bin/age-keygen" -o "$key" 2>/dev/null
+          chmod 600 "$key"
+          printf 'AGE_BIN=%s\nAGE_IDENTITY=%s\nRECALL_BACKUP_AGE_RECIPIENT=%s\n' \
+            "$RUNNER_TEMP/age-bin" "$key" "$("$RUNNER_TEMP/age-bin/age-keygen" -y "$key")" >> "$GITHUB_ENV"
+      - name: Encrypt, fence the active API, restore to the independent empty cluster and verify the retained hold
+        working-directory: infra/do-inference
+        run: |
+          export PATH="$AGE_BIN:$PATH"
+          export DO_OPS_TEST_CONNECTION_FILE="$PWD/secrets/ci-test-connections.local"
+          export RECALL_BACKUP_DATABASE_URL_FILE="$PWD/secrets/ci_operator_database_url.local"
+          export RECALL_BACKUP_DESTINATION="$RUNNER_TEMP/recall-synthetic.age"
+          uv run --project ../../services/backend python ops/backup.py
+          uv run --project ../../services/backend python ops/prepare-ci-restore.py
+          export RECALL_RESTORE_ARCHIVE="$RECALL_BACKUP_DESTINATION"
+          export RECALL_RESTORE_AGE_IDENTITY_FILE="$AGE_IDENTITY"
+          export RECALL_RESTORE_DATABASE_URL_FILE="$PWD/secrets/ci_restore_database_url.local"
+          export RECALL_RESTORE_HOLD_PATH="$PWD/recovery/hold.json"
+          export RECALL_RESTORE_API_FENCE_URL="http://127.0.0.1:8001/healthz"
+          cp "$RECALL_BACKUP_DESTINATION" "$RUNNER_TEMP/corrupt-synthetic.age"
+          digest="$(cut -d ' ' -f1 "${RECALL_BACKUP_DESTINATION}.sha256")"
+          printf '%s  %s\n' "$digest" corrupt-synthetic.age > "$RUNNER_TEMP/corrupt-synthetic.age.sha256"
+          printf 'corruption' >> "$RUNNER_TEMP/corrupt-synthetic.age"
+          export RECALL_RESTORE_ARCHIVE="$RUNNER_TEMP/corrupt-synthetic.age"
+          if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi
+          python -c "import json,os; assert json.load(open(os.environ['RECALL_RESTORE_HOLD_PATH']))['hold'] is True"
+          export RECALL_RESTORE_ARCHIVE="$RECALL_BACKUP_DESTINATION"
+          api_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -aq api)"
+          export RECALL_RESTORE_COMPOSE_PROJECT="$RECALL_CI_PROJECT"
+          export RECALL_RESTORE_API_CONTAINER_ID="$api_id"
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -v ON_ERROR_STOP=1 -c 'CREATE TABLE restore_refusal_sentinel (value text); INSERT INTO restore_refusal_sentinel VALUES (''preserved'')'
+          if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -tAc "SELECT value FROM restore_refusal_sentinel" | grep -qx preserved
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml rm -sf restore-db
+          docker volume rm "${RECALL_CI_PROJECT}_postgres_restore_data"
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile restore up -d restore-db
+          for attempt in $(seq 1 60); do
+            if docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db pg_isready -U recall_operator -d recall_restore; then break; fi
+            sleep 1
+          done
+          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db pg_isready -U recall_operator -d recall_restore
+          restore_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -q restore-db)"
+          export DO_OPS_RESTORE_DATABASE_HOST="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$restore_id")"
+          rm -f -- secrets/ci_restore_database_url.local
+          uv run --project ../../services/backend python ops/prepare-ci-restore.py
+          uv run --project ../../services/backend python ops/restore.py
+          python -c "import json,os; assert json.load(open(os.environ['RECALL_RESTORE_HOLD_PATH']))['hold'] is True"
+          for attempt in $(seq 1 20); do
+            if ! curl --silent --fail http://127.0.0.1:8001/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          if curl --silent --fail http://127.0.0.1:8001/healthz >/dev/null; then exit 1; fi
+          DO_OPS_TEST_CONNECTION_FILE="$PWD/secrets/ci-test-connections.local" uv run --project ../../services/backend python ops/verify-ci-restore.py
+      - name: Remove only this run's disposable Compose project and local synthetic files
+        if: always()
+        working-directory: infra/do-inference
+        run: |
+          if [ -n "${RECALL_CI_PROJECT:-}" ]; then docker compose -p "$RECALL_CI_PROJECT" -f compose.yml down --volumes --remove-orphans; fi
+          sudo rm -rf -- secrets recovery

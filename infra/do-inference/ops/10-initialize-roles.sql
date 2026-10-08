@@ -1,0 +1,12 @@
+\getenv migration_password MIGRATION_PASSWORD
+\getenv api_password API_PASSWORD
+CREATE ROLE recall_app NOLOGIN NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE recall_worker NOLOGIN NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE recall_migrator LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION
+  PASSWORD :'migration_password';
+CREATE ROLE recall_api LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION
+  PASSWORD :'api_password';
+GRANT recall_app TO recall_api;
+SELECT format('ALTER DATABASE %I OWNER TO recall_migrator', current_database()) \gexec
+SELECT format('GRANT CONNECT ON DATABASE %I TO recall_api', current_database()) \gexec
+CREATE EXTENSION vector;

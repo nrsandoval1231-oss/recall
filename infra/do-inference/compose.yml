@@ -1,0 +1,178 @@
+name: recall-do-inference
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg16-bookworm@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+    environment:
+      POSTGRES_DB: recall
+      POSTGRES_USER: recall_operator
+      POSTGRES_PASSWORD_FILE: /run/secrets/operator_password
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=trust
+    secrets:
+      - operator_password
+      - migration_password
+      - api_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./ops/initialize-roles.sh:/docker-entrypoint-initdb.d/10-initialize-roles.sh:ro
+      - ./ops/10-initialize-roles.sql:/ops/initialize-roles.sql:ro
+    networks: [database]
+    mem_limit: 1g
+    cpus: 0.75
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U recall_operator -d recall]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  restore-db:
+    image: pgvector/pgvector:0.8.7-pg16-bookworm@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+    profiles: [restore]
+    environment:
+      POSTGRES_DB: recall_restore
+      POSTGRES_USER: recall_operator
+      POSTGRES_PASSWORD_FILE: /run/secrets/operator_password
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=trust
+    secrets:
+      - operator_password
+      - migration_password
+      - api_password
+    volumes:
+      - postgres_restore_data:/var/lib/postgresql/data
+      - ./ops/initialize-roles.sh:/docker-entrypoint-initdb.d/10-initialize-roles.sh:ro
+      - ./ops/10-initialize-roles.sql:/ops/initialize-roles.sql:ro
+    networks: [database]
+    mem_limit: 1g
+    cpus: 0.75
+    restart: "no"
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U recall_operator -d recall_restore]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  migrate:
+    image: recall-do-inference:local
+    build:
+      context: ../..
+      dockerfile: services/backend/Dockerfile
+    profiles: [maintenance]
+    environment:
+      RECALL_MIGRATION_DSN_FILE: /run/secrets/migration_database_url
+    secrets:
+      - migration_database_url
+    volumes:
+      - ./ops/run-migrations.py:/ops/run-migrations.py:ro
+      - ./ops/audit-database.py:/ops/audit-database.py:ro
+    entrypoint: [python, /ops/run-migrations.py]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [database]
+    read_only: true
+    tmpfs: [/tmp:size=32m,mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 512m
+    cpus: 0.5
+
+  bootstrap:
+    image: recall-do-inference:local
+    build:
+      context: ../..
+      dockerfile: services/backend/Dockerfile
+    profiles: [maintenance]
+    environment:
+      RECALL_BOOTSTRAP_DSN_FILE: /run/secrets/operator_database_url
+    secrets:
+      - operator_database_url
+    volumes:
+      - ./ops/run-bootstrap.py:/ops/run-bootstrap.py:ro
+    entrypoint: [python, /ops/run-bootstrap.py]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [database]
+    read_only: true
+    tmpfs: [/tmp:size=32m,mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 512m
+    cpus: 0.5
+
+  api:
+    image: recall-do-inference:local
+    build:
+      context: ../..
+      dockerfile: services/backend/Dockerfile
+    profiles: [runtime]
+    environment:
+      RECALL_SERVICE_PROFILE: inference
+      RECALL_AUTO_PROVISION_WORKSPACES: "false"
+      RECALL_DEVICE_PAIRING_ENABLED: "true"
+      RECALL_ACTIVATION_RECORD_FILE: /run/secrets/activation_record
+      RECALL_RECOVERY_HOLD_FILE: /recovery/hold.json
+      RECALL_API_DATABASE_URL_FILE: /run/secrets/api_database_url
+      RECALL_AI_API_KEY_FILE: /run/secrets/ai_api_key
+    secrets:
+      - api_database_url
+      - activation_record
+      - ai_api_key
+    env_file:
+      - ./secrets/runtime.env.local
+    entrypoint: [python, /ops/start-api.py]
+    volumes:
+      - ./ops/start-api.py:/ops/start-api.py:ro
+      - ./ops/preflight.py:/ops/preflight.py:ro
+      - ./recovery:/recovery:ro
+    ports:
+      - 127.0.0.1:8001:8000
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [database, egress]
+    read_only: true
+    tmpfs: [/tmp:size=32m,mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 512m
+    cpus: 1.0
+    restart: "no"
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5)"]
+      interval: 20s
+      timeout: 8s
+      retries: 3
+      start_period: 25s
+
+secrets:
+  operator_password:
+    file: ./secrets/operator_password.local
+  migration_password:
+    file: ./secrets/migration_password.local
+  api_password:
+    file: ./secrets/api_password.local
+  migration_database_url:
+    file: ./secrets/migration_database_url.local
+  operator_database_url:
+    file: ./secrets/operator_database_url.local
+  api_database_url:
+    file: ./secrets/api_database_url.local
+  activation_record:
+    file: ./secrets/activation_record.local
+  ai_api_key:
+    file: ./secrets/ai_api_key.local
+
+volumes:
+  postgres_data:
+  postgres_restore_data:
+
+networks:
+  database:
+    internal: true
+  egress: {}

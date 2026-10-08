@@ -1,0 +1,1 @@
+postgresql://recall_migrator:SYNTHETIC-ONLY@db:5432/recall

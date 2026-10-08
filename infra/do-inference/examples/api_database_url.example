@@ -1,0 +1,1 @@
+postgresql://recall_api:SYNTHETIC-ONLY@db:5432/recall

@@ -1,5 +1,11 @@
 # Infrastructure boundary
 
+## Current direction — DigitalOcean inference service
+
+The current operational direction is an isolated private PostgreSQL realm and the inference-only API profile on the existing DigitalOcean host. DO-OPS-01 adds reproducible source and synthetic CI evidence; it does not inspect or mutate the live host, provision the database, create real credentials, enroll devices, or deploy. The live host's current state and capacity remain unverified. Legacy Supabase ownership and active use are also **UNKNOWN**; the historical pilot material below is retained as context, not current deployment evidence.
+
+See [the DO inference operations contract](do-inference/README.md) for pinned Compose configuration, operator-only migration/bootstrap, activation and recovery gates, and the synthetic restore drill.
+
 Pilot provisioning began on 2026-10-06 with owner authorization: existing Supabase project `jjlkcligwhoxcbthkmov` and dedicated DigitalOcean `recall-pilot` (ID `606826157`, Toronto, Ubuntu 24.04, 2 vCPU / 4 GiB / 80 GiB, listed $24/month). The host bills until deleted. Approved limits are $25/month hosting and $5 total first AI evaluation; these do not authorize a Supabase plan upgrade or ongoing AI spending.
 
 Proposed pilot: managed Supabase Postgres/Auth/private Storage plus one API deployment and one durable worker process from the same backend package. Choose a compatible host when the owner authorizes deployment. Do not add a service mesh, Redis, a graph database, or another vector service by default.

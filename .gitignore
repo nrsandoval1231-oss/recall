@@ -43,6 +43,7 @@ Thumbs.db
 # Runtime manifests and media are never application fixtures by default
 *.local
 *.tmp
+infra/do-inference/recovery/
 
 # Tauri generated schemas/build output
 apps/desktop/src-tauri/gen/
