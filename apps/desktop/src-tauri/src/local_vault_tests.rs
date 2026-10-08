@@ -2325,3 +2325,314 @@ fn reading_abandoned_machine_draft_does_not_poison_later_human_revision() {
     assert!(v.accept_reading(&req, &response).is_err());
     assert_eq!(v.list("fresh human").unwrap().len(), 1);
 }
+
+#[test]
+fn independent_review_partial_prepare_does_not_block_other_memory_operations() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let a = v
+        .capture(&op(), "synthetic.png", &photo(), "first")
+        .unwrap();
+    let b = v
+        .capture(&op(), "synthetic.png", &photo(), "second")
+        .unwrap();
+    let operation = op();
+    let fault = FaultGuard::set(|point, path| {
+        if point == "create_before" && path.to_string_lossy().contains("request.stage-") {
+            Err("INJECTED interruption writing request".into())
+        } else {
+            Ok(())
+        }
+    });
+    let prepared = v.prepare_reading(&a.id, 1, &operation);
+    drop(fault);
+    assert!(prepared.is_err(), "must reach partial prepare boundary");
+    let req = v.prepare_reading(&b.id, 1, &op()).unwrap();
+    v.accept_reading(&req, &reading_response(&req)).unwrap();
+    assert!(
+        f.vault().reading_operations(&b.id).is_ok(),
+        "one interrupted prepare must not break unrelated completed operation listing"
+    );
+}
+
+#[test]
+fn independent_review_cancel_after_partial_publication_preserves_search() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let fault = FaultGuard::set(|point, _| {
+        if point == "before_history" {
+            Err("INJECTED pre-history crash".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+    drop(fault);
+    assert_eq!(
+        v.cancel_reading(&req.binding.operation_id).unwrap().state,
+        "cancelled"
+    );
+    let reopened = f.vault();
+    assert!(reopened
+        .accept_reading(&req, &reading_response(&req))
+        .is_err());
+    assert!(reopened.list("").unwrap()[0].reading.is_none());
+    assert_eq!(
+        reopened.list("base").unwrap().len(),
+        1,
+        "safe cancelled generated publication should leave original local search usable"
+    );
+}
+
+#[test]
+fn independent_review_cancel_after_history_before_receipt_reports_committed() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let fault = FaultGuard::set(|point, _| {
+        if point == "before_receipt" {
+            Err("INJECTED post-history crash".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+    drop(fault);
+    assert_eq!(
+        f.vault()
+            .cancel_reading(&req.binding.operation_id)
+            .unwrap()
+            .state,
+        "committed"
+    );
+}
+
+#[test]
+fn independent_review_pending_journal_rejects_external_edit_rename_delete() {
+    for change in ["edit", "rename", "delete"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+        let fault = FaultGuard::set(|point, _| {
+            if point == "before_note" {
+                Err("INJECTED pre-note crash".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+        drop(fault);
+        match change {
+            "edit" => fs::write(
+                v.note_path(&m.id),
+                markdown(&m).replace("base", "new human draft"),
+            )
+            .unwrap(),
+            "rename" => fs::rename(v.note_path(&m.id), v.path("Memories/moved.md")).unwrap(),
+            _ => fs::remove_file(v.note_path(&m.id)).unwrap(),
+        }
+        assert!(
+            f.vault()
+                .accept_reading(&req, &reading_response(&req))
+                .is_err(),
+            "{change}"
+        );
+        assert!(!v.history_path(&m.id, 2).exists());
+    }
+}
+#[test]
+fn reading_not_found_retry_keeps_operation_and_connection_scope() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let scope = "a".repeat(64);
+    v.bind_reading_connection(&req, &scope).unwrap();
+    v.reading_dispatch(&req).unwrap();
+    assert_eq!(
+        f.vault().retry_reading_not_found(&req, &scope).unwrap(),
+        photo()
+    );
+    assert!(v.retry_reading_not_found(&req, &"b".repeat(64)).is_err());
+    let mut admitted = reading_response(&req);
+    admitted.state = "unknown".into();
+    admitted.result = None;
+    admitted.error_code = Some("PROVIDER_OUTCOME_UNKNOWN".into());
+    v.retain_reading_response(&req, &admitted).unwrap();
+    assert!(v.retry_reading_not_found(&req, &scope).is_err());
+    let another = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    v.reading_dispatch(&another).unwrap();
+    assert!(
+        v.bind_reading_connection(&another, &scope).is_err(),
+        "old uncertain intent lacking connection proof must fail closed"
+    );
+}
+#[test]
+fn reading_cancel_rollback_restarts_without_losing_original_search() {
+    for point in [
+        "rollback_before_move",
+        "rollback_before_restore",
+        "rollback_after_restore",
+    ] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+        let fault = FaultGuard::set(|p, _| {
+            if p == "before_history" {
+                Err("INJECTED pre-history".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+        drop(fault);
+        let fault = FaultGuard::set(move |p, _| {
+            if p == point {
+                Err("INJECTED rollback crash".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.cancel_reading(&req.binding.operation_id).is_err());
+        drop(fault);
+        let reopened = f.vault();
+        assert_eq!(reopened.list("base").unwrap().len(), 1, "{point}");
+        assert_eq!(reopened.history(&m.id).unwrap().len(), 1);
+        assert_eq!(reopened.source(&m.id).unwrap().bytes, photo());
+        assert_eq!(
+            reopened
+                .cancel_reading(&req.binding.operation_id)
+                .unwrap()
+                .state,
+            "cancelled"
+        );
+    }
+}
+#[test]
+fn reading_cancellation_preserves_human_edit_racing_with_rollback() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+    let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+    let fault = FaultGuard::set(|p, _| {
+        if p == "before_history" {
+            Err("INJECTED pre-history".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+    drop(fault);
+    let draft = markdown(&m).replace("base", "real human draft");
+    let retained = draft.clone();
+    let fault = FaultGuard::set(move |p, path| {
+        if p == "rollback_before_restore" {
+            fs::write(path, &draft).unwrap();
+        }
+        Ok(())
+    });
+    assert!(v.cancel_reading(&req.binding.operation_id).is_err());
+    drop(fault);
+    assert_eq!(fs::read_to_string(v.note_path(&m.id)).unwrap(), retained);
+    assert_eq!(f.vault().list("").unwrap()[0].state, "conflict");
+    assert_eq!(fs::read_to_string(v.note_path(&m.id)).unwrap(), retained);
+}
+#[test]
+fn reading_incomplete_prepare_boundaries_are_isolated_and_same_id_retry_safe() {
+    for (needle, point) in [
+        ("note-path.stage-", "create_before"),
+        ("note-path.stage-", "write_after"),
+        ("request.stage-", "create_before"),
+        ("request.stage-", "write_after"),
+        ("request.json", "publish_after"),
+    ] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let operation = op();
+        let fault = FaultGuard::set(move |p, path| {
+            if p == point && path.to_string_lossy().contains(needle) {
+                Err("INJECTED intent interruption".into())
+            } else {
+                Ok(())
+            }
+        });
+        let attempt = v.prepare_reading(&m.id, 1, &operation);
+        drop(fault);
+        assert!(attempt.is_err());
+        assert!(f.vault().reading_operations(&m.id).is_ok());
+        let retry = v.prepare_reading(&m.id, 1, &operation).unwrap();
+        assert_eq!(retry.binding.operation_id, operation);
+        v.cancel_reading(&operation).unwrap();
+        assert!(v.prepare_reading(&m.id, 1, &operation).is_err());
+    }
+}
+#[test]
+fn reading_status_and_switch_repair_history_commit_without_prior_list() {
+    for action in ["status", "switch"] {
+        let f = Fixture::new();
+        let other = Fixture::new();
+        let settings = Fixture::new();
+        let state = LocalVaultState::new(settings.0.join("selected.json"));
+        let token = state.select_path(&f.0).unwrap().vault_id.unwrap();
+        let m = state
+            .with(&token, |v| {
+                v.capture(&op(), "synthetic.png", &photo(), "base")
+            })
+            .unwrap();
+        let (v, req) = state.begin_reading(&token, &m.id, 1, &op()).unwrap();
+        let fault = FaultGuard::set(|p, _| {
+            if p == "before_receipt" {
+                Err("INJECTED post-history".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+        drop(fault);
+        if action == "status" {
+            assert_eq!(
+                f.vault().reading_operations(&m.id).unwrap()[0].state,
+                "committed"
+            );
+        } else {
+            state.select_path(&other.0).unwrap();
+            assert_eq!(
+                f.vault().reading_operations(&m.id).unwrap()[0].state,
+                "committed"
+            );
+        }
+    }
+}
+#[test]
+fn reading_cancel_resolves_before_and_after_note_backup_move() {
+    for boundary in ["before_note", "rename_after", "before_history"] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let m = v.capture(&op(), "synthetic.png", &photo(), "base").unwrap();
+        let req = v.prepare_reading(&m.id, 1, &op()).unwrap();
+        let backup = v.backup_path(&req.binding.operation_id);
+        let fault = FaultGuard::set(move |point, path| {
+            if point == boundary && (boundary != "rename_after" || path == backup) {
+                Err("INJECTED publication interruption".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(v.accept_reading(&req, &reading_response(&req)).is_err());
+        drop(fault);
+        assert_eq!(
+            v.cancel_reading(&req.binding.operation_id).unwrap().state,
+            "cancelled"
+        );
+        let reopened = f.vault();
+        assert_eq!(reopened.list("base").unwrap().len(), 1, "{boundary}");
+        assert_eq!(reopened.history(&m.id).unwrap().len(), 1);
+        assert_eq!(reopened.source(&m.id).unwrap().bytes, photo());
+    }
+}

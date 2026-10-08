@@ -1,0 +1,74 @@
+{
+  "description": "SYNTHETIC Unicode reading normalized by actual backend validate_extraction; based on the shared synthetic image fixture. No provider or database call.",
+  "request": {
+    "binding": {
+      "schema_version": "1.0",
+      "operation_id": "11111111-1111-4111-8111-111111111111",
+      "vault_id": "22222222-2222-4222-8222-222222222222",
+      "memory_id": "33333333-3333-4333-8333-333333333333",
+      "source_id": "33333333-3333-4333-8333-333333333333",
+      "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+      "expected_revision": 1,
+      "captured_at": "2026-10-08T12:00:00Z"
+    },
+    "media_type": "image/jpeg",
+    "image_base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAwAEADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDgfvfX+dJRS/e+v86+q/h/4fy/4H5em3z/APvH+P8A9K/+2/8ASv8AF8SUUUVqcoUUUUAL976/zpKKX731/nWX8P8Aw/l/wPy9Nur/AHj/AB/+lf8A23/pX+L4kooorU5RfvfX+dJRS/e+v86y/h/4fy/4H5em3V/vH+P/ANK/+2/9K/xfElFFFanKFFFFABRRRQAUUUUAL976/wA6Sil+99f51l/D/wAP5f8AA/L026v94/x/+lf/AG3/AKV/i+JKKKK1OU//2Q=="
+  },
+  "response": {
+    "schema_version": "1.0",
+    "binding": {
+      "vault_id": "22222222-2222-4222-8222-222222222222",
+      "memory_id": "33333333-3333-4333-8333-333333333333",
+      "source_id": "33333333-3333-4333-8333-333333333333",
+      "captured_at": "2026-10-08T12:00:00Z",
+      "operation_id": "11111111-1111-4111-8111-111111111111",
+      "source_sha256": "695d62c9a1e3fe1a3eab2e98167f5c1662ee22723c7649e6bdf09582e34350d8",
+      "schema_version": "1.0",
+      "expected_revision": 1
+    },
+    "state": "complete",
+    "result": {
+      "model_id": "fake-model",
+      "provider": "anthropic",
+      "derivative": {
+        "sha256": "b233f30be24a8ed4f80df0cce57ae45524759019a15cd8c7d872957bac2cc0c0",
+        "media_type": "image/jpeg",
+        "transform_version": "jpeg-rgb-exif-orient-v1"
+      },
+      "extraction": {
+        "pages": [
+          {
+            "ordinal": 1,
+            "page_id": "33333333-3333-4333-8333-333333333333",
+            "legibility": "clear",
+            "transcription": "Stra\u00dfe 12?"
+          }
+        ],
+        "summary": null,
+        "mentions": [],
+        "capture_id": "33333333-3333-4333-8333-333333333333",
+        "statements": [],
+        "uncertainties": [
+          {
+            "kind": "other",
+            "evidence": [
+              {
+                "quote": "STRASSE 12?",
+                "page_id": "33333333-3333-4333-8333-333333333333"
+              }
+            ],
+            "description": "Marked uncertain on the page: Synthetic note: 12?"
+          }
+        ],
+        "schema_version": "1.1",
+        "summary_evidence": [],
+        "action_suggestions": [],
+        "input_manifest_sha256": "03b8837f713e87c5eaaef4fb4c0afdc8be4587cea737a4d5c14bf72972a2b353"
+      },
+      "review_state": "unreviewed",
+      "validation_notes": [],
+      "input_manifest_sha256": "03b8837f713e87c5eaaef4fb4c0afdc8be4587cea737a4d5c14bf72972a2b353"
+    },
+    "error_code": null
+  }
+}

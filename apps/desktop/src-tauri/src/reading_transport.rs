@@ -7,6 +7,7 @@ type Result<T> = std::result::Result<T, String>;
 const PROTECTED_SERVICE: &str = "app.recall.desktop.selected-photo-reading";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[derive(Clone)]
 pub struct ProtectedConnection {
     schema_version: String,
     vault_id: String,
@@ -40,6 +41,35 @@ impl ProtectedConnection {
         }
         Ok(c)
     }
+    pub fn fingerprint(&self) -> String {
+        // A non-secret digest binds retries to the exact existing device connection.
+        // Neither bearer credential nor origin is written into the portable intent.
+        let origin = reqwest::Url::parse(&self.origin)
+            .expect("validated connection URL")
+            .origin()
+            .ascii_serialization();
+        crate::reading::sha(
+            &serde_json::to_vec(&(
+                "recall-reading-connection-v1",
+                &self.vault_id,
+                origin,
+                &self.credential,
+            ))
+            .expect("string tuple serialization"),
+        )
+    }
+    #[cfg(test)]
+    pub(crate) fn test_connection(origin: &str, vault: &str, credential: &str) -> Self {
+        let url = reqwest::Url::parse(origin).unwrap();
+        assert_eq!(url.scheme(), "http");
+        assert_eq!(url.host_str(), Some("127.0.0.1"));
+        Self {
+            schema_version: "1.0".into(),
+            vault_id: vault.into(),
+            origin: origin.into(),
+            credential: credential.into(),
+        }
+    }
     pub fn read(vault_id: &str) -> Result<Option<Self>> {
         let entry = keyring::Entry::new(PROTECTED_SERVICE, vault_id)
             .map_err(|_| "Photo reading is not connected")?;
@@ -47,6 +77,19 @@ impl ProtectedConnection {
             Ok(raw) => Self::parse(&raw, vault_id).map(Some),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(_) => Err("Photo reading is not connected".into()),
+        }
+    }
+}
+pub enum ServiceResponse {
+    Receipt(ReadingReceipt),
+    NotFound,
+}
+#[cfg(test)]
+impl ServiceResponse {
+    fn receipt(self) -> ReadingReceipt {
+        match self {
+            Self::Receipt(r) => r,
+            Self::NotFound => panic!("unexpected not found"),
         }
     }
 }
@@ -66,11 +109,16 @@ impl ReadingTransport {
             .map_err(|_| "Photo reading transport unavailable")?;
         Ok(Self { client, connection })
     }
-    pub fn send(&self, request: &ReadingRequest, bytes: Option<Vec<u8>>) -> Result<ReadingReceipt> {
+    pub fn send(
+        &self,
+        request: &ReadingRequest,
+        bytes: Option<Vec<u8>>,
+    ) -> Result<ServiceResponse> {
         request.validate()?;
         if request.binding.vault_id != self.connection.vault_id {
             return Err("Photo reading connection scope changed".into());
         }
+        let recovery = bytes.is_none();
         let origin = self.connection.origin.trim_end_matches('/');
         let builder = if let Some(bytes) = bytes {
             if bytes.len() > 25 * 1024 * 1024 {
@@ -99,6 +147,9 @@ impl ReadingTransport {
                 "Reading response unavailable; recover the same operation. Provider cost may apply."
             })?;
         let status = response.status().as_u16();
+        if status == 404 && recovery {
+            return Ok(ServiceResponse::NotFound);
+        }
         if ![200, 202].contains(&status) {
             return Err(match status {
                 403 => "Photo reading is not connected or no longer authorized",
@@ -128,7 +179,21 @@ impl ReadingTransport {
         if (status == 202) != matches!(receipt.state.as_str(), "in_flight" | "unknown") {
             return Err("Reading response status mismatch".into());
         }
-        Ok(receipt)
+        Ok(ServiceResponse::Receipt(receipt))
+    }
+    #[cfg(test)]
+    pub(crate) fn test_from_connection(connection: ProtectedConnection) -> Result<Self> {
+        let url = reqwest::Url::parse(&connection.origin).map_err(|_| "Invalid loopback")?;
+        if url.scheme() != "http" || url.host_str() != Some("127.0.0.1") {
+            return Err("Test transport only permits loopback".into());
+        }
+        let client = reqwest::blocking::Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(2))
+            .build()
+            .map_err(|_| "Test client")?;
+        Ok(Self { client, connection })
     }
     #[cfg(test)]
     fn test_loopback(origin: &str, timeout: Duration) -> Result<Self> {
@@ -231,7 +296,8 @@ mod tests {
                         None
                     },
                 )
-                .unwrap();
+                .unwrap()
+                .receipt();
             assert_eq!(result.state, "in_flight");
             let wire = server.join().unwrap();
             assert!(wire

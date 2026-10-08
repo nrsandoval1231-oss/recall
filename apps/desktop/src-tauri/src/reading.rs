@@ -1,8 +1,10 @@
 //! Untrusted selected-photo wire contract. No vault paths, credentials or tools occur in results.
+use caseless::Caseless;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use unicode_normalization::UnicodeNormalization;
 type Result<T> = std::result::Result<T, String>;
 pub const MAX_RESPONSE: u64 = 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -236,14 +238,21 @@ fn local_id(v: &Value, prefix: char) -> Result<&str> {
     Ok(s)
 }
 fn normalized(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
+    let folded: String = s.nfkc().default_case_fold().collect();
+    // Python str.split/re \s additionally classify U+001C..U+001F as whitespace.
+    folded
+        .split(|c: char| c.is_whitespace() || ('\u{1c}'..='\u{1f}').contains(&c))
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 fn evidence(v: &Value, min: usize, max: usize, source: &str, transcript: &str) -> Result<()> {
     for ev in array(v, min, max)? {
         keys(ev, &["page_id", "quote"])?;
         ensure(ev["page_id"] == source)?;
         let quote = string(&ev["quote"], 1, 3000)?;
-        ensure(normalized(transcript).contains(&normalized(quote)))?;
+        let quote = normalized(quote);
+        ensure(!quote.is_empty() && normalized(transcript).contains(&quote))?;
     }
     Ok(())
 }
@@ -475,5 +484,66 @@ mod tests {
         r.as_object_mut().unwrap().remove("result");
         r.as_object_mut().unwrap().remove("error_code");
         assert!(serde_json::from_value::<ReadingReceipt>(r).is_err());
+    }
+}
+
+#[cfg(test)]
+mod independent_review {
+    use super::*;
+    #[test]
+    fn independent_review_accepts_actual_backend_normalized_unicode_quote() {
+        let f: Value = serde_json::from_str(include_str!(
+            "../../../../packages/contracts/fixtures/local-reading-unicode-synthetic.json"
+        ))
+        .unwrap();
+        let request:ReadingRequest=serde_json::from_value(serde_json::json!({"binding":f["request"]["binding"],"media_type":f["request"]["media_type"]})).unwrap();
+        let receipt: ReadingReceipt = serde_json::from_value(f["response"].clone()).unwrap();
+        assert!(
+            receipt.validate(&request).is_ok(),
+            "receipt produced by actual backend validate_extraction must remain native-compatible"
+        );
+    }
+    #[test]
+    fn independent_review_rejects_blank_source_evidence() {
+        let mut f: Value = serde_json::from_str(include_str!(
+            "../../../../packages/contracts/fixtures/local-reading-unicode-synthetic.json"
+        ))
+        .unwrap();
+        let request:ReadingRequest=serde_json::from_value(serde_json::json!({"binding":f["request"]["binding"],"media_type":f["request"]["media_type"]})).unwrap();
+        f["response"]["result"]["extraction"]["pages"][0]["transcription"] = "".into();
+        f["response"]["result"]["extraction"]["uncertainties"][0]["evidence"][0]["quote"] =
+            " \t\n".into();
+        let receipt: ReadingReceipt = serde_json::from_value(f["response"].clone()).unwrap();
+        assert!(
+            receipt.validate(&request).is_err(),
+            "blank quote must not claim evidence in blank transcript"
+        );
+    }
+}
+#[cfg(test)]
+mod normalization_contract_tests {
+    use super::*;
+    #[test]
+    fn reading_backend_quote_equivalence_and_blank_evidence_fixture() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../packages/contracts/fixtures/local-reading-evidence-normalization.json"
+        ))
+        .unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            let transcript = case["transcription"].as_str().unwrap();
+            let quote = case["quote"].as_str().unwrap();
+            let result = evidence(
+                &serde_json::json!([{"page_id":"source","quote":quote}]),
+                1,
+                10,
+                "source",
+                transcript,
+            );
+            assert_eq!(
+                result.is_ok(),
+                case["accepted"].as_bool().unwrap(),
+                "{case}"
+            );
+        }
     }
 }

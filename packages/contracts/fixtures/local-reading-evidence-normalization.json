@@ -1,0 +1,50 @@
+{
+  "description": "SYNTHETIC quote cases generated from actual backend _PageText.context (NFKC, casefold and Python whitespace); no model calls.",
+  "cases": [
+    {
+      "transcription": "Stra\u00dfe 12?",
+      "quote": "STRASSE 12?",
+      "accepted": true
+    },
+    {
+      "transcription": "\uff26\uff55\uff4c\uff4c \uff11\uff12?",
+      "quote": "full 12?",
+      "accepted": true
+    },
+    {
+      "transcription": "\ufb03 12?",
+      "quote": "FFI 12?",
+      "accepted": true
+    },
+    {
+      "transcription": "\u039f\u03c2 \u03a3",
+      "quote": "\u03bf\u03c3 \u03c3",
+      "accepted": true
+    },
+    {
+      "transcription": "A\u00a0 \tB\nC",
+      "quote": "a b c",
+      "accepted": true
+    },
+    {
+      "transcription": "A\u001cB",
+      "quote": "a b",
+      "accepted": true
+    },
+    {
+      "transcription": "",
+      "quote": " \t\n",
+      "accepted": false
+    },
+    {
+      "transcription": "Synthetic note",
+      "quote": "\u00a0",
+      "accepted": false
+    },
+    {
+      "transcription": "\u1c90 12?",
+      "quote": "\u10d0 12?",
+      "accepted": true
+    }
+  ]
+}

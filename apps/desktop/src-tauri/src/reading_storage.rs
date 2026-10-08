@@ -136,6 +136,9 @@ impl Vault {
             fs::create_dir(&dir).map_err(fail)?;
             sync_dir(&root)?;
         }
+        if entries(&dir)?.len() + 4 > 32 {
+            return Err("Reading preparation retention capacity reached".into());
+        }
         Ok(())
     }
     pub fn reading_request(&self, operation: &str) -> Result<ReadingRequest> {
@@ -183,6 +186,76 @@ impl Vault {
         }
         immutable(&marker, b"may-have-been-sent")?;
         Ok(Some(self.verify_source(&m)?.bytes))
+    }
+    pub fn bind_reading_connection(
+        &self,
+        request: &ReadingRequest,
+        fingerprint: &str,
+    ) -> Result<()> {
+        let _lock = self.lock()?;
+        if self.request(&request.binding.operation_id)? != *request
+            || self.cancelled(&request.binding.operation_id)?
+        {
+            return Err("Reading cancelled or request changed".into());
+        }
+        self.connection_matches(request, fingerprint, true)
+    }
+    fn connection_matches(
+        &self,
+        request: &ReadingRequest,
+        fingerprint: &str,
+        initialize: bool,
+    ) -> Result<()> {
+        if fingerprint.len() != 64
+            || !fingerprint
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err("Invalid connection fingerprint".into());
+        }
+        let operation = &request.binding.operation_id;
+        let path = self.reading_file(operation, "connection-sha256")?;
+        if path.exists() {
+            if read(&path, 64)? != fingerprint.as_bytes() {
+                return Err(
+                    "Reading connection changed; previous operation cannot be resent".into(),
+                );
+            }
+        } else {
+            if !initialize
+                || self.reading_file(operation, "dispatched")?.exists()
+                || self.reading_file(operation, "status.json")?.exists()
+            {
+                return Err(
+                    "Previous reading connection identity is unavailable; operation was not resent"
+                        .into(),
+                );
+            }
+            immutable(&path, fingerprint.as_bytes())?;
+        }
+        Ok(())
+    }
+    pub fn retry_reading_not_found(
+        &self,
+        request: &ReadingRequest,
+        fingerprint: &str,
+    ) -> Result<Vec<u8>> {
+        let _lock = self.lock()?;
+        self.connection_matches(request, fingerprint, false)?;
+        let operation = &request.binding.operation_id;
+        // Once admission was observed, a later 404 must never turn into redispatch.
+        if self.reading_file(operation, "status.json")?.exists()
+            || self.reading_file(operation, "complete.json")?.exists()
+        {
+            return Err("Previously admitted reading cannot be resent".into());
+        }
+        let m = self.check_reading_current(request)?;
+        let bytes = self.verify_source(&m)?.bytes;
+        immutable(
+            &self.reading_file(operation, "dispatched")?,
+            b"may-have-been-sent",
+        )?;
+        Ok(bytes)
     }
     pub fn reading_saved_result(&self, operation: &str) -> Result<Option<ReadingReceipt>> {
         let _lock = self.lock()?;
@@ -378,8 +451,85 @@ impl Vault {
         // A completed local commit cannot be undone by cancellation; UI receives committed status.
         if !self.history_has_reading(operation)? {
             immutable(&self.reading_file(operation, "cancelled")?, b"cancelled")?;
+            if self.journal_path(operation).exists() {
+                let event: Event = decode(&self.journal_path(operation))?;
+                self.rollback_cancelled_reading(&event)?;
+            }
         }
         self.reading_status_inner(operation)
+    }
+    /// Resolve only an uncommitted cancelled generated publication. All original
+    /// journals/backups and any displaced draft remain immutable retained evidence.
+    pub(super) fn rollback_cancelled_reading(&self, e: &Event) -> Result<()> {
+        self.event_valid(e)?;
+        if e.kind != "machine_reading"
+            || !self.cancelled(&e.operation_id)?
+            || self.history_has_reading(&e.operation_id)?
+        {
+            return Ok(());
+        }
+        let last = self
+            .records(&e.memory.id)?
+            .pop()
+            .ok_or("Missing rollback authority")?;
+        if last.memory.revision != e.expected_revision {
+            return Ok(());
+        }
+        if e.parent_sha256 != Some(self.parent_hash(&e.memory.id, e.expected_revision)?)
+            || e.previous_markdown.as_ref() != Some(&last.markdown)
+        {
+            return Err("Cancelled reading parent changed".into());
+        }
+        let note = self.event_note_path(e)?;
+        if self
+            .inventory(&e.memory.id, e.note_path.as_deref())?
+            .is_some_and(|p| p != note)
+        {
+            return Err("Cancelled reading note moved; retained files need review".into());
+        }
+        let base = last.markdown.as_bytes();
+        let backup = self.backup_path(&e.operation_id);
+        if backup.exists() && read(&backup, MAX_JSON)? != base {
+            return Err(
+                "Concurrent human draft retained; cancellation did not overwrite it".into(),
+            );
+        }
+        let displaced = self.reading_file(&e.operation_id, "cancelled-publication.md")?;
+        if displaced.exists() && read(&displaced, MAX_JSON)? != e.markdown.as_bytes() {
+            return Err("Concurrent editor draft retained during cancellation".into());
+        }
+        let current = if note.exists() {
+            Some(read(&note, MAX_JSON)?)
+        } else {
+            None
+        };
+        if current.as_deref() == Some(base) {
+            return Ok(());
+        }
+        if !backup.exists()
+            || (current.is_some() && current.as_deref() != Some(e.markdown.as_bytes()))
+        {
+            return Err("Concurrent note edit; cancellation retained all files".into());
+        }
+        boundary!("rollback_before_move", &note);
+        if current.is_some() {
+            // Create-only rename preserves an intervening editor's bytes, then verify
+            // them before publishing the old authoritative note at the vacant path.
+            rename(&note, &displaced)?;
+            if read(&displaced, MAX_JSON)? != e.markdown.as_bytes() {
+                return Err("Concurrent note edit retained during cancellation".into());
+            }
+        }
+        boundary!("rollback_before_restore", &note);
+        atomic_new(&note, base)?;
+        boundary!("rollback_after_restore", &note);
+        if read(&note, MAX_JSON)? != base
+            || read(&backup, MAX_JSON)? != base
+            || (displaced.exists() && read(&displaced, MAX_JSON)? != e.markdown.as_bytes())
+        {
+            return Err("Concurrent editor draft retained during cancellation".into());
+        }
+        Ok(())
     }
     fn history_has_reading(&self, operation: &str) -> Result<bool> {
         let path = self.journal_path(operation);
@@ -388,8 +538,20 @@ impl Vault {
         }
         let e: Event = decode(&path)?;
         self.event_valid(&e)?;
-        Ok(self.history_path(&e.memory.id, e.memory.revision).exists()
-            && self.receipt(operation)?.is_some())
+        let bytes = read(&path, MAX_JSON)?;
+        if read(
+            &self.history_path(&e.memory.id, e.memory.revision),
+            MAX_JSON,
+        )
+        .ok()
+            != Some(bytes.clone())
+        {
+            return Ok(false);
+        }
+        // History publication is the commit point. Repair only that exact immutable
+        // chain, never finish/publish an uncommitted machine draft here.
+        self.repair_receipt(&e, &bytes)?;
+        Ok(true)
     }
     pub fn reading_operations(&self, memory_id: &str) -> Result<Vec<ReadingOperation>> {
         let _lock = self.lock()?;
@@ -405,14 +567,23 @@ impl Vault {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .ok_or("Invalid reading directory")?;
-            if !self.reading_file(operation, "request.json")?.exists()
-                && self.cancelled(operation)?
-            {
+            // An incomplete/damaged intent cannot be attributed by directory alone.
+            // Keep every artifact, but never let it hide another memory's operations.
+            let Ok(req) = self.request(operation) else {
                 continue;
-            }
-            let req = self.request(operation)?;
+            };
             if req.binding.memory_id == memory_id {
-                out.push(self.reading_status_inner(operation)?);
+                match self.reading_status_inner(operation) {
+                    Ok(status) => out.push(status),
+                    Err(_) => out.push(ReadingOperation {
+                        operation_id: operation.into(),
+                        memory_id: memory_id.into(),
+                        expected_revision: req.binding.expected_revision,
+                        state: "failed".into(),
+                        may_have_been_sent: self.reading_file(operation, "dispatched")?.exists(),
+                        error_code: Some("LOCAL_READING_STATE_INVALID".into()),
+                    }),
+                }
             }
         }
         Ok(out)
