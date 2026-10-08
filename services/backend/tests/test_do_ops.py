@@ -386,7 +386,8 @@ def test_synthetic_inference_receipt_survives_restart_and_revoke() -> None:
         auto_provision_workspaces=False,
         device_pairing_enabled=True,
         ai_provider="anthropic",
-        ai_model_id="synthetic-ci-model",
+        # FakeProvider reports this fixed model id; runtime preflight continues to use synthetic-ci-model.
+        ai_model_id="fake-model",
         ai_api_key="synthetic-ci-key-not-a-credential",
         ai_input_usd_per_mtok=1,
         ai_output_usd_per_mtok=1,
@@ -422,8 +423,8 @@ def test_synthetic_inference_receipt_survives_restart_and_revoke() -> None:
     with TestClient(app) as client:
         assert client.post(f"/v1/device-pairings/{invitation}/claim", json={"secret": bearer}).status_code == 200
         first = client.post("/v1/local-readings", content=original, headers=photo_headers)
-        assert first.status_code == 200, first.json()
-        assert first.json()["state"] == "complete", first.json()
+        assert first.status_code == 200, json.dumps(first.json(), sort_keys=True)
+        assert first.json()["state"] == "complete", json.dumps(first.json(), sort_keys=True)
         receipt = client.get(f"/v1/local-readings/{binding['operation_id']}", headers=headers)
         assert receipt.json() == first.json()
     app_db.close()
