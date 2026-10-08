@@ -60,8 +60,9 @@ class AnthropicProvider:
         effort: str,
         refusal_fallback: bool,
         client: anthropic.Anthropic | None = None,
+        max_retries: int = 2,
     ) -> None:
-        self._client = client or anthropic.Anthropic(api_key=api_key, max_retries=2, timeout=600.0)
+        self._client = client or anthropic.Anthropic(api_key=api_key, max_retries=max_retries, timeout=600.0)
         self._model = model_id
         self._effort = effort
         self._fallback = refusal_fallback

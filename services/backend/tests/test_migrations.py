@@ -36,6 +36,7 @@ TABLES = [
     "memory_overrides",
     "change_events",
     "identity_operations",
+    "local_reading_receipts",
 ]
 
 MIGRATIONS = [
@@ -46,6 +47,7 @@ MIGRATIONS = [
     "0005_hybrid_retrieval.sql",
     "0006_portability.sql",
     "0007_provider_budget_reservations.sql",
+    "0008_local_readings.sql",
 ]
 
 

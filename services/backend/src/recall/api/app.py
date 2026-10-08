@@ -27,6 +27,7 @@ from ..domain.export import export_janitor
 from ..domain.manifest import find_schema_path, load_schema, validate_manifest
 from ..domain.memories import MemoryService
 from ..errors import ApiError, payload_too_large, unauthenticated, unsupported_media, validation
+from ..ingestion.local_reading import DenyDeviceAuthorizer, DeviceAuthorizer, LocalReadingService
 from ..ingestion.provider import Provider
 from ..storage import ObjectStore
 from ..storage.factory import build_object_store
@@ -34,6 +35,7 @@ from ..sync.routes import register_routes as register_sync_routes
 from .auth import Principal, TokenVerifier
 from .deletion import register_routes as register_deletion_routes
 from .export import register_routes as register_export_routes
+from .local_reading import register_routes as register_local_reading_routes
 
 log = logging.getLogger("recall")
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
@@ -73,6 +75,8 @@ def create_app(
     store: ObjectStore | None = None,
     database: Database | None = None,
     provider: Provider | None = None,
+    local_reading_authorizer: DeviceAuthorizer | None = None,
+    local_reading_provider: Provider | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     schema = load_schema(str(find_schema_path(settings)))
@@ -90,6 +94,20 @@ def create_app(
             effort=settings.ai_effort,
             refusal_fallback=settings.ai_refusal_fallback,
         )
+    if local_reading_provider is None and local_reading_authorizer is not None and settings.ai_configured:
+        from ..ingestion.anthropic_provider import AnthropicProvider
+
+        assert settings.ai_api_key and settings.ai_model_id
+        local_reading_provider = AnthropicProvider(
+            api_key=settings.ai_api_key,
+            model_id=settings.ai_model_id,
+            effort=settings.ai_effort,
+            refusal_fallback=False,
+            max_retries=0,
+        )
+    local_readings = LocalReadingService(
+        db, settings, local_reading_authorizer or DenyDeviceAuthorizer(), local_reading_provider
+    )
     memories = MemoryService(db, settings, provider)
     entities = EntityService(db, settings)
     deletion = DeletionService(db)
@@ -100,13 +118,27 @@ def create_app(
             db.open()
         db.assert_least_privilege()
         object_store.check_ready()
+        await run_in_threadpool(local_readings.expire)
         stop = asyncio.Event()
         janitor = asyncio.create_task(export_janitor(stop))
+
+        async def expire_readings() -> None:
+            while not stop.is_set():
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=60)
+                except TimeoutError:
+                    try:
+                        await run_in_threadpool(local_readings.expire)
+                    except Exception:
+                        log.error("local reading retention maintenance failed")
+
+        reading_janitor = asyncio.create_task(expire_readings())
         try:
             yield
         finally:
             stop.set()
             await janitor
+            await reading_janitor
             if database is None:
                 db.close()
 
@@ -377,6 +409,7 @@ def create_app(
     ) -> JSONResponse:
         return _json(memories.update_action(who.user_id, action_id, key, if_match, body))
 
+    register_local_reading_routes(app, local_readings)
     register_sync_routes(app, db, settings, service, memories, principal)
     register_export_routes(app, db, object_store, principal)
     register_deletion_routes(app, db, principal)

@@ -175,3 +175,146 @@ These are the exact, tested semantics of the packet-001 routes. Where they refin
 **`GET /v1/search?q=`**: Postgres full-text (`english`) over eligible chunks of current revisions; the question's lexemes are OR-ed and ranked (`ts_rank_cd`), so vague recollections match on shared words. A summary or statement supported by several pages is indexed once per supporting page, so a citation always opens a page that actually supports it. Results carry `memory_id`, `capture_id`, `source_id`, `page`, `kind` (`transcription|statement|summary|context`), `epistemic_state`, `excerpt`. Optional versioned vectors are listed in the V1 section above.
 
 **`POST /v1/ask`** `{"question"}` (`conversation_id`, `entity_ids`, `as_of` must be null/empty in RCL-002, else 422). The server retrieves; with no matches it returns `insufficient_evidence` (`reason: NO_EVIDENCE`) **without a model call**. Otherwise it sends at most 8 excerpts as a packet with server citation ids `c1…`; the model must return sentences each citing ≥1 packet id. Any unknown id, empty answer, or schema failure → `insufficient_evidence` (`reason: ANSWER_UNVERIFIED`) with no answer text. AI off / consent missing / budget reached / provider down → `unavailable` with `reason` (`AI_NOT_CONFIGURED`, `CONSENT_REQUIRED`, `BUDGET_EXHAUSTED`, provider code) and `mode: sources_only`. Every response includes `sources` (matching excerpts with `source_id`/`page`) so the original is always one step away; `citations` are server-resolved from the packet, never from model text. Entailment (does the cited text really support the sentence?) is not checked at runtime; it is an evaluation metric.
+
+## Selected local photo reading — contract 1.0
+
+This optional route reads one explicitly selected vault original with Claude. It creates **no** cloud capture,
+source object, memory or search projection. The local vault remains authoritative. The production authorizer
+is default-deny: ordinary cloud login tokens do not enable this route. No enrollment, credential creation,
+account UX or production configuration is supplied by this packet.
+
+The native adapter uses a fixed HTTPS service origin and an opaque, inference-only device credential held in
+OS-protected storage. The server's injected `DeviceAuthorizer.verify` must verify current revocation and exact
+vault scope, and map to an **existing** operational user/workspace/device. The server independently checks
+current workspace membership without provisioning. It verifies the device before reading any request body,
+again before dispatch, and again before returning a POST or GET receipt. The renderer never receives the
+credential, chooses an origin, or supplies a filesystem path.
+
+### Request
+
+`POST /v1/local-readings` uses a raw image body (not JSON/base64 or multipart):
+
+- `Authorization: Bearer <opaque-device-credential>`
+- `Content-Type`: exactly `image/jpeg`, `image/png`, `image/webp`, `image/heic` or `image/heif`.
+- `X-Recall-Reading`: one JSON object, at most 4,096 UTF-8 bytes, with exactly the following fields.
+
+```json
+{
+  "schema_version": "1.0",
+  "operation_id": "11111111-1111-4111-8111-111111111111",
+  "vault_id": "22222222-2222-4222-8222-222222222222",
+  "memory_id": "33333333-3333-4333-8333-333333333333",
+  "source_id": "33333333-3333-4333-8333-333333333333",
+  "source_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "expected_revision": 1,
+  "captured_at": "2026-10-08T12:00:00Z"
+}
+```
+
+This is a synthetic shape example; its hash is not a real attachment hash. All four IDs are canonical lowercase
+hyphenated UUID strings. `vault_id` is the vault manifest's stable identity, **not** a transient native session
+ID. `memory_id` and `source_id` are both bound explicitly; they may be equal for the current one-original
+memory subset. `source_sha256` is the lowercase 64-hex SHA-256 of the exact preserved original.
+`expected_revision` is an integer from 1 through 9,007,199,254,740,991 (JSON booleans are rejected).
+`captured_at` is an RFC3339 date/time string of at most 40 characters with uppercase `T`, explicit `Z` or `±HH:MM` offset, and optional 1–9 fractional second digits.
+No workspace ID, context hint, annotation, other memory, vault listing or image path is accepted.
+
+The original must already be durably saved locally. Body size is bounded while streaming, including chunked
+requests, by the configured page limit (maximum 25 MiB). The received hash, decoded image format and pixel
+limit must pass before dispatch. The existing image derivative code produces one metadata-free, oriented JPEG
+with maximum edge 2,000 pixels (or the lower configured limit) and at most 3,500,000 bytes. The provider receives
+that full-page derivative only. No original or derivative is stored by this server.
+
+### Response and input binding
+
+POST and `GET /v1/local-readings/{operation_id}` return the same receipt shape with `Cache-Control: no-store`.
+GET requires the same device/vault scope and can recover a response without re-uploading the image. Every HTTP
+receipt is below 1 MiB; the normalized `result` JSON is capped at 900,000 bytes. Native clients enforce their
+own response/body/field limits and validate this contract plus the referenced extraction schema before promotion.
+
+```json
+{
+  "schema_version": "1.0",
+  "binding": {
+    "schema_version": "1.0",
+    "operation_id": "11111111-1111-4111-8111-111111111111",
+    "vault_id": "22222222-2222-4222-8222-222222222222",
+    "memory_id": "33333333-3333-4333-8333-333333333333",
+    "source_id": "33333333-3333-4333-8333-333333333333",
+    "source_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "expected_revision": 1,
+    "captured_at": "2026-10-08T12:00:00Z"
+  },
+  "state": "in_flight",
+  "result": null,
+  "error_code": null
+}
+```
+
+For `complete`, `result` has exactly these fields:
+
+| Field | Contract |
+| --- | --- |
+| `provider` | `"anthropic"` |
+| `model_id` | The exact configured model ID reported by the provider; mismatches fail closed with an unknown hold |
+| `input_manifest_sha256` | Digest defined below |
+| `derivative` | Object with `sha256` (lowercase hex64), `transform_version: "jpeg-rgb-exif-orient-v1"`, `media_type: "image/jpeg"` |
+| `extraction` | Normalized output validated by `validate_extraction` against [`extraction.schema.json`](../packages/contracts/extraction.schema.json), schema version `1.1` |
+| `validation_notes` | Array of objects containing string `code` and string `detail`; deterministic normalization/review notes, never executable instructions |
+| `review_state` | Always `"unreviewed"`, even when schema validation succeeds |
+
+The input digest is `SHA256(UTF8(canonical_json({"binding": binding, "media_type": content_type})))`.
+Canonical JSON recursively sorts object keys, uses `,` and `:` separators with no whitespace, and ASCII-escapes
+non-ASCII characters (Python `json.dumps(..., sort_keys=True, separators=(",", ":"), ensure_ascii=True)`).
+All accepted binding values supplied by the native client are ASCII. The extraction's `capture_id` equals
+`binding.memory_id`; `input_manifest_sha256` equals this digest; its only page has `page_id` equal to
+`binding.source_id` and `ordinal: 1`. All extraction evidence references must resolve to that page. The native
+adapter rechecks every binding, current revision/source bytes, vault session, active state and cancellation
+before journaling the machine proposal. Schema/reference validation is not proof of pixel-level reading truth.
+
+| Receipt state | HTTP status | `result` / `error_code` | Meaning |
+| --- | --- | --- | --- |
+| `complete` | 200 | object / null | Validated unreviewed proposal available for local commit |
+| `in_flight` | 202 | null / null | Admitted operation; GET later using the same operation ID |
+| `unknown` | 202 | null / `PROVIDER_OUTCOME_UNKNOWN` | Provider outcome/accounting uncertain; never automatically re-dispatch |
+| `failed` | 200 | null / stable code | Terminal operation; same ID returns the same failure without another call |
+| `expired` | 200 | null / `RECEIPT_EXPIRED` | Content expired or workspace erased; operation remains fenced against replay |
+
+Terminal failure codes are `INVALID_EXTRACTION`, `PROVIDER_REFUSED`, `OUTPUT_TRUNCATED`, `PROVIDER_FAILED`, and
+`AUTHORIZATION_CHANGED`. Model text, exception messages, credentials and image content are not returned in
+errors or application logs. Transport/admission failures use the existing `{ "error": { "code", "message",
+"retryable", "request_id" } }` envelope: 403 `FORBIDDEN` (unconfigured/revoked/wrong scope/missing membership),
+404 `NOT_FOUND` (GET unknown operation or another scope), 409 `IDEMPOTENCY_CONFLICT` (changed payload under an
+existing operation ID), 409 `AI_NOT_CONFIGURED`, `CONSENT_REQUIRED` or `BUDGET_EXHAUSTED`, 413 `PAYLOAD_TOO_LARGE`,
+415 `UNSUPPORTED_MEDIA`, and 422 `VALIDATION_ERROR` or `HASH_MISMATCH`. Membership removed during a paid call
+can prevent settlement until authorized operator recovery; the durable reservation remains held.
+
+### Retry, cost and retention
+
+The receipt key is operational workspace + device + vault + operation UUID. Payload binding includes the
+media type and original hash. Receipt insertion and the existing deployment-wide budget reservation commit
+atomically before provider dispatch. The provider runs outside database locks. Concurrent identical requests
+return the existing receipt; changed valid input with the same key fails. There is one `Provider.interpret`
+invocation per admitted operation, no repair call, no SDK transport retry and no refusal fallback for this
+flow. Existing cloud provider behavior is unchanged. The shared ledger reserves the existing conservative
+24,784 input / 64,000 output token bounds with configured pricing; no model, price or budget is chosen here.
+Usage is settled only when model/usage match that bound. An uncertain call retains its reservation for
+operator reconciliation; no automatic refund or retry is promised.
+
+After a lost response or native restart, recover by GET. A 404 allows repeating the **same** POST operation;
+a committed receipt prevents duplicate dispatch. At 15 minutes, an abandoned `in_flight` becomes `unknown`;
+late completions cannot promote an already unknown/expired receipt. A local cancellation must durably prevent
+local promotion, including restart/recovery, but cannot promise to cancel an already dispatched provider call
+or reverse its charge. The server may finish and retain its receipt after the client disconnects. Do not
+silently create a new operation for unknown, failed, expired or cancelled work.
+
+Only normalized reading content is retained, for a 24-hour recovery window from admission. Expiry is enforced
+on receipt access, at API startup, and every 60 seconds while the API is running. Expiry and existing workspace
+erasure clear the result and fence late completion; original bytes, derivatives and raw model responses are
+never written to durable storage. While the API is stopped, scheduled SQL cleanup does not run; startup clears
+expired content before serving. Database backups/WAL may retain previously stored content under their separate
+operational retention policy; this is logical deletion, not a secure-erasure claim. Minimal binding metadata,
+payload digest, terminal status and budget linkage remain as idempotency tombstones indefinitely; they do not
+serve as canonical memories and are not indexed/exported as vault memory.
+
+The shared [synthetic wire fixture](../packages/contracts/fixtures/local-reading-synthetic.json) includes the exact selected image bytes (base64 for fixture portability), request binding, and actual normalized HTTP result. Python contract tests replay it against real PostgreSQL and compare the full response; native tests can consume the same digest and extraction without live provider calls.
