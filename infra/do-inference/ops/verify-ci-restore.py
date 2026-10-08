@@ -11,6 +11,18 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
+
+def roles_by_name(conn):  # type: ignore[no-untyped-def]
+    with conn.cursor(row_factory=dict_row) as cursor:
+        return {
+            row["rolname"]: row
+            for row in cursor.execute(
+                "select rolname,rolcanlogin,rolsuper,rolbypassrls,rolcreatedb,rolcreaterole "
+                "from pg_roles where rolname in ('recall_api','recall_migrator','recall_worker','recall_app')"
+            )
+        }
+
+
 secrets = Path(__file__).resolve().parents[1] / "secrets"
 connections = json.loads(Path(os.environ["DO_OPS_TEST_CONNECTION_FILE"]).read_text(encoding="utf-8"))
 restored = conninfo_to_dict((secrets / "ci_restore_database_url.local").read_text(encoding="utf-8").strip())
@@ -23,14 +35,7 @@ for key in ("host", "port", "dbname"):
 with psycopg.connect(**restored_operator) as conn:
     restored_identity = conn.execute("select inet_server_addr()::text,inet_server_port(),current_database()").fetchone()
     assert restored_identity[2] == "recall_restore"
-    roles = {
-        row["rolname"]: row
-        for row in conn.execute(
-            "select rolname,rolcanlogin,rolsuper,rolbypassrls,rolcreatedb,rolcreaterole "
-            "from pg_roles where rolname in ('recall_api','recall_migrator','recall_worker','recall_app')",
-            row_factory=dict_row,
-        )
-    }
+    roles = roles_by_name(conn)
     assert set(roles) == {
         "recall_api",
         "recall_migrator",

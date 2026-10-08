@@ -236,6 +236,38 @@ def test_restore_verifier_passes_target_connection_mapping_as_keywords() -> None
         assert isinstance(call.keywords[0].value, ast.Name) and call.keywords[0].value.id == "restored_operator"
 
 
+def test_restore_verifier_uses_dict_row_cursor_for_roles_only() -> None:
+    path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "verify-ci-restore.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    helper = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "roles_by_name")
+    marker = object()
+    namespace = {"dict_row": marker}
+    exec(compile(ast.Module(body=[helper], type_ignores=[]), str(path), "exec"), namespace)
+
+    class Cursor:
+        def __enter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        def __exit__(self, *args):  # type: ignore[no-untyped-def]
+            return False
+
+        def execute(self, statement: str):  # type: ignore[no-untyped-def]
+            assert "from pg_roles" in statement
+            return iter(({"rolname": "recall_api", "rolcanlogin": True},))
+
+    class Connection:
+        def __init__(self) -> None:
+            self.row_factory = None
+
+        def cursor(self, *, row_factory):  # type: ignore[no-untyped-def]
+            self.row_factory = row_factory
+            return Cursor()
+
+    connection = Connection()
+    assert namespace["roles_by_name"](connection) == {"recall_api": {"rolname": "recall_api", "rolcanlogin": True}}  # type: ignore[operator]
+    assert connection.row_factory is marker
+
+
 def test_restore_checksum_refusal_sets_external_hold(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     archive = tmp_path / "backup.age"
     archive.write_bytes(b"corrupted-synthetic-backup")
