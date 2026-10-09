@@ -1,5 +1,8 @@
 # Security, privacy, and operations
 
+> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+
+
 ## V1 operations and limitations
 
 New tables enforce workspace RLS. Source and memory deletion use narrow SECURITY DEFINER commands with fixed search paths and verified membership, rather than granting generic client DELETE access. Purge workers consume only server-recorded private object keys, use bounded retry/backoff and keep provider error content out of the database. Deleted memory is durably suppressed from future processing; full capture purge removes its derived state and queues original byte deletion. Provider retention is controlled by the provider account terms; Recall cannot erase copies already sent to a provider or arbitrary exported files.
