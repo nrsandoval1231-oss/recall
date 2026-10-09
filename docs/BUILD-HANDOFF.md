@@ -1,6 +1,9 @@
 # First builder handoff — RCL-001
 
-Status update: RCL-001 has been implemented (see [DEVELOPMENT](DEVELOPMENT.md) and ACCEPTANCE "RCL-001 evidence"). The text below is the original brief and is kept for scope reference. RCL-002 has not been started.
+> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+
+
+Status update: RCL-001 has been implemented (see [DEVELOPMENT](DEVELOPMENT.md) and ACCEPTANCE "RCL-001 evidence"). The text below is the original brief and is kept for scope reference. RCL-002 was implemented subsequently; see the dated V1 status ledger.
 
 This is the bounded first-packet brief. The written foundation still needs owner review; do not interpret the existence of this file as authorization to implement every roadmap item or provision paid infrastructure.
 
