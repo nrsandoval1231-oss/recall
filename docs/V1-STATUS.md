@@ -1,5 +1,8 @@
 # Recall V1 implementation and acceptance
 
+> **2026-10-09 PILOT DIRECTION UPDATE:** [Pilot Product Contract](PILOT-CONTRACT.md) supersedes older active instructions here. The pilot is an installable iPhone Home Screen PWA and Windows browser, with **no login UX** and secure, operator-provisioned, revocable device access. Existing Supabase email authentication and native clients below are **historical implementation evidence, not pilot requirements**. Real-device proof of the new flow is outstanding. The exact owner-referenced visual image has not yet been provided; [UX-SPEC](UX-SPEC.md) remains the visual authority.
+
+
 This is the implementation ledger for the V1 build from accepted baseline `92b4c33aafda412f89d745f38b87858f2d4b2837`. A PASS below means deterministic implementation evidence, not live product quality. Physical devices, live infrastructure and model quality have separate gates.
 
 ## What works
