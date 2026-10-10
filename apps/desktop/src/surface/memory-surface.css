@@ -1,20 +1,16 @@
-html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; background: #1a140f; }
+html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; background: #12141a; }
 .ms {
   --ink: #f6f1e8;
   --muted: rgba(246, 241, 232, 0.72);
   --line: rgba(255, 244, 220, 0.18);
-  --glass: rgba(18, 16, 14, 0.46);
+  --glass: rgba(22, 24, 30, 0.72);
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
   display: grid;
   grid-template-columns: 212px minmax(0, 1fr);
   color: var(--ink);
-  background:
-    radial-gradient(80px 80px at 18% 78%, rgba(20, 16, 12, 0.2), transparent 70%),
-    radial-gradient(900px 520px at 82% 0%, rgba(255, 196, 122, 0.38), transparent 58%),
-    radial-gradient(700px 480px at 8% 100%, rgba(48, 32, 22, 0.65), transparent 70%),
-    linear-gradient(180deg, #8a6a52 0%, #4a3b32 34%, #1a1613 100%);
+  background: #12141a;
   font-family: "Segoe UI", "Avenir Next", system-ui, sans-serif;
   font-size: 14px;
 }
@@ -62,40 +58,7 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 .ms-stage {
   position: relative; min-width: 0; min-height: 0; overflow: hidden;
   display: flex; flex-direction: column; padding: 18px 22px 12px;
-}
-.ms-desk { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-.ms-paper {
-  position: absolute; left: 34%; width: min(520px, 46%); top: 46%;
-  background:
-    linear-gradient(90deg, rgba(70, 90, 140, 0.08) 0 1px, transparent 1px) 0 0 / 28px 100%,
-    repeating-linear-gradient(#f4efe4, #f4efe4 27px, rgba(90, 120, 170, 0.28) 28px);
-  color: #2c2924;
-  padding: 34px 36px 48px;
-  transform: rotate(-2deg);
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.38);
-  font-family: "Segoe Script", "Snell Roundhand", Palatino, Georgia, serif;
-  border-radius: 2px 6px 4px 2px;
-}
-.ms-paper p { margin: 0 0 10px; font-size: 18px; }
-.ms-paper ul { margin: 0; padding-left: 18px; }
-.ms-paper li { margin: 4px 0; }
-.ms-polaroid {
-  position: absolute; right: 7%; top: 58%; width: 168px; height: 128px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.25), transparent 28%),
-    linear-gradient(160deg, #d9c2a2, #8d7358 42%, #6e8496 72%, #d7c4a4);
-  transform: rotate(7deg);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
-  border: 10px solid #f7f4ee; border-bottom-width: 28px;
-}
-.ms-polaroid::after {
-  content: ""; position: absolute; left: 18%; right: 18%; bottom: -18px; height: 8px;
-  background: rgba(40, 32, 24, 0.25); border-radius: 4px;
-}
-.ms-mug {
-  position: absolute; left: 18px; bottom: 28px; width: 118px;
-  color: rgba(247, 244, 238, 0.78);
-  font-size: 10px; letter-spacing: 0.14em; line-height: 1.45; text-transform: uppercase;
+  background: #12141a;
 }
 
 .ms-ui {

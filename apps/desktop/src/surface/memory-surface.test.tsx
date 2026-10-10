@@ -57,8 +57,8 @@ function vault(over: Partial<LocalVault> = {}, memories: VaultMemory[] = []): Lo
 const preview: LocalVault = { ...vault(), available: false, status: async () => emptyStatus };
 
 describe("Memory Surface", () => {
-  it("shows the synthetic Brooks Campus desk when no vault is open", () => {
-    render(<MemorySurface vault={preview} />);
+  it("shows the synthetic Brooks Campus surface when no vault is open", () => {
+    const { container } = render(<MemorySurface vault={preview} />);
     expect(screen.getByText("RECALL")).toBeTruthy();
     expect(screen.getByText("Your life remembers itself.")).toBeTruthy();
     for (const label of ["Ask Recall", "Home", "Recent", "People", "Places", "Projects", "Equipment", "Timeline", "Capture"]) {
@@ -68,6 +68,8 @@ describe("Memory Surface", () => {
     expect(screen.getByRole("button", { name: /Blake Combs/ })).toBeTruthy();
     expect(screen.getByText(/Synthetic demo/)).toBeTruthy();
     expect(screen.getAllByText(/Potential 300MW \(phased\)/).length).toBeGreaterThan(0);
+    expect(container.querySelector(".ms-desk, .ms-paper, .ms-polaroid, .ms-mug")).toBeNull();
+    expect(screen.queryByText("Important conversations deserve a long memory.")).toBeNull();
     expect(screen.queryByRole("img", { name: /site illustration/i })).toBeNull();
     expect(screen.queryByText("Synthetic site illustration")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Recent Memories" })).toBeNull();

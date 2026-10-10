@@ -429,23 +429,6 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
         </div>
       </aside>
       <div className="ms-stage">
-        {demo && section !== "evidence" && (
-          <div className="ms-desk" aria-hidden="true">
-            <article className="ms-paper">
-              <p>Brooks Campus  8/16/26</p>
-              <ul>
-                <li>Met w/ Brad + Blake</li>
-                <li>Temporary generation likely</li>
-                <li>Oncor timeline ~ Q1 2027</li>
-                <li>Need site walk w/ Prism</li>
-                <li>Discussed laydown yard (north side)</li>
-                <li>Potential 300MW (phased)</li>
-              </ul>
-            </article>
-            <div className="ms-polaroid" />
-            <p className="ms-mug">Important conversations deserve a long memory.</p>
-          </div>
-        )}
         <div className="ms-ui">
           {checking && <p className="ms-notice" role="status">Checking this device…</p>}
           {demo && !checking && <p className="ms-banner" role="status">{FIXTURE_BANNER}{selected ? " This vault has no active memories yet." : ""}</p>}
