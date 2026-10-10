@@ -67,11 +67,6 @@ function displayDate(iso: string): string {
   if (!month) return iso;
   return `${month[0]}${month.slice(1).toLowerCase()} ${Number(match[3])}, ${match[1]}`;
 }
-function monthOf(iso: string): string | null {
-  const match = /^(\d{4})-(\d{2})-/.exec(iso);
-  if (!match) return null;
-  return MONTHS[Number(match[2]) - 1] ?? null;
-}
 function panelFor(section: Section): Panel {
   if (section === "people") return "people";
   if (section === "places") return "places";
@@ -104,9 +99,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [reading, setReading] = useState<Reading | null>(null);
   const [reader, setReader] = useState(librarian);
   const [readOp, setReadOp] = useState<string | null>(null);
-  const [month, setMonth] = useState<string | null>(null);
   const askRef = useRef<HTMLInputElement>(null);
-  const recentRef = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
   const previewRef = useRef<Preview | null>(null);
   previewRef.current = preview;
@@ -179,10 +172,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setError("");
     setAnswer(null);
     setVaultHits(null);
-    if (next === "recent") {
-      try { recentRef.current?.scrollIntoView({ block: "nearest" }); } catch { /* the preview has no layout */ }
-    }
-    if (next === "home" || next === "projects") { setPanel("overview"); setDetail(null); setMonth(null); }
+    if (next === "home" || next === "projects") { setPanel("overview"); setDetail(null); }
     if (next === "people" || next === "places" || next === "equipment" || next === "timeline" || next === "recent") setPanel(panelFor(next));
   }
 
@@ -414,8 +404,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     }
   }
 
-  const demoMemories = brooks.memories.filter((memory) => !month || memory.month === month);
-  const vaultMemories = kept.filter((memory) => !month || monthOf(memory.captured_at) === month);
+  const demoMemories = brooks.memories;
+  const vaultMemories = kept;
   const evidenceMemory = kept.find((memory) => memory.id === evidenceId) ?? null;
   const demoEvidence = demo ? fixtureMemory(evidenceId ?? "") : undefined;
 
@@ -571,39 +561,6 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                   {demo && <p className="ms-quote glass">{brooks.quote}</p>}
                 </div>
               </div>
-              <section className="glass ms-bottom" aria-label="Timeline and recent memories" ref={recentRef}>
-                <div className="ms-timeline">
-                  <div className="ms-card-head"><h2>Timeline</h2></div>
-                  <div className="ms-months">
-                    {(demo ? brooks.months : monthsPresent(kept)).map((label) => (
-                      <button key={label} type="button" className={month === label || (month === null && demo && label === brooks.marker) ? "is-mark" : undefined} aria-pressed={month === label} onClick={() => setMonth(month === label ? null : label)}>{label}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="ms-recent">
-                  <div className="ms-card-head"><h2>Recent Memories</h2>{demo && <p className="ms-fine">View all ({brooks.stats.memories})</p>}</div>
-                  <div className="ms-recent-row">
-                    {demo ? demoMemories.slice(0, 4).map((memory) => (
-                      <button key={memory.id} type="button" className={`ms-thumb ${memory.kind.toLowerCase()}`} onClick={() => openDemoMemory(memory)}>
-                        <i />
-                        <strong>{memory.date}</strong>
-                        <span>{memory.title}</span>
-                        <em>{memory.kind}</em>
-                      </button>
-                    )) : vaultMemories.slice(0, 4).map((memory) => (
-                      <button key={memory.id} type="button" className="ms-thumb" onClick={() => void openVaultMemory(memory)} disabled={!openable(memory)}>
-                        <i />
-                        <strong>{displayDate(memory.captured_at)}</strong>
-                        <span>{titleOf(memory)}</span>
-                        <em>{memory.state === "active" ? "Saved in your vault" : memory.state === "missing" ? "Markdown note missing" : memory.conflict ?? memory.state}</em>
-                      </button>
-                    ))}
-                  </div>
-                  {demo && <p className="ms-fine">Four sample notes can be opened. The rest of the count is the illustration.</p>}
-                  {demo && month && demoMemories.length === 0 && <p className="ms-fine">No sample note in {month}.</p>}
-                  {!demo && month && vaultMemories.length === 0 && <p className="ms-fine">No note in {month}.</p>}
-                </div>
-              </section>
             </>
           )}
           <p className="ms-footer">CAPTURE · UNDERSTAND · CONNECT · REMEMBER · RECALL · ACT</p>
@@ -616,10 +573,6 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
 function titleOf(memory: VaultMemory): string {
   const name = memory.source_name.replace(/\.[a-z0-9]+$/i, "");
   return name || "Untitled page";
-}
-function monthsPresent(memories: VaultMemory[]): string[] {
-  const found = memories.map((memory) => monthOf(memory.captured_at)).filter((label): label is string => Boolean(label));
-  return [...new Set(found)];
 }
 function detailFrom(id: string): { title: string; text: string } | null {
   const docs = fixtureDocuments();

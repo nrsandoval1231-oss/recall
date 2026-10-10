@@ -68,6 +68,8 @@ describe("Memory Surface", () => {
     expect(screen.getByRole("button", { name: /Blake Combs/ })).toBeTruthy();
     expect(screen.getByText(/Synthetic demo/)).toBeTruthy();
     expect(screen.getAllByText(/Potential 300MW \(phased\)/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("heading", { name: "Recent Memories" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Timeline and recent memories" })).toBeNull();
     expect(screen.queryByText("Email me a sign-in link")).toBeNull();
     expect((screen.getByRole("button", { name: "Voice ask is not available in this build" }) as HTMLButtonElement).disabled).toBe(true);
   });
