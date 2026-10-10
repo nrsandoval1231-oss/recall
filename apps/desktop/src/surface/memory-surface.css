@@ -176,7 +176,6 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 }
 .ms-place { margin: 0 0 8px; color: rgba(246, 241, 232, 0.8); }
 .ms-updated { color: var(--muted); font-size: 12px; text-align: right; }
-.ms-split { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(180px, 0.95fr); gap: 14px; align-items: stretch; }
 .ms-summary { margin: 0 0 8px; line-height: 1.45; }
 .ms-stats { display: flex; gap: 18px; margin: 12px 0; padding: 0; }
 .ms-stats div { display: grid; gap: 2px; }
@@ -188,14 +187,6 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 }
 .ms-tabs button { border-radius: 999px; padding: 0 12px; min-height: 32px; font-size: 13px; }
 .ms-tabs button[aria-selected="true"] { background: rgba(255, 255, 255, 0.14); }
-.ms-site {
-  min-height: 180px; border-radius: 16px; overflow: hidden; position: relative;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
-}
-.ms-site-art { display: block; width: 100%; height: 100%; min-height: 180px; object-fit: cover; }
-.ms-site-label {
-  background: rgba(14, 16, 20, 0.72); border-radius: 999px; padding: 4px 8px; font-size: 11px;
-}
 .ms-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .ms-actions button, .ms-primary {
   border-radius: 999px; padding: 0 14px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line);
@@ -222,7 +213,7 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 @media (max-width: 1100px) {
   .ms { grid-template-columns: 72px minmax(0, 1fr); }
   .ms-nav button span, .ms-tagline, .ms-root { display: none; }
-  .ms-columns, .ms-split, .ms-evidence { grid-template-columns: 1fr; }
+  .ms-columns, .ms-evidence { grid-template-columns: 1fr; }
   .ms-side { grid-template-columns: 1fr 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {

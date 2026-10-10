@@ -527,29 +527,24 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       </div>
                       <h1>{detail?.title ?? (demo ? brooks.project : featured ? titleOf(featured) : "Your vault")}</h1>
                       <p className="ms-place">{demo ? brooks.place : selected ? selected.root : "No vault open"}</p>
-                      <div className="ms-split">
-                        <div>
-                          {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : featured?.note || "Import a photo to keep the original and a note in this vault."}</p>}
-                          {demo && panel === "overview" && !detail && <p className="ms-fine">{brooks.caveat}</p>}
-                          {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
-                          {panel === "people" && !detail && <SimpleList demo={demo} rows={brooks.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
-                          {panel === "places" && !detail && <SimpleList demo={demo} rows={brooks.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
-                          {panel === "equipment" && <SimpleList demo={demo} rows={brooks.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
-                          {panel === "related" && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
-                          <dl className="ms-stats">
-                            <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : active.length}</dd></div>
-                            <div><dt>People</dt><dd>{demo ? brooks.stats.people : "—"}</dd></div>
-                            <div><dt>Locations</dt><dd>{demo ? brooks.stats.locations : "—"}</dd></div>
-                            <div><dt>Key Topics</dt><dd>{demo ? brooks.stats.topics : "—"}</dd></div>
-                          </dl>
-                          {demo && <p className="ms-fine">{brooks.statsNote}</p>}
-                          <div className="ms-tabs" role="tablist" aria-label="Project">
-                            {(["overview", "timeline", "people", "equipment", "related"] as const).map((tab) => (
-                              <button key={tab} type="button" role="tab" aria-selected={panel === tab} onClick={() => { setPanel(tab); setDetail(null); }}>{tab[0]?.toUpperCase()}{tab.slice(1)}</button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="ms-site" aria-hidden="true">{demo ? <SiteArt /> : <span className="ms-site-label">Original stays in the vault</span>}</div>
+                      {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : featured?.note || "Import a photo to keep the original and a note in this vault."}</p>}
+                      {demo && panel === "overview" && !detail && <p className="ms-fine">{brooks.caveat}</p>}
+                      {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
+                      {panel === "people" && !detail && <SimpleList demo={demo} rows={brooks.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
+                      {panel === "places" && !detail && <SimpleList demo={demo} rows={brooks.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
+                      {panel === "equipment" && <SimpleList demo={demo} rows={brooks.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
+                      {panel === "related" && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
+                      <dl className="ms-stats">
+                        <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : active.length}</dd></div>
+                        <div><dt>People</dt><dd>{demo ? brooks.stats.people : "—"}</dd></div>
+                        <div><dt>Locations</dt><dd>{demo ? brooks.stats.locations : "—"}</dd></div>
+                        <div><dt>Key Topics</dt><dd>{demo ? brooks.stats.topics : "—"}</dd></div>
+                      </dl>
+                      {demo && <p className="ms-fine">{brooks.statsNote}</p>}
+                      <div className="ms-tabs" role="tablist" aria-label="Project">
+                        {(["overview", "timeline", "people", "equipment", "related"] as const).map((tab) => (
+                          <button key={tab} type="button" role="tab" aria-selected={panel === tab} onClick={() => { setPanel(tab); setDetail(null); }}>{tab[0]?.toUpperCase()}{tab.slice(1)}</button>
+                        ))}
                       </div>
                       {featured && !demo && <div className="ms-actions"><button type="button" onClick={() => void openVaultMemory(featured)}>Open original: {titleOf(featured)}</button></div>}
                     </>
@@ -797,26 +792,3 @@ function PinIcon() {
   );
 }
 
-function SiteArt() {
-  return (
-    <svg className="ms-site-art" viewBox="0 0 640 420" role="img" aria-label="Synthetic site illustration">
-      <defs>
-        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f0c48a" />
-          <stop offset="0.45" stopColor="#c9845a" />
-          <stop offset="1" stopColor="#6e7f90" />
-        </linearGradient>
-      </defs>
-      <rect width="640" height="420" fill="url(#sky)" />
-      <path d="M40 250h80l20-70h40l18 70h70" fill="none" stroke="#2c241c" strokeWidth="8" />
-      <path d="M70 180 V90 M70 110 H150 M150 110 V250" fill="none" stroke="#2c241c" strokeWidth="6" />
-      <rect x="230" y="150" width="210" height="160" fill="#8d6a45" />
-      <path d="M230 150 H440 V250 H250 V170 H300 V250" fill="none" stroke="#1d1814" strokeWidth="7" />
-      <path d="M250 190 H430 M250 220 H430 M280 150 V310 M330 150 V310 M380 150 V310" stroke="#1d1814" strokeWidth="3" opacity="0.7" />
-      <path d="M470 250 V70 M470 90 H560 M545 90 V250" fill="none" stroke="#241c16" strokeWidth="7" />
-      <path d="M0 300 H640 V420 H0Z" fill="#6b543c" />
-      <path d="M0 330 H640" stroke="#8a704f" strokeWidth="8" />
-      <text x="24" y="392" fill="#f7f1e6" fontSize="22" fontFamily="Georgia, serif">Synthetic site illustration</text>
-    </svg>
-  );
-}
