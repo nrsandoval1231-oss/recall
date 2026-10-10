@@ -89,8 +89,8 @@ function makeAuth(
   let listener: ((value: BrowserSession | null) => void) | undefined;
   return {
     getSession: vi.fn(async () => initial),
-    requestSignIn: vi.fn(async () => undefined),
-    signOut: vi.fn(async () => undefined),
+    endSession: vi.fn(async () => undefined),
+    enrollmentNotice: () => null,
     onChange: (callback) => {
       listener = callback;
       return () => {
@@ -158,11 +158,13 @@ afterEach(() => {
 });
 
 describe("web capture privacy and source boundary", () => {
-  it("shows sign-in without invoking private API reads while signed out", async () => {
+  it("shows an unprovisioned browser without invoking private API reads", async () => {
     const auth = makeAuth(null);
     const api = {} as RecallApiClient;
     render(<App services={{ auth, api }} />);
-    expect(await screen.findByText("Keep what matters.")).toBeTruthy();
+    expect(await screen.findByText("This browser is not provisioned.")).toBeTruthy();
+    expect(screen.queryByLabelText("Email")).toBeNull();
+    expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
   });
   it("disables sign out while the durable original is uploading", async () => {
     const auth = makeAuth(session("u1", "w1"));
@@ -192,7 +194,7 @@ describe("web capture privacy and source boundary", () => {
     fireEvent.click(screen.getByRole("button", { name: "Workspace settings" }));
     await waitFor(() =>
       expect(
-        (screen.getByRole("button", { name: "Sign out" }) as HTMLButtonElement)
+        (screen.getByRole("button", { name: "End this device" }) as HTMLButtonElement)
           .disabled,
       ).toBe(true),
     );
@@ -213,7 +215,7 @@ describe("web capture privacy and source boundary", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Capture" }));
     expect(await screen.findByText("pending note")).toBeTruthy();
     auth.emit(null);
-    await screen.findByText("Keep what matters.");
+    await screen.findByText("This browser is not provisioned.");
     expect(storage.clearDrafts).not.toHaveBeenCalled();
     auth.emit(session("u2", "w2"));
     await waitFor(() => expect(screen.queryByText("pending note")).toBeNull());
@@ -260,32 +262,16 @@ describe("web capture privacy and source boundary", () => {
     expect(storage.deleteDraft).toHaveBeenCalledWith("draft-1");
   });
 
-  it("shows the provider rate limit and prevents a second request", async () => {
-    sessionStorage.clear();
+  it("shows an enrollment failure without asking for credentials", async () => {
     const auth = makeAuth(null);
-    auth.requestSignIn = vi.fn(async () => {
-      throw new Error("EMAIL_RATE_LIMITED");
-    });
+    auth.enrollmentNotice = () => "This enrollment link is no longer valid.";
     const api = {} as RecallApiClient;
     render(<App services={{ auth, api }} />);
-    await screen.findByText("Keep what matters.");
-    fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "pilot@example.com" },
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Email me a sign-in link" }),
-    );
     expect(
-      await screen.findByText(/Email sign-in is temporarily limited/),
+      await screen.findByText("This enrollment link is no longer valid."),
     ).toBeTruthy();
-    expect(auth.requestSignIn).toHaveBeenCalledTimes(1);
-    expect(
-      (
-        screen.getByRole("button", {
-          name: /temporarily limited/,
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
+    expect(screen.queryByLabelText(/password/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /email/i })).toBeNull();
   });
 });
 
@@ -299,7 +285,7 @@ it("a late initial session cannot undo logout", async () => {
   const api = makeApi();
   render(<App services={{ auth, api }} />);
   auth.emit(null);
-  await screen.findByText("Keep what matters.");
+  await screen.findByText("This browser is not provisioned.");
   release(session("u1", "w1"));
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(
@@ -340,7 +326,7 @@ it("denied upload retry hides private context while preserving the local origina
   render(<App services={{ auth: makeAuth(session("u1", "w1")), api }} />);
   fireEvent.click(await screen.findByRole("button", { name: "Capture" }));
   fireEvent.click(await screen.findByRole("button", { name: "Retry upload" }));
-  expect(await screen.findByText("Keep what matters.")).toBeTruthy();
+  expect(await screen.findByText("This browser is not provisioned.")).toBeTruthy();
   expect(storage.deleteDraft).not.toHaveBeenCalled();
   expect(storage.clearDrafts).not.toHaveBeenCalled();
   expect(screen.queryByText("pending note")).toBeNull();
@@ -375,7 +361,7 @@ it("late denial from an old workspace cannot discard the new session", async () 
     new ApiError("UNAUTHENTICATED", "Expired old session", 401, false, null),
   );
   await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(screen.queryByText("Keep what matters.")).toBeNull();
+  expect(screen.queryByText("This browser is not provisioned.")).toBeNull();
   expect(
     screen.getByRole("heading", { name: "What do you need to remember?" }),
   ).toBeTruthy();

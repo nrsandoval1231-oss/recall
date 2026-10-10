@@ -54,6 +54,23 @@ Without Docker, create two login roles yourself in any PostgreSQL 16: an **owner
 
 Migrations are plain ordered SQL in `services/backend/migrations/`, checksummed in `schema_migrations`; editing an applied file is an error. If `RECALL_AUTO_PROVISION_WORKSPACES=false`, provision a user with `python -m recall.db.provision <auth-user-uuid>`.
 
+## Web pilot (installable PWA, no login screen)
+
+`apps/web` is the active pilot client. `npm run build --workspace @recall/web` emits the Vite app, `manifest.webmanifest`, icons, and `sw.js`. The same URL is what iPhone Safari uses for Add to Home Screen and what a Windows browser opens. That manual check is still open; the build does not perform it.
+
+Set `RECALL_OPERATOR_TOKEN` (at least 32 characters) only on the API. Unset, the operator routes respond 404. Issue a device with:
+
+```bash
+curl -s -X POST "$API/v1/operator/enrollments" \
+  -H "Authorization: Bearer $RECALL_OPERATOR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"label":"pilot phone"}'
+```
+
+The response contains `enrollment_token` once. On the device, open `https://<site>/#<enrollment_token>` and do not put that token in a query string, bookmark, or chat log after it has been used. The page strips the fragment and the Worker stores a revocable session cookie. `RECALL_SITE_ORIGINS` must include the site origin or an `Origin` header is rejected. Revoke one session with `POST /v1/operator/sessions/<id>/revoke`, one workspace with `POST /v1/operator/workspaces/<id>/revoke-sessions`, or every device with `POST /v1/operator/kill-switch`.
+
+Provider JWTs still authenticate the preserved native clients. The web Worker does not call the email identity provider. Supabase in this repository remains the private object-storage option and the historical email-login record, not the pilot sign-in path.
+
 ### Local object storage
 
 `RECALL_STORAGE_BACKEND=local` writes originals under `RECALL_LOCAL_STORAGE_DIR` (private dir, write-once, server-assigned keys). For Supabase set `RECALL_STORAGE_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server only), and create a **private** bucket named `RECALL_STORAGE_BUCKET`. See [infra/supabase](../infra/supabase/README.md).
@@ -106,7 +123,25 @@ npm run lint && npm run typecheck && npm test                                   
 
 `services/backend/tests/test_e2e_clients.py` launches a real uvicorn + Postgres and drives the TypeScript sync engine and API client (`tests/e2e/rcl001.e2e.ts`). It skips with a message if `npm install` has not been run.
 
-## Real-device acceptance procedure (RCL-001 exit gate)
+## Real-device acceptance procedure (current web pilot)
+
+This is the open gate for the installable web app. It is not satisfied by CI.
+
+Preconditions: deployed HTTPS API and web origin, `RECALL_OPERATOR_TOKEN` set only on the API, `RECALL_SITE_ORIGINS` set to that origin, private storage, and two provisioned workspaces. Use synthetic or personally owned pages kept outside the repository. Do not call a paid model for this gate.
+
+1. On an iPhone, open the site in Safari, use Add to Home Screen, and launch the icon. Confirm the name Recall, the icon, standalone display, and that the layout clears the notch and home indicator.
+2. On Windows, open the same URL in a desktop browser. Confirm it loads the Memory Surface without an install step.
+3. Before enrollment, confirm the phone and the Windows browser both stop at the unprovisioned state and do not show email, password, or a sign-in link.
+4. Enroll the phone from an operator-issued fragment. Confirm Recall opens into memory, the fragment is gone from the address bar, and refreshing still opens memory.
+5. Photograph a note, save it, and confirm the original is on the server with a matching SHA-256. Ask on the enrolled Windows browser and open that same original.
+6. Revoke the phone session from the operator API. Confirm the phone loses captures and originals, and the Windows session for the other workspace still cannot read them.
+7. Replay the used enrollment fragment and confirm it does not create a second session.
+
+Record device, OS, browser, commit, and every deviation in ACCEPTANCE. Anything not done stays **OPEN**.
+
+## Historical real-device procedure (RCL-001 native exit gate)
+
+The steps below describe the earlier native sign-in build. They are not the active pilot path.
 
 Preconditions: live Supabase project (signups restricted), deployed or tunneled HTTPS API with private storage, a signed iPhone build, an installed Windows build, and two test accounts. Use **synthetic or personally owned test pages kept outside the repository**.
 

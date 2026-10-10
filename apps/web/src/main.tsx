@@ -24,7 +24,7 @@ if (
   );
 } else if ("missing" in loaded)
   root.render(
-    <main className="signin card">
+    <main className="gate card">
       <div className="brand">Recall</div>
       <h1>Almost ready.</h1>
       <p className="muted">
@@ -33,6 +33,9 @@ if (
     </main>,
   );
 else {
+  if (import.meta.env.PROD && "serviceWorker" in navigator) {
+    void navigator.serviceWorker.register("/sw.js");
+  }
   const auth = createBrowserAuth();
   const api = new RecallApiClient({
     baseUrl: loaded.config.apiBaseUrl,

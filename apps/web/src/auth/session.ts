@@ -1,24 +1,118 @@
-export interface BrowserSession { userId: string; email: string | null; workspaceId: string; }
+export interface BrowserSession {
+  userId: string;
+  email: string | null;
+  workspaceId: string;
+}
 export interface BrowserAuth {
   getSession(): Promise<BrowserSession | null>;
-  requestSignIn(email: string): Promise<void>;
-  signOut(): Promise<void>;
+  endSession(): Promise<void>;
+  enrollmentNotice(): string | null;
   onChange(callback: (session: BrowserSession | null) => void): () => void;
 }
 
+const ENROLLMENT = /^enr_[A-Za-z0-9_-]{20,120}$/;
+
 function parseSession(value: unknown): BrowserSession | null {
   if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>; const user = (record.user && typeof record.user === "object" ? record.user : record) as Record<string, unknown>; const workspace = (record.workspace && typeof record.workspace === "object" ? record.workspace : {}) as Record<string, unknown>;
-  const workspaces = Array.isArray(record.workspaces) ? record.workspaces : []; const firstWorkspace = workspaces[0] && typeof workspaces[0] === "object" ? workspaces[0] as Record<string, unknown> : null;
-  const userId = typeof user.id === "string" ? user.id : typeof record.user_id === "string" ? record.user_id : null; const workspaceId = typeof workspace.id === "string" ? workspace.id : typeof record.active_workspace_id === "string" ? record.active_workspace_id : typeof record.workspace_id === "string" ? record.workspace_id : firstWorkspace && typeof firstWorkspace.id === "string" ? firstWorkspace.id : null;
-  return userId && workspaceId ? { userId, workspaceId, email: typeof user.email === "string" ? user.email : typeof record.email === "string" ? record.email : null } : null;
+  const record = value as Record<string, unknown>;
+  const user = (
+    record.user && typeof record.user === "object" ? record.user : record
+  ) as Record<string, unknown>;
+  const workspace = (
+    record.workspace && typeof record.workspace === "object" ? record.workspace : {}
+  ) as Record<string, unknown>;
+  const workspaces = Array.isArray(record.workspaces) ? record.workspaces : [];
+  const firstWorkspace =
+    workspaces[0] && typeof workspaces[0] === "object"
+      ? (workspaces[0] as Record<string, unknown>)
+      : null;
+  const userId =
+    typeof user.id === "string"
+      ? user.id
+      : typeof record.user_id === "string"
+        ? record.user_id
+        : null;
+  const workspaceId =
+    typeof workspace.id === "string"
+      ? workspace.id
+      : typeof record.active_workspace_id === "string"
+        ? record.active_workspace_id
+        : typeof record.workspace_id === "string"
+          ? record.workspace_id
+          : firstWorkspace && typeof firstWorkspace.id === "string"
+            ? firstWorkspace.id
+            : null;
+  return userId && workspaceId
+    ? {
+        userId,
+        workspaceId,
+        email:
+          typeof user.email === "string"
+            ? user.email
+            : typeof record.email === "string"
+              ? record.email
+              : null,
+      }
+    : null;
 }
 
-export function createBrowserAuth(fetchImpl: typeof fetch = fetch, basePath = ""): BrowserAuth {
+/** Read a one-time enrollment fragment and remove it before the app renders. */
+export function takeEnrollmentToken(): string | null {
+  const locationRef = globalThis.location;
+  if (!locationRef) return null;
+  const hash = locationRef.hash.startsWith("#") ? locationRef.hash.slice(1) : "";
+  const token = ENROLLMENT.test(hash) ? hash : null;
+  const path = locationRef.pathname;
+  if (locationRef.hash || path === "/enroll" || path === "/auth/callback") {
+    globalThis.history.replaceState(null, "", "/");
+  }
+  return token;
+}
+
+export function createBrowserAuth(
+  fetchImpl: typeof fetch = fetch,
+  basePath = "",
+): BrowserAuth {
   const listeners = new Set<(session: BrowserSession | null) => void>();
   const url = (path: string) => `${basePath}${path}`;
+  let pending = takeEnrollmentToken();
+  let notice: string | null = null;
+  let redeeming: Promise<void> | null = null;
+  const enrollIfNeeded = (): Promise<void> => {
+    if (redeeming) return redeeming;
+    const token = pending;
+    pending = null;
+    if (!token) {
+      redeeming = Promise.resolve();
+      return redeeming;
+    }
+    redeeming = (async () => {
+      try {
+        const enrolled = await fetchImpl(url("/auth/enroll"), {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            "x-recall-enrollment": "1",
+          },
+          body: JSON.stringify({ enrollment_token: token }),
+        });
+        if (enrolled.status === 429) {
+          notice =
+            "Enrollment is temporarily limited. Ask the operator for a fresh link later.";
+        } else if (enrolled.status !== 204) {
+          notice = "This enrollment link is no longer valid.";
+        }
+      } catch (failure) {
+        pending = token;
+        redeeming = null;
+        throw failure;
+      }
+    })();
+    return redeeming;
+  };
   const getSession = async (): Promise<BrowserSession | null> => {
-    if (globalThis.location?.pathname === "/auth/callback") await redeemEmailCallback(fetchImpl, basePath);
+    await enrollIfNeeded();
     const response = await fetchImpl(url("/auth/me"), { credentials: "include" });
     if (response.status === 401) return null;
     if (!response.ok) throw new Error("Could not check the Recall session.");
@@ -26,45 +120,18 @@ export function createBrowserAuth(fetchImpl: typeof fetch = fetch, basePath = ""
   };
   return {
     getSession,
-    async requestSignIn(email) {
-      const response = await fetchImpl(url("/auth/request"), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-      if (response.status === 429) throw new Error("EMAIL_RATE_LIMITED");
-      if (!response.ok) throw new Error("Could not send the sign-in email.");
-    },
-    async signOut() {
-      const response = await fetchImpl(url("/auth/logout"), { method: "POST", credentials: "include" });
-      if (!response.ok) throw new Error("Could not sign out.");
+    async endSession() {
+      const response = await fetchImpl(url("/auth/logout"), {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Could not end this device session.");
       listeners.forEach((listener) => listener(null));
     },
-    onChange(callback) { listeners.add(callback); return () => listeners.delete(callback); },
+    enrollmentNotice: () => notice,
+    onChange(callback) {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
   };
-}
-
-/** Redeem the one-time email-link fragment without persisting tokens in browser storage. */
-export async function redeemEmailCallback(fetchImpl: typeof fetch = fetch, basePath = ""): Promise<boolean> {
-  const query = new URLSearchParams(globalThis.location.search);
-  const fragment = new URLSearchParams(globalThis.location.hash.slice(1));
-  const state = one(query, "state");
-  const accessToken = one(fragment, "access_token");
-  const refreshToken = one(fragment, "refresh_token");
-  const expiresAt = one(fragment, "expires_at");
-  const tokenType = one(fragment, "token_type");
-
-  // Remove bearer material before the first network request or application render.
-  globalThis.history.replaceState(null, "", "/");
-  if (!state || !accessToken || !refreshToken || tokenType?.toLowerCase() !== "bearer" || accessToken.length > 10_000 || refreshToken.length > 10_000) return false;
-  const parsedExpiry = expiresAt === null ? null : Number(expiresAt);
-  if (parsedExpiry !== null && (!Number.isSafeInteger(parsedExpiry) || parsedExpiry <= 0)) return false;
-  const response = await fetchImpl(`${basePath}/auth/session`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken, ...(parsedExpiry === null ? {} : { expires_at: parsedExpiry }), state }),
-  });
-  return response.status === 204;
-}
-
-function one(params: URLSearchParams, name: string): string | null {
-  const values = params.getAll(name);
-  return values.length === 1 ? values[0] ?? null : null;
 }

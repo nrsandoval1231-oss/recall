@@ -1,11 +1,15 @@
 # Recall V1 implementation and acceptance
 
-> **2026-10-09 PILOT DIRECTION UPDATE:** [Pilot Product Contract](PILOT-CONTRACT.md) supersedes older active instructions here. The pilot is an installable iPhone Home Screen PWA and Windows browser, with **no login UX** and secure, operator-provisioned, revocable device access. Existing Supabase email authentication and native clients below are **historical implementation evidence, not pilot requirements**. Real-device proof of the new flow is outstanding. The exact owner-referenced visual image has not yet been provided; [UX-SPEC](UX-SPEC.md) remains the visual authority.
+> **2026-10-09 PILOT DIRECTION UPDATE:** [Pilot Product Contract](PILOT-CONTRACT.md) supersedes older active instructions here. The pilot is an installable iPhone Home Screen PWA and Windows browser, with **no login UX** and secure, operator-provisioned, revocable device access. Existing Supabase email authentication and native clients below are **historical implementation evidence, not pilot requirements**. The October 6 email-link deployment notes and the 23:35 CDT email-rate-limit incident stay historical; they are not instructions to restore email sign-in. Real-device proof of the enrollment flow is outstanding. The exact owner-referenced visual image has not yet been provided; [UX-SPEC](UX-SPEC.md) remains the visual authority.
 
 
 This is the implementation ledger for the V1 build from accepted baseline `92b4c33aafda412f89d745f38b87858f2d4b2837`. A PASS below means deterministic implementation evidence, not live product quality. Physical devices, live infrastructure and model quality have separate gates.
 
 ## What works
+
+### Installable web pilot, October 10
+
+`apps/web` serves a standalone PWA. The default journey has no sign-in, password, passkey, magic link, or OTP screen. An operator issues a single-use enrollment capability; the site stores a revocable device session in an HttpOnly Secure cookie. Automated evidence is in [ACCEPTANCE](ACCEPTANCE.md) under "Pilot PWA and device enrollment evidence". Real iPhone Home Screen, Windows browser, and deployed enrollment checks are still open. The October 6 email-link notes below remain historical evidence.
 
 ### Canonical browser Memory Surface, October 7
 

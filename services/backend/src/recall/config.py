@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     cors_allow_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=list, validation_alias="RECALL_CORS_ORIGINS"
     )
+    # Browser origins allowed to redeem an enrollment capability. Empty rejects any
+    # request that sends an Origin. The operator token is server-only.
+    site_origins: Annotated[list[str], NoDecode] = Field(default_factory=list, validation_alias="RECALL_SITE_ORIGINS")
+    operator_token: str | None = Field(None, validation_alias="RECALL_OPERATOR_TOKEN")
+    enrollment_ttl_seconds: int = Field(600, validation_alias="RECALL_ENROLLMENT_TTL_SECONDS")
+    device_session_ttl_seconds: int = Field(7 * 24 * 3600, validation_alias="RECALL_DEVICE_SESSION_TTL_SECONDS")
+    enrollment_client_limit: int = Field(8, validation_alias="RECALL_ENROLLMENT_CLIENT_LIMIT")
+    enrollment_global_limit: int = Field(60, validation_alias="RECALL_ENROLLMENT_GLOBAL_LIMIT")
+    enrollment_window_seconds: int = Field(600, validation_alias="RECALL_ENROLLMENT_WINDOW_SECONDS")
+    operator_issue_limit: int = Field(30, validation_alias="RECALL_OPERATOR_ISSUE_LIMIT")
+    operator_issue_window_seconds: int = Field(3600, validation_alias="RECALL_OPERATOR_ISSUE_WINDOW_SECONDS")
 
     capture_schema_path: Path | None = Field(None, validation_alias="RECALL_CAPTURE_SCHEMA_PATH")
 
@@ -120,7 +131,7 @@ class Settings(BaseSettings):
     def provider_processing_configured(self) -> bool:
         return self.ai_configured or self.embedding_configured
 
-    @field_validator("cors_allow_origins", mode="before")
+    @field_validator("cors_allow_origins", "site_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
@@ -134,6 +145,18 @@ class Settings(BaseSettings):
     def _validate(self) -> Settings:
         if "*" in self.cors_allow_origins:
             raise ValueError("RECALL_CORS_ORIGINS must list explicit origins, never '*'")
+        if "*" in self.site_origins:
+            raise ValueError("RECALL_SITE_ORIGINS must list explicit origins, never '*'")
+        if self.operator_token is not None and len(self.operator_token) < 32:
+            raise ValueError("RECALL_OPERATOR_TOKEN must be at least 32 characters")
+        if not 60 <= self.enrollment_ttl_seconds <= 3600:
+            raise ValueError("RECALL_ENROLLMENT_TTL_SECONDS must be 60-3600")
+        if not 3600 <= self.device_session_ttl_seconds <= 2_592_000:
+            raise ValueError("RECALL_DEVICE_SESSION_TTL_SECONDS must be 3600-2592000")
+        if self.enrollment_client_limit < 1 or self.enrollment_global_limit < 1 or self.operator_issue_limit < 1:
+            raise ValueError("enrollment rate limits must be at least 1")
+        if self.enrollment_window_seconds < 1 or self.operator_issue_window_seconds < 1:
+            raise ValueError("enrollment windows must be at least 1 second")
         if len(self.signing_secret) < 32:
             raise ValueError("RECALL_SIGNING_SECRET must be at least 32 characters")
         if bool(self.auth_jwks_url) == bool(self.auth_jwt_secret):

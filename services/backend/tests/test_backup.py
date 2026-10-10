@@ -56,7 +56,7 @@ def test_restore_preserves_sources_history_graph_corrections_and_sync(
         }
     archive = tmp_path / "private-backup.zip"
     manifest = backup(ai.admin_dsn, ai.store, archive)
-    assert manifest["snapshot"]["schema_versions"][-1] == "0007_provider_budget_reservations.sql"
+    assert manifest["snapshot"]["schema_versions"][-1] == "0008_device_enrollment.sql"
     assert manifest["snapshot"]["workspace_sync_clocks"]
     owner, _ = make_database(pg_cluster, apply_migrations=False)
     restored_store = LocalObjectStore(tmp_path / "restored-objects")

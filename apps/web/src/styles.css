@@ -125,7 +125,12 @@ small {
 }
 .memory-surface {
   min-height: 100svh;
-  padding: 30px 5vw 22px;
+  min-height: 100dvh;
+  padding:
+    calc(30px + env(safe-area-inset-top, 0px))
+    calc(5vw + env(safe-area-inset-right, 0px))
+    calc(22px + env(safe-area-inset-bottom, 0px))
+    calc(5vw + env(safe-area-inset-left, 0px));
   position: relative;
   isolation: isolate;
   background:
@@ -1006,24 +1011,29 @@ textarea {
 .settings p {
   font-size: 13px;
 }
-.signin {
+.gate {
   max-width: 470px;
-  margin: 15vh auto;
-  padding: 35px;
+  margin: calc(12vh + env(safe-area-inset-top, 0px)) auto
+    calc(12vh + env(safe-area-inset-bottom, 0px));
+  padding:
+    35px
+    max(35px, env(safe-area-inset-right, 0px))
+    35px
+    max(35px, env(safe-area-inset-left, 0px));
   border: 1px solid #ffffffb0;
   border-radius: 18px;
   background: #fffdf47a;
   box-shadow: 0 30px 80px #544b3517;
 }
-.signin .brand {
+.gate .brand {
   font-family: Georgia, serif;
   font-size: 28px;
   margin-bottom: 30px;
 }
-.signin h1 {
+.gate h1 {
   font-size: 42px;
 }
-.signin > .button {
+.gate > .button {
   margin-top: 20px;
 }
 .empty {
@@ -1063,7 +1073,11 @@ textarea {
 }
 @media (max-width: 760px) {
   .memory-surface {
-    padding: 20px 20px 25px;
+    padding:
+      calc(20px + env(safe-area-inset-top, 0px))
+      calc(20px + env(safe-area-inset-right, 0px))
+      calc(25px + env(safe-area-inset-bottom, 0px))
+      calc(20px + env(safe-area-inset-left, 0px));
   }
   .surface-header {
     gap: 20px;
@@ -1235,8 +1249,9 @@ textarea {
     line-height: 1.6;
     margin-bottom: 0;
   }
-  .signin {
-    margin: 10vh 20px;
+  .gate {
+    margin: calc(8vh + env(safe-area-inset-top, 0px)) 20px
+      calc(8vh + env(safe-area-inset-bottom, 0px));
   }
   .claim {
     padding-right: 60px;

@@ -27,6 +27,10 @@ def unauthenticated(message: str = "Sign in again.") -> ApiError:
     return ApiError("UNAUTHENTICATED", message, 401)
 
 
+def rate_limited(message: str = "Too many attempts. Wait and try again.") -> ApiError:
+    return ApiError("RATE_LIMITED", message, 429, retryable=True)
+
+
 def forbidden(message: str = "You do not have access to this.") -> ApiError:
     return ApiError("FORBIDDEN", message, 403)
 

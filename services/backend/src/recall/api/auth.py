@@ -17,6 +17,7 @@ from ..errors import ApiError, unauthenticated
 class Principal:
     user_id: uuid.UUID
     email: str | None
+    workspace_id: uuid.UUID | None = None
 
 
 class KeyResolver(Protocol):
