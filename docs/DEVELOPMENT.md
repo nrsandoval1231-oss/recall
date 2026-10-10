@@ -125,7 +125,7 @@ npm run lint && npm run typecheck && npm test                                   
 
 ## Real-device acceptance procedure (current web pilot)
 
-This is the open gate for the installable web app. It is not satisfied by CI.
+This is the open gate for the installable web app. It is not satisfied by CI. The host order is the unchecked list in [Real-device deploy checklist](audits/2026-10-10-real-device-deploy-checklist.md). That checklist does not record the gates as passed.
 
 Preconditions: deployed HTTPS API and web origin, `RECALL_OPERATOR_TOKEN` set only on the API, `RECALL_SITE_ORIGINS` set to that origin, private storage, and two provisioned workspaces. Use synthetic or personally owned pages kept outside the repository. Do not call a paid model for this gate.
 

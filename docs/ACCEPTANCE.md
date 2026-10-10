@@ -206,6 +206,8 @@ Enrollment tests cover an unprovisioned caller, a wrong or unset operator secret
 
 ### Open gates
 
+The steps to run on the host and on devices are the unchecked list in [Real-device deploy checklist](audits/2026-10-10-real-device-deploy-checklist.md). This section does not mark those gates passed.
+
 - iPhone Safari Add to Home Screen, standalone launch, and safe-area behavior on a real phone.
 - The same URL in a Windows desktop browser, including install or pin if the browser offers it.
 - A deployed API and Worker with `RECALL_OPERATOR_TOKEN`, `RECALL_SITE_ORIGINS`, and `SESSION_KEY` set, then one real enrollment, revocation, and cross-workspace denial.
