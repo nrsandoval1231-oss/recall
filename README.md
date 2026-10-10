@@ -21,7 +21,7 @@ Example: “What was the name of that guy Sarah introduced me to last summer who
 
 ## Current status
 
-**The product center is the desktop Memory Surface writing into an Obsidian vault. That slice is not built on `main`, and nothing here is deployed.** The owner reference is checked in. [The realignment audit](docs/audits/2026-10-10-obsidian-desktop-realignment.md) is the recommendation: revive and rebase draft PRs #11–#14 (local vault, lifecycle, Claude reading, pairing). Do not close them. Do not deploy PR #16 as the way to start using Recall.
+**The product center is the desktop Memory Surface writing into an Obsidian vault.** The Tauri app opens that surface with no login, saves a photo as an original plus a Markdown note, and answers from keyword search over the vault. Claude reading is opt-in on that desktop process and off unless a key, model, prices, and budgets are set; no live reading was accepted. The phone companion and an installed Windows run are not done. Automated evidence is in [ACCEPTANCE](docs/ACCEPTANCE.md) under "Desktop Obsidian Memory Surface". Draft PRs #11–#14 stay open; this slice ports their vault behavior instead of merging them. Do not deploy PR #16 as the way to start using Recall.
 
 PR #16 is merged and real: `apps/web` is an installable PWA with no login screen and operator device enrollment, covered by synthetic tests. iPhone Home Screen, a Windows browser, and a deployed enrollment were not accepted. That web app stays as an optional companion and enrollment transport. The October 9 decision that made it the pilot is historical.
 
@@ -36,10 +36,11 @@ This repository is public. Every checked-in example must remain synthetic. Never
 | Layer | Responsibility |
 | --- | --- |
 | Original sources | Immutable evidence: photos first; later voice, screenshots, files, links, text, and other authorized inputs |
-| Cloud PostgreSQL + pgvector | Structured state in the code on `main`: temporal history, relationships, corrections, permissions, and retrieval indexes. The 2026-10-10 amendment makes the Obsidian vault the memory the user keeps; the vault slice updates this row with that implementation. |
-| Desktop SQLite | Rebuildable offline cache and durable pending operations |
-| AI | Interpretation, extraction, retrieval synthesis, and proposals; never canonical truth |
-| Organized notes | Obsidian vault: the memory the user keeps. Recall writes the notes and preserves original photos. The code on `main` still exports Markdown from Cloud Postgres; the next slice makes the desktop vault the place those notes land. |
+| Obsidian vault | Memory for the desktop product: original photos, Markdown notes, and append-only history in a folder the user chooses. |
+| Cloud PostgreSQL + pgvector | Store for the optional web companion and the legacy cloud desktop. Not the authority for the desktop vault path. |
+| Desktop SQLite | Rebuildable cache and outbox for that legacy cloud desktop. |
+| AI | Interpretation is off on the desktop vault path. Keyword search is not a Claude answer. Model output stays untrusted when a reader exists. |
+| Organized notes | The desktop app writes them into the vault. The legacy cloud path can still export Markdown and will not overwrite a local-vault tree. |
 | Web companion (PR #16) | Optional browser companion and enrollment transport. Not the primary shell. |
 
 ## First useful loop

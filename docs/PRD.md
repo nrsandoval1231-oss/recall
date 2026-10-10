@@ -5,7 +5,7 @@
 
 Version: 0.3 | Date: 2026-10-07 | Product owner: Nick Sandoval
 
-Status: universal vision approved; initial V1 features exist as code. The 2026-10-10 amendment moves the product center to the desktop Memory Surface and an Obsidian vault. The no-login PWA in PR #16 is a merged optional companion, not the start-using-it product. Real-device validation of that companion and of the vault slice both remain open.
+Status: universal vision approved; initial V1 features exist as code. The desktop Memory Surface writes into a local Obsidian vault without login. Ask on that path is keyword search with the original still reachable. Live Claude, the phone companion, and an installed Windows run are open. The no-login PWA in PR #16 remains an optional companion, not the start-using-it product.
 
 ## 1. Product thesis
 

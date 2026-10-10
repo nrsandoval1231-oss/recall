@@ -33,7 +33,7 @@ Desktop-first. The broader universal-memory application grows from making that e
 ### What this amendment does not change by itself
 
 - Nothing is deployed, and draft PRs #11–#14 are not merged by this document. Those drafts are the Tauri/Obsidian vault stack to revive and rebase. See [the realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md).
-- The code on `main` still uses Cloud Postgres and private object storage, and it still exports Markdown. ARCHITECTURE, PRD, ROADMAP, AGENTS.md, and SYNC-AND-EXPORT now label the older “Obsidian is optional” wording as historical and point at this amendment. The vault slice replaces that storage model in the same change as the implementation. This amendment does not add a second architecture document, and it does not pretend that migration has already landed.
+- The desktop slice writes the local vault and does not consult Cloud Postgres on that path. The web companion and `?mode=legacy-cloud` still use Cloud Postgres, private object storage, and Markdown export. ARCHITECTURE, PRD, ROADMAP, AGENTS.md, and SYNC-AND-EXPORT record both. This amendment does not add a second architecture document. Device install, live Claude, and the phone companion are not claimed done.
 - A question mark, hypothesis, illegible number, or unresolved first name stays uncertain.
 - A locally edited Obsidian file is never silently replaced.
 - Offline keyword search is not described as a fresh generative answer.

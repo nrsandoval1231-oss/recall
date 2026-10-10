@@ -215,3 +215,37 @@ The steps to run on the host and on devices are the unchecked list in [Real-devi
 - A deployed API and Worker with `RECALL_OPERATOR_TOKEN`, `RECALL_SITE_ORIGINS`, and `SESSION_KEY` set, then one real enrollment, revocation, and cross-workspace denial.
 - Live handwriting interpretation. Hooks stay stubs or the existing unconfigured path; no paid provider was called.
 - Native Expo, Tauri, and NSIS builds. They are not the pilot acceptance path and were not changed as a stack.
+
+## Desktop Obsidian Memory Surface (2026-10-10)
+
+This section is the desktop vault slice. The PR #16 sentence above still describes that packet: native installers were not its acceptance path. This slice is the product center. It is synthetic and automated. It is not an installed Windows app, a phone companion, or a live Claude reading.
+
+Candidate: branch `cursor/desktop-vault-memory-surface-bab1` (exact SHA in the PR). Environment: Linux sandbox, Node 22.14.0, rustc 1.99.0. Synthetic Brooks Campus fixture and generated photo bytes only. No private notes. No paid model call.
+
+### What the code does
+
+The Tauri app opens the Memory Surface with no email, password, or sign-in link. `?mode=legacy-cloud` still reaches the older cloud desktop, including its email sign-in. That is not the happy path. `apps/web` enrollment is unchanged.
+
+A chosen folder, or `Documents/Recall` from **Use default vault**, holds `Recall/Sources`, `Recall/Memories`, `Recall/History`, and `Recall/_meta`. The webview cannot pass a path. `RECALL_VAULT_DIR` is a native-process override and must be absolute. Import writes the original bytes before the Markdown note. A correction appends history and publishes only when the expected revision still matches. A note edited outside Recall is kept. Ask is keyword search over those notes, or over the labeled synthetic fixture when no vault memory exists, and can open the original. The result is labeled keyword search. Claude reading is unwired. A test can inject a synthetic reader; it does not make a network call, and its text is saved only after an explicit checkbox and a save.
+
+When no vault is open, or the vault has no memories, the board is the synthetic Brooks Campus fixture and says so. People, places, topics, and related counts on that board are the illustration. They are not inferred from a real vault.
+
+### Automated results
+
+| Suite | Result |
+| --- | --- |
+| `npm test --workspace @recall/desktop` | 57 passed (9 files) |
+| `npx tsc -p apps/desktop/tsconfig.json` and `npx eslint` on the new desktop files | clean |
+| `cd apps/desktop && npx vite build` with no `VITE_*` values | succeeded |
+| `cd apps/desktop/src-tauri && cargo test --lib` | 121 passed, 0 failed (includes 7 librarian tests: default-off, missing budget, consent, hash mismatch, identical retry, spent budget, uncertain outcome not retried, and the note staying human until correction) |
+| Browser preview of `npm run dev` in `apps/desktop` | home shows Brooks Campus and the synthetic banner, with no email field; Ask, a sample note, and the capture form were exercised in headless Chromium |
+
+Rust coverage includes original-before-note writes, identical retries, rejected changed retries, versioned corrections, preserved external edits, journal recovery, symlink rejection, a second writer lock, and the librarian gates above. Desktop tests cover the empty demo board, keyword abstention, vault photo import, retry identity, correction history, hash verification, the synthetic reader consent gate, and a Claude refusal that does not replace the note.
+
+### Open gates
+
+- **Installed Windows.** The `windows-native` job builds an unsigned NSIS installer and uploads `recall-windows-desktop` for seven days. This environment did not install it, and did not open a native Tauri window. `npm run dev` cannot write a vault.
+- **Live Claude quality.** The desktop can call Claude only when `RECALL_CLAUDE_API_KEY`, a model, per-million-token prices, and daily and monthly budgets are set on the native process. Default is off. One consented photo is sent; the proposal is stored unreviewed; the note changes only when a person saves a correction; keyword ask searches that note. Automated tests use a fake provider. No key, budget, or private photo was used, and no live reading quality is claimed.
+- **Phone companion.** Not in this slice.
+- **Visual fidelity.** The surface keeps the owner reference layout: left rail, ask bar, project board, and context cards. The owner removed the bottom timeline strip, the recent-memory thumbnails, the site image on the project board, and the notebook/desk photograph behind the glass. The stage background is a flat charcoal field. That board is text, stats, and tabs. Demo stats are fixture counts. The opened sample note still shows its text; that note is not a backdrop.
+- **Real Obsidian on a person's machine.** Not run. The folder layout is what Obsidian can open; Obsidian itself was not launched.

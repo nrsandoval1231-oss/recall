@@ -1,9 +1,9 @@
-# Recall desktop (Tauri 2 + React, Windows first)
+# Recall desktop
 
-RCL-001 scope only: email-code sign-in, recent captures with the shared status words, multi-page original viewer that hash-verifies every downloaded page, source metadata, "Save exact copy". An empty account is shown as empty. No dashboards, AI, search, or Obsidian.
+The product path is the Memory Surface. It opens without an email, password, or sign-in link and keeps memory in a local Obsidian vault. Run it from [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
 
-Native boundary (`src-tauri`): three credential-store commands (`secret_get/set/remove`, fixed service name, validated keys, bounded values) backed by the OS credential store. No fs/shell/http plugins; the WebView has no filesystem access. The auth session is chunked to fit Windows Credential Manager limits.
+`npm run dev` is a browser preview of that surface. It shows the synthetic Brooks Campus fixture and cannot write files. `npx tauri dev` chooses a vault folder, or creates `Documents/Recall`, then imports a photo into `Recall/Sources` and a Markdown note into `Recall/Memories`.
 
-Only a Linux `cargo check/test` and a Vite build were run; the Windows build/installer is **not verified** (ACCEPTANCE gate G4). Setup/run: [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+Ask searches note text and opens the original. It is keyword search, not a Claude answer. Claude reading stays off unless the desktop process has `RECALL_CLAUDE_API_KEY`, a model, prices, and budgets. A consented read stores an unreviewed proposal and does not replace the note until you save a correction. Tests use a fake provider and do not make a network call.
 
-**RCL-002 additions:** Ask bar on Recent (citations open the exact cited page); the viewer shows the labelled machine reading for the current page, unclear items, suggested actions ("suggestions only"), and validation notes beside the hash-verified original; Settings has the opt-in AI-reading switch; failed readings offer a retry.
+`?mode=legacy-cloud` keeps the older cloud desktop, including its email sign-in. It is not the happy path. The Windows NSIS build is unsigned. An Actions artifact is not an installed-app acceptance.

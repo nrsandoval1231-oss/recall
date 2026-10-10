@@ -7,7 +7,7 @@ Status update: RCL-001 has been implemented (see [DEVELOPMENT](DEVELOPMENT.md) a
 
 ## Historical web slice (2026-10-10, PR #16)
 
-PR #16 already added the installable `apps/web` PWA and operator enrollment described in [DEVELOPMENT](DEVELOPMENT.md). That code stays. It is an optional companion and enrollment transport. The [2026-10-10 amendment](PILOT-CONTRACT.md) moves the product center to the desktop Memory Surface and a local Obsidian vault; the next slice is described in [the realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md). Do not deploy the web app as the way to start using Recall. Do not add a sign-in screen to the web companion. Live iPhone Home Screen and Windows browser proof of that companion is still open and is not the launch gate.
+PR #16 already added the installable `apps/web` PWA and operator enrollment described in [DEVELOPMENT](DEVELOPMENT.md). That code stays. It is an optional companion and enrollment transport. The desktop Memory Surface now writes a local Obsidian vault; how to run it, and what is not device-proven, is in [DEVELOPMENT](DEVELOPMENT.md) and [ACCEPTANCE](ACCEPTANCE.md). Do not deploy the web app as the way to start using Recall. Do not add a sign-in screen to the web companion. Live iPhone Home Screen and Windows browser proof of that companion is still open and is not the launch gate.
 
 This is the bounded first-packet brief. The written foundation still needs owner review; do not interpret the existence of this file as authorization to implement every roadmap item or provision paid infrastructure.
 
