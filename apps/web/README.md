@@ -1,4 +1,6 @@
-# Recall web pilot
+# Recall web companion (PR #16)
+
+Historical as product center under the [2026-10-10 amendment](../../docs/PILOT-CONTRACT.md). This app is an optional browser companion and enrollment transport. It is not the desktop Memory Surface and not the way to start using Recall.
 
 The Cloudflare Worker serves the Vite app and proxies only `/api/v1/*` to the Recall API. A provisioned browser opens Recall directly. There is no sign-in screen.
 

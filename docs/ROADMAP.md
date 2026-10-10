@@ -1,11 +1,11 @@
 # Recall build roadmap
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
 Version: 0.3 | Dependency-ordered, not delivery-date promises
 
-The active pilot path is the Cloudflare-served, installable iPhone Home Screen PWA and Windows browser, with zero login UI and private provisioned device access. Native clients remain preserved. As of 2026-10-10 the web app has a manifest, service worker, and operator enrollment with synthetic negative tests; Add to Home Screen, a real Windows browser, and deployment acceptance remain open. Browser implementation/local verification recorded in V1-STATUS before that date is historical.
+**Historical path, 2026-10-09, implemented by PR #16 and superseded 2026-10-10.** That path was the Cloudflare-served, installable iPhone Home Screen PWA and Windows browser, with zero login UI and private provisioned device access. The web app has a manifest, service worker, and operator enrollment with synthetic negative tests; Add to Home Screen, a real Windows browser, and deployment acceptance remain open and are not the launch gate. The active product center is the desktop Memory Surface and a local Obsidian vault. See the [realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md). Browser implementation/local verification recorded in V1-STATUS before 2026-10-10 is historical.
 
 ## Foundation
 
@@ -57,7 +57,7 @@ Objective: Recall is not a data trap.
 
 Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tombstones, backup/restore, and optional managed Obsidian adapter with local-edit conflict protection.
 
-Obsidian remains optional and must never be required for Recall correctness.
+Historical under the 2026-10-09 contract: Obsidian was optional and was not required for Recall correctness. The 2026-10-10 amendment makes the vault the memory the user keeps. The vault slice updates this packet together with the implementation. Local-edit protection in the sentence above still applies.
 
 ## RCL-005A — Canonical Memory Surface
 

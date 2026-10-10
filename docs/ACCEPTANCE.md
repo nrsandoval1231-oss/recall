@@ -1,6 +1,6 @@
 # Recall acceptance and evaluation
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
 Version: 0.3 | Automated evidence and OPEN live gates
@@ -186,7 +186,9 @@ Keyword-only retrieval (no embeddings); one revision per memory (no reprocessing
 
 See [V1 implementation and acceptance ledger](V1-STATUS.md) for exact automated evidence, requirement statuses, limitations and live gates. PR checks supersede intermediate local counts. No simulated test closes physical-device or live-provider acceptance.
 
-## Pilot PWA and device enrollment evidence (2026-10-10)
+## Web companion PWA and device enrollment evidence (2026-10-10, PR #16)
+
+This section records PR #16. It is the optional web companion, not the product-center launch. See the [2026-10-10 amendment](PILOT-CONTRACT.md).
 
 Candidate: branch `cursor/pwa-device-enrollment-d77c` (exact SHA in the PR description). Environment: Linux sandbox, Node 22.14.0, Python 3.12, PostgreSQL 16 without pgvector. Synthetic fixtures only. This is not iPhone, Windows, deployment, or live-provider acceptance.
 

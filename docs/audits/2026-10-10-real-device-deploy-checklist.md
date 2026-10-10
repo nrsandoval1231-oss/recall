@@ -1,8 +1,10 @@
 # Real-device deploy checklist (PR #16)
 
+> **HISTORICAL WEB-COMPANION GATE.** The [2026-10-10 amendment](../PILOT-CONTRACT.md) says not to run this checklist as the way to start using Recall. PR #16 stays. This list is only for a later optional browser companion. See [the realignment audit](2026-10-10-obsidian-desktop-realignment.md).
+
 Date: 2026-10-10. Audience: Nick Sandoval.
 
-This is the manual gate for the installable web pilot after [PR #16](https://github.com/nrsandoval1231-oss/recall/pull/16) is merged. Automated tests in that PR do not check these boxes. **This PR does not claim any item below is already passed.** Leave each box unchecked until that step is done on the real host and devices, then record device, OS, browser, commit, and deviations in [ACCEPTANCE](../ACCEPTANCE.md).
+This is the manual gate for the installable web companion after [PR #16](https://github.com/nrsandoval1231-oss/recall/pull/16) is merged. Automated tests in that PR do not check these boxes. **This PR does not claim any item below is already passed.** Leave each box unchecked until that step is done on the real host and devices, then record device, OS, browser, commit, and deviations in [ACCEPTANCE](../ACCEPTANCE.md).
 
 Do not write secret values, enrollment tokens, or session cookies into git, the PR, or this file. Do not call a paid model for this gate.
 

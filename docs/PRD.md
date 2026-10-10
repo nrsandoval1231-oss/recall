@@ -1,11 +1,11 @@
 # Recall — Product Requirements Document
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
 Version: 0.3 | Date: 2026-10-07 | Product owner: Nick Sandoval
 
-Status: universal vision approved; initial V1 features exist as code, but the revised no-login PWA pilot requires new implementation and real-device validation.
+Status: universal vision approved; initial V1 features exist as code. The 2026-10-10 amendment moves the product center to the desktop Memory Surface and an Obsidian vault. The no-login PWA in PR #16 is a merged optional companion, not the start-using-it product. Real-device validation of that companion and of the vault slice both remain open.
 
 ## 1. Product thesis
 
@@ -65,7 +65,7 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 7. AI proposes; deterministic software commits.
 8. Source access is part of recall.
 9. Complexity stays behind the glass.
-10. Portability and privacy are product features; Obsidian is optional.
+10. Portability and privacy are product features. Historical 2026-10-07 wording said Obsidian is optional. The 2026-10-10 amendment makes the Obsidian vault the memory the user keeps.
 11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.
 12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
@@ -189,7 +189,7 @@ Deferred:
 | ACT-01 | Suggested actions/commitments do not become obligations automatically |
 | SYN-01 | One canonical server state with conflict-safe sync |
 | OFF-01 | Desktop cached browsing/search and durable outbox |
-| EXP-01 | Portable export; Obsidian is optional adapter |
+| EXP-01 | Portable export. Historical wording: Obsidian is an optional adapter. The 2026-10-10 amendment makes the vault the memory the user keeps. |
 | PRIV-01 | Workspace isolation and owner control |
 | OPS-01 | Backup, restore, deletion, independently readable export |
 
@@ -208,7 +208,7 @@ Evaluation includes both Paul-style difficult handwriting and general-domain cas
 
 ## 14. Architecture constraints
 
-Cloud Postgres + pgvector is canonical structured state. Private object storage holds original evidence. Desktop SQLite is a rebuildable cache/outbox. Markdown/JSON/original export is the portability layer. Obsidian is one optional consumer.
+Cloud Postgres + pgvector is canonical structured state in the code on `main`. Private object storage holds original evidence. Desktop SQLite is a rebuildable cache/outbox. Markdown/JSON/original export is the portability layer in that code. Historical wording called Obsidian one optional consumer. The 2026-10-10 amendment makes the vault the memory the user keeps; the vault slice updates this section with the implementation.
 
 Mobile and desktop use the same authenticated Memory API. Neither receives database-owner or AI-provider secrets. AI remains replaceable derived machinery.
 

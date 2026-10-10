@@ -1,6 +1,6 @@
 # Developer setup and real-device acceptance (RCL-001)
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
 ## V1 deployment, recovery and acceptance
@@ -54,9 +54,9 @@ Without Docker, create two login roles yourself in any PostgreSQL 16: an **owner
 
 Migrations are plain ordered SQL in `services/backend/migrations/`, checksummed in `schema_migrations`; editing an applied file is an error. If `RECALL_AUTO_PROVISION_WORKSPACES=false`, provision a user with `python -m recall.db.provision <auth-user-uuid>`.
 
-## Web pilot (installable PWA, no login screen)
+## Web companion (installable PWA, no login screen)
 
-`apps/web` is the active pilot client. `npm run build --workspace @recall/web` emits the Vite app, `manifest.webmanifest`, icons, and `sw.js`. The same URL is what iPhone Safari uses for Add to Home Screen and what a Windows browser opens. That manual check is still open; the build does not perform it.
+`apps/web` is the optional companion from PR #16, not the product center. `npm run build --workspace @recall/web` emits the Vite app, `manifest.webmanifest`, icons, and `sw.js`. The same URL is what iPhone Safari uses for Add to Home Screen and what a Windows browser opens. That manual check is still open; the build does not perform it, and it is not the launch gate.
 
 Set `RECALL_OPERATOR_TOKEN` (at least 32 characters) only on the API. Unset, the operator routes respond 404. Issue a device with:
 
@@ -123,9 +123,9 @@ npm run lint && npm run typecheck && npm test                                   
 
 `services/backend/tests/test_e2e_clients.py` launches a real uvicorn + Postgres and drives the TypeScript sync engine and API client (`tests/e2e/rcl001.e2e.ts`). It skips with a message if `npm install` has not been run.
 
-## Real-device acceptance procedure (current web pilot)
+## Real-device acceptance procedure (web companion, not the launch gate)
 
-This is the open gate for the installable web app. It is not satisfied by CI. The host order is the unchecked list in [Real-device deploy checklist](audits/2026-10-10-real-device-deploy-checklist.md). That checklist does not record the gates as passed.
+This is the open gate for the optional installable web app from PR #16. It is not the way to start using Recall, and it is not satisfied by CI. The host order is the unchecked list in [Real-device deploy checklist](audits/2026-10-10-real-device-deploy-checklist.md). That checklist does not record the gates as passed.
 
 Preconditions: deployed HTTPS API and web origin, `RECALL_OPERATOR_TOKEN` set only on the API, `RECALL_SITE_ORIGINS` set to that origin, private storage, and two provisioned workspaces. Use synthetic or personally owned pages kept outside the repository. Do not call a paid model for this gate.
 
@@ -141,7 +141,7 @@ Record device, OS, browser, commit, and every deviation in ACCEPTANCE. Anything 
 
 ## Historical real-device procedure (RCL-001 native exit gate)
 
-The steps below describe the earlier native sign-in build. They are not the active pilot path.
+The steps below describe the earlier native sign-in build. They are historical email-login steps, not the desktop vault slice.
 
 Preconditions: live Supabase project (signups restricted), deployed or tunneled HTTPS API with private storage, a signed iPhone build, an installed Windows build, and two test accounts. Use **synthetic or personally owned test pages kept outside the repository**.
 

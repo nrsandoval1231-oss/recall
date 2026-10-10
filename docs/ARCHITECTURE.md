@@ -1,11 +1,11 @@
 # Recall architecture
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
 ## V1 implementation update
 
-The active pilot client is a responsive React web app served by a Cloudflare Worker. The Worker must hold secure HttpOnly revocable provisioned-device sessions and proxy only the fixed Recall API origin. The existing Supabase email callback is legacy behavior and must be removed from the active pilot flow after replacement and negative security tests. Browser tokens are removed from callback URLs before network redemption. Canonical PostgreSQL, private originals, and the Python API/worker remain unchanged. Browser IndexedDB is a workspace-scoped original-draft outbox, not the native SQLite cache or an offline generative service. Pending drafts survive logout and have explicit confirmed removal controls. Deployment and live browser acceptance are tracked separately in V1-STATUS.
+The 2026-10-09 web pilot client, continued by PR #16, is a responsive React web app served by a Cloudflare Worker. The 2026-10-10 amendment moves the product center to the desktop Memory Surface and a local Obsidian vault; this paragraph records the web companion, not the launch path. The Worker must hold secure HttpOnly revocable provisioned-device sessions and proxy only the fixed Recall API origin. The existing Supabase email callback is legacy behavior and must be removed from the active pilot flow after replacement and negative security tests. Browser tokens are removed from callback URLs before network redemption. Canonical PostgreSQL, private originals, and the Python API/worker remain unchanged. Browser IndexedDB is a workspace-scoped original-draft outbox, not the native SQLite cache or an offline generative service. Pending drafts survive logout and have explicit confirmed removal controls. Deployment and live browser acceptance are tracked separately in V1-STATUS.
 
 Migrations 0003–0006 extend the accepted capture/worker architecture. Canonical entities, mentions, relationships, claims and append-only claim revisions remain relational PostgreSQL records. User overrides take precedence when rebuilding interpretations and search projections. Retrieval combines authorized keyword, alias/entity and optional pgvector lanes; configuration/revision/hash checks exclude incompatible or stale vectors.
 
@@ -127,7 +127,7 @@ The desktop is the local bridge; there is no separate always-on service in V1. I
 
 Core services operate only on universal captures, sources, memories, entities, relationships, statements, actions, and temporal/provenance records. Domain-specific experiences are projections/adapters. Do not fork storage or retrieval into separate schemas for maintenance, sales, education, travel, or other verticals.
 
-Obsidian is an optional export adapter. No core capture, Ask, correction, sync, or retrieval path may depend on Obsidian being installed or configured.
+Historical for the code on `main`: Obsidian is an optional export adapter, and no core capture, Ask, correction, sync, or retrieval path depends on Obsidian being installed. The 2026-10-10 amendment overrides that for the product center. The vault slice updates this section in the same change as the implementation.
 
 The architecture must allow later source adapters (voice, screenshots, files, links, connected apps) to enter through the same trusted source-memory boundary and later assistant surfaces to access memory through the same authenticated API/tool contract.
 

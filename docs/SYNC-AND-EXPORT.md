@@ -1,5 +1,7 @@
 # Sync, offline behavior, and Obsidian export
 
+> **HISTORICAL STORAGE WORDING for the code on `main`.** This file describes Cloud Postgres as authoritative and Obsidian as a one-way export. The [2026-10-10 amendment](PILOT-CONTRACT.md) makes the Obsidian vault the memory the user keeps. The vault slice updates this file with that implementation. Local-edit protection in this file still applies. PR #16 does not change this file into the product center.
+
 ## V1 implementation details
 
 The server serializes workspace changes into monotonic identifier events. Native SQLite applies records, FTS/inventory changes and cursor transactionally. Dependent changes use event sequence rather than only parent version. Snapshot recovery preserves pending outbox operations; terminal conflicts/rejections are not endlessly replayed. Downloaded originals are hash verified and scoped by user/workspace. Tombstones remove controlled bytes before advancing SQLite state, so file-lock failures remain retryable.

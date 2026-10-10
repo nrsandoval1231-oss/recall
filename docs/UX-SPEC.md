@@ -1,11 +1,40 @@
 # Recall — Canonical Experience & Visual System
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **CURRENT PRODUCT CENTER — 2026-10-10.** The [pilot amendment](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The desktop Memory Surface is the primary shell. The phone is the capture/ask companion. No login or email-auth UX. PR #16 remains an optional web companion and enrollment transport. The 2026-10-09 PWA-only pilot note is historical.
 
 
-Version: 1.0 | Date: 2026-10-07 | Status: **approved canonical product direction**
+Version: 1.1 | Date: 2026-10-10 | Status: **approved canonical product direction, with the owner visual reference as desktop authority**
 
 This document defines the target Recall experience. It supersedes conventional dashboard/page-navigation interpretations of the earlier UX baseline while preserving Recall's trust, provenance, accessibility, and universal-memory requirements.
+
+The desktop composition target is the owner-supplied reference below. Prose in this file remains authority for materials, trust, capture, and interaction grammar. Where the 2026-10-07 prose and the reference differ on desktop layout, the reference wins. Those differences are called out in the reference section.
+
+## Owner visual reference (2026-10-10)
+
+![Owner-supplied Memory Surface reference, 2026-10-10](assets/memory-surface-reference-2026-10-10.jpg)
+
+File: [docs/assets/memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg). Credit: owner-supplied reference, Nick Sandoval, dated 2026-10-10. Recall did not invent this composition. The 2026-10-09 contract said no image was attached; that statement is historical and false as of this date.
+
+The picture is a desktop desk. Glass understanding sits over a physical notebook and site photographs. Brooks Campus names, counts, and dates in the image are the existing synthetic design fixture, not customer evidence. Do not hard-code that fixture as a production screen.
+
+Components visible in the reference, and therefore part of the desktop Memory Surface:
+
+- **Left rail.** Wordmark “RECALL” and “Your life remembers itself.” Entries: Ask Recall, Home, Recent, People, Places, Projects, Equipment, Timeline, Capture. This rail is the approved desktop navigation. It is how the surface is entered. It is not a taxonomy the user must maintain.
+- **Ask.** A top field with the question “What do you know about Brooks Campus?” plus a voice control. Ask stays the way a vague recollection reconstructs memory.
+- **Project glass board.** Centered primary board: project label, title, place line, short grounded summary, counts (memories, people, locations, key topics), a photograph of the subject, and tabs Overview, Timeline, People, Equipment, Related. “Last updated” and a quiet overflow control sit on the board.
+- **Floating context.** People (name and role, plus a more-people affordance), Locations (place and locality, plus a more-locations affordance), Key Topics (label and count), Related (connected names and counts). These panels are the approved contextual glass beside the focused board.
+- **Timeline strip.** Months across the bottom with a position marker, labeled Timeline.
+- **Recent memories.** Thumbnail row under the timeline: dated items with a kind (notebook, photo, email, document) and a “view all” affordance.
+- **Physical original under the glass.** An open handwritten notebook, loose photographs, and the desk remain visible through and around the panels. Evidence is not a generic attachment icon.
+- **Footer loop.** CAPTURE · UNDERSTAND · CONNECT · REMEMBER · RECALL · ACT.
+
+The reference also shows a short editorial line (“Some notes. A sharper tomorrow.”) and a quote card about captured detail becoming later clarity. Those are tone, not extra product modules.
+
+Layout consequences for older prose in this file:
+
+- Section 5’s earlier preference for minimal permanent navigation yields to this rail on desktop.
+- Section 8’s cautions against a permanent taxonomy sidebar and against tiny floating-card constellations yield to this rail and these four context panels on desktop. The cautions still forbid a generic admin sidebar and a decorative cloud of cards that do not represent memory.
+- Section 6 still governs the phone: capture and ask, one primary board, evidence one gesture away. The phone is the companion. It is not a shrunk copy of this desktop, and it is not the primary shell.
 
 ## 1. North-star experience
 
@@ -73,7 +102,7 @@ Reduced-motion mode must preserve the same hierarchy through opacity/layout chan
 
 ## 5. Canonical desktop journey
 
-The first production-quality vertical slice is:
+The desktop composition for this journey is the [owner visual reference](assets/memory-surface-reference-2026-10-10.jpg). The rail, project board, floating context, timeline, recent memories, and the notebook under the glass are in that picture. The first production-quality vertical slice is:
 
 ```text
 Home
@@ -92,9 +121,9 @@ This is a synthetic design fixture, not customer/project evidence.
 
 ### Home
 
-Home is intentionally sparse. Ask is the gravitational center. Capture and recent context are secondary. Avoid a dense dashboard.
+Home is intentionally quiet. Ask is the gravitational center. Capture and recent context are secondary. Avoid a dense admin dashboard.
 
-Permanent navigation should be minimal: **Recall / Ask / Capture / Recent** or an equivalently small set. People, Places, Projects, Equipment, Topics, and Timeline emerge contextually instead of becoming organizational chores.
+On desktop, the reference’s left rail is permanent: **Ask Recall, Home, Recent, People, Places, Projects, Equipment, Timeline, Capture**. People, places, projects, equipment, and timeline also appear as contextual glass around the focused memory. The rail is navigation into memory. It does not ask the user to file or maintain a taxonomy. The 2026-10-07 preference for a four-item nav yields to this rail.
 
 ### Ask / reconstruction
 
@@ -132,9 +161,9 @@ Correction should operate on human statements, not raw metadata. The user select
 
 ## 6. Mobile adaptation
 
-Mobile is not desktop shrunk down.
+The phone is the capture and ask companion. It is not the primary shell, and it is not the desktop reference shrunk down.
 
-**Mobile = Remember + Recall.**
+**Phone = capture + ask.**
 
 - Camera/capture and Ask dominate.
 - Present one primary glass board at a time.
@@ -143,7 +172,7 @@ Mobile is not desktop shrunk down.
 - Deep comparison/exploration can simplify into sequential focus states.
 - No required title, folder, tag, entity selection, transcript approval, or taxonomy maintenance for normal capture.
 
-Desktop is the richer **Think + Explore** surface. Both share the same materials, language, states, provenance, and interaction grammar.
+Desktop is the primary **Think + Explore** surface and matches the owner reference. Both share the same materials, language, states, provenance, and interaction grammar. The phone does not require the Obsidian mobile app.
 
 ## 7. Capture
 
@@ -179,11 +208,11 @@ Avoid:
 - neon AI gradients;
 - glowing sci-fi orbs;
 - excessive glass on every surface;
-- tiny floating-card constellations;
 - gratuitous 3D;
-- permanent taxonomy sidebars;
 - chat bubbles as the dominant memory representation;
 - fake certainty/confidence theater.
+
+The owner reference includes a desktop rail and four floating context panels (People, Locations, Key Topics, Related). Those are approved. Still avoid a taxonomy the user must maintain, and still avoid decorative cards that do not represent a person, place, topic, or related memory.
 
 ## 9. Glass-board rules
 

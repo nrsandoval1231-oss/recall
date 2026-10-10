@@ -4,11 +4,11 @@
 
 Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository starts as documentation and a scaffold, not an existing working app.
 
-Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. Mobile and desktop are one product. Obsidian is optional. Do not rebuild a general productivity suite.
+Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. The primary shell is the desktop Memory Surface. The phone is a capture and ask companion. Organized notes live in Obsidian, and originals stay preserved. The installable web app (PR #16) is an optional companion and enrollment transport, not the product people start using. Do not rebuild a general productivity suite. The 2026-10-10 amendment in `docs/PILOT-CONTRACT.md` is the product-center authority.
 
 ## Non-negotiable invariants
 
-- Cloud Postgres owns canonical state. Original files live in private object storage. SQLite is a local cache/outbox. Markdown is an export.
+- Cloud Postgres owns canonical state in the code on `main`. Original files live in private object storage. SQLite is a local cache/outbox. Markdown is an export in that code. The 2026-10-10 owner decision makes the Obsidian vault the memory the user keeps. The vault slice must update this invariant in the same change as the implementation. Do not deploy the web PWA as the way to start using Recall.
 - All private records and queries are workspace-scoped. Check authorization before retrieval, model context construction, source access, and mutation.
 - Never commit real captures, client data, credentials, local databases, vault exports, or private test corpora. Synthetic fixtures must be clearly marked.
 - Save original bytes durably before AI processing. Report local-only, uploaded, processed, and failed states honestly.
