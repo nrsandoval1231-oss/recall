@@ -209,6 +209,9 @@ fn selected_managed_root(selected: &Path) -> Result<PathBuf, ExportError> {
     let selected = fs::canonicalize(selected)?;
     validate_directory(&selected)?;
     let managed = ensure_child_directory(&selected, "Recall")?;
+    if managed.join("_meta").exists() {
+        return Err(ExportError::DestinationExists);
+    }
     ensure_child_directory(&managed, "Memories")?;
     Ok(managed)
 }
@@ -218,6 +221,9 @@ fn checked_root(root: &Path) -> Result<PathBuf, ExportError> {
     let canonical = fs::canonicalize(root)?;
     if canonical != root {
         return Err(ExportError::UnsafePath);
+    }
+    if canonical.join("_meta").exists() {
+        return Err(ExportError::DestinationExists);
     }
     ensure_child_directory(&canonical, "Memories")?;
     Ok(canonical)
@@ -808,6 +814,20 @@ mod tests {
         ));
         fs::create_dir(&selected).unwrap();
         selected_managed_root(&selected).unwrap()
+    }
+
+    #[test]
+    fn local_vault_tree_is_refused_by_legacy_exporter() {
+        let root = root("local-vault-collision");
+        fs::create_dir(root.join("_meta")).unwrap();
+        fs::write(
+            root.join("_meta/manifest.json"),
+            b"{\"format\":\"recall-local-vault-v1\"}",
+        )
+        .unwrap();
+        assert!(apply_projection(&root, projection("legacy", 1)).is_err());
+        assert!(!root.join(format!("Memories/{MEMORY_ID}.md")).exists());
+        fs::remove_dir_all(root.parent().unwrap()).unwrap();
     }
 
     fn projection(content: &str, revision: i64) -> Projection {

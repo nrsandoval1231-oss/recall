@@ -3,6 +3,36 @@
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
+## Desktop Memory Surface (current product)
+
+The desktop app opens onto the Memory Surface. It does not ask for an email, password, or sign-in link. Memory for this path is a local Obsidian vault.
+
+```bash
+cd apps/desktop
+npm install                      # from the repo root, once
+npm run dev                      # browser preview. It cannot write a vault.
+npx tauri dev                    # native app. Choose a folder, or use the default vault.
+npm run typecheck && npm test
+cd src-tauri && cargo test --locked --lib
+```
+
+Linux native builds need `libwebkit2gtk-4.1-dev`, `libsoup-3.0-dev`, `librsvg2-dev`, `libxdo-dev`, `libssl-dev`, and `pkg-config`. Windows needs WebView2 and the MSVC build tools. On Windows, `npx tauri build` from `apps/desktop` produces an unsigned NSIS installer. The `windows-native` GitHub job runs that build and uploads `recall-windows-desktop` for seven days. Downloading the artifact is not an installed-Windows acceptance.
+
+**Use default vault** creates `Documents/Recall` and selects it. Set `RECALL_VAULT_DIR` to an absolute path to send that same command elsewhere. The webview cannot pass a folder. Inside the selected folder Recall creates:
+
+```text
+Recall/Sources/     original photo bytes, written once
+Recall/Memories/    Markdown note linking to the original
+Recall/History/     append-only revisions
+Recall/_meta/       manifest, journal, commit receipts, preserved local edits
+```
+
+Open that parent folder in Obsidian. A note edited there is not silently replaced. Import writes the original before the note. An optional note is your words, not a reading of the page. Ask searches those notes and can open the original. The result is labeled keyword search. It is not a Claude answer. Claude reading is off in this build: there is no live provider client, and a photo is not sent anywhere.
+
+When no vault is open, or the vault has no memories, the surface shows the synthetic Brooks Campus board and says so. It is the owner reference fixture, not your notes, and it leaves once a real memory is saved.
+
+`?mode=legacy-cloud` still opens the older cloud desktop. That view needs the public `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` values. It is not the product path. `apps/web` enrollment is unchanged and is not this journey.
+
 ## V1 deployment, recovery and acceptance
 
 Apply all checksummed migrations with the owner connection; enable pgvector as administrator first. API and worker connections must be least privilege and cannot own tables or bypass RLS. Fill `infra/api.env.example` and `infra/worker.env.example` into ignored private `.env` files. `docker compose -f infra/pilot.compose.yml up --build` runs API and worker against external Supabase. Bind is local-only by default; place HTTPS/authenticated ingress in front of it. No external infrastructure is provisioned by these templates.
@@ -100,19 +130,19 @@ npx expo export --platform ios     # JS bundle check, no device or signing neede
 
 Camera, photo import, SecureStore, and the file adapter need a real iPhone build (`npx expo run:ios --device` or an EAS development build; requires an Apple developer account, which this repository does not provision). The app refuses to run without its three `EXPO_PUBLIC_*` values rather than falling back to a fake mode.
 
-## Desktop (Tauri 2, Windows)
+## Desktop legacy cloud mode
+
+The commands in [Desktop Memory Surface](#desktop-memory-surface-current-product) are the product path. The block below is only for `?mode=legacy-cloud`.
 
 ```bash
 cp .env.example apps/desktop/.env  # fill VITE_* only (public values)
 cd apps/desktop
-npm run dev          # Vite only (no native secret store)
+npm run dev          # then open /?mode=legacy-cloud
 npx tauri dev        # full app; Windows needs WebView2 and MSVC build tools
 npx tauri build      # NSIS installer (unsigned unless you configure signing)
-npm run typecheck && npm test
-cd src-tauri && cargo test --lib && cargo check
 ```
 
-Add the desktop origin to the API: `RECALL_CORS_ORIGINS=http://tauri.localhost` (Tauri 2 on Windows). Dev server: `http://localhost:1420`.
+Add the desktop origin to the API: `RECALL_CORS_ORIGINS=http://tauri.localhost` (Tauri 2 on Windows). Dev server: `http://localhost:1420`. The Windows installer job does not embed these public values; a vault build does not need them.
 
 ## Tests
 

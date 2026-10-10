@@ -8,7 +8,7 @@ Preserve the product: a pen-and-paper user photographs notes and retrieves sourc
 
 ## Non-negotiable invariants
 
-- Cloud Postgres owns canonical state in the code on `main`. Original files live in private object storage. SQLite is a local cache/outbox. Markdown is an export in that code. The 2026-10-10 owner decision makes the Obsidian vault the memory the user keeps. The vault slice must update this invariant in the same change as the implementation. Do not deploy the web PWA as the way to start using Recall.
+- The desktop product keeps memory in the user's Obsidian vault. Original photos live under `Recall/Sources`. Markdown notes live under `Recall/Memories`. History is append-only, and a locally edited note is not silently replaced. Cloud Postgres, private object storage, and SQLite remain the store for the optional web companion and the legacy cloud desktop (`?mode=legacy-cloud`). They are not the memory authority for the desktop vault path. Do not deploy the web PWA as the way to start using Recall.
 - All private records and queries are workspace-scoped. Check authorization before retrieval, model context construction, source access, and mutation.
 - Never commit real captures, client data, credentials, local databases, vault exports, or private test corpora. Synthetic fixtures must be clearly marked.
 - Save original bytes durably before AI processing. Report local-only, uploaded, processed, and failed states honestly.

@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Recall", "width": 1100, "height": 780, "minWidth": 720, "minHeight": 560 }],
+    "windows": [{ "title": "Recall", "width": 1440, "height": 960, "minWidth": 960, "minHeight": 640 }],
     "security": {
       "csp": "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:8000 http://127.0.0.1:8000"
     }

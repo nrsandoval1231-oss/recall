@@ -3,6 +3,16 @@
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
+## Desktop vault slice
+
+The Tauri desktop opens the Memory Surface with no account, password, or email link. For that path the memory is the Obsidian vault the user chooses, or `Documents/Recall` when they ask for the default folder. The webview cannot supply the path.
+
+- Original photo bytes are written once under `Recall/Sources` and hashed.
+- The Markdown note is under `Recall/Memories` and points at the original. The note is human text, not an OCR claim.
+- A correction appends history and publishes only when the expected revision still matches. A note edited outside Recall is kept.
+- Ask is keyword search of those notes. It opens the original. It is not a Claude answer. This slice does not call a live model.
+- Cloud Postgres is not consulted. The web companion and `?mode=legacy-cloud` still use the server model described below.
+
 ## V1 implementation update
 
 The 2026-10-09 web pilot client, continued by PR #16, is a responsive React web app served by a Cloudflare Worker. The 2026-10-10 amendment moves the product center to the desktop Memory Surface and a local Obsidian vault; this paragraph records the web companion, not the launch path. The Worker must hold secure HttpOnly revocable provisioned-device sessions and proxy only the fixed Recall API origin. The existing Supabase email callback is legacy behavior and must be removed from the active pilot flow after replacement and negative security tests. Browser tokens are removed from callback URLs before network redemption. Canonical PostgreSQL, private originals, and the Python API/worker remain unchanged. Browser IndexedDB is a workspace-scoped original-draft outbox, not the native SQLite cache or an offline generative service. Pending drafts survive logout and have explicit confirmed removal controls. Deployment and live browser acceptance are tracked separately in V1-STATUS.

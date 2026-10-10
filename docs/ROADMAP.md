@@ -57,7 +57,7 @@ Objective: Recall is not a data trap.
 
 Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tombstones, backup/restore, and optional managed Obsidian adapter with local-edit conflict protection.
 
-Historical under the 2026-10-09 contract: Obsidian was optional and was not required for Recall correctness. The 2026-10-10 amendment makes the vault the memory the user keeps. The vault slice updates this packet together with the implementation. Local-edit protection in the sentence above still applies.
+The desktop vault slice keeps memory in the user's Obsidian folder and will not silently replace a local edit. Ask there is keyword search, not a live Claude answer. Phone companion, live reading, and installed-Windows proof remain open. See [DEVELOPMENT](DEVELOPMENT.md) and [ACCEPTANCE](ACCEPTANCE.md).
 
 ## RCL-005A — Canonical Memory Surface
 

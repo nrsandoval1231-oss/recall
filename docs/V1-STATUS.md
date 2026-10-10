@@ -7,6 +7,10 @@ This is the implementation ledger for the V1 build from accepted baseline `92b4c
 
 ## What works
 
+### Desktop Obsidian Memory Surface
+
+The Tauri shell opens the Memory Surface without email login, points at a local vault, writes an original plus a Markdown note, versions corrections, and answers by keyword search. Evidence and the open gates are in [ACCEPTANCE](ACCEPTANCE.md) under "Desktop Obsidian Memory Surface". This is not installed-Windows acceptance and not a live Claude reading.
+
 ### Installable web companion, October 10 (PR #16, historical as product center)
 
 `apps/web` serves a standalone PWA. The default journey has no sign-in, password, passkey, magic link, or OTP screen. An operator issues a single-use enrollment capability; the site stores a revocable device session in an HttpOnly Secure cookie. Automated evidence is in [ACCEPTANCE](ACCEPTANCE.md) under "Web companion PWA and device enrollment evidence". Real iPhone Home Screen, Windows browser, and deployed enrollment checks are still open. Those checks are not the launch gate. The October 6 email-link notes below remain historical evidence.

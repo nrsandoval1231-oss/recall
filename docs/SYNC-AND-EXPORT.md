@@ -1,6 +1,6 @@
 # Sync, offline behavior, and Obsidian export
 
-> **HISTORICAL STORAGE WORDING for the code on `main`.** This file describes Cloud Postgres as authoritative and Obsidian as a one-way export. The [2026-10-10 amendment](PILOT-CONTRACT.md) makes the Obsidian vault the memory the user keeps. The vault slice updates this file with that implementation. Local-edit protection in this file still applies. PR #16 does not change this file into the product center.
+> **TWO STORES.** The desktop vault path keeps memory in the user's Obsidian folder: originals in `Recall/Sources`, notes in `Recall/Memories`, append-only history, and no silent replacement of a local edit. Cloud Postgres is not that path's authority. The rest of this file describes the legacy cloud cache and the managed Markdown export. That export refuses to write into a folder that already has a local-vault `_meta` tree. The [2026-10-10 amendment](PILOT-CONTRACT.md) is the product center. PR #16 does not change this file into the launch path.
 
 ## V1 implementation details
 
