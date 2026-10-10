@@ -1,15 +1,15 @@
 # Recall V1 implementation and acceptance
 
-> **2026-10-09 PILOT DIRECTION UPDATE:** [Pilot Product Contract](PILOT-CONTRACT.md) supersedes older active instructions here. The pilot is an installable iPhone Home Screen PWA and Windows browser, with **no login UX** and secure, operator-provisioned, revocable device access. Existing Supabase email authentication and native clients below are **historical implementation evidence, not pilot requirements**. The October 6 email-link deployment notes and the 23:35 CDT email-rate-limit incident stay historical; they are not instructions to restore email sign-in. Real-device proof of the enrollment flow is outstanding. The exact owner-referenced visual image has not yet been provided; [UX-SPEC](UX-SPEC.md) remains the visual authority.
+> **2026-10-10 PRODUCT CENTER.** The [pilot amendment](PILOT-CONTRACT.md) supersedes the 2026-10-09 PWA-only direction. The desktop Memory Surface and an Obsidian vault are the product center. The phone is the capture/ask companion. No login or email-auth UX. PR #16, recorded below, remains the installable web companion and enrollment transport. The October 6 email-link deployment notes and the 23:35 CDT email-rate-limit incident stay historical; they are not instructions to restore email sign-in. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg), credited as owner-supplied on 2026-10-10. The earlier sentence that the image had not been provided is false as of that date.
 
 
 This is the implementation ledger for the V1 build from accepted baseline `92b4c33aafda412f89d745f38b87858f2d4b2837`. A PASS below means deterministic implementation evidence, not live product quality. Physical devices, live infrastructure and model quality have separate gates.
 
 ## What works
 
-### Installable web pilot, October 10
+### Installable web companion, October 10 (PR #16, historical as product center)
 
-`apps/web` serves a standalone PWA. The default journey has no sign-in, password, passkey, magic link, or OTP screen. An operator issues a single-use enrollment capability; the site stores a revocable device session in an HttpOnly Secure cookie. Automated evidence is in [ACCEPTANCE](ACCEPTANCE.md) under "Pilot PWA and device enrollment evidence". Real iPhone Home Screen, Windows browser, and deployed enrollment checks are still open. The October 6 email-link notes below remain historical evidence.
+`apps/web` serves a standalone PWA. The default journey has no sign-in, password, passkey, magic link, or OTP screen. An operator issues a single-use enrollment capability; the site stores a revocable device session in an HttpOnly Secure cookie. Automated evidence is in [ACCEPTANCE](ACCEPTANCE.md) under "Web companion PWA and device enrollment evidence". Real iPhone Home Screen, Windows browser, and deployed enrollment checks are still open. Those checks are not the launch gate. The October 6 email-link notes below remain historical evidence.
 
 ### Canonical browser Memory Surface, October 7
 

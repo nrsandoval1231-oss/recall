@@ -1,6 +1,6 @@
 # Security, privacy, and operations
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
 ## V1 operations and limitations
@@ -56,9 +56,9 @@ Scope Tauri native operations to app-private directories and one approved export
 
 Sign-out/revocation should clear protected sessions and controlled local caches according to explicit settings. Explain that remote revocation cannot instantly erase an offline device or manually copied export.
 
-## Pilot device enrollment (2026-10-10)
+## Web companion device enrollment (2026-10-10, PR #16)
 
-The web pilot does not use an email sign-in screen. An operator holding `RECALL_OPERATOR_TOKEN` (API environment only, at least 32 characters) issues one short-lived enrollment capability. The database stores SHA-256 only. Redeeming it once creates a device session bound to that user and workspace. The web edge seals the session in a `__Host-` cookie with `HttpOnly`, `Secure`, and `SameSite=Lax`. The browser bundle does not receive the operator token, the session token, or a reusable API key, and it does not put the enrollment token in `localStorage` or a query string.
+The web companion does not use an email sign-in screen. An operator holding `RECALL_OPERATOR_TOKEN` (API environment only, at least 32 characters) issues one short-lived enrollment capability. The database stores SHA-256 only. Redeeming it once creates a device session bound to that user and workspace. The web edge seals the session in a `__Host-` cookie with `HttpOnly`, `Secure`, and `SameSite=Lax`. The browser bundle does not receive the operator token, the session token, or a reusable API key, and it does not put the enrollment token in `localStorage` or a query string.
 
 Every later API and original request resolves that session and then uses the existing membership checks. A session cannot choose a different workspace. Revoking the session, the workspace's sessions, or the operator kill switch fails the next request. Redeem rejects a replay, an expired or revoked capability, a missing `X-Recall-Enrollment` header, a cross-site `Sec-Fetch-Site`, and an `Origin` outside `RECALL_SITE_ORIGINS`. Issuance and redemption are rate limited. Audit rows record the outcome and ids, not the token. The API role has no table grant on the enrollment tables.
 

@@ -1,13 +1,13 @@
 # First builder handoff — RCL-001
 
-> **CURRENT PILOT DIRECTIVE — 2026-10-09.** [Pilot Product Contract](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The pilot is a **single iPhone Home Screen installable web app (PWA) and Windows browser app**, **no login or email-auth UI**, with **secure operator provisioned revocable private device access**. Keep the canonical Memory Surface, original evidence and provenance. Native Expo/Tauri flows are **not pilot prerequisites**; earlier email login / deployment / test narratives are **historical**, not current instructions. The separately mentioned visual reference image was not attached; **do not claim exact image match**.
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
 Status update: RCL-001 has been implemented (see [DEVELOPMENT](DEVELOPMENT.md) and ACCEPTANCE "RCL-001 evidence"). The text below is the original brief and is kept for scope reference. RCL-002 was implemented subsequently; see the dated V1 status ledger.
 
-## Current pilot slice (2026-10-10)
+## Historical web slice (2026-10-10, PR #16)
 
-Build the installable `apps/web` PWA and operator enrollment described in [DEVELOPMENT](DEVELOPMENT.md). Do not add a sign-in screen. Do not treat Expo, Tauri, or NSIS as the way this pilot is accepted. The native packet steps later in this file remain historical scope, not the active queue. Live iPhone Home Screen and Windows browser proof is still required after the code lands; do not mark it done from tests.
+PR #16 already added the installable `apps/web` PWA and operator enrollment described in [DEVELOPMENT](DEVELOPMENT.md). That code stays. It is an optional companion and enrollment transport. The [2026-10-10 amendment](PILOT-CONTRACT.md) moves the product center to the desktop Memory Surface and a local Obsidian vault; the next slice is described in [the realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md). Do not deploy the web app as the way to start using Recall. Do not add a sign-in screen to the web companion. Live iPhone Home Screen and Windows browser proof of that companion is still open and is not the launch gate.
 
 This is the bounded first-packet brief. The written foundation still needs owner review; do not interpret the existence of this file as authorization to implement every roadmap item or provision paid infrastructure.
 
