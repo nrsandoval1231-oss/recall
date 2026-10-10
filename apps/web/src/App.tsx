@@ -65,7 +65,7 @@ export function App({ services }: { services: Services }) {
   }, [services]);
   if (startupError)
     return (
-      <main className="signin card">
+      <main className="gate card">
         <div className="brand">Recall</div>
         <h1>Recall is unavailable.</h1>
         <p className="error" role="alert">
@@ -85,93 +85,22 @@ export function App({ services }: { services: Services }) {
       onSessionLost={loseSession}
     />
   ) : (
-    <SignIn auth={services.auth} />
+    <Unprovisioned notice={services.auth.enrollmentNotice()} />
   );
 }
 
-function SignIn({ auth }: { auth: BrowserAuth }) {
-  const cooldownKey = "recall-signin-limited-until";
-  const cooldownUntil = () => {
-    const value = Number(sessionStorage.getItem(cooldownKey) ?? "0");
-    return Number.isFinite(value) && value > Date.now();
-  };
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [limited, setLimited] = useState(cooldownUntil);
-  const [busy, setBusy] = useState(false);
-  const request = async () => {
-    if (limited || busy || sent) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await auth.requestSignIn(email.trim());
-      setSent(true);
-    } catch (failure) {
-      if (
-        failure instanceof Error &&
-        failure.message === "EMAIL_RATE_LIMITED"
-      ) {
-        sessionStorage.setItem(
-          cooldownKey,
-          String(Date.now() + 60 * 60 * 1000),
-        );
-        setLimited(true);
-        setError("Email sign-in is temporarily limited. Try again later.");
-      } else
-        setError(
-          failure instanceof Error
-            ? failure.message
-            : "Could not send the sign-in email.",
-        );
-    } finally {
-      setBusy(false);
-    }
-  };
+function Unprovisioned({ notice }: { notice: string | null }) {
   return (
-    <main className="signin card">
+    <main className="gate card">
       <div className="brand">Recall</div>
-      <h1>Keep what matters.</h1>
+      <h1>This browser is not provisioned.</h1>
       <p className="muted">
-        Sign in privately. The link in your email returns here automatically.
+        A provisioned device opens straight into memory. Ask an operator to
+        enroll this browser.
       </p>
-      <div className="field">
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          autoComplete="email"
-        />
-      </div>
-      <button
-        className="button primary"
-        onClick={() => void request()}
-        disabled={busy || limited || sent || !email.includes("@")}
-      >
-        {busy
-          ? "Sending…"
-          : limited
-            ? "Email sign-in temporarily limited"
-            : sent
-              ? "Email sent"
-              : "Email me a sign-in link"}
-      </button>
-      {sent && (
-        <p className="status" role="status">
-          Check your email. Follow the link to return to Recall.
-        </p>
-      )}
-      {limited && (
+      {notice && (
         <p className="error" role="alert">
-          Email sign-in is temporarily limited. Try again later; refreshing will
-          not bypass the provider limit.
-        </p>
-      )}
-      {error && !limited && (
-        <p className="error" role="alert">
-          {error}
+          {notice}
         </p>
       )}
     </main>
@@ -597,15 +526,17 @@ function Home({
           className="button link"
           disabled={busy}
           title={
-            busy ? "Finish saving this original before signing out." : undefined
+            busy
+              ? "Finish saving this original before ending this device."
+              : undefined
           }
           onClick={() =>
             void services.auth
-              .signOut()
-              .catch(() => setError("Could not sign out. Try again."))
+              .endSession()
+              .catch(() => setError("Could not end this device session."))
           }
         >
-          Sign out
+          End this device
         </button>
       }
       notices={

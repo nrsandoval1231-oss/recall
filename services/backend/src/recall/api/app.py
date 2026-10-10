@@ -22,17 +22,29 @@ from ..config import Settings, get_settings
 from ..db.database import Database
 from ..domain.captures import CaptureService
 from ..domain.deletion import DeletionService
+from ..domain.enrollment import (
+    EnrollmentService,
+    csrf_blocked,
+    enrollment_header_missing,
+    not_provisioned,
+    operator_matches,
+    operator_rejected,
+    operator_unavailable,
+    parse_client_key,
+)
 from ..domain.entities import EntityService
 from ..domain.export import export_janitor
 from ..domain.manifest import find_schema_path, load_schema, validate_manifest
 from ..domain.memories import MemoryService
-from ..errors import ApiError, payload_too_large, unauthenticated, unsupported_media, validation
+from ..errors import ApiError, not_found, payload_too_large, unauthenticated, unsupported_media, validation
 from ..ingestion.provider import Provider
+from ..request_scope import device_scope, rejected_device_session
 from ..storage import ObjectStore
 from ..storage.factory import build_object_store
 from ..sync.routes import register_routes as register_sync_routes
 from .auth import Principal, TokenVerifier
 from .deletion import register_routes as register_deletion_routes
+from .device_scope import DeviceSessionMiddleware
 from .export import register_routes as register_export_routes
 
 log = logging.getLogger("recall")
@@ -93,6 +105,7 @@ def create_app(
     memories = MemoryService(db, settings, provider)
     entities = EntityService(db, settings)
     deletion = DeletionService(db)
+    enrollment = EnrollmentService(db, settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -112,6 +125,7 @@ def create_app(
 
     app = FastAPI(title="Recall API", version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(DeviceSessionMiddleware, enrollment=enrollment)
     if settings.cors_allow_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -147,9 +161,49 @@ def create_app(
         return _error_response(request, "INTERNAL", "Something went wrong.", 500, True)
 
     def principal(authorization: Annotated[str | None, Header()] = None) -> Principal:
+        if rejected_device_session.get():
+            raise not_provisioned()
+        scope = device_scope.get()
+        if scope is not None:
+            return Principal(user_id=scope.user_id, email=None, workspace_id=scope.workspace_id)
         if not authorization or not authorization.lower().startswith("bearer "):
             raise unauthenticated()
-        return token_verifier.verify(authorization[7:].strip())
+        raw = authorization[7:].strip()
+        if raw.startswith("rcs_"):
+            raise not_provisioned()
+        return token_verifier.verify(raw)
+
+    def require_operator(authorization: Annotated[str | None, Header()] = None) -> None:
+        if not settings.operator_token:
+            raise operator_unavailable()
+        if not authorization or not authorization.lower().startswith("bearer "):
+            raise operator_rejected()
+        if not operator_matches(authorization[7:].strip(), settings.operator_token):
+            raise operator_rejected()
+
+    Operator = Annotated[None, Depends(require_operator)]
+
+    def _guard_redeem(request: Request) -> None:
+        if enrollment_header_missing(request.headers.get("x-recall-enrollment")) or csrf_blocked(
+            request.headers.get("origin"), request.headers.get("sec-fetch-site"), settings.site_origins
+        ):
+            enrollment.note_csrf(parse_client_key(request.headers.get("x-recall-client-key")))
+            raise ApiError("FORBIDDEN", "Invalid request origin.", 403)
+
+    def _optional_uuid(value: object, field: str) -> uuid.UUID | None:
+        if value is None:
+            return None
+        try:
+            return uuid.UUID(str(value))
+        except (TypeError, ValueError):
+            raise validation(f"{field} must be a UUID.") from None
+
+    def _label(value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip() or len(value.strip()) > 80:
+            raise validation("label must be 1-80 characters.")
+        return value.strip()
 
     Auth = Annotated[Principal, Depends(principal)]
 
@@ -376,6 +430,62 @@ def create_app(
         body: Annotated[Any, Body()],
     ) -> JSONResponse:
         return _json(memories.update_action(who.user_id, action_id, key, if_match, body))
+
+    @app.post("/v1/operator/enrollments")
+    def post_enrollment(body: Annotated[Any, Body()], _: Operator) -> JSONResponse:
+        if not isinstance(body, dict) or set(body) - {"user_id", "workspace_id", "label"}:
+            raise validation("Body may only contain user_id, workspace_id, and label.")
+        issued = enrollment.issue(
+            _optional_uuid(body.get("user_id"), "user_id"),
+            _optional_uuid(body.get("workspace_id"), "workspace_id"),
+            _label(body.get("label")),
+        )
+        return _json(issued, 201)
+
+    @app.post("/v1/operator/enrollments/{enrollment_id}/revoke")
+    def post_revoke_enrollment(enrollment_id: uuid.UUID, _: Operator) -> JSONResponse:
+        if not enrollment.revoke_enrollment(enrollment_id):
+            raise not_found("Enrollment not found.")
+        return _json({"revoked": True})
+
+    @app.post("/v1/operator/sessions/{session_id}/revoke")
+    def post_revoke_session(session_id: uuid.UUID, _: Operator) -> JSONResponse:
+        if not enrollment.revoke_session(session_id):
+            raise not_found("Session not found.")
+        return _json({"revoked": True})
+
+    @app.post("/v1/operator/workspaces/{workspace_id}/revoke-sessions")
+    def post_revoke_workspace(workspace_id: uuid.UUID, _: Operator) -> JSONResponse:
+        return _json({"revoked_sessions": enrollment.revoke_workspace(workspace_id)})
+
+    @app.post("/v1/operator/kill-switch")
+    def post_kill_switch(_: Operator) -> JSONResponse:
+        return _json({"revoked_sessions": enrollment.kill_switch()})
+
+    @app.post("/v1/enrollment/redeem")
+    def post_redeem(request: Request, body: Annotated[Any, Body()]) -> JSONResponse:
+        _guard_redeem(request)
+        if not isinstance(body, dict) or set(body) - {"enrollment_token", "device_id"}:
+            raise validation("Body may only contain enrollment_token and device_id.")
+        token = body.get("enrollment_token")
+        if not isinstance(token, str):
+            raise validation("enrollment_token is required.")
+        redeemed = enrollment.redeem(
+            token,
+            device_id=_optional_uuid(body.get("device_id"), "device_id"),
+            user_agent=request.headers.get("user-agent"),
+            client_key=parse_client_key(request.headers.get("x-recall-client-key")),
+        )
+        return _json(redeemed)
+
+    @app.post("/v1/enrollment/session/revoke")
+    def post_revoke_bearer(request: Request) -> JSONResponse:
+        authorization = request.headers.get("authorization")
+        if not authorization or not authorization.lower().startswith("bearer "):
+            raise not_provisioned()
+        if not enrollment.revoke_bearer(authorization[7:].strip()):
+            raise not_provisioned()
+        return _json({"revoked": True})
 
     register_sync_routes(app, db, settings, service, memories, principal)
     register_export_routes(app, db, object_store, principal)

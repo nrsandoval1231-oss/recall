@@ -101,19 +101,20 @@ class CaptureService:
 
     # ------------------------------------------------------------------ identity
     def me(self, user_id: uuid.UUID, email: str | None) -> dict[str, Any]:
-        rows: list[Row] = self._guard(
-            user_id,
-            lambda tx: tx.all(
+        def load(tx: Tx) -> tuple[list[Row], uuid.UUID]:
+            rows = tx.all(
                 "select w.id, w.name, m.role from workspace_members m "
                 "join workspaces w on w.id = m.workspace_id where m.user_id = %s order by m.created_at",
                 (user_id,),
-            ),
-        )
+            )
+            return rows, tx.workspace_id
+
+        rows, active = self._guard(user_id, load)
         return {
             "user_id": str(user_id),
             "email": email,
             "workspaces": [{"id": str(r["id"]), "name": r["name"], "role": r["role"]} for r in rows],
-            "active_workspace_id": str(rows[0]["id"]),
+            "active_workspace_id": str(active),
             "capabilities": {
                 "capture": True,
                 "ai_processing": self.settings.ai_configured,

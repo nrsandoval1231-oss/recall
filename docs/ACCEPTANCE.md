@@ -185,3 +185,31 @@ Keyword-only retrieval (no embeddings); one revision per memory (no reprocessing
 ## V1 build evidence
 
 See [V1 implementation and acceptance ledger](V1-STATUS.md) for exact automated evidence, requirement statuses, limitations and live gates. PR checks supersede intermediate local counts. No simulated test closes physical-device or live-provider acceptance.
+
+## Pilot PWA and device enrollment evidence (2026-10-10)
+
+Candidate: branch `cursor/pwa-device-enrollment-d77c` (exact SHA in the PR description). Environment: Linux sandbox, Node 22.14.0, Python 3.12, PostgreSQL 16 without pgvector. Synthetic fixtures only. This is not iPhone, Windows, deployment, or live-provider acceptance.
+
+### Automated results
+
+| Suite | Result |
+| --- | --- |
+| `cd services/backend && uv run ruff check . && uv run ruff format --check . && uv run mypy src` | clean |
+| `cd services/backend && uv run pytest -q` | 206 passed, 8 skipped (pgvector is not installed in this local PostgreSQL; Linux CI installs `postgresql-16-pgvector`) |
+| `npx eslint .` | clean |
+| `npm run typecheck` | clean |
+| `npm test` | api-client 26, design-tokens 4, sync 64, desktop 36, mobile 9, web 55 |
+| `npm run build -w @recall/web` | Vite production build; fixture isolation passed. Manifest, icons, and `sw.js` are in the build output |
+| `RECALL_CHROMIUM=/usr/local/bin/google-chrome npm run test:ui` | 42 passed (desktop, mobile, reduced-motion). This uses the development fixture route, not an enrolled device |
+
+Enrollment tests cover an unprovisioned caller, a wrong or unset operator secret, single-use replay, expiry, revocation, a non-member workspace, issuance and redemption rate limits, a missing enrollment header, cross-site `Sec-Fetch-Site`, a foreign `Origin`, a revoked session losing `/v1/me` and original bytes, cross-workspace read/write, the operator kill switch, and the API role being unable to read enrollment tables. Web tests cover fragment redemption without `localStorage`, a legacy email callback that is not posted, overlapping session checks posting once, a dropped enrollment request that can be retried, the unprovisioned screen, and a service worker that does not cache `/api/` or `/auth/`.
+
+### Open gates
+
+The steps to run on the host and on devices are the unchecked list in [Real-device deploy checklist](audits/2026-10-10-real-device-deploy-checklist.md). This section does not mark those gates passed.
+
+- iPhone Safari Add to Home Screen, standalone launch, and safe-area behavior on a real phone.
+- The same URL in a Windows desktop browser, including install or pin if the browser offers it.
+- A deployed API and Worker with `RECALL_OPERATOR_TOKEN`, `RECALL_SITE_ORIGINS`, and `SESSION_KEY` set, then one real enrollment, revocation, and cross-workspace denial.
+- Live handwriting interpretation. Hooks stay stubs or the existing unconfigured path; no paid provider was called.
+- Native Expo, Tauri, and NSIS builds. They are not the pilot acceptance path and were not changed as a stack.

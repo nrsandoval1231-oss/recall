@@ -5,7 +5,7 @@
 
 Version: 0.3 | Dependency-ordered, not delivery-date promises
 
-The active pilot path is the Cloudflare-served, installable iPhone Home Screen PWA and Windows browser, with zero login UI and private provisioned device access. Native clients remain preserved. Browser implementation/local verification is recorded in V1-STATUS; deployment and real signed-in cross-device acceptance remain open.
+The active pilot path is the Cloudflare-served, installable iPhone Home Screen PWA and Windows browser, with zero login UI and private provisioned device access. Native clients remain preserved. As of 2026-10-10 the web app has a manifest, service worker, and operator enrollment with synthetic negative tests; Add to Home Screen, a real Windows browser, and deployment acceptance remain open. Browser implementation/local verification recorded in V1-STATUS before that date is historical.
 
 ## Foundation
 

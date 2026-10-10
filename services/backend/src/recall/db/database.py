@@ -17,6 +17,8 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+from ..request_scope import device_scope
+
 Row = dict[str, Any]
 
 
@@ -64,17 +66,29 @@ class Database:
                 "select set_config('app.user_id', %s, true), set_config('app.workspace_id', '', true)",
                 (str(user_id),),
             )
-            row = conn.execute(
-                "select workspace_id from workspace_members where user_id = %s "
-                "order by created_at, workspace_id limit 1",
-                (user_id,),
-            ).fetchone()
-            if row is None:
-                if not provision:
+            pinned = device_scope.get()
+            if pinned is not None:
+                if pinned.user_id != user_id:
+                    raise LookupError("device session does not match the actor")
+                member = conn.execute(
+                    "select workspace_id from workspace_members where user_id = %s and workspace_id = %s",
+                    (user_id, pinned.workspace_id),
+                ).fetchone()
+                if member is None:
                     raise LookupError("no workspace")
-                workspace_id = _provision_workspace(conn, user_id)
+                workspace_id = pinned.workspace_id
             else:
-                workspace_id = row["workspace_id"]
+                row = conn.execute(
+                    "select workspace_id from workspace_members where user_id = %s "
+                    "order by created_at, workspace_id limit 1",
+                    (user_id,),
+                ).fetchone()
+                if row is None:
+                    if not provision:
+                        raise LookupError("no workspace")
+                    workspace_id = _provision_workspace(conn, user_id)
+                else:
+                    workspace_id = row["workspace_id"]
             conn.execute("select set_config('app.workspace_id', %s, true)", (str(workspace_id),))
             # Pilot mutations and consistent cache snapshots use the same
             # workspace lock as the worker. Network/provider I/O stays outside.

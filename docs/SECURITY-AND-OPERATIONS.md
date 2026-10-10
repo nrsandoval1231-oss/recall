@@ -56,6 +56,14 @@ Scope Tauri native operations to app-private directories and one approved export
 
 Sign-out/revocation should clear protected sessions and controlled local caches according to explicit settings. Explain that remote revocation cannot instantly erase an offline device or manually copied export.
 
+## Pilot device enrollment (2026-10-10)
+
+The web pilot does not use an email sign-in screen. An operator holding `RECALL_OPERATOR_TOKEN` (API environment only, at least 32 characters) issues one short-lived enrollment capability. The database stores SHA-256 only. Redeeming it once creates a device session bound to that user and workspace. The web edge seals the session in a `__Host-` cookie with `HttpOnly`, `Secure`, and `SameSite=Lax`. The browser bundle does not receive the operator token, the session token, or a reusable API key, and it does not put the enrollment token in `localStorage` or a query string.
+
+Every later API and original request resolves that session and then uses the existing membership checks. A session cannot choose a different workspace. Revoking the session, the workspace's sessions, or the operator kill switch fails the next request. Redeem rejects a replay, an expired or revoked capability, a missing `X-Recall-Enrollment` header, a cross-site `Sec-Fetch-Site`, and an `Origin` outside `RECALL_SITE_ORIGINS`. Issuance and redemption are rate limited. Audit rows record the outcome and ids, not the token. The API role has no table grant on the enrollment tables.
+
+This is not a general quota for captures, and it is not live iPhone or Windows proof. Provider JWTs remain for the preserved native clients. The earlier Supabase email-link path is retired for `apps/web`; the incident notes in V1-STATUS stay historical.
+
 ## Implemented in RCL-001
 
 Authenticated serving only: originals are streamed through the API after a membership check on every request; no read URLs exist, so there is nothing to outlive a revoked session. Upload capabilities are HMAC-signed, bound to one workspace/user/capture/source, expire in minutes, and are useless without the matching bearer token. RLS is forced and tested with two workspaces, including raw SQL as the API role. The API fails fast if its database role could bypass RLS. Errors and logs carry IDs and error classes only. A Supabase project used with this API must have **public signups disabled** (or `RECALL_AUTO_PROVISION_WORKSPACES=false`), otherwise anyone who can obtain a token gets a workspace and storage quota. Not yet implemented: rate limits/quotas, deletion/purge, backup/restore, monitoring (later packets).

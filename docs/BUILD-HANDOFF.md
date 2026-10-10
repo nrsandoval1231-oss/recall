@@ -5,6 +5,10 @@
 
 Status update: RCL-001 has been implemented (see [DEVELOPMENT](DEVELOPMENT.md) and ACCEPTANCE "RCL-001 evidence"). The text below is the original brief and is kept for scope reference. RCL-002 was implemented subsequently; see the dated V1 status ledger.
 
+## Current pilot slice (2026-10-10)
+
+Build the installable `apps/web` PWA and operator enrollment described in [DEVELOPMENT](DEVELOPMENT.md). Do not add a sign-in screen. Do not treat Expo, Tauri, or NSIS as the way this pilot is accepted. The native packet steps later in this file remain historical scope, not the active queue. Live iPhone Home Screen and Windows browser proof is still required after the code lands; do not mark it done from tests.
+
 This is the bounded first-packet brief. The written foundation still needs owner review; do not interpret the existence of this file as authorization to implement every roadmap item or provision paid infrastructure.
 
 ## Mission
