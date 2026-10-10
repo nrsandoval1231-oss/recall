@@ -102,6 +102,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [consent, setConsent] = useState(false);
   const [reading, setReading] = useState<Reading | null>(null);
+  const [reader, setReader] = useState(librarian);
+  const [readOp, setReadOp] = useState<string | null>(null);
   const [month, setMonth] = useState<string | null>(null);
   const askRef = useRef<HTMLInputElement>(null);
   const recentRef = useRef<HTMLDivElement>(null);
@@ -154,6 +156,18 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     })();
     return () => { cancel = true; };
   }, [vault]);
+
+  useEffect(() => {
+    setReader(librarian);
+    if (!librarian.inspect) return;
+    let cancel = false;
+    void librarian.inspect().then((next) => {
+      if (!cancel) setReader(next);
+    }).catch((inspectError) => {
+      if (!cancel) setError(message(inspectError));
+    });
+    return () => { cancel = true; };
+  }, [librarian]);
 
   function go(next: Section) {
     if (next === "ask") {
@@ -270,6 +284,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setHistory(null);
     setReading(null);
     setConsent(false);
+    setReadOp(null);
     setConfirmRemove(false);
     setCorrection(memory.note);
     setEvidenceId(memory.id);
@@ -374,13 +389,24 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   }
 
   async function readPhoto(memory: VaultMemory) {
-    if (!consent || librarian.mode !== "synthetic") return;
+    if (!consent || reader.mode === "unavailable" || !selected) return;
+    const operation = readOp ?? operationId();
+    setReadOp(operation);
     setBusy(true); setError("");
     try {
-      const result = await librarian.read({ sha256: memory.source_sha256, note: memory.note });
+      const result = await reader.read({
+        sha256: memory.source_sha256,
+        note: memory.note,
+        consent: true,
+        operationId: operation,
+        vaultId: selected.vault_id,
+        memoryId: memory.id,
+      });
       if (!alive.current) return;
       setReading(result);
       setCorrection(result.transcription);
+      setConsent(false);
+      setReadOp(null);
     } catch (readError) {
       if (alive.current) setError(message(readError));
     } finally {
@@ -438,9 +464,10 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
           <div className="ms-toprow">{demo && <p className="ms-editorial">{brooks.editorial}</p>}</div>
           <div className="ms-askrow">
             <form className="ms-ask" role="search" onSubmit={(event) => void ask(event)}>
+              <SearchIcon />
               <label className="ms-sr" htmlFor="recall-ask">Ask Recall</label>
               <input id="recall-ask" ref={askRef} type="search" value={query} placeholder={demo ? "What do you know about Brooks Campus?" : "Ask your notes"} onChange={(event) => setQuery(event.target.value)} />
-              <button type="submit" disabled={busy}>Ask</button>
+              <button type="submit" disabled={busy} aria-label="Ask"><span aria-hidden="true">→</span></button>
             </form>
             <button className="ms-mic" type="button" disabled aria-label="Voice ask is not available in this build">Voice</button>
           </div>
@@ -457,7 +484,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               confirmRemove={confirmRemove}
               consent={consent}
               reading={reading}
-              librarian={librarian}
+              librarian={reader}
               onBack={() => go("home")}
               onCorrection={setCorrection}
               onSave={() => evidenceMemory && void saveCorrection(evidenceMemory)}
@@ -466,7 +493,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               onConfirmRemove={setConfirmRemove}
               onRemove={() => evidenceMemory && void removeMemory(evidenceMemory)}
               onRestore={() => evidenceMemory && void restoreMemory(evidenceMemory)}
-              onConsent={setConsent}
+              onConsent={(value) => { setConsent(value); if (!value) setReadOp(null); }}
               onRead={() => evidenceMemory && void readPhoto(evidenceMemory)}
             />
           ) : section === "capture" ? (
@@ -487,7 +514,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                   <ContextCard title="People" demo={demo} empty="Names in your notes stay as you wrote them. Recall does not turn a first name into a person record.">
                     <ul className="ms-list">
                       {brooks.people.map((person) => (
-                        <li key={person.name}><button type="button" onClick={() => { setDetail({ title: person.name, text: `${person.role}. ${person.note}` }); setPanel("people"); setSection("people"); }}><span>{person.name}<small className="ms-role"> {person.role}</small></span></button></li>
+                        <li key={person.name}><button type="button" onClick={() => { setDetail({ title: person.name, text: `${person.role}. ${person.note}` }); setPanel("people"); setSection("people"); }}><i className="ms-avatar" aria-hidden="true">{initials(person.name)}</i><span className="ms-person"><strong>{person.name}</strong><small className="ms-role">{person.role}</small></span></button></li>
                       ))}
                     </ul>
                     <p className="ms-more">+ {brooks.morePeople}</p>
@@ -495,7 +522,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                   <ContextCard title="Locations" demo={demo} empty="Places are not split out of your notes in this build.">
                     <ul className="ms-list">
                       {brooks.places.map((place) => (
-                        <li key={place.name}><button type="button" onClick={() => { setDetail({ title: place.name, text: `${place.locality}. ${place.note}` }); setPanel("places"); setSection("places"); }}><span>{place.name}<small className="ms-role"> {place.locality}</small></span></button></li>
+                        <li key={place.name}><button type="button" onClick={() => { setDetail({ title: place.name, text: `${place.locality}. ${place.note}` }); setPanel("places"); setSection("places"); }}><PinIcon /><span className="ms-person"><strong>{place.name}</strong><small className="ms-role">{place.locality}</small></span></button></li>
                       ))}
                     </ul>
                     <p className="ms-more">+ {brooks.morePlaces}</p>
@@ -532,7 +559,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                             ))}
                           </div>
                         </div>
-                        <div className="ms-site" aria-hidden="true"><span>{demo ? "Synthetic site illustration" : "Original stays in the vault"}</span></div>
+                        <div className="ms-site" aria-hidden="true">{demo ? <SiteArt /> : <span className="ms-site-label">Original stays in the vault</span>}</div>
                       </div>
                       {featured && !demo && <div className="ms-actions"><button type="button" onClick={() => void openVaultMemory(featured)}>Open original: {titleOf(featured)}</button></div>}
                     </>
@@ -544,24 +571,26 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                   {demo && <p className="ms-quote glass">{brooks.quote}</p>}
                 </div>
               </div>
-              <section className="glass ms-timeline" aria-label="Timeline" ref={recentRef}>
-                <div className="ms-card-head"><h2>Timeline</h2></div>
-                <div className="ms-months">
-                  {(demo ? brooks.months : monthsPresent(kept)).map((label) => (
-                    <button key={label} type="button" aria-pressed={month === label} onClick={() => setMonth(month === label ? null : label)}>{label}</button>
-                  ))}
-                  <i className="ms-line" />
+              <section className="glass ms-bottom" aria-label="Timeline and recent memories" ref={recentRef}>
+                <div className="ms-timeline">
+                  <div className="ms-card-head"><h2>Timeline</h2></div>
+                  <div className="ms-months">
+                    {(demo ? brooks.months : monthsPresent(kept)).map((label) => (
+                      <button key={label} type="button" className={month === label || (month === null && demo && label === brooks.marker) ? "is-mark" : undefined} aria-pressed={month === label} onClick={() => setMonth(month === label ? null : label)}>{label}</button>
+                    ))}
+                  </div>
                 </div>
                 <div className="ms-recent">
+                  <div className="ms-card-head"><h2>Recent Memories</h2>{demo && <p className="ms-fine">View all ({brooks.stats.memories})</p>}</div>
                   <div className="ms-recent-row">
-                    {demo ? demoMemories.map((memory) => (
-                      <button key={memory.id} type="button" className={`ms-thumb ${memory.kind === "Photo" ? "photo" : ""}`} onClick={() => openDemoMemory(memory)}>
+                    {demo ? demoMemories.slice(0, 4).map((memory) => (
+                      <button key={memory.id} type="button" className={`ms-thumb ${memory.kind.toLowerCase()}`} onClick={() => openDemoMemory(memory)}>
                         <i />
                         <strong>{memory.date}</strong>
                         <span>{memory.title}</span>
                         <em>{memory.kind}</em>
                       </button>
-                    )) : vaultMemories.map((memory) => (
+                    )) : vaultMemories.slice(0, 4).map((memory) => (
                       <button key={memory.id} type="button" className="ms-thumb" onClick={() => void openVaultMemory(memory)} disabled={!openable(memory)}>
                         <i />
                         <strong>{displayDate(memory.captured_at)}</strong>
@@ -570,10 +599,10 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       </button>
                     ))}
                   </div>
-                  {demo && <p className="ms-fine">View all ({brooks.stats.memories}). Four sample notes can be opened. The rest of the count is the illustration.</p>}
+                  {demo && <p className="ms-fine">Four sample notes can be opened. The rest of the count is the illustration.</p>}
+                  {demo && month && demoMemories.length === 0 && <p className="ms-fine">No sample note in {month}.</p>}
+                  {!demo && month && vaultMemories.length === 0 && <p className="ms-fine">No note in {month}.</p>}
                 </div>
-                {demo && month && demoMemories.length === 0 && <p className="ms-fine">No sample note in {month}.</p>}
-                {!demo && month && vaultMemories.length === 0 && <p className="ms-fine">No note in {month}.</p>}
               </section>
             </>
           )}
@@ -772,21 +801,69 @@ function Evidence(props: {
 }
 
 function ReadingBlock({ librarian, busy, consent, reading, onConsent, onRead }: { librarian: Librarian; busy: boolean; consent: boolean; reading: Reading | null; onConsent: (value: boolean) => void; onRead: () => void }) {
-  if (librarian.mode !== "synthetic") {
-    return <p>Claude reading is off. Recall will not send this photo anywhere.</p>;
+  if (librarian.mode === "unavailable") {
+    return <p>{librarian.notice}</p>;
   }
+  const claude = librarian.mode === "claude";
   return (
-    <section aria-label="Synthetic reading">
+    <section aria-label={claude ? "Claude reading" : "Synthetic reading"}>
       <h2>Unreviewed machine reading</h2>
-      <label className="ms-check"><input type="checkbox" checked={consent} onChange={(event) => onConsent(event.target.checked)} /> Use the synthetic reader for this photo. It does not call Claude.</label>
-      <button type="button" disabled={busy || !consent} onClick={onRead}>Read this photo</button>
+      <p className="ms-fine">{librarian.notice}</p>
+      <label className="ms-check"><input type="checkbox" checked={consent} onChange={(event) => onConsent(event.target.checked)} /> {claude ? "Send this one photo to Claude. This costs money. The reading stays unreviewed until I save a correction." : "Use the synthetic reader for this photo. It does not call Claude."}</label>
+      <button type="button" disabled={busy || !consent} onClick={onRead}>{claude ? "Read this photo with Claude" : "Read this photo"}</button>
       {reading && (
         <>
-          <p className="ms-note">{reading.transcription}</p>
+          <p className="ms-note" data-status="unreviewed">{reading.transcription}</p>
           <ul>{reading.uncertainties.map((item) => <li key={item}>{item}</li>)}</ul>
-          <p className="ms-fine">Not saved to the vault. Provider: {reading.provider}. Saving a correction stores your words, not a verified fact.</p>
+          <p className="ms-fine">{claude ? `Unreviewed proposal from ${reading.provider}${reading.model ? ` · ${reading.model}` : ""}. It is stored beside the note, not as the note. Ask still searches the correction you save.` : `Not saved to the vault. Provider: ${reading.provider}. Saving a correction stores your words, not a verified fact.`}</p>
         </>
       )}
     </section>
+  );
+}
+
+function initials(name: string): string {
+  return name.split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase();
+}
+
+function SearchIcon() {
+  return (
+    <svg className="ms-search" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M16 16l5 5" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg className="ms-pin" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.2" />
+    </svg>
+  );
+}
+
+function SiteArt() {
+  return (
+    <svg className="ms-site-art" viewBox="0 0 640 420" role="img" aria-label="Synthetic site illustration">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f0c48a" />
+          <stop offset="0.45" stopColor="#c9845a" />
+          <stop offset="1" stopColor="#6e7f90" />
+        </linearGradient>
+      </defs>
+      <rect width="640" height="420" fill="url(#sky)" />
+      <path d="M40 250h80l20-70h40l18 70h70" fill="none" stroke="#2c241c" strokeWidth="8" />
+      <path d="M70 180 V90 M70 110 H150 M150 110 V250" fill="none" stroke="#2c241c" strokeWidth="6" />
+      <rect x="230" y="150" width="210" height="160" fill="#8d6a45" />
+      <path d="M230 150 H440 V250 H250 V170 H300 V250" fill="none" stroke="#1d1814" strokeWidth="7" />
+      <path d="M250 190 H430 M250 220 H430 M280 150 V310 M330 150 V310 M380 150 V310" stroke="#1d1814" strokeWidth="3" opacity="0.7" />
+      <path d="M470 250 V70 M470 90 H560 M545 90 V250" fill="none" stroke="#241c16" strokeWidth="7" />
+      <path d="M0 300 H640 V420 H0Z" fill="#6b543c" />
+      <path d="M0 330 H640" stroke="#8a704f" strokeWidth="8" />
+      <text x="24" y="392" fill="#f7f1e6" fontSize="22" fontFamily="Georgia, serif">Synthetic site illustration</text>
+    </svg>
   );
 }

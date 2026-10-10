@@ -234,18 +234,18 @@ When no vault is open, or the vault has no memories, the board is the synthetic 
 
 | Suite | Result |
 | --- | --- |
-| `npm test --workspace @recall/desktop` | 56 passed (9 files) |
+| `npm test --workspace @recall/desktop` | 57 passed (9 files) |
 | `npx tsc -p apps/desktop/tsconfig.json` and `npx eslint` on the new desktop files | clean |
 | `cd apps/desktop && npx vite build` with no `VITE_*` values | succeeded |
-| `cd apps/desktop/src-tauri && cargo test --locked --lib` | 114 passed, 0 failed |
+| `cd apps/desktop/src-tauri && cargo test --lib` | 121 passed, 0 failed (includes 7 librarian tests: default-off, missing budget, consent, hash mismatch, identical retry, spent budget, uncertain outcome not retried, and the note staying human until correction) |
 | Browser preview of `npm run dev` in `apps/desktop` | home shows Brooks Campus and the synthetic banner, with no email field; Ask, a sample note, and the capture form were exercised in headless Chromium |
 
-Rust coverage includes original-before-note writes, identical retries, rejected changed retries, versioned corrections, preserved external edits, journal recovery, symlink rejection, and a second writer lock. Desktop tests cover the empty demo board, keyword abstention, vault photo import, retry identity, correction history, hash verification, and the synthetic reader consent gate.
+Rust coverage includes original-before-note writes, identical retries, rejected changed retries, versioned corrections, preserved external edits, journal recovery, symlink rejection, a second writer lock, and the librarian gates above. Desktop tests cover the empty demo board, keyword abstention, vault photo import, retry identity, correction history, hash verification, the synthetic reader consent gate, and a Claude refusal that does not replace the note.
 
 ### Open gates
 
 - **Installed Windows.** The `windows-native` job builds an unsigned NSIS installer and uploads `recall-windows-desktop` for seven days. This environment did not install it, and did not open a native Tauri window. `npm run dev` cannot write a vault.
-- **Live Claude.** No provider client is compiled into this slice. No key, budget, or private photo was used.
+- **Live Claude quality.** The desktop can call Claude only when `RECALL_CLAUDE_API_KEY`, a model, per-million-token prices, and daily and monthly budgets are set on the native process. Default is off. One consented photo is sent; the proposal is stored unreviewed; the note changes only when a person saves a correction; keyword ask searches that note. Automated tests use a fake provider. No key, budget, or private photo was used, and no live reading quality is claimed.
 - **Phone companion.** Not in this slice.
 - **Visual fidelity.** The surface approximates the owner reference: left rail, ask bar, project board, context cards, timeline, and recent notes. It is not the photographed desk, notebook, or site picture. Demo stats are fixture counts.
 - **Real Obsidian on a person's machine.** Not run. The folder layout is what Obsidian can open; Obsidian itself was not launched.

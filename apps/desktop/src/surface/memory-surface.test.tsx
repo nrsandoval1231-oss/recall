@@ -166,7 +166,7 @@ describe("Memory Surface", () => {
     cleanup();
 
     const read = vi.fn(async () => ({ transcription: "Met w/ Brad?", uncertainties: ["Brad is an unresolved first name."], provider: "synthetic-fixture" }));
-    const librarian: Librarian = { mode: "synthetic", read };
+    const librarian: Librarian = { mode: "synthetic", notice: "Synthetic reader. It does not call Claude.", read };
     const consented = vault({}, [page]);
     render(<MemorySurface vault={consented} librarian={librarian} />);
     await user.click(await screen.findByRole("button", { name: "Open original: north-lot" }));
@@ -177,7 +177,7 @@ describe("Memory Surface", () => {
     expect((await screen.findAllByText("Met w/ Brad?")).length).toBeGreaterThan(0);
     expect(screen.getByText(/unresolved first name/)).toBeTruthy();
     expect(screen.getByText(/Not saved to the vault/)).toBeTruthy();
-    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ consent: true, sha256: page.source_sha256, memoryId: page.id }));
     expect(consented.correct).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
@@ -188,7 +188,7 @@ describe("Memory Surface", () => {
     const page = memory();
     const client = vault({}, [page]);
     const read = vi.fn(async () => ({ transcription: "Met w/ Brad?", uncertainties: ["Brad is an unresolved first name."], provider: "synthetic-fixture" }));
-    render(<MemorySurface vault={client} librarian={{ mode: "synthetic", read }} />);
+    render(<MemorySurface vault={client} librarian={{ mode: "synthetic", notice: "Synthetic reader. It does not call Claude.", read }} />);
     await user.click(await screen.findByRole("button", { name: "Open original: north-lot" }));
     await user.click(screen.getByRole("checkbox", { name: /synthetic reader/ }));
     await user.click(screen.getByRole("button", { name: "Read this photo" }));
@@ -217,6 +217,35 @@ describe("Memory Surface", () => {
     await user.click(screen.getByRole("checkbox", { name: /Remove from Recall/ }));
     await user.click(remove);
     expect(filled.remove).toHaveBeenCalledWith("session-token", page.id, 1, expect.any(String), "active");
+  });
+
+  it("asks the saved note after an unreviewed reading and does not spend without consent", async () => {
+    const user = userEvent.setup();
+    const page = memory();
+    const client = vault({}, [page]);
+    const read = vi.fn(async () => {
+      throw new Error("The Claude budget for this desktop is spent. Recall did not send this photo. Your note was not changed.");
+    });
+    const librarian: Librarian = {
+      mode: "claude",
+      notice: "Claude (claude-test) can read this one photo after you agree. It costs money.",
+      read,
+    };
+    render(<MemorySurface vault={client} librarian={librarian} />);
+    await user.click(await screen.findByRole("button", { name: "Open original: north-lot" }));
+    const readButton = screen.getByRole("button", { name: "Read this photo with Claude" }) as HTMLButtonElement;
+    expect(readButton.disabled).toBe(true);
+    expect(read).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("checkbox", { name: /Send this one photo to Claude/ }));
+    await user.click(readButton);
+    expect((await screen.findByRole("alert")).textContent).toMatch(/budget/);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(client.correct).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "laydown");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
+    expect(client.list).toHaveBeenCalledWith("session-token", "laydown");
   });
 
   it("refuses a mismatched original hash", async () => {

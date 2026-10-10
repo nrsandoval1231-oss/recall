@@ -27,7 +27,25 @@ Recall/History/     append-only revisions
 Recall/_meta/       manifest, journal, commit receipts, preserved local edits
 ```
 
-Open that parent folder in Obsidian. A note edited there is not silently replaced. Import writes the original before the note. An optional note is your words, not a reading of the page. Ask searches those notes and can open the original. The result is labeled keyword search. It is not a Claude answer. Claude reading is off in this build: there is no live provider client, and a photo is not sent anywhere.
+Open that parent folder in Obsidian. A note edited there is not silently replaced. Import writes the original before the note. An optional note is your words, not a reading of the page. Ask searches those notes and can open the original. The result is labeled keyword search. It is not a Claude answer.
+
+### Enabling Claude reading
+
+Claude is off unless the **desktop process** has every value below. `npm run dev` cannot send a photo. Do not put the key in a `VITE_` variable, a checked-in file, or the webview.
+
+```bash
+export RECALL_CLAUDE_API_KEY=...                 # never commit this
+export RECALL_CLAUDE_MODEL=claude-opus-5-5       # the model you intend to pay for
+export RECALL_CLAUDE_INPUT_USD_PER_MTOK=3        # replace with that model's published input price
+export RECALL_CLAUDE_OUTPUT_USD_PER_MTOK=15      # replace with that model's published output price
+export RECALL_CLAUDE_DAILY_BUDGET_USD=2          # hard stop for this desktop
+export RECALL_CLAUDE_MONTHLY_BUDGET_USD=20
+cd apps/desktop && npx tauri dev
+```
+
+The prices above are a shape, not a quote. Use the provider's current published prices. The reservation assumes up to 8,000 input tokens and 1,024 output tokens and refuses the call when that estimate would pass the daily or monthly cap.
+
+Open one saved photo, check the consent box, then choose **Read this photo with Claude**. That sends only that photo. The result is stored under `Recall/_meta/readings/` as an unreviewed proposal, with a budget ledger at `Recall/_meta/librarian-budget.json`. The Markdown note does not change until you press **Save correction**. Ask searches that note, not the unreviewed proposal. A missing price or budget, a refused hash, a spent budget, or a provider error is shown and does not pretend the photo was unread when the outcome is unknown. No live call is part of the automated tests; those use a fake provider.
 
 When no vault is open, or the vault has no memories, the surface shows the synthetic Brooks Campus board and says so. It is the owner reference fixture, not your notes, and it leaves once a real memory is saved.
 

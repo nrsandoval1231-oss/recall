@@ -21,7 +21,7 @@ Example: “What was the name of that guy Sarah introduced me to last summer who
 
 ## Current status
 
-**The product center is the desktop Memory Surface writing into an Obsidian vault.** The Tauri app opens that surface with no login, saves a photo as an original plus a Markdown note, and answers from keyword search over the vault. Live Claude, the phone companion, and an installed Windows run are not done. Automated evidence is in [ACCEPTANCE](docs/ACCEPTANCE.md) under "Desktop Obsidian Memory Surface". Draft PRs #11–#14 stay open; this slice ports their vault behavior instead of merging them. Do not deploy PR #16 as the way to start using Recall.
+**The product center is the desktop Memory Surface writing into an Obsidian vault.** The Tauri app opens that surface with no login, saves a photo as an original plus a Markdown note, and answers from keyword search over the vault. Claude reading is opt-in on that desktop process and off unless a key, model, prices, and budgets are set; no live reading was accepted. The phone companion and an installed Windows run are not done. Automated evidence is in [ACCEPTANCE](docs/ACCEPTANCE.md) under "Desktop Obsidian Memory Surface". Draft PRs #11–#14 stay open; this slice ports their vault behavior instead of merging them. Do not deploy PR #16 as the way to start using Recall.
 
 PR #16 is merged and real: `apps/web` is an installable PWA with no login screen and operator device enrollment, covered by synthetic tests. iPhone Home Screen, a Windows browser, and a deployed enrollment were not accepted. That web app stays as an optional companion and enrollment transport. The October 9 decision that made it the pilot is historical.
 

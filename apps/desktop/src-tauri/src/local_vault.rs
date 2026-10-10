@@ -157,6 +157,11 @@ pub struct Vault {
     root: PathBuf,
     pub id: String,
 }
+impl Vault {
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
+}
 
 // Compiled out entirely outside unit tests; no production fault controls.
 macro_rules! boundary {

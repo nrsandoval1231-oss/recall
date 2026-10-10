@@ -1,3 +1,4 @@
+mod librarian;
 mod local_vault;
 mod managed_export;
 mod persistence;
@@ -320,6 +321,48 @@ fn vault_history(
     state.with(&expected_vault_id, |vault| vault.history(&memory_id))
 }
 
+#[tauri::command]
+fn librarian_status() -> librarian::LibrarianStatus {
+    librarian::public_status(&librarian::config_from_env())
+}
+
+#[tauri::command]
+fn librarian_read(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    memory_id: String,
+    operation_id: String,
+    consent: bool,
+) -> Result<librarian::StoredReading, String> {
+    if !consent {
+        return Err("Consent is required. Recall did not send this photo.".into());
+    }
+    let (root, input) = state.with(&expected_vault_id, |vault| {
+        let memory = vault
+            .list("")?
+            .into_iter()
+            .find(|item| item.id == memory_id)
+            .ok_or_else(|| "That memory is not in this vault. Recall did not send this photo.".to_string())?;
+        if memory.state != "active" || memory.conflict.is_some() || memory.revision == 0 {
+            return Err("Resolve this memory before reading it. Recall did not send this photo.".into());
+        }
+        let source = vault.source(&memory.id)?;
+        Ok((
+            vault.root().to_path_buf(),
+            librarian::ReadInput {
+                consent: true,
+                operation_id,
+                memory_id: memory.id,
+                expected_revision: memory.revision,
+                source_sha256: source.sha256,
+                mime_type: source.mime_type,
+                bytes: source.bytes,
+            },
+        ))
+    })?;
+    librarian::read_selected(&root, &librarian::config_from_env(), &input, &librarian::ClaudeTransport)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -352,6 +395,8 @@ pub fn run() {
             vault_rebuild,
             vault_source,
             vault_history,
+            librarian_status,
+            librarian_read,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,

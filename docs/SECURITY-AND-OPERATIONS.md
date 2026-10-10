@@ -4,7 +4,7 @@
 
 ## Desktop vault
 
-The desktop vault path does not sign in and does not send notes or photos to the Recall API. The folder is as private as the operating-system account. Recall does not add its own encryption. `RECALL_VAULT_DIR`, when set, is read by the native process; the webview cannot choose an arbitrary path. Live Claude is not called. The legacy cloud desktop and the web companion still use the server controls below.
+The desktop vault path does not sign in and does not send notes or photos to the Recall API. The folder is as private as the operating-system account. Recall does not add its own encryption. `RECALL_VAULT_DIR`, when set, is read by the native process; the webview cannot choose an arbitrary path. Claude reading is a separate opt-in: the API key stays in the desktop process, one photo is sent only after a checkbox, and a missing budget refuses the call. The webview cannot read the key. The legacy cloud desktop and the web companion still use the server controls below.
 
 
 ## V1 operations and limitations
