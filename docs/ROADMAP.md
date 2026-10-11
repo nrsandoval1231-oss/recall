@@ -57,7 +57,7 @@ Objective: Recall is not a data trap.
 
 Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tombstones, backup/restore, and optional managed Obsidian adapter with local-edit conflict protection.
 
-The desktop vault slice keeps memory in the user's Obsidian folder and will not silently replace a local edit. Ask there is keyword search, not a live Claude answer. Phone companion, live reading, and installed-Windows proof remain open. See [DEVELOPMENT](DEVELOPMENT.md) and [ACCEPTANCE](ACCEPTANCE.md).
+The desktop vault slice keeps memory in the user's Obsidian folder and will not silently replace a local edit. Ask there is keyword search, not a live Claude answer. The phone companion is a local Tailscale page on that same computer; a real iPhone session, live reading, and installed-Windows proof remain open. See [DEVELOPMENT](DEVELOPMENT.md) and [ACCEPTANCE](ACCEPTANCE.md).
 
 ## RCL-005A — Canonical Memory Surface
 

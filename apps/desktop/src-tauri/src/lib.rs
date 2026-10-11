@@ -1,7 +1,8 @@
 mod librarian;
-mod local_vault;
+pub(crate) mod local_vault;
 mod managed_export;
 mod persistence;
+pub mod phone;
 mod secrets;
 
 use managed_export::ManagedExportState;

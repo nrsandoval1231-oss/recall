@@ -33,7 +33,7 @@ Desktop-first. The broader universal-memory application grows from making that e
 ### What this amendment does not change by itself
 
 - Nothing is deployed, and draft PRs #11–#14 are not merged by this document. Those drafts are the Tauri/Obsidian vault stack to revive and rebase. See [the realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md).
-- The desktop slice writes the local vault and does not consult Cloud Postgres on that path. The web companion and `?mode=legacy-cloud` still use Cloud Postgres, private object storage, and Markdown export. ARCHITECTURE, PRD, ROADMAP, AGENTS.md, and SYNC-AND-EXPORT record both. This amendment does not add a second architecture document. Device install, live Claude, and the phone companion are not claimed done.
+- The desktop slice writes the local vault and does not consult Cloud Postgres on that path. The web companion and `?mode=legacy-cloud` still use Cloud Postgres, private object storage, and Markdown export. ARCHITECTURE, PRD, ROADMAP, AGENTS.md, and SYNC-AND-EXPORT record both. This amendment does not add a second architecture document. Device install and live Claude are not claimed done. The phone companion is a local process on the desktop machine for that same vault; a real iPhone over Tailscale is not claimed done.
 - A question mark, hypothesis, illegible number, or unresolved first name stays uncertain.
 - A locally edited Obsidian file is never silently replaced.
 - Offline keyword search is not described as a fresh generative answer.

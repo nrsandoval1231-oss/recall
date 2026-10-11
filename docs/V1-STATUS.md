@@ -9,7 +9,7 @@ This is the implementation ledger for the V1 build from accepted baseline `92b4c
 
 ### Desktop Obsidian Memory Surface
 
-The Tauri shell opens the Memory Surface without email login, points at a local vault, writes an original plus a Markdown note, versions corrections, and answers by keyword search. Evidence and the open gates are in [ACCEPTANCE](ACCEPTANCE.md) under "Desktop Obsidian Memory Surface". This is not installed-Windows acceptance and not a live Claude reading.
+The Tauri shell opens the Memory Surface without email login, points at a local vault, writes an original plus a Markdown note, versions corrections, and answers by keyword search. `recall-phone` serves Capture and Ask for that same vault on the desktop's Tailscale address, without a login page and without calling Claude. Evidence and the open gates are in [ACCEPTANCE](ACCEPTANCE.md) under "Desktop Obsidian Memory Surface" and "Phone companion over Tailscale". This is not installed-Windows acceptance, not a live iPhone session, and not a live Claude reading.
 
 ### Installable web companion, October 10 (PR #16, historical as product center)
 

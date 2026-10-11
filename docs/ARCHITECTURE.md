@@ -11,6 +11,7 @@ The Tauri desktop opens the Memory Surface with no account, password, or email l
 - The Markdown note is under `Recall/Memories` and points at the original. The note is human text, not an OCR claim.
 - A correction appends history and publishes only when the expected revision still matches. A note edited outside Recall is kept.
 - Ask is keyword search of those notes. It opens the original. It is not a Claude answer. This slice does not call a live model.
+- The phone companion is a separate `recall-phone` process on that same computer. It serves one Capture and Ask page and calls the same vault writer. It listens on the machine's Tailscale IPv4 when that address is available, or on loopback when it is not. Listening on every interface requires an explicit setting. It does not call Claude and does not consult Cloud Postgres. A real iPhone session is still an open check. See [DEVELOPMENT](DEVELOPMENT.md).
 - Cloud Postgres is not consulted. The web companion and `?mode=legacy-cloud` still use the server model described below.
 
 ## V1 implementation update
