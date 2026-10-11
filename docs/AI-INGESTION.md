@@ -1,5 +1,10 @@
 # AI ingestion and grounded retrieval
 
+## Active Claude librarian status (2026-10-11)
+
+The active desktop-vault product intends consented Claude interpretation of handwritten notes, source-grounded organization, cross-note relationships, and vague retrieval. Current keyword matching is not generative recall. Existing provider-independent contracts and cloud embeddings below are reusable safety guidance, not evidence that live Claude or pgvector are integrated into the active vault path. Validate real handwriting, ambiguity, source citations, correction precedence, and abstention before claiming the librarian works. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
+
+
 ## V1 correction and embedding implementation
 
 Canonical user overrides are applied before saving a new machine revision, and canonical claim revisions retain user text/status/validity across reprocessing. Evidence keys carry identity decisions across revisions without accepting same-name candidates automatically. Corrected canonical claims produce explicit claim-linked search chunks; superseded/retracted/out-of-validity claims are excluded from current retrieval while historical revisions remain addressable.
