@@ -18,9 +18,9 @@ The optional native adapter writes only UUID memory files beneath a selected `Re
 
 Version: 0.1 | No bidirectional vault synchronization in V1
 
-## 1. Source of truth
+## 1. Source of truth — legacy cloud subsystem only
 
-Cloud PostgreSQL is authoritative for committed application state. SQLite stores a local projection and durable pending commands. Local records are never copied wholesale over server records. Obsidian is an optional one-way export, not a second master.
+For the legacy cloud subsystem, Cloud PostgreSQL is authoritative for committed application state. For the active desktop product, the Obsidian vault is authoritative; this cloud rule does not apply. SQLite stores a local projection and durable pending commands. Local records are never copied wholesale over server records. Obsidian is an optional one-way export, not a second master.
 
 Offline work is acknowledged as saved on this device until the server accepts it. The UI shows last successful sync and any failed/conflicting operations. Do not say "synced" just because a request was sent.
 
