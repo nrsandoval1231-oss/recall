@@ -96,15 +96,16 @@ Windows may ask for firewall permission. Allow the port on the Tailscale adapter
 
 ### What the phone can do
 
-Capture chooses a photo or takes one. An optional note is your words, not a reading of the page. Save writes the original bytes under `Recall/Sources` before the Markdown note under `Recall/Memories`. Ask requires every remaining word to occur in the note or the source name. Question words are ignored. Each hit shows an excerpt, the vault-relative paths, and the original image. The page says keyword search, not a Claude answer.
+Capture can save a note alone. A photo or file is optional, and Save is not blocked when the file field is empty. The note is your words, not a reading of a page. A note with no photo is written under `Recall/Memories` and does not create a file in `Recall/Sources`. When a photo is included, Save writes those original bytes under `Recall/Sources` before the Markdown note. Ask requires every remaining word to occur in the note or the source name. Question words are ignored. Each hit shows an excerpt and the vault-relative note path. A hit that has a photo also shows that original. The page says keyword search, not a Claude answer.
 
 There is no token in the page, the URL, or browser storage. A browser on another site cannot submit the form: a cross-site `Origin` or `Sec-Fetch-Site` is refused. A file upload from this page is accepted when the browser marks it same-origin, including the `Origin: null` value Chrome sends on that upload. A program that can already open the address on the tailnet can read and write the vault, because there is no second login. Treat a Tailscale ACL as the access boundary. A starting shape, which this repository does not install, is to accept only the phone tag to the desktop tag on port 8787.
 
 ### Honest gaps
 
 - **HTTPS and certificates.** The page is HTTP. Recall does not install a certificate, terminate TLS, or run Tailscale Serve. Safari may limit Add to Home Screen or camera APIs on plain HTTP. The file field still offers the camera and the photo library in Safari without a secure context. Do not describe this as an HTTPS site.
-- **Offline.** The phone does not queue a photo. If the page does not load, nothing was saved. There is no service worker and no offline generative answer.
-- **Claude from the phone.** This process never calls Claude and never reads `RECALL_CLAUDE_API_KEY`. A saved photo is the queue: open it in the desktop app, check the consent box, and read it there. That desktop call still needs the key, model, prices, and budgets on the desktop process.
+- **Offline.** The phone does not queue a photo or a note. If the page does not load, nothing was saved. There is no service worker and no offline generative answer.
+- **Claude from the phone.** This process never calls Claude and never reads `RECALL_CLAUDE_API_KEY`. A saved photo is the queue: open it in the desktop app, check the consent box, and read it there. That desktop call still needs the key, model, prices, and budgets on the desktop process. A text-only note has no photo to send.
+- **Desktop evidence for a text note.** The Markdown note is in the vault. The desktop evidence view still asks for an original photo, so opening that note there reports that there is no original. Keyword search on the phone still finds the note.
 - **Not a public deployment.** Nothing here is hosted, published, or pointed at Cloud Postgres. A real iPhone on a real tailnet was not part of the automated tests. Those tests bind loopback and use synthetic image bytes.
 
 ## V1 deployment, recovery and acceptance

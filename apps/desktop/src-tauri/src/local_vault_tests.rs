@@ -22,6 +22,49 @@ fn photo() -> Vec<u8> {
     b"\x89PNG\r\n\x1a\nSYNTHETIC-TEST-ONLY".to_vec()
 }
 #[test]
+fn text_note_writes_markdown_without_a_source_file() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let id = op();
+    let saved = v
+        .capture_note(&id, "pump house valve, uncertain?")
+        .unwrap();
+    assert_eq!(saved.id, id);
+    assert!(saved.source_name.is_empty());
+    assert_eq!(saved.source_sha256, hash(b""));
+    assert!(v.source(&id).unwrap_err().contains("no original photo"));
+    assert_eq!(
+        fs::read_dir(f.0.join("Recall/Sources")).unwrap().count(),
+        0
+    );
+    let path = v.note_path(&id);
+    let markdown = fs::read_to_string(&path).unwrap();
+    assert!(markdown.contains("No original photo."));
+    assert!(!markdown.contains("../Sources/"));
+    assert!(markdown.contains("pump house valve, uncertain?"));
+    assert_eq!(
+        v.capture_note(&id, "pump house valve, uncertain?")
+            .unwrap()
+            .id,
+        id
+    );
+    assert!(v.capture_note(&id, "changed").is_err());
+    assert!(v.capture_note(&op(), "   ").is_err());
+    assert_eq!(
+        fs::read_dir(f.0.join("Recall/Sources")).unwrap().count(),
+        0
+    );
+    let edited = markdown.replace("uncertain?", "Obsidian kept this?");
+    fs::write(&path, &edited).unwrap();
+    let listed = v.list("Obsidian").unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].note, "pump house valve, Obsidian kept this?");
+    assert_eq!(listed[0].state, "active");
+    assert!(listed[0].conflict.is_none());
+    assert_eq!(fs::read_to_string(&path).unwrap(), edited);
+    assert!(v.source(&id).is_err());
+}
+#[test]
 fn capture_reopens_with_original_hash_and_history() {
     let f = Fixture::new();
     let m = f

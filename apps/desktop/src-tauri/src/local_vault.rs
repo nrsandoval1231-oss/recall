@@ -432,8 +432,32 @@ fn image_type(bytes: &[u8]) -> Result<&'static str> {
         Err("Choose a PNG, JPEG or WebP photo with a valid signature".into())
     }
 }
+fn absent_original(memory: &VaultMemory) -> bool {
+    memory.source_name.is_empty() && memory.source_sha256 == hash(b"")
+}
+fn source_identity_ok(memory: &VaultMemory) -> bool {
+    if memory.source_name.is_empty() {
+        return memory.source_sha256 == hash(b"");
+    }
+    memory.source_sha256.len() == 64
+        && memory.source_name.len() <= 260
+        && ["png", "jpg", "webp"].contains(&memory.source_name.rsplit('.').next().unwrap_or(""))
+        && !memory.source_name.contains(['/', '\\', '\0'])
+}
 fn markdown(m: &VaultMemory) -> String {
-    format!("<!-- Recall memory {} | human annotation, not OCR -->\n[Original photo](../Sources/{}.{})\n\n{}",m.id,m.id,m.source_name.rsplit('.').next().unwrap_or("png"),m.note)
+    let evidence = if absent_original(m) {
+        "No original photo.".to_string()
+    } else {
+        format!(
+            "[Original photo](../Sources/{}.{})",
+            m.id,
+            m.source_name.rsplit('.').next().unwrap_or("png")
+        )
+    };
+    format!(
+        "<!-- Recall memory {} | human annotation, not OCR -->\n{evidence}\n\n{}",
+        m.id, m.note
+    )
 }
 fn payload(
     kind: &str,
@@ -681,11 +705,7 @@ impl Vault {
                 } else {
                     "human:recall"
                 }
-            || e.memory.source_sha256.len() != 64
-            || e.memory.source_name.len() > 260
-            || !["png", "jpg", "webp"]
-                .contains(&e.memory.source_name.rsplit('.').next().unwrap_or(""))
-            || e.memory.source_name.contains(['/', '\\', '\0'])
+            || !source_identity_ok(&e.memory)
             || e.memory.captured_at.len() != 20
             || e.memory.updated_at.len() != 20
             || e.markdown != markdown(&e.memory)
@@ -753,6 +773,22 @@ impl Vault {
             mime_type: mime,
             sha256: m.source_sha256.clone(),
         })
+    }
+    /// A text note has no bytes in Recall/Sources. A photo still has to match.
+    fn confirm_source(&self, m: &VaultMemory) -> Result<()> {
+        if absent_original(m) {
+            for other in ["png", "jpg", "webp"] {
+                let path = self.path(&format!("Sources/{}.{other}", m.id));
+                if path.exists() {
+                    return Err(
+                        "Text note has a source file; resolve that file before using the note"
+                            .into(),
+                    );
+                }
+            }
+            return Ok(());
+        }
+        self.verify_source(m).map(|_| ())
     }
     fn records(&self, memory_id: &str) -> Result<Vec<Event>> {
         self.records_inner(memory_id, true)
@@ -918,22 +954,24 @@ impl Vault {
         if json(e)?.len() as u64 > MAX_JSON {
             return Err("Revision metadata exceeds size limit".into());
         }
-        let extension = e
-            .memory
-            .source_name
-            .rsplit('.')
-            .next()
-            .ok_or("Missing source extension")?;
-        let source = self.path(&format!("Sources/{}.{extension}", e.memory.id));
         let history = self.history_path(&e.memory.id, e.memory.revision);
         let history_dir = history.parent().ok_or("Missing history directory")?;
-        let mut additions: BTreeMap<PathBuf, usize> = BTreeMap::new();
-        for path in [
-            source,
+        let mut paths = vec![
             self.journal_path(&e.operation_id),
             self.done_path(&e.operation_id),
             history.clone(),
-        ] {
+        ];
+        if !absent_original(&e.memory) {
+            let extension = e
+                .memory
+                .source_name
+                .rsplit('.')
+                .next()
+                .ok_or("Missing source extension")?;
+            paths.push(self.path(&format!("Sources/{}.{extension}", e.memory.id)));
+        }
+        let mut additions: BTreeMap<PathBuf, usize> = BTreeMap::new();
+        for path in paths {
             safe(&path)?;
             let count = if path.try_exists().map_err(fail)? {
                 0
@@ -1019,7 +1057,7 @@ impl Vault {
             // Never replay its Markdown over a later head (especially a tombstone).
             return self.repair_receipt(e, &bytes);
         }
-        self.verify_source(&e.memory)?;
+        self.confirm_source(&e.memory)?;
         if e.expected_revision > 0 {
             let records = self.records(&e.memory.id)?;
             let last = records.last().ok_or("Missing parent")?;
@@ -1295,6 +1333,56 @@ impl Vault {
         )?;
         self.commit(&e)
     }
+    pub fn capture_note(&self, operation_id: &str, note: &str) -> Result<VaultMemory> {
+        let _lock = self.lock()?;
+        let pending = self.recover()?;
+        id(operation_id)?;
+        note_valid(note)?;
+        if note.trim().is_empty() {
+            return Err("Write a note, or choose a photo.".into());
+        }
+        let source_hash = hash(b"");
+        let payload_sha256 = payload("capture", operation_id, 0, note, &source_hash, "")?;
+        if let Some(e) = self.receipt(operation_id)? {
+            if e.payload_sha256 != payload_sha256 {
+                return Err("Operation ID reused with different payload".into());
+            }
+            return self.current(&e.memory.id, &pending);
+        }
+        if let Some(error) = pending.get(operation_id) {
+            return Err(error.clone());
+        }
+        let now = timestamp();
+        let memory = VaultMemory {
+            id: operation_id.into(),
+            revision: 1,
+            note: note.into(),
+            source_sha256: source_hash,
+            source_name: String::new(),
+            captured_at: now.clone(),
+            updated_at: now,
+            conflict: None,
+            state: "active".into(),
+            note_path: None,
+        };
+        let e = Event {
+            format: FORMAT_V2.into(),
+            vault_id: self.id.clone(),
+            operation_id: operation_id.into(),
+            kind: "capture".into(),
+            note_path: Some(format!("{operation_id}.md")),
+            expected_state: None,
+            expected_revision: 0,
+            payload_sha256,
+            parent_sha256: None,
+            origin: "human:recall".into(),
+            markdown: markdown(&memory),
+            previous_markdown: None,
+            memory,
+        };
+        self.preflight_capacity(&e)?;
+        self.commit(&e)
+    }
     fn reconciled(&self, memory_id: &str) -> Result<VaultMemory> {
         let records = self.records(memory_id)?;
         let last = records.last().ok_or("Missing history")?;
@@ -1304,7 +1392,7 @@ impl Vault {
             m.note_path = last.note_path.clone();
             return Ok(m);
         }
-        self.verify_source(&m)?;
+        self.confirm_source(&m)?;
         let np = match self.inventory(memory_id, last.note_path.as_deref()) {
             Ok(Some(p)) => p,
             Ok(None) => {
@@ -1625,6 +1713,9 @@ impl Vault {
         let m = self.reconciled(memory_id)?;
         if m.state != "active" || m.conflict.is_some() {
             return Err("Resolve this memory's conflict before using its evidence".into());
+        }
+        if absent_original(&m) {
+            return Err("This note has no original photo.".into());
         }
         self.verify_source(&m)
     }

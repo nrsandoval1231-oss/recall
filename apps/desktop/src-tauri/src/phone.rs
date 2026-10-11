@@ -375,42 +375,65 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
     let form = match read_capture(request) {
         Ok(form) => form,
         Err(err) => {
-            return html(
+            return not_saved(
                 err.status,
-                page(
-                    "Photo not saved",
-                    &format!(
-                        "<h1>Photo not saved</h1><p>{}</p>{}",
-                        esc(&err.message),
-                        capture_form(&Uuid::new_v4().to_string(), "")
-                    ),
-                ),
+                &err.message,
+                &Uuid::new_v4().to_string(),
+                "",
+                false,
             );
         }
     };
-    match vault.capture(&form.operation_id, &form.filename, &form.photo, &form.note) {
+    let saved = match &form.photo {
+        Some(photo) => vault.capture(&form.operation_id, &form.filename, photo, &form.note),
+        None => vault.capture_note(&form.operation_id, &form.note),
+    };
+    match saved {
         Ok(memory) => redirect(&format!("/saved/{}", memory.id)),
-        Err(err) => {
-            let status = vault_status(&err);
-            html(
-                status,
-                page(
-                    "Photo not saved",
-                    &format!(
-                        "<h1>Photo not saved</h1><p>{}</p><p>Nothing new was uploaded to a cloud, and Claude was not called. If this same photo was already saved, <a href=\"/\">start a new capture</a>.</p>{}",
-                        esc(&err),
-                        capture_form(&form.operation_id, &form.note)
-                    ),
-                ),
-            )
-        }
+        Err(err) => not_saved(
+            vault_status(&err),
+            &err,
+            &form.operation_id,
+            &form.note,
+            form.photo.is_some(),
+        ),
     }
+}
+
+fn not_saved(
+    status: u16,
+    message: &str,
+    operation_id: &str,
+    note: &str,
+    had_photo: bool,
+) -> PhoneResponse {
+    let title = if had_photo {
+        "Photo not saved"
+    } else {
+        "Note not saved"
+    };
+    let detail = if had_photo {
+        "Nothing new was uploaded to a cloud, and Claude was not called. If this same photo was already saved, <a href=\"/\">start a new capture</a>."
+    } else {
+        "Nothing new was written. Nothing was uploaded to a cloud, and Claude was not called."
+    };
+    html(
+        status,
+        page(
+            title,
+            &format!(
+                "<h1>{title}</h1><p>{}</p><p>{detail}</p>{}",
+                esc(message),
+                capture_form(operation_id, note)
+            ),
+        ),
+    )
 }
 
 struct CaptureForm {
     operation_id: String,
     filename: String,
-    photo: Vec<u8>,
+    photo: Option<Vec<u8>>,
     note: String,
 }
 
@@ -427,28 +450,75 @@ fn read_capture(request: &PhoneRequest<'_>) -> Result<CaptureForm, FormError> {
     {
         return read_multipart_capture(content_type, request.body);
     }
+    if content_type
+        .to_ascii_lowercase()
+        .starts_with("application/x-www-form-urlencoded")
+    {
+        return read_urlencoded_capture(request);
+    }
     if !(content_type.to_ascii_lowercase().starts_with("image/")
         || content_type.eq_ignore_ascii_case("application/octet-stream")
         || content_type.is_empty())
     {
         return Err(FormError {
             status: 400,
-            message: "Send the photo as a form upload.".into(),
+            message: "Send the note as a form, or the photo as a form upload.".into(),
         });
     }
+    let note = header(request.headers, "x-recall-note")
+        .unwrap_or("")
+        .to_string();
     if request.body.is_empty() {
-        return Err(FormError {
-            status: 400,
-            message: "Choose a photo.".into(),
+        if note.trim().is_empty() {
+            return Err(FormError {
+                status: 400,
+                message: "Write a note, or choose a photo. A photo is optional.".into(),
+            });
+        }
+        return Ok(CaptureForm {
+            operation_id: operation_id(header(request.headers, "x-recall-operation-id"))?,
+            filename: String::new(),
+            photo: None,
+            note,
         });
     }
     Ok(CaptureForm {
         operation_id: operation_id(header(request.headers, "x-recall-operation-id"))?,
         filename: "photo".into(),
-        photo: request.body.to_vec(),
-        note: header(request.headers, "x-recall-note")
-            .unwrap_or("")
-            .to_string(),
+        photo: Some(request.body.to_vec()),
+        note,
+    })
+}
+
+fn read_urlencoded_capture(request: &PhoneRequest<'_>) -> Result<CaptureForm, FormError> {
+    let text = std::str::from_utf8(request.body).map_err(|_| FormError {
+        status: 400,
+        message: "That field is not UTF-8.".into(),
+    })?;
+    let note = form_value(text, "note").map_err(|message| FormError {
+        status: 400,
+        message,
+    })?;
+    let operation = form_value(text, "operation_id").map_err(|message| FormError {
+        status: 400,
+        message,
+    })?;
+    if note.trim().is_empty() {
+        return Err(FormError {
+            status: 400,
+            message: "Write a note, or choose a photo. A photo is optional.".into(),
+        });
+    }
+    let operation = if operation.trim().is_empty() {
+        None
+    } else {
+        Some(operation)
+    };
+    Ok(CaptureForm {
+        operation_id: operation_id(operation.as_deref())?,
+        filename: String::new(),
+        photo: None,
+        note,
     })
 }
 
@@ -466,16 +536,13 @@ fn read_multipart_capture(content_type: &str, body: &[u8]) -> Result<CaptureForm
     })? {
         match part.name {
             "photo" => {
+                if part.body.is_empty() {
+                    continue;
+                }
                 if photo.is_some() {
                     return Err(FormError {
                         status: 400,
                         message: "Send one photo.".into(),
-                    });
-                }
-                if part.body.is_empty() {
-                    return Err(FormError {
-                        status: 400,
-                        message: "Choose a photo.".into(),
                     });
                 }
                 photo = Some((photo_filename(part.filename), part.body.to_vec()));
@@ -485,10 +552,18 @@ fn read_multipart_capture(content_type: &str, body: &[u8]) -> Result<CaptureForm
             _ => {}
         }
     }
-    let (filename, photo) = photo.ok_or_else(|| FormError {
-        status: 400,
-        message: "Choose a photo.".into(),
-    })?;
+    let (filename, photo) = match photo {
+        Some((filename, photo)) => (filename, Some(photo)),
+        None => {
+            if note.trim().is_empty() {
+                return Err(FormError {
+                    status: 400,
+                    message: "Write a note, or choose a photo. A photo is optional.".into(),
+                });
+            }
+            (String::new(), None)
+        }
+    };
     Ok(CaptureForm {
         operation_id: operation_id(operation.as_deref())?,
         filename,
@@ -585,17 +660,29 @@ fn keyword_answer(vault: &Vault, question: &str) -> Result<String, String> {
     }
     let mut cards = String::new();
     for memory in eligible {
-        let source_path = source_rel(memory);
         let note_path = note_rel(memory);
+        let body = esc(&excerpt(
+            &memory.note,
+            terms.first().map(String::as_str).unwrap_or(""),
+        ));
+        let evidence = if let Some(source_path) = source_rel(memory) {
+            format!(
+                "<img src=\"/sources/{}\" alt=\"Original page\"><p class=\"path\">{}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p>",
+                esc(&memory.id),
+                esc(&note_path),
+                esc(&source_path),
+                esc(&memory.id),
+            )
+        } else {
+            format!(
+                "<p>No original photo.</p><p class=\"path\">{}</p>",
+                esc(&note_path)
+            )
+        };
         cards.push_str(&format!(
-            "<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><img src=\"/sources/{}\" alt=\"Original page\"><p class=\"path\">{}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p></article>",
+            "<article data-memory=\"{}\"><h2>{}</h2><p>{body}</p>{evidence}</article>",
             esc(&memory.id),
             esc(&title_for(memory)),
-            esc(&excerpt(&memory.note, terms.first().map(String::as_str).unwrap_or(""))),
-            esc(&memory.id),
-            esc(&note_path),
-            esc(&source_path),
-            esc(&memory.id),
         ));
     }
     Ok(format!(
@@ -678,22 +765,34 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
             409,
             page(
                 "Resolve on the desktop",
-                "<h1>Resolve this note on the desktop</h1><p>The original is still in the vault. This phone will not replace a local edit or a conflict.</p><p><a href=\"/\">Back</a></p>",
+                "<h1>Resolve this note on the desktop</h1><p>This phone will not replace a local edit or a conflict.</p><p><a href=\"/\">Back</a></p>",
             ),
         );
     }
+    let note_path = note_rel(&memory);
+    let body = if let Some(source_path) = source_rel(&memory) {
+        format!(
+            "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. It was not uploaded to a cloud, and Claude was not called. Open the photo in the desktop app later if you want Claude to read it.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>",
+            esc(&source_path),
+            esc(&note_path),
+            esc(&memory.id),
+            esc(&memory.note),
+            esc(&note_path),
+            esc(&source_path),
+        )
+    } else {
+        format!(
+            "<h1>Saved in the desktop vault</h1><p>The note is in {note}. There is no original photo, and nothing was added under Recall/Sources. It was not uploaded to a cloud, and Claude was not called.</p><p>{}</p><p class=\"path\">{note}</p>",
+            esc(&memory.note),
+            note = esc(&note_path),
+        )
+    };
     html(
         200,
         page(
             "Saved in the desktop vault",
             &format!(
-                "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. It was not uploaded to a cloud, and Claude was not called. Open the photo in the desktop app later if you want Claude to read it.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
-                esc(&source_rel(&memory)),
-                esc(&note_rel(&memory)),
-                esc(&memory.id),
-                esc(&memory.note),
-                esc(&note_rel(&memory)),
-                esc(&source_rel(&memory)),
+                "{body}{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
                 capture_form(&Uuid::new_v4().to_string(), ""),
                 ask_form("")
             ),
@@ -776,7 +875,7 @@ fn home_page() -> String {
     page(
         "Recall",
         &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. The desktop app can read a saved photo with Claude later; this page does not.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, the photo was not saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. The desktop app can read a saved photo with Claude later; this page does not.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
             capture_form(&Uuid::new_v4().to_string(), ""),
             ask_form("")
         ),
@@ -785,7 +884,7 @@ fn home_page() -> String {
 
 fn capture_form(operation_id: &str, note: &str) -> String {
     format!(
-        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Photograph a page or choose one<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" required></label><label>Optional note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><button type=\"submit\">Save to the vault</button></form><p class=\"fine\">The original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><button type=\"submit\">Save to the vault</button></form><p class=\"fine\">A photo is optional. A note by itself is saved under Recall/Memories and does not add a file under Recall/Sources. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
         esc(operation_id),
         esc(note)
     )
@@ -972,14 +1071,16 @@ fn title_for(memory: &VaultMemory) -> String {
     }
 }
 
-fn source_rel(memory: &VaultMemory) -> String {
+fn source_rel(memory: &VaultMemory) -> Option<String> {
+    if memory.source_name.is_empty() {
+        return None;
+    }
     let ext = memory
         .source_name
         .rsplit('.')
         .next()
-        .filter(|ext| !ext.is_empty() && ext.len() <= 8)
-        .unwrap_or("png");
-    format!("Recall/Sources/{}.{ext}", memory.id)
+        .filter(|ext| !ext.is_empty() && ext.len() <= 8)?;
+    Some(format!("Recall/Sources/{}.{ext}", memory.id))
 }
 
 fn note_rel(memory: &VaultMemory) -> String {
@@ -1587,6 +1688,146 @@ mod tests {
         assert_eq!(changed.status, 400);
         assert!(text(&changed).contains("different payload"));
         assert!(fs::read_to_string(&note).unwrap().contains("800 psi?"));
+    }
+
+    #[test]
+    fn text_only_note_is_saved_without_a_source_and_ask_finds_it() {
+        let dir = TempDir::new();
+        Vault::open(&dir.0).unwrap();
+        let home = text(&call(&dir.0, "GET", "/", &[], b""));
+        assert!(home.contains("A photo is optional."));
+        assert!(home.contains("Photo or file, optional"));
+        assert!(!home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" required"));
+        assert!(home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\""));
+
+        let id = Uuid::new_v4().to_string();
+        let boundary = "RecallSyntheticBoundary";
+        let mut body = Vec::new();
+        body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"operation_id\"\r\n\r\n{id}\r\n").into_bytes());
+        body.extend(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nMeet Pat at the pump house, uncertain?\r\n"
+            )
+            .into_bytes(),
+        );
+        body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"\"\r\nContent-Type: application/octet-stream\r\n\r\n\r\n").into_bytes());
+        body.extend(format!("--{boundary}--\r\n").into_bytes());
+        let headers = [(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )];
+        let response = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[("content-type", headers[0].1.as_str())],
+            &body,
+        );
+        assert_eq!(response.status, 303, "{}", text(&response));
+        let note_path = dir.0.join(format!("Recall/Memories/{id}.md"));
+        let markdown = fs::read_to_string(&note_path).unwrap();
+        assert!(markdown.contains("No original photo."));
+        assert!(markdown.contains("Meet Pat at the pump house, uncertain?"));
+        assert!(!markdown.contains("../Sources/"));
+        assert_eq!(
+            fs::read_dir(dir.0.join("Recall/Sources")).unwrap().count(),
+            0
+        );
+        let saved = text(&call(&dir.0, "GET", &format!("/saved/{id}"), &[], b""));
+        assert!(saved.contains("There is no original photo"));
+        assert!(saved.contains("Meet Pat at the pump house, uncertain?"));
+        assert!(!saved.contains(&format!("Recall/Sources/{id}")));
+        assert!(!saved.contains("<img"));
+        assert_eq!(
+            call(&dir.0, "GET", &format!("/sources/{id}"), &[], b"").status,
+            404
+        );
+
+        let again = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[("content-type", headers[0].1.as_str())],
+            &body,
+        );
+        assert_eq!(again.status, 303, "{}", text(&again));
+        assert_eq!(
+            fs::read_dir(dir.0.join("Recall/Memories")).unwrap().count(),
+            1
+        );
+        assert_eq!(
+            fs::read_dir(dir.0.join("Recall/Sources")).unwrap().count(),
+            0
+        );
+
+        let ask = call(
+            &dir.0,
+            "POST",
+            "/ask",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            b"q=What+about+the+pump+house%3F",
+        );
+        let page = text(&ask);
+        assert_eq!(ask.status, 200, "{page}");
+        assert!(page.contains(KEYWORD_LABEL));
+        assert!(page.contains("Meet Pat at the pump house, uncertain?"));
+        assert!(page.contains("No original photo."));
+        assert!(page.contains(&format!("Recall/Memories/{id}.md")));
+        assert!(!page.contains("Recall/Sources"));
+        assert!(!page.contains("<img"));
+        assert!(!page.contains(&format!("/sources/{id}")));
+
+        let mut changed = Vec::new();
+        changed.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"operation_id\"\r\n\r\n{id}\r\n").into_bytes());
+        changed.extend(
+            format!("--{boundary}\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nchanged\r\n")
+                .into_bytes(),
+        );
+        changed.extend(format!("--{boundary}--\r\n").into_bytes());
+        let rejected = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[("content-type", headers[0].1.as_str())],
+            &changed,
+        );
+        assert_eq!(rejected.status, 400, "{}", text(&rejected));
+        assert!(fs::read_to_string(&note_path)
+            .unwrap()
+            .contains("uncertain?"));
+
+        let blank = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            format!("operation_id={}&note=%20%20", Uuid::new_v4()).as_bytes(),
+        );
+        assert_eq!(blank.status, 400, "{}", text(&blank));
+        assert!(text(&blank).contains("A photo is optional"));
+        assert_eq!(
+            fs::read_dir(dir.0.join("Recall/Memories")).unwrap().count(),
+            1
+        );
+        assert_eq!(
+            fs::read_dir(dir.0.join("Recall/Sources")).unwrap().count(),
+            0
+        );
+
+        let edited = fs::read_to_string(&note_path)
+            .unwrap()
+            .replace("uncertain?", "Obsidian kept this?");
+        fs::write(&note_path, &edited).unwrap();
+        let edited_ask = text(&call(
+            &dir.0,
+            "POST",
+            "/ask",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            b"q=Obsidian",
+        ));
+        assert!(edited_ask.contains("Obsidian kept this?"));
+        assert!(!edited_ask.contains("Recall/Sources"));
+        assert_eq!(fs::read_to_string(&note_path).unwrap(), edited);
     }
 
     #[test]
