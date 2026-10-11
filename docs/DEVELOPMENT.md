@@ -51,6 +51,62 @@ When no vault is open, or the vault has no memories, the surface shows the synth
 
 `?mode=legacy-cloud` still opens the older cloud desktop. That view needs the public `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` values. It is not the product path. `apps/web` enrollment is unchanged and is not this journey.
 
+## Phone companion over Tailscale
+
+The phone is a capture and ask page served by a small process on the same computer as the desktop app. It writes the same Obsidian vault. It does not show a login, sign-up, password, or email field. It does not use Cloud Postgres, and it does not call Claude. A photo saved here stays in the vault until someone opens it in the desktop app and consents to a reading there. The Claude key, when set, stays in the desktop process. It is not in this page.
+
+Build and run it from the desktop crate:
+
+```bash
+cd apps/desktop/src-tauri
+cargo run --bin recall-phone
+```
+
+`npm run phone` from `apps/desktop` runs the same command. A release binary is `cargo build --release --bin recall-phone`, which writes `target/release/recall-phone` (`recall-phone.exe` on Windows). Leave the console open. It prints the vault folder and the URL. Closing it stops the phone page.
+
+### Which vault
+
+Set `RECALL_VAULT_DIR` to the same absolute folder the desktop uses. The folder must already exist. The process then uses the `Recall/Sources`, `Recall/Memories`, `Recall/History`, and `Recall/_meta` tree inside it, creating that tree only when the folder is empty of one.
+
+If `RECALL_VAULT_DIR` is unset, the process follows the folder the desktop app last selected:
+
+| System | Selection file |
+| --- | --- |
+| Windows | `%APPDATA%\com.example.recall.desktop\selected-vault.json` |
+| Linux | `$XDG_DATA_HOME` or `~/.local/share/com.example.recall.desktop/selected-vault.json` |
+| macOS | `~/Library/Application Support/com.example.recall.desktop/selected-vault.json` |
+
+If neither is available, it exits without creating a second vault. Open the folder in the desktop app first, or set `RECALL_VAULT_DIR`.
+
+The desktop app and this process share the vault writer lock. If one is mid-write, the other is told the vault is busy. A busy or failed save is not described as saved. A note edited in Obsidian is not replaced. Ask reads the current note text, including that edit, and says it is keyword search.
+
+### Reach the page from the iPhone
+
+1. Install Tailscale on the desktop and on the iPhone, and join the same tailnet.
+2. On the desktop, run `tailscale ip -4`. That is the address to open. Example shape: `100.64.1.5`.
+3. Start `recall-phone` on the desktop. When `tailscale ip -4` succeeds and `RECALL_PHONE_BIND` is unset, the process listens on that IPv4 and port `8787` only. It does not listen on `0.0.0.0`.
+4. On the iPhone, with Tailscale connected, open `http://<that-ipv4>:8787/` in Safari.
+5. Add to Home Screen is optional. The icon uses the page manifest. It does not cache notes or photos, and it does not answer while the desktop process is unreachable.
+
+Set `RECALL_PHONE_PORT` to use another port from 1 to 65535. Set `RECALL_PHONE_BIND` to a specific IP, or to `tailscale` to fail instead of falling back, or to `loopback` for this computer only. If Tailscale is not running and the bind is unset, the process listens on `127.0.0.1` and the banner says the phone cannot open it.
+
+`RECALL_PHONE_ALLOW_ALL_INTERFACES=1` together with `RECALL_PHONE_BIND=0.0.0.0` listens on every interface. That is off unless both are set. Do not set them on a machine with a public or untrusted LAN address. A Tailscale ACL does not apply to those other interfaces.
+
+Windows may ask for firewall permission. Allow the port on the Tailscale adapter only. Do not allow it on a Public profile, and do not forward the port from a router.
+
+### What the phone can do
+
+Capture chooses a photo or takes one. An optional note is your words, not a reading of the page. Save writes the original bytes under `Recall/Sources` before the Markdown note under `Recall/Memories`. Ask requires every remaining word to occur in the note or the source name. Question words are ignored. Each hit shows an excerpt, the vault-relative paths, and the original image. The page says keyword search, not a Claude answer.
+
+There is no token in the page, the URL, or browser storage. A browser on another site cannot submit the form: a cross-site `Origin` or `Sec-Fetch-Site` is refused. A file upload from this page is accepted when the browser marks it same-origin, including the `Origin: null` value Chrome sends on that upload. A program that can already open the address on the tailnet can read and write the vault, because there is no second login. Treat a Tailscale ACL as the access boundary. A starting shape, which this repository does not install, is to accept only the phone tag to the desktop tag on port 8787.
+
+### Honest gaps
+
+- **HTTPS and certificates.** The page is HTTP. Recall does not install a certificate, terminate TLS, or run Tailscale Serve. Safari may limit Add to Home Screen or camera APIs on plain HTTP. The file field still offers the camera and the photo library in Safari without a secure context. Do not describe this as an HTTPS site.
+- **Offline.** The phone does not queue a photo. If the page does not load, nothing was saved. There is no service worker and no offline generative answer.
+- **Claude from the phone.** This process never calls Claude and never reads `RECALL_CLAUDE_API_KEY`. A saved photo is the queue: open it in the desktop app, check the consent box, and read it there. That desktop call still needs the key, model, prices, and budgets on the desktop process.
+- **Not a public deployment.** Nothing here is hosted, published, or pointed at Cloud Postgres. A real iPhone on a real tailnet was not part of the automated tests. Those tests bind loopback and use synthetic image bytes.
+
 ## V1 deployment, recovery and acceptance
 
 Apply all checksummed migrations with the owner connection; enable pgvector as administrator first. API and worker connections must be least privilege and cannot own tables or bypass RLS. Fill `infra/api.env.example` and `infra/worker.env.example` into ignored private `.env` files. `docker compose -f infra/pilot.compose.yml up --build` runs API and worker against external Supabase. Bind is local-only by default; place HTTPS/authenticated ingress in front of it. No external infrastructure is provisioned by these templates.

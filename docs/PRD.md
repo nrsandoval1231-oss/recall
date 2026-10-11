@@ -5,7 +5,7 @@
 
 Version: 0.3 | Date: 2026-10-07 | Product owner: Nick Sandoval
 
-Status: universal vision approved; initial V1 features exist as code. The desktop Memory Surface writes into a local Obsidian vault without login. Ask on that path is keyword search with the original still reachable. Live Claude, the phone companion, and an installed Windows run are open. The no-login PWA in PR #16 remains an optional companion, not the start-using-it product.
+Status: universal vision approved; initial V1 features exist as code. The desktop Memory Surface writes into a local Obsidian vault without login. Ask on that path is keyword search with the original still reachable. A phone on the same Tailscale network can capture and ask into that vault through a local page on the desktop machine; a real iPhone session is still open. Live Claude and an installed Windows run are open. The no-login PWA in PR #16 remains an optional companion, not the start-using-it product.
 
 ## 1. Product thesis
 

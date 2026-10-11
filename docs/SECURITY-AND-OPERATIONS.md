@@ -6,6 +6,10 @@
 
 The desktop vault path does not sign in and does not send notes or photos to the Recall API. The folder is as private as the operating-system account. Recall does not add its own encryption. `RECALL_VAULT_DIR`, when set, is read by the native process; the webview cannot choose an arbitrary path. Claude reading is a separate opt-in: the API key stays in the desktop process, one photo is sent only after a checkbox, and a missing budget refuses the call. The webview cannot read the key. The legacy cloud desktop and the web companion still use the server controls below.
 
+### Phone companion on the tailnet
+
+`recall-phone` serves the vault only to clients that can open its listen address. The default listen address is the Tailscale IPv4 from `tailscale ip -4`, or `127.0.0.1` when that command fails. `0.0.0.0` is refused unless `RECALL_PHONE_ALLOW_ALL_INTERFACES=1` is also set. The page has no login and no bearer token. A Tailscale ACL is the intended boundary: only the owner's phone should reach the desktop port. Anyone who can open the URL can read originals and write captures. The process rejects a browser `Origin` or `Sec-Fetch-Site` that is not same-origin, so another website cannot submit the form. That check is not a substitute for the ACL. The page does not receive the Claude key. Photos are not sent to a provider by this process. The connection is HTTP; this slice does not install a certificate.
+
 
 ## V1 operations and limitations
 

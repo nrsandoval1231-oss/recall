@@ -6,4 +6,6 @@ The product path is the Memory Surface. It opens without an email, password, or 
 
 Ask searches note text and opens the original. It is keyword search, not a Claude answer. Claude reading stays off unless the desktop process has `RECALL_CLAUDE_API_KEY`, a model, prices, and budgets. A consented read stores an unreviewed proposal and does not replace the note until you save a correction. Tests use a fake provider and do not make a network call.
 
+`cargo run --bin recall-phone` from `src-tauri` serves the phone Capture and Ask page for the same vault. It is meant for the Tailscale address of this computer. Steps and the HTTPS, offline, and Claude gaps are in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+
 `?mode=legacy-cloud` keeps the older cloud desktop, including its email sign-in. It is not the happy path. The Windows NSIS build is unsigned. An Actions artifact is not an installed-app acceptance.

@@ -1,0 +1,1826 @@
+//! Phone capture and ask for the desktop Obsidian vault.
+//!
+//! This process is the Tailscale companion. It serves one mobile page and writes
+//! through the same vault the desktop app uses. It does not call Claude, does not
+//! read an API key, and does not talk to Cloud Postgres. Bind is a Tailscale
+//! address or loopback unless every interface is explicitly allowed.
+
+use crate::local_vault::{Vault, VaultMemory};
+use std::collections::VecDeque;
+use std::io::Read;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::{Duration, Instant};
+use uuid::Uuid;
+
+const DEFAULT_PORT: u16 = 8787;
+const MAX_BODY: usize = 26 * 1024 * 1024;
+const MAX_QUESTION: usize = 4096;
+const CAPTURES_PER_MINUTE: u32 = 30;
+const ASKS_PER_MINUTE: u32 = 60;
+const KEYWORD_LABEL: &str = "Keyword search. Not a Claude answer.";
+const ICON_PNG: &[u8] = include_bytes!("../icons/32x32.png");
+
+const QUESTION_WORDS: &[&str] = &[
+    "what",
+    "whats",
+    "who",
+    "whom",
+    "whose",
+    "where",
+    "when",
+    "why",
+    "how",
+    "do",
+    "does",
+    "did",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "you",
+    "your",
+    "yours",
+    "me",
+    "my",
+    "we",
+    "our",
+    "the",
+    "a",
+    "an",
+    "of",
+    "to",
+    "for",
+    "in",
+    "on",
+    "at",
+    "and",
+    "or",
+    "about",
+    "know",
+    "tell",
+    "anything",
+    "something",
+    "please",
+    "recall",
+];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BindMode {
+    Loopback,
+    Tailscale,
+    Explicit,
+    AllInterfaces,
+}
+
+#[derive(Debug)]
+struct BindChoice {
+    addr: SocketAddr,
+    mode: BindMode,
+}
+
+struct PhoneRequest<'a> {
+    method: &'a str,
+    target: &'a str,
+    headers: &'a [(&'a str, &'a str)],
+    body: &'a [u8],
+}
+
+struct PhoneResponse {
+    status: u16,
+    content_type: String,
+    extra: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+struct WindowLimiter {
+    limit: u32,
+    hits: VecDeque<Instant>,
+}
+
+impl WindowLimiter {
+    fn new(limit: u32) -> Self {
+        Self {
+            limit,
+            hits: VecDeque::new(),
+        }
+    }
+
+    fn allow(&mut self, now: Instant) -> bool {
+        if self.limit == u32::MAX {
+            return true;
+        }
+        let window = Duration::from_secs(60);
+        while self
+            .hits
+            .front()
+            .is_some_and(|at| now.saturating_duration_since(*at) >= window)
+        {
+            self.hits.pop_front();
+        }
+        if self.hits.len() as u32 >= self.limit {
+            return false;
+        }
+        self.hits.push_back(now);
+        true
+    }
+}
+
+pub fn run_from_env() -> Result<(), String> {
+    let root = resolve_vault_root(
+        env_nonempty("RECALL_VAULT_DIR").as_deref(),
+        selection_file_from_env()?.as_deref(),
+    )?;
+    let vault = Vault::open(&root)?;
+    let choice = decide_bind(
+        env_nonempty("RECALL_PHONE_BIND").as_deref(),
+        allow_all_interfaces(),
+        port_from_env()?,
+        detect_tailscale_command(),
+    )?;
+    eprintln!("{}", startup_banner(&root, &vault.id, &choice));
+    let server = tiny_http::Server::http(choice.addr).map_err(|err| {
+        format!(
+            "Could not listen on {}. If this is a Tailscale address, Tailscale has to be running on this computer and the address has to belong to it. {err}",
+            choice.addr
+        )
+    })?;
+    let bound = server
+        .server_addr()
+        .to_ip()
+        .ok_or_else(|| "The phone companion listens on TCP only.".to_string())?;
+    eprintln!("Listening on {}", http_url(bound));
+    let mut captures = WindowLimiter::new(CAPTURES_PER_MINUTE);
+    let mut asks = WindowLimiter::new(ASKS_PER_MINUTE);
+    for request in server.incoming_requests() {
+        if let Err(err) = serve_one(&root, &mut captures, &mut asks, request) {
+            eprintln!("recall-phone: {err}");
+        }
+    }
+    Ok(())
+}
+
+fn serve_one(
+    root: &Path,
+    captures: &mut WindowLimiter,
+    asks: &mut WindowLimiter,
+    mut request: tiny_http::Request,
+) -> Result<(), String> {
+    let method = request.method().as_str().to_string();
+    let target = request.url().to_string();
+    let path = target
+        .split('?')
+        .next()
+        .unwrap_or(target.as_str())
+        .to_string();
+    let limited = match (method.as_str(), path.as_str()) {
+        ("POST", "/capture") => !captures.allow(Instant::now()),
+        ("POST", "/ask") => !asks.allow(Instant::now()),
+        _ => false,
+    };
+    let headers: Vec<(String, String)> = request
+        .headers()
+        .iter()
+        .map(|header| {
+            (
+                header.field.as_str().as_str().to_string(),
+                header.value.as_str().to_string(),
+            )
+        })
+        .collect();
+    let response = if limited {
+        html(
+            429,
+            page(
+                "Slow down",
+                "<h1>Slow down</h1><p>Too many captures or questions in the last minute. Nothing was written.</p><p><a href=\"/\">Back</a></p>",
+            ),
+        )
+    } else {
+        let body = if method == "POST" {
+            match read_body(&mut request) {
+                Ok(body) => body,
+                Err(err) => {
+                    let response = html(
+                        413,
+                        page(
+                            "Photo not saved",
+                            &format!(
+                                "<h1>Photo not saved</h1><p>{}</p><p><a href=\"/\">Back</a></p>",
+                                esc(&err)
+                            ),
+                        ),
+                    );
+                    return respond(request, &method, &path, response);
+                }
+            }
+        } else {
+            Vec::new()
+        };
+        let pairs: Vec<(&str, &str)> = headers
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+            .collect();
+        handle(
+            root,
+            &PhoneRequest {
+                method: &method,
+                target: &target,
+                headers: &pairs,
+                body: &body,
+            },
+        )
+    };
+    respond(request, &method, &path, response)
+}
+
+fn respond(
+    request: tiny_http::Request,
+    method: &str,
+    path: &str,
+    response: PhoneResponse,
+) -> Result<(), String> {
+    let status = response.status;
+    let mut output = tiny_http::Response::from_data(response.body).with_status_code(status);
+    output = output.with_header(ascii_header("Content-Type", &response.content_type)?);
+    output = output.with_header(ascii_header("Cache-Control", "no-store")?);
+    output = output.with_header(ascii_header("X-Content-Type-Options", "nosniff")?);
+    output = output.with_header(ascii_header("Referrer-Policy", "no-referrer")?);
+    output = output.with_header(ascii_header("X-Frame-Options", "DENY")?);
+    output = output.with_header(ascii_header(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src 'self'; style-src 'unsafe-inline'; script-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    )?);
+    for (name, value) in &response.extra {
+        output = output.with_header(ascii_header(name, value)?);
+    }
+    request.respond(output).map_err(|err| err.to_string())?;
+    eprintln!("recall-phone {method} {path} {status}");
+    Ok(())
+}
+
+fn ascii_header(name: &str, value: &str) -> Result<tiny_http::Header, String> {
+    tiny_http::Header::from_bytes(name.as_bytes(), value.as_bytes())
+        .map_err(|_| format!("refusing a non-ASCII header {name}"))
+}
+
+fn read_body(request: &mut tiny_http::Request) -> Result<Vec<u8>, String> {
+    if request.body_length().unwrap_or(0) > MAX_BODY {
+        return Err("The upload is larger than 26 MiB. Nothing was written.".into());
+    }
+    let mut body = Vec::new();
+    request
+        .as_reader()
+        .take(MAX_BODY as u64 + 1)
+        .read_to_end(&mut body)
+        .map_err(|err| err.to_string())?;
+    if body.len() > MAX_BODY {
+        return Err("The upload is larger than 26 MiB. Nothing was written.".into());
+    }
+    Ok(body)
+}
+
+fn split_target(target: &str) -> (&str, &str) {
+    match target.split_once('?') {
+        Some((path, query)) => (path, query),
+        None => (target, ""),
+    }
+}
+
+fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
+    let (path, query) = split_target(request.target);
+    if path.contains('\\') || path.split('/').any(|part| part == ".." || part == ".") {
+        return html(
+            404,
+            page(
+                "Not found",
+                "<h1>Not found</h1><p><a href=\"/\">Back</a></p>",
+            ),
+        );
+    }
+    match (request.method, path) {
+        ("GET" | "HEAD", "/" | "/index.html") => html(200, home_page()),
+        ("GET" | "HEAD", "/ask" | "/capture") => html(
+            405,
+            page(
+                "Use Capture and Ask",
+                "<h1>Use Capture and Ask</h1><p><a href=\"/\">Back</a></p>",
+            ),
+        ),
+        ("GET" | "HEAD", "/manifest.webmanifest") => bytes(
+            200,
+            "application/manifest+json",
+            MANIFEST.as_bytes().to_vec(),
+        ),
+        ("GET" | "HEAD", "/icon.png") => bytes(200, "image/png", ICON_PNG.to_vec()),
+        ("POST", "/capture") => {
+            if let Err(response) = same_origin(request.headers) {
+                return response;
+            }
+            capture(root, request)
+        }
+        ("POST", "/ask") => {
+            if query_contains_question(query) {
+                return html(
+                    400,
+                    page(
+                        "Ask on the page",
+                        "<h1>Ask on the page</h1><p>The question stays in the form, not in the address.</p><p><a href=\"/\">Back</a></p>",
+                    ),
+                );
+            }
+            if let Err(response) = same_origin(request.headers) {
+                return response;
+            }
+            ask(root, request)
+        }
+        ("GET" | "HEAD", path) if path.starts_with("/saved/") => {
+            saved(root, &path["/saved/".len()..])
+        }
+        ("GET" | "HEAD", path) if path.starts_with("/sources/") => {
+            source(root, &path["/sources/".len()..])
+        }
+        ("GET" | "HEAD", _) => html(
+            404,
+            page(
+                "Not found",
+                "<h1>Not found</h1><p><a href=\"/\">Back</a></p>",
+            ),
+        ),
+        _ => html(
+            405,
+            page(
+                "Use Capture and Ask",
+                "<h1>Use Capture and Ask</h1><p><a href=\"/\">Back</a></p>",
+            ),
+        ),
+    }
+}
+
+fn query_contains_question(query: &str) -> bool {
+    query.split('&').any(|pair| {
+        let key = pair.split('=').next().unwrap_or("");
+        key.eq_ignore_ascii_case("q")
+    })
+}
+
+fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
+    let vault = match Vault::open(root) {
+        Ok(vault) => vault,
+        Err(err) => return vault_page(err),
+    };
+    let form = match read_capture(request) {
+        Ok(form) => form,
+        Err(err) => {
+            return html(
+                err.status,
+                page(
+                    "Photo not saved",
+                    &format!(
+                        "<h1>Photo not saved</h1><p>{}</p>{}",
+                        esc(&err.message),
+                        capture_form(&Uuid::new_v4().to_string(), "")
+                    ),
+                ),
+            );
+        }
+    };
+    match vault.capture(&form.operation_id, &form.filename, &form.photo, &form.note) {
+        Ok(memory) => redirect(&format!("/saved/{}", memory.id)),
+        Err(err) => {
+            let status = vault_status(&err);
+            html(
+                status,
+                page(
+                    "Photo not saved",
+                    &format!(
+                        "<h1>Photo not saved</h1><p>{}</p><p>Nothing new was uploaded to a cloud, and Claude was not called. If this same photo was already saved, <a href=\"/\">start a new capture</a>.</p>{}",
+                        esc(&err),
+                        capture_form(&form.operation_id, &form.note)
+                    ),
+                ),
+            )
+        }
+    }
+}
+
+struct CaptureForm {
+    operation_id: String,
+    filename: String,
+    photo: Vec<u8>,
+    note: String,
+}
+
+struct FormError {
+    status: u16,
+    message: String,
+}
+
+fn read_capture(request: &PhoneRequest<'_>) -> Result<CaptureForm, FormError> {
+    let content_type = header(request.headers, "content-type").unwrap_or("");
+    if content_type
+        .to_ascii_lowercase()
+        .starts_with("multipart/form-data")
+    {
+        return read_multipart_capture(content_type, request.body);
+    }
+    if !(content_type.to_ascii_lowercase().starts_with("image/")
+        || content_type.eq_ignore_ascii_case("application/octet-stream")
+        || content_type.is_empty())
+    {
+        return Err(FormError {
+            status: 400,
+            message: "Send the photo as a form upload.".into(),
+        });
+    }
+    if request.body.is_empty() {
+        return Err(FormError {
+            status: 400,
+            message: "Choose a photo.".into(),
+        });
+    }
+    Ok(CaptureForm {
+        operation_id: operation_id(header(request.headers, "x-recall-operation-id"))?,
+        filename: "photo".into(),
+        photo: request.body.to_vec(),
+        note: header(request.headers, "x-recall-note")
+            .unwrap_or("")
+            .to_string(),
+    })
+}
+
+fn read_multipart_capture(content_type: &str, body: &[u8]) -> Result<CaptureForm, FormError> {
+    let boundary = boundary(content_type).map_err(|message| FormError {
+        status: 400,
+        message,
+    })?;
+    let mut photo: Option<(String, Vec<u8>)> = None;
+    let mut note = String::new();
+    let mut operation = None;
+    for part in split_multipart(body, &boundary).map_err(|message| FormError {
+        status: 400,
+        message,
+    })? {
+        match part.name {
+            "photo" => {
+                if photo.is_some() {
+                    return Err(FormError {
+                        status: 400,
+                        message: "Send one photo.".into(),
+                    });
+                }
+                if part.body.is_empty() {
+                    return Err(FormError {
+                        status: 400,
+                        message: "Choose a photo.".into(),
+                    });
+                }
+                photo = Some((photo_filename(part.filename), part.body.to_vec()));
+            }
+            "note" => note = utf8_field(part.body)?,
+            "operation_id" => operation = Some(utf8_field(part.body)?),
+            _ => {}
+        }
+    }
+    let (filename, photo) = photo.ok_or_else(|| FormError {
+        status: 400,
+        message: "Choose a photo.".into(),
+    })?;
+    Ok(CaptureForm {
+        operation_id: operation_id(operation.as_deref())?,
+        filename,
+        photo,
+        note,
+    })
+}
+
+fn ask(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
+    let question = match read_question(request) {
+        Ok(question) => question,
+        Err(err) => {
+            return html(
+                err.status,
+                page(
+                    "Ask",
+                    &format!("<h1>Ask</h1><p>{}</p>{}", esc(&err.message), ask_form("")),
+                ),
+            );
+        }
+    };
+    let vault = match Vault::open(root) {
+        Ok(vault) => vault,
+        Err(err) => return vault_page(err),
+    };
+    let answer = match keyword_answer(&vault, &question) {
+        Ok(answer) => answer,
+        Err(err) => return vault_page(err),
+    };
+    html(
+        200,
+        page("Ask", &format!("{answer}{}", ask_form(&question))),
+    )
+}
+
+fn read_question(request: &PhoneRequest<'_>) -> Result<String, FormError> {
+    let content_type = header(request.headers, "content-type").unwrap_or("");
+    let question = if content_type.to_ascii_lowercase().starts_with("multipart/") {
+        let boundary = boundary(content_type).map_err(|message| FormError {
+            status: 400,
+            message,
+        })?;
+        let mut question = None;
+        for part in split_multipart(request.body, &boundary).map_err(|message| FormError {
+            status: 400,
+            message,
+        })? {
+            if part.name == "q" {
+                question = Some(utf8_field(part.body)?);
+            }
+        }
+        question.unwrap_or_default()
+    } else {
+        let text = std::str::from_utf8(request.body).map_err(|_| FormError {
+            status: 400,
+            message: "The question is not UTF-8.".into(),
+        })?;
+        form_value(text, "q").map_err(|message| FormError {
+            status: 400,
+            message,
+        })?
+    };
+    if question.len() > MAX_QUESTION {
+        return Err(FormError {
+            status: 400,
+            message: "That question is too long to search.".into(),
+        });
+    }
+    Ok(question)
+}
+
+fn keyword_answer(vault: &Vault, question: &str) -> Result<String, String> {
+    if question.len() > MAX_QUESTION {
+        return Ok(abstain("That question is too long to search."));
+    }
+    if question.trim().is_empty() {
+        return Ok(abstain("Type a question to search the notes."));
+    }
+    let terms = keyword_terms(question);
+    if terms.is_empty() {
+        return Ok(abstain(
+            "Type a question that includes a word from the notes.",
+        ));
+    }
+    let memories = vault.list_with_deleted(&terms.join(" "), false)?;
+    let eligible: Vec<&VaultMemory> = memories
+        .iter()
+        .filter(|memory| memory.state == "active" && memory.conflict.is_none())
+        .collect();
+    if eligible.is_empty() {
+        return Ok(abstain(
+            "Nothing in the notes matches that. This is keyword search of the desktop vault, not a Claude answer.",
+        ));
+    }
+    let mut cards = String::new();
+    for memory in eligible {
+        let source_path = source_rel(memory);
+        let note_path = note_rel(memory);
+        cards.push_str(&format!(
+            "<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><img src=\"/sources/{}\" alt=\"Original page\"><p class=\"path\">{}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p></article>",
+            esc(&memory.id),
+            esc(&title_for(memory)),
+            esc(&excerpt(&memory.note, terms.first().map(String::as_str).unwrap_or(""))),
+            esc(&memory.id),
+            esc(&note_path),
+            esc(&source_path),
+            esc(&memory.id),
+        ));
+    }
+    Ok(format!(
+        "<h1>Notes that contain those words</h1><p class=\"fine\">{KEYWORD_LABEL} Searched the Markdown notes in the desktop vault. Nothing was sent to Claude.</p>{cards}"
+    ))
+}
+
+fn keyword_terms(question: &str) -> Vec<String> {
+    question
+        .to_lowercase()
+        .split_whitespace()
+        .map(strip_edges)
+        .filter(|term| term.chars().count() > 1 && !QUESTION_WORDS.contains(&term.as_str()))
+        .collect()
+}
+
+fn strip_edges(term: &str) -> String {
+    let chars: Vec<char> = term.chars().collect();
+    let mut start = 0;
+    let mut end = chars.len();
+    while start < end && !chars[start].is_alphanumeric() {
+        start += 1;
+    }
+    while end > start && !chars[end - 1].is_alphanumeric() {
+        end -= 1;
+    }
+    chars[start..end].iter().collect()
+}
+
+fn excerpt(text: &str, term: &str) -> String {
+    let at = text.to_lowercase().find(&term.to_lowercase());
+    let mut start = at.map(|index| index.saturating_sub(48)).unwrap_or(0);
+    while !text.is_char_boundary(start) && start > 0 {
+        start -= 1;
+    }
+    let mut end = text.len().min(start + 220);
+    while !text.is_char_boundary(end) && end < text.len() {
+        end += 1;
+    }
+    let slice = text[start..end].trim();
+    if start > 0 {
+        format!("…{slice}")
+    } else {
+        slice.to_string()
+    }
+}
+
+fn saved(root: &Path, id: &str) -> PhoneResponse {
+    let id = match canonical_id(id) {
+        Ok(id) => id,
+        Err(_) => {
+            return html(
+                404,
+                page(
+                    "Not found",
+                    "<h1>Not found</h1><p><a href=\"/\">Back</a></p>",
+                ),
+            );
+        }
+    };
+    let vault = match Vault::open(root) {
+        Ok(vault) => vault,
+        Err(err) => return vault_page(err),
+    };
+    let memories = match vault.list_with_deleted("", false) {
+        Ok(memories) => memories,
+        Err(err) => return vault_page(err),
+    };
+    let Some(memory) = memories.into_iter().find(|memory| memory.id == id) else {
+        return html(
+            404,
+            page(
+                "Not in the vault",
+                "<h1>Not in the vault</h1><p><a href=\"/\">Back</a></p>",
+            ),
+        );
+    };
+    if memory.state != "active" || memory.conflict.is_some() {
+        return html(
+            409,
+            page(
+                "Resolve on the desktop",
+                "<h1>Resolve this note on the desktop</h1><p>The original is still in the vault. This phone will not replace a local edit or a conflict.</p><p><a href=\"/\">Back</a></p>",
+            ),
+        );
+    }
+    html(
+        200,
+        page(
+            "Saved in the desktop vault",
+            &format!(
+                "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. It was not uploaded to a cloud, and Claude was not called. Open the photo in the desktop app later if you want Claude to read it.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
+                esc(&source_rel(&memory)),
+                esc(&note_rel(&memory)),
+                esc(&memory.id),
+                esc(&memory.note),
+                esc(&note_rel(&memory)),
+                esc(&source_rel(&memory)),
+                capture_form(&Uuid::new_v4().to_string(), ""),
+                ask_form("")
+            ),
+        ),
+    )
+}
+
+fn source(root: &Path, id: &str) -> PhoneResponse {
+    let id = match canonical_id(id) {
+        Ok(id) => id,
+        Err(_) => {
+            return html(
+                404,
+                page(
+                    "Not found",
+                    "<h1>Not found</h1><p><a href=\"/\">Back</a></p>",
+                ),
+            );
+        }
+    };
+    let vault = match Vault::open(root) {
+        Ok(vault) => vault,
+        Err(err) => return vault_page(err),
+    };
+    match vault.source(&id) {
+        Ok(source) => {
+            let filename = match source.mime_type.as_str() {
+                "image/jpeg" => "original.jpg",
+                "image/webp" => "original.webp",
+                _ => "original.png",
+            };
+            let mut response = bytes(200, &source.mime_type, source.bytes);
+            response.extra.push((
+                "Content-Disposition".into(),
+                format!("inline; filename=\"{filename}\""),
+            ));
+            response
+        }
+        Err(_) => html(
+            404,
+            page(
+                "Original unavailable",
+                "<h1>Original unavailable</h1><p>The page is missing, or the desktop note needs to be resolved before its photo can be opened.</p><p><a href=\"/\">Back</a></p>",
+            ),
+        ),
+    }
+}
+
+fn same_origin(headers: &[(&str, &str)]) -> Result<(), PhoneResponse> {
+    // Browsers set both of these. A file upload from this page is same-origin and
+    // may send Origin: null. A page on another site cannot claim same-origin.
+    let site = header(headers, "sec-fetch-site");
+    let origin = header(headers, "origin")
+        .map(str::trim)
+        .map(|value| value.trim_end_matches('/'));
+    let host = header(headers, "host").unwrap_or("");
+    let expected = format!("http://{host}");
+    let site_ok = site.is_none_or(|value| value.eq_ignore_ascii_case("same-origin"));
+    let origin_ok = origin.is_none_or(|value| {
+        value.eq_ignore_ascii_case("null") || value.eq_ignore_ascii_case(&expected)
+    });
+    if site_ok && origin_ok {
+        return Ok(());
+    }
+    eprintln!(
+        "recall-phone refused cross-site post site={} origin={} host={host}",
+        site.unwrap_or("-"),
+        origin.unwrap_or("-")
+    );
+    Err(html(
+        403,
+        page(
+            "Refused",
+            "<h1>Refused</h1><p>Open the Recall page on this computer and use the form there.</p>",
+        ),
+    ))
+}
+
+fn home_page() -> String {
+    page(
+        "Recall",
+        &format!(
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. The desktop app can read a saved photo with Claude later; this page does not.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, the photo was not saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            capture_form(&Uuid::new_v4().to_string(), ""),
+            ask_form("")
+        ),
+    )
+}
+
+fn capture_form(operation_id: &str, note: &str) -> String {
+    format!(
+        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Photograph a page or choose one<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" required></label><label>Optional note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><button type=\"submit\">Save to the vault</button></form><p class=\"fine\">The original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        esc(operation_id),
+        esc(note)
+    )
+}
+
+fn ask_form(question: &str) -> String {
+    format!(
+        "<form method=\"post\" action=\"/ask\"><label>Ask the notes<input name=\"q\" maxlength=\"4096\" value=\"{}\" autocomplete=\"off\" required></label><button class=\"secondary\" type=\"submit\">Search notes</button></form>",
+        esc(question)
+    )
+}
+
+fn page(title: &str, main: &str) -> String {
+    format!(
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-title\" content=\"Recall\"><meta name=\"theme-color\" content=\"#12141a\"><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" href=\"/icon.png\"><title>{}</title><style>{}</style></head><body>{}</body></html>",
+        esc(title),
+        PAGE_CSS,
+        main
+    )
+}
+
+const PAGE_CSS: &str = "
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #12141a; color: #f6f1e8; font-family: \"Segoe UI\", \"Avenir Next\", system-ui, sans-serif; line-height: 1.45; padding: calc(20px + env(safe-area-inset-top)) 18px calc(32px + env(safe-area-inset-bottom)); }
+h1, h2, p { margin: 0 0 12px; }
+h1 { font-family: Palatino, Georgia, serif; font-weight: 500; font-size: 32px; }
+h2 { font-size: 18px; }
+a { color: #f2d7a2; }
+.mark { letter-spacing: 0.42em; font-size: 13px; margin-bottom: 6px; }
+.tag { font-family: Palatino, Georgia, serif; font-style: italic; color: rgba(246,241,232,0.72); }
+.fine, footer { color: rgba(246,241,232,0.72); font-size: 13px; }
+footer { margin-top: 18px; }
+section, article { background: rgba(22,24,30,0.72); border: 1px solid rgba(255,244,220,0.18); border-radius: 18px; padding: 16px; margin: 14px 0; }
+label { display: block; margin: 12px 0; }
+input, textarea, button { width: 100%; font: inherit; color: inherit; }
+input[type=text], input:not([type]), textarea { min-height: 48px; border-radius: 12px; border: 1px solid rgba(255,244,220,0.28); background: rgba(255,255,255,0.04); padding: 10px 12px; }
+textarea { min-height: 96px; resize: vertical; }
+input[type=file] { margin-top: 8px; }
+button { min-height: 48px; margin-top: 8px; border: 0; border-radius: 14px; background: #f2d7a2; color: #1a140c; font-weight: 650; }
+button.secondary { background: transparent; color: #f6f1e8; border: 1px solid rgba(255,244,220,0.35); }
+img { width: 100%; border-radius: 16px; background: #0e1014; margin: 8px 0 12px; }
+.path { font-family: ui-monospace, \"Cascadia Mono\", monospace; font-size: 12px; word-break: break-all; }
+:focus-visible { outline: 2px solid #f2d7a2; outline-offset: 2px; }
+";
+
+const MANIFEST: &str = r##"{
+  "name": "Recall",
+  "short_name": "Recall",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#12141a",
+  "theme_color": "#12141a",
+  "icons": [{ "src": "/icon.png", "sizes": "32x32", "type": "image/png", "purpose": "any" }]
+}"##;
+
+fn html(status: u16, body: String) -> PhoneResponse {
+    bytes(status, "text/html; charset=utf-8", body.into_bytes())
+}
+
+fn bytes(status: u16, content_type: &str, body: Vec<u8>) -> PhoneResponse {
+    PhoneResponse {
+        status,
+        content_type: content_type.into(),
+        extra: Vec::new(),
+        body,
+    }
+}
+
+fn redirect(location: &str) -> PhoneResponse {
+    let mut response = html(
+        303,
+        page(
+            "Saved",
+            &format!(
+                "<h1>Saved</h1><p><a href=\"{}\">Open the saved page</a></p>",
+                esc(location)
+            ),
+        ),
+    );
+    response
+        .extra
+        .push(("Location".into(), location.to_string()));
+    response
+}
+
+fn vault_page(err: String) -> PhoneResponse {
+    html(
+        vault_status(&err),
+        page(
+            "Vault unavailable",
+            &format!(
+                "<h1>Vault unavailable</h1><p>{}</p><p>Nothing was sent to Claude.</p><p><a href=\"/\">Back</a></p>",
+                esc(&err)
+            ),
+        ),
+    )
+}
+
+fn vault_status(err: &str) -> u16 {
+    if err.contains("Vault is busy") {
+        409
+    } else if err.contains("exceeds") || err.contains("too large") || err.contains("26 MiB") {
+        413
+    } else {
+        400
+    }
+}
+
+fn abstain(message: &str) -> String {
+    format!(
+        "<h1>No matching note</h1><p>{}</p><p class=\"fine\">{KEYWORD_LABEL}</p>",
+        esc(message)
+    )
+}
+
+fn header<'a>(headers: &'a [(&str, &str)], name: &str) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        .map(|(_, value)| *value)
+}
+
+fn operation_id(value: Option<&str>) -> Result<String, FormError> {
+    let value = value.unwrap_or("").trim();
+    if value.is_empty() {
+        return Ok(Uuid::new_v4().to_string());
+    }
+    canonical_id(value).map_err(|_| FormError {
+        status: 400,
+        message: "The capture id is not valid. Start again from the Recall page.".into(),
+    })
+}
+
+fn canonical_id(value: &str) -> Result<String, ()> {
+    let id = Uuid::parse_str(value.trim()).map_err(|_| ())?;
+    Ok(id.to_string())
+}
+
+fn photo_filename(filename: Option<&str>) -> String {
+    let base = filename
+        .unwrap_or("photo")
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or("photo")
+        .trim();
+    if base.is_empty() || base.len() > 255 || base.contains(['\0', '/', '\\']) {
+        "photo".into()
+    } else {
+        base.to_string()
+    }
+}
+
+fn utf8_field(bytes: &[u8]) -> Result<String, FormError> {
+    String::from_utf8(bytes.to_vec()).map_err(|_| FormError {
+        status: 400,
+        message: "That field is not UTF-8.".into(),
+    })
+}
+
+fn title_for(memory: &VaultMemory) -> String {
+    let line = memory
+        .note
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("")
+        .trim();
+    if line.is_empty() {
+        if memory.source_name.is_empty() {
+            "Untitled page".into()
+        } else {
+            memory.source_name.clone()
+        }
+    } else {
+        let mut title = String::new();
+        for (count, ch) in line.chars().enumerate() {
+            if count == 80 {
+                title.push('…');
+                break;
+            }
+            title.push(ch);
+        }
+        title
+    }
+}
+
+fn source_rel(memory: &VaultMemory) -> String {
+    let ext = memory
+        .source_name
+        .rsplit('.')
+        .next()
+        .filter(|ext| !ext.is_empty() && ext.len() <= 8)
+        .unwrap_or("png");
+    format!("Recall/Sources/{}.{ext}", memory.id)
+}
+
+fn note_rel(memory: &VaultMemory) -> String {
+    let name = memory
+        .note_path
+        .as_deref()
+        .filter(|name| {
+            !name.is_empty()
+                && name.ends_with(".md")
+                && !name.contains(['/', '\\', '\0'])
+                && *name != "."
+                && *name != ".."
+        })
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("{}.md", memory.id));
+    format!("Recall/Memories/{name}")
+}
+
+fn esc(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+struct Part<'a> {
+    name: &'a str,
+    filename: Option<&'a str>,
+    body: &'a [u8],
+}
+
+fn boundary(content_type: &str) -> Result<String, String> {
+    let lower = content_type.to_ascii_lowercase();
+    let index = lower
+        .find("boundary=")
+        .ok_or("The upload is missing its boundary.")?;
+    let rest = content_type[index + "boundary=".len()..].trim();
+    let raw = if let Some(quoted) = rest.strip_prefix('"') {
+        quoted.split('"').next().unwrap_or("")
+    } else {
+        rest.split(';').next().unwrap_or("").trim()
+    };
+    if raw.is_empty()
+        || raw.len() > 200
+        || raw
+            .bytes()
+            .any(|byte| byte.is_ascii_whitespace() || byte == b'"')
+    {
+        return Err("The upload boundary is not valid.".into());
+    }
+    Ok(raw.to_string())
+}
+
+fn split_multipart<'a>(body: &'a [u8], boundary: &str) -> Result<Vec<Part<'a>>, String> {
+    let marker = format!("--{boundary}");
+    let marker = marker.as_bytes();
+    let start = find_slice(body, marker).ok_or("The upload is incomplete.")?;
+    let mut rest = &body[start + marker.len()..];
+    let mut parts = Vec::new();
+    loop {
+        if rest.starts_with(b"--") {
+            break;
+        }
+        if rest.starts_with(b"\r\n") {
+            rest = &rest[2..];
+        }
+        let next = find_slice(rest, marker).ok_or("The upload is incomplete.")?;
+        let mut part = &rest[..next];
+        if part.ends_with(b"\r\n") {
+            part = &part[..part.len() - 2];
+        }
+        parts.push(parse_part(part)?);
+        if parts.len() > 8 {
+            return Err("The form has too many fields.".into());
+        }
+        rest = &rest[next + marker.len()..];
+    }
+    Ok(parts)
+}
+
+fn parse_part(part: &[u8]) -> Result<Part<'_>, String> {
+    let sep = find_slice(part, b"\r\n\r\n").ok_or("A form field is incomplete.")?;
+    let headers = std::str::from_utf8(&part[..sep]).map_err(|_| "A form header is not UTF-8.")?;
+    let body = &part[sep + 4..];
+    let mut name = None;
+    let mut filename = None;
+    for line in headers.split("\r\n") {
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        if key.eq_ignore_ascii_case("content-disposition") {
+            name = disposition_param(value, "name");
+            filename = disposition_param(value, "filename");
+        }
+    }
+    Ok(Part {
+        name: name.ok_or("A form field is missing its name.")?,
+        filename,
+        body,
+    })
+}
+
+fn disposition_param<'a>(header: &'a str, key: &str) -> Option<&'a str> {
+    let needle = format!("{key}=");
+    let index = header
+        .to_ascii_lowercase()
+        .find(&needle.to_ascii_lowercase())?;
+    let rest = &header[index + needle.len()..];
+    if let Some(rest) = rest.strip_prefix('"') {
+        let end = rest.find('"')?;
+        Some(&rest[..end])
+    } else {
+        Some(rest.split(';').next()?.trim())
+    }
+}
+
+fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
+fn form_value(body: &str, key: &str) -> Result<String, String> {
+    for pair in body.split('&') {
+        if pair.is_empty() {
+            continue;
+        }
+        let (raw_key, raw_value) = pair.split_once('=').unwrap_or((pair, ""));
+        if url_decode(raw_key)? == key {
+            return url_decode(raw_value);
+        }
+    }
+    Ok(String::new())
+}
+
+fn url_decode(input: &str) -> Result<String, String> {
+    let bytes = input.as_bytes();
+    let mut out = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'+' => {
+                out.push(b' ');
+                index += 1;
+            }
+            b'%' if index + 2 < bytes.len() => {
+                let hex = std::str::from_utf8(&bytes[index + 1..index + 3])
+                    .map_err(|_| "The question encoding is not valid.".to_string())?;
+                let value = u8::from_str_radix(hex, 16)
+                    .map_err(|_| "The question encoding is not valid.".to_string())?;
+                out.push(value);
+                index += 3;
+            }
+            b'%' => return Err("The question encoding is not valid.".into()),
+            byte => {
+                out.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8(out).map_err(|_| "The question is not UTF-8.".into())
+}
+
+fn env_nonempty(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn allow_all_interfaces() -> bool {
+    matches!(
+        std::env::var("RECALL_PHONE_ALLOW_ALL_INTERFACES")
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("1") | Some("true")
+    )
+}
+
+fn port_from_env() -> Result<u16, String> {
+    let Some(value) = env_nonempty("RECALL_PHONE_PORT") else {
+        return Ok(DEFAULT_PORT);
+    };
+    let port: u16 = value
+        .parse()
+        .map_err(|_| "RECALL_PHONE_PORT must be a number from 1 to 65535.".to_string())?;
+    if port == 0 {
+        return Err("RECALL_PHONE_PORT must be a number from 1 to 65535.".into());
+    }
+    Ok(port)
+}
+
+fn selection_file_from_env() -> Result<Option<PathBuf>, String> {
+    if env_nonempty("RECALL_VAULT_DIR").is_some() {
+        return Ok(None);
+    }
+    if let Some(explicit) = env_nonempty("RECALL_PHONE_SELECTION_FILE") {
+        return Ok(Some(PathBuf::from(explicit)));
+    }
+    Ok(Some(desktop_selection_file()?))
+}
+
+fn desktop_selection_file() -> Result<PathBuf, String> {
+    let id = "com.example.recall.desktop";
+    #[cfg(windows)]
+    {
+        let base = std::env::var_os("APPDATA").ok_or("APPDATA is unset.")?;
+        return Ok(PathBuf::from(base).join(id).join("selected-vault.json"));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var_os("HOME").ok_or("HOME is unset.")?;
+        return Ok(PathBuf::from(home)
+            .join("Library/Application Support")
+            .join(id)
+            .join("selected-vault.json"));
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let base = std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share"))
+            })
+            .ok_or("HOME is unset.")?;
+        Ok(base.join(id).join("selected-vault.json"))
+    }
+}
+
+fn resolve_vault_root(
+    env_dir: Option<&str>,
+    selection_file: Option<&Path>,
+) -> Result<PathBuf, String> {
+    if let Some(value) = env_dir.map(str::trim).filter(|value| !value.is_empty()) {
+        let path = PathBuf::from(value);
+        if !path.is_absolute() {
+            return Err("RECALL_VAULT_DIR must be an absolute path.".into());
+        }
+        if !path.is_dir() {
+            return Err(
+                "RECALL_VAULT_DIR must already exist. Choose that folder in the desktop app, or create it, before starting the phone companion.".into(),
+            );
+        }
+        return Ok(path);
+    }
+    let Some(path) = selection_file else {
+        return Err(missing_vault());
+    };
+    if !path.is_file() {
+        return Err(format!(
+            "{}. The desktop selection file was not found at {}.",
+            missing_vault(),
+            path.display()
+        ));
+    }
+    let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
+    if bytes.len() > 64 * 1024 {
+        return Err("The desktop vault selection file is too large.".into());
+    }
+    let parsed: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|_| "The desktop vault selection file is not valid JSON.".to_string())?;
+    let root = parsed
+        .get("root")
+        .and_then(|value| value.as_str())
+        .ok_or("The desktop vault selection file has no folder.")?;
+    let expected = parsed
+        .get("vault_identity")
+        .and_then(|value| value.as_str())
+        .or_else(|| parsed.get("vault_id").and_then(|value| value.as_str()))
+        .filter(|value| !value.is_empty())
+        .ok_or("The desktop vault selection file has no vault id.")?;
+    let root = PathBuf::from(root);
+    if !root.is_absolute() || !root.is_dir() {
+        return Err("The desktop vault folder is missing.".into());
+    }
+    let vault = Vault::open(&root)?;
+    if vault.id != expected {
+        return Err("The desktop vault identity does not match the selection file. Choose the folder again in the desktop app.".into());
+    }
+    Ok(root)
+}
+
+fn missing_vault() -> String {
+    "Set RECALL_VAULT_DIR to the same absolute folder the desktop app uses, or open a vault in the desktop app first.".into()
+}
+
+fn decide_bind(
+    explicit: Option<&str>,
+    allow_all_interfaces: bool,
+    port: u16,
+    detected_tailscale: Option<IpAddr>,
+) -> Result<BindChoice, String> {
+    let explicit = explicit.map(str::trim).filter(|value| !value.is_empty());
+    let (ip, mode) = match explicit {
+        None => match detected_tailscale {
+            Some(ip) => (ip, BindMode::Tailscale),
+            None => (IpAddr::V4(Ipv4Addr::LOCALHOST), BindMode::Loopback),
+        },
+        Some("tailscale") => {
+            let ip = detected_tailscale.ok_or(
+                "RECALL_PHONE_BIND=tailscale needs `tailscale ip -4` to succeed on this computer.",
+            )?;
+            (ip, BindMode::Tailscale)
+        }
+        Some("loopback" | "localhost" | "127.0.0.1") => {
+            (IpAddr::V4(Ipv4Addr::LOCALHOST), BindMode::Loopback)
+        }
+        Some(value) => {
+            let ip: IpAddr = value.parse().map_err(|_| {
+                "RECALL_PHONE_BIND must be an IP address, tailscale, or loopback. Hostnames are not accepted.".to_string()
+            })?;
+            if ip.is_unspecified() {
+                if !allow_all_interfaces {
+                    return Err(
+                        "Refusing to listen on every interface. Set RECALL_PHONE_BIND to the Tailscale IPv4 from `tailscale ip -4`, or set RECALL_PHONE_ALLOW_ALL_INTERFACES=1 only when no public interface can reach this port.".into(),
+                    );
+                }
+                (ip, BindMode::AllInterfaces)
+            } else if ip.is_loopback() {
+                (ip, BindMode::Loopback)
+            } else {
+                (ip, BindMode::Explicit)
+            }
+        }
+    };
+    Ok(BindChoice {
+        addr: SocketAddr::new(ip, port),
+        mode,
+    })
+}
+
+fn detect_tailscale_command() -> Option<IpAddr> {
+    let output = Command::new("tailscale").args(["ip", "-4"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8(output.stdout).ok()?;
+    detect_tailscale_ipv4(&text)
+}
+
+fn detect_tailscale_ipv4(stdout: &str) -> Option<IpAddr> {
+    stdout.lines().find_map(|line| match line.trim().parse() {
+        Ok(IpAddr::V4(ip)) => Some(IpAddr::V4(ip)),
+        _ => None,
+    })
+}
+
+fn startup_banner(root: &Path, vault_id: &str, choice: &BindChoice) -> String {
+    let reach = match choice.mode {
+        BindMode::Loopback => "Reach: this computer only. The phone cannot open this until Tailscale is running or you set RECALL_PHONE_BIND to this machine's tailnet IPv4.",
+        BindMode::Tailscale => "Reach: this Tailscale address only. It is not a public bind. A Tailscale ACL should allow only your phone to open this port. Anyone on the tailnet who can open it can read and write the vault.",
+        BindMode::Explicit => "Reach: the address you set. If it is not a Tailscale address, this port is exposed on that network. Do not forward it to the public internet.",
+        BindMode::AllInterfaces => "Reach: every network interface. Tailscale ACLs do not protect a LAN or public address. Do not use this if any interface is reachable from a network you do not trust.",
+    };
+    format!(
+        "Recall phone companion\nVault: {}\nVault id: {vault_id}\nOpen: {}\n{reach}\nNo login page. No API key in the page. Claude is not called from this process.\nHTTPS certificates, an offline phone queue, and Claude-from-the-phone are not part of this process.",
+        root.display(),
+        http_url(choice.addr)
+    )
+}
+
+fn http_url(addr: SocketAddr) -> String {
+    match addr.ip() {
+        IpAddr::V4(ip) => format!("http://{ip}:{}/", addr.port()),
+        IpAddr::V6(ip) => format!("http://[{ip}]:{}/", addr.port()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Read;
+    use std::sync::Arc;
+    use std::thread::JoinHandle;
+
+    struct TempDir(PathBuf);
+    impl TempDir {
+        fn new() -> Self {
+            let path =
+                std::env::temp_dir().join(format!("recall-phone-synthetic-{}", Uuid::new_v4()));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn png() -> Vec<u8> {
+        b"\x89PNG\r\n\x1a\nSYNTHETIC-TEST-ONLY".to_vec()
+    }
+
+    fn jpeg() -> Vec<u8> {
+        let mut bytes = b"\xff\xd8\xffSYNTHETIC-TEST-ONLY".to_vec();
+        bytes.extend_from_slice(b"\xff\xd9");
+        bytes
+    }
+
+    fn text(response: &PhoneResponse) -> String {
+        String::from_utf8(response.body.clone()).unwrap()
+    }
+
+    fn call(
+        root: &Path,
+        method: &str,
+        target: &str,
+        headers: &[(&str, &str)],
+        body: &[u8],
+    ) -> PhoneResponse {
+        handle(
+            root,
+            &PhoneRequest {
+                method,
+                target,
+                headers,
+                body,
+            },
+        )
+    }
+
+    #[test]
+    fn bind_defaults_to_loopback_and_refuses_every_interface() {
+        let choice = decide_bind(None, false, 8787, None).unwrap();
+        assert_eq!(choice.addr, "127.0.0.1:8787".parse().unwrap());
+        assert_eq!(choice.mode, BindMode::Loopback);
+        assert!(!choice.addr.ip().is_unspecified());
+
+        let tailnet = decide_bind(None, false, 8787, Some("100.64.1.5".parse().unwrap())).unwrap();
+        assert_eq!(tailnet.addr, "100.64.1.5:8787".parse().unwrap());
+        assert_eq!(tailnet.mode, BindMode::Tailscale);
+
+        let refused = decide_bind(Some("0.0.0.0"), false, 8787, None).unwrap_err();
+        assert!(refused.contains("Refusing to listen on every interface"));
+        let allowed = decide_bind(Some("0.0.0.0"), true, 8787, None).unwrap();
+        assert_eq!(allowed.mode, BindMode::AllInterfaces);
+        assert!(decide_bind(Some("nick-pc.tailnet.ts.net"), false, 8787, None).is_err());
+        assert!(decide_bind(Some("tailscale"), false, 8787, None).is_err());
+    }
+
+    #[test]
+    fn tailscale_output_uses_the_first_ipv4() {
+        assert_eq!(
+            detect_tailscale_ipv4("100.64.8.8\nfd7a:115c:a1e0::1\n"),
+            Some("100.64.8.8".parse().unwrap())
+        );
+        assert_eq!(detect_tailscale_ipv4("not-an-address\n"), None);
+    }
+
+    #[test]
+    fn vault_dir_must_be_absolute_and_selection_must_match() {
+        let missing = TempDir::new();
+        let absent = missing.0.join("nope");
+        assert!(resolve_vault_root(Some("relative/vault"), None).is_err());
+        assert!(resolve_vault_root(Some(absent.to_str().unwrap()), None).is_err());
+
+        let dir = TempDir::new();
+        let opened = resolve_vault_root(Some(dir.0.to_str().unwrap()), None).unwrap();
+        assert_eq!(opened, dir.0);
+
+        let selected = TempDir::new();
+        let vault = Vault::open(&selected.0).unwrap();
+        let settings = selected.0.join("selected-vault.json");
+        fs::write(
+            &settings,
+            serde_json::json!({
+                "root": selected.0,
+                "vault_id": vault.id,
+                "vault_identity": vault.id
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            resolve_vault_root(None, Some(&settings)).unwrap(),
+            selected.0
+        );
+        fs::write(
+            &settings,
+            serde_json::json!({
+                "root": selected.0,
+                "vault_id": Uuid::new_v4(),
+                "vault_identity": Uuid::new_v4()
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(resolve_vault_root(None, Some(&settings)).is_err());
+    }
+
+    #[test]
+    fn home_page_has_no_login_and_no_fixture_memories() {
+        let dir = TempDir::new();
+        Vault::open(&dir.0).unwrap();
+        let response = call(&dir.0, "GET", "/", &[], b"");
+        let page = text(&response);
+        assert_eq!(response.status, 200);
+        assert!(page.contains(KEYWORD_LABEL));
+        assert!(page.contains("no account"));
+        assert!(!page.to_lowercase().contains("password"));
+        assert!(!page.to_lowercase().contains("sign in"));
+        assert!(!page.to_lowercase().contains("sign-in"));
+        assert!(!page.contains("type=\"email\""));
+        assert!(!page.contains("Brooks Campus"));
+        assert!(!page.contains("300MW"));
+        assert!(page.contains("script-src 'none'") || !page.contains("<script"));
+    }
+
+    #[test]
+    fn capture_writes_original_then_note_and_retry_is_idempotent() {
+        let dir = TempDir::new();
+        Vault::open(&dir.0).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let boundary = "RecallSyntheticBoundary";
+        let mut body = Vec::new();
+        body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"operation_id\"\r\n\r\n{id}\r\n").into_bytes());
+        body.extend(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\n800 psi?\r\n"
+            )
+            .into_bytes(),
+        );
+        body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"C:\\\\DCIM\\\\page.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").into_bytes());
+        body.extend(jpeg());
+        body.extend(format!("\r\n--{boundary}--\r\n").into_bytes());
+        let response = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[(
+                "content-type",
+                &format!("multipart/form-data; boundary={boundary}"),
+            )],
+            &body,
+        );
+        assert_eq!(response.status, 303, "{}", text(&response));
+        assert_eq!(
+            response
+                .extra
+                .iter()
+                .find(|(name, _)| name == "Location")
+                .map(|(_, value)| value.as_str()),
+            Some(format!("/saved/{id}").as_str())
+        );
+        let source = dir.0.join(format!("Recall/Sources/{id}.jpg"));
+        let note = dir.0.join(format!("Recall/Memories/{id}.md"));
+        assert_eq!(fs::read(&source).unwrap(), jpeg());
+        let markdown = fs::read_to_string(&note).unwrap();
+        assert!(markdown.starts_with(&format!(
+            "<!-- Recall memory {id} | human annotation, not OCR -->"
+        )));
+        assert!(markdown.contains(&format!("../Sources/{id}.jpg")));
+        assert!(markdown.contains("800 psi?"));
+        assert!(!dir.0.join("page.jpg").exists());
+        assert!(!dir.0.join("DCIM").exists());
+
+        let again = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[(
+                "content-type",
+                &format!("multipart/form-data; boundary={boundary}"),
+            )],
+            &body,
+        );
+        assert_eq!(again.status, 303);
+        assert_eq!(
+            fs::read_dir(dir.0.join("Recall/Sources")).unwrap().count(),
+            1
+        );
+
+        body.clear();
+        body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"operation_id\"\r\n\r\n{id}\r\n").into_bytes());
+        body.extend(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nchanged\r\n"
+            )
+            .into_bytes(),
+        );
+        body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"page.jpg\"\r\n\r\n").into_bytes());
+        body.extend(jpeg());
+        body.extend(format!("\r\n--{boundary}--\r\n").into_bytes());
+        let changed = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[(
+                "content-type",
+                &format!("multipart/form-data; boundary={boundary}"),
+            )],
+            &body,
+        );
+        assert_eq!(changed.status, 400);
+        assert!(text(&changed).contains("different payload"));
+        assert!(fs::read_to_string(&note).unwrap().contains("800 psi?"));
+    }
+
+    #[test]
+    fn ask_cites_the_vault_and_keeps_a_local_edit() {
+        let dir = TempDir::new();
+        Vault::open(&dir.0).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let saved = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[
+                ("content-type", "image/png"),
+                ("x-recall-operation-id", &id),
+                ("x-recall-note", "Brooks pump house, uncertain?"),
+            ],
+            &png(),
+        );
+        assert_eq!(saved.status, 303, "{}", text(&saved));
+        let note_path = dir.0.join(format!("Recall/Memories/{id}.md"));
+        let edited = fs::read_to_string(&note_path)
+            .unwrap()
+            .replace("uncertain?", "Obsidian kept this?");
+        fs::write(&note_path, &edited).unwrap();
+
+        let ask = call(
+            &dir.0,
+            "POST",
+            "/ask",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            b"q=What+do+you+know+about+Obsidian%3F",
+        );
+        let page = text(&ask);
+        assert_eq!(ask.status, 200, "{page}");
+        assert!(page.contains(KEYWORD_LABEL));
+        assert!(page.contains("Not a Claude answer"));
+        assert!(page.contains("Obsidian kept this?"));
+        assert!(page.contains(&format!("/sources/{id}")));
+        assert!(page.contains(&format!("Recall/Memories/{id}.md")));
+        assert!(page.contains(&format!("Recall/Sources/{id}.png")));
+        assert_eq!(fs::read_to_string(&note_path).unwrap(), edited);
+        assert_eq!(
+            fs::read(dir.0.join(format!("Recall/Sources/{id}.png"))).unwrap(),
+            png()
+        );
+
+        let miss = call(
+            &dir.0,
+            "POST",
+            "/ask",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            b"q=xylophone+quantum",
+        );
+        assert!(text(&miss).contains("Nothing in the notes matches"));
+        assert!(text(&miss).contains("not a Claude answer"));
+
+        let fresh = TempDir::new();
+        Vault::open(&fresh.0).unwrap();
+        let no_fixture = call(
+            &fresh.0,
+            "POST",
+            "/ask",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            b"q=Brooks+Campus",
+        );
+        assert!(text(&no_fixture).contains("Nothing in the notes matches"));
+        assert!(!text(&no_fixture).contains("300MW"));
+    }
+
+    #[test]
+    fn cross_site_post_does_not_write_and_paths_stay_inside_sources() {
+        let dir = TempDir::new();
+        Vault::open(&dir.0).unwrap();
+        let refused = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[
+                ("host", "127.0.0.1:8787"),
+                ("origin", "https://evil.example"),
+                ("sec-fetch-site", "cross-site"),
+                ("content-type", "image/png"),
+            ],
+            &png(),
+        );
+        assert_eq!(refused.status, 403);
+        assert!(!dir
+            .0
+            .join("Recall/Sources")
+            .read_dir()
+            .unwrap()
+            .next()
+            .is_some());
+        let file_upload = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[
+                ("host", "127.0.0.1:8787"),
+                ("origin", "null"),
+                ("sec-fetch-site", "same-origin"),
+                ("content-type", "image/png"),
+                ("x-recall-operation-id", &Uuid::new_v4().to_string()),
+                ("x-recall-note", "file upload"),
+            ],
+            &png(),
+        );
+        assert_eq!(file_upload.status, 303, "{}", text(&file_upload));
+
+        let id = Uuid::new_v4().to_string();
+        let saved = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[
+                ("host", "127.0.0.1:8787"),
+                ("origin", "http://127.0.0.1:8787"),
+                ("sec-fetch-site", "same-origin"),
+                ("content-type", "image/png"),
+                ("x-recall-operation-id", &id),
+                ("x-recall-note", "<script>alert(1)</script>"),
+            ],
+            &png(),
+        );
+        assert_eq!(saved.status, 303);
+        let page = call(&dir.0, "GET", &format!("/saved/{id}"), &[], b"");
+        let html = text(&page);
+        assert!(html.contains("&lt;script&gt;"));
+        assert!(!html.contains("<script>alert"));
+        let original = call(&dir.0, "GET", &format!("/sources/{id}"), &[], b"");
+        assert_eq!(original.status, 200);
+        assert_eq!(original.body, png());
+        assert_eq!(original.content_type, "image/png");
+        assert_eq!(
+            call(&dir.0, "GET", "/sources/../../etc/passwd", &[], b"").status,
+            404
+        );
+        assert_eq!(
+            call(&dir.0, "GET", "/sources/not-an-id", &[], b"").status,
+            404
+        );
+        let leaked = call(&dir.0, "GET", "/ask?q=secret-word", &[], b"");
+        assert_eq!(leaked.status, 405);
+        assert!(!text(&leaked).contains("secret-word"));
+    }
+
+    #[test]
+    fn limiter_stops_the_thirty_first_capture_in_a_minute() {
+        let mut limiter = WindowLimiter::new(30);
+        let now = Instant::now();
+        for _ in 0..30 {
+            assert!(limiter.allow(now));
+        }
+        assert!(!limiter.allow(now));
+        assert!(limiter.allow(now + Duration::from_secs(60)));
+    }
+
+    struct Running {
+        addr: SocketAddr,
+        server: Arc<tiny_http::Server>,
+        thread: Option<JoinHandle<()>>,
+    }
+
+    impl Running {
+        fn spawn(root: PathBuf) -> Self {
+            let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+            let addr = server.server_addr().to_ip().unwrap();
+            let server = Arc::new(server);
+            let background = Arc::clone(&server);
+            let thread = std::thread::spawn(move || {
+                let mut captures = WindowLimiter::new(u32::MAX);
+                let mut asks = WindowLimiter::new(u32::MAX);
+                for request in background.incoming_requests() {
+                    let _ = serve_one(&root, &mut captures, &mut asks, request);
+                }
+            });
+            Self {
+                addr,
+                server,
+                thread: Some(thread),
+            }
+        }
+    }
+
+    impl Drop for Running {
+        fn drop(&mut self) {
+            self.server.unblock();
+            if let Some(thread) = self.thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
+
+    #[test]
+    fn http_server_on_loopback_saves_and_serves_the_original() {
+        let dir = TempDir::new();
+        Vault::open(&dir.0).unwrap();
+        let running = Running::spawn(dir.0.clone());
+        let agent = ureq::AgentBuilder::new().redirects(0).build();
+        let id = Uuid::new_v4().to_string();
+        let mut response = None;
+        for _ in 0..50 {
+            match agent
+                .post(&format!("http://{}/capture", running.addr))
+                .set("Content-Type", "image/png")
+                .set("X-Recall-Operation-Id", &id)
+                .set("X-Recall-Note", "synthetic page")
+                .send_bytes(&png())
+            {
+                Ok(ok) => {
+                    response = Some(ok);
+                    break;
+                }
+                Err(_) => std::thread::sleep(Duration::from_millis(20)),
+            }
+        }
+        let response = response.expect("phone companion did not accept a capture");
+        assert_eq!(response.status(), 303);
+        assert_eq!(
+            response.header("Location"),
+            Some(format!("/saved/{id}").as_str())
+        );
+        let page = ureq::get(&format!("http://{}/saved/{id}", running.addr))
+            .call()
+            .unwrap()
+            .into_string()
+            .unwrap();
+        assert!(page.contains("Saved in the desktop vault"));
+        assert!(page.contains("Claude was not called"));
+        let response = ureq::get(&format!("http://{}/sources/{id}", running.addr))
+            .call()
+            .unwrap();
+        let mut original = Vec::new();
+        response.into_reader().read_to_end(&mut original).unwrap();
+        assert_eq!(original, png());
+    }
+}

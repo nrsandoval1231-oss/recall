@@ -246,6 +246,38 @@ Rust coverage includes original-before-note writes, identical retries, rejected 
 
 - **Installed Windows.** The `windows-native` job builds an unsigned NSIS installer and uploads `recall-windows-desktop` for seven days. This environment did not install it, and did not open a native Tauri window. `npm run dev` cannot write a vault.
 - **Live Claude quality.** The desktop can call Claude only when `RECALL_CLAUDE_API_KEY`, a model, per-million-token prices, and daily and monthly budgets are set on the native process. Default is off. One consented photo is sent; the proposal is stored unreviewed; the note changes only when a person saves a correction; keyword ask searches that note. Automated tests use a fake provider. No key, budget, or private photo was used, and no live reading quality is claimed.
-- **Phone companion.** Not in this slice.
+- **Phone companion.** The local Tailscale page is covered in the next section. A real iPhone is still open.
 - **Visual fidelity.** The surface keeps the owner reference layout: left rail, ask bar, project board, and context cards. The owner removed the bottom timeline strip, the recent-memory thumbnails, the site image on the project board, and the notebook/desk photograph behind the glass. The stage background is a flat charcoal field. That board is text, stats, and tabs. Demo stats are fixture counts. The opened sample note still shows its text; that note is not a backdrop.
 - **Real Obsidian on a person's machine.** Not run. The folder layout is what Obsidian can open; Obsidian itself was not launched.
+
+## Phone companion over Tailscale (2026-10-11)
+
+This section is the local phone page. It is synthetic and automated, plus a loopback browser check on Linux. It is not an iPhone, not a Tailscale login, and not a Claude reading.
+
+### What the code does
+
+`recall-phone` serves one mobile page from the desktop machine. With Tailscale's IPv4 available it binds that address. Without it, or when tests ask for loopback, it binds `127.0.0.1`. `0.0.0.0` is refused unless `RECALL_PHONE_ALLOW_ALL_INTERFACES=1`. The page has no login, email, or password field, and it does not show the Brooks Campus fixture.
+
+A photo upload calls the desktop vault writer. The original bytes land in `Recall/Sources` and the Markdown note in `Recall/Memories`. The same capture id and the same bytes are idempotent. A changed note on that id is rejected and the first note stays. A filename with a Windows path is not used as a destination. A cross-site `Origin` does not write. Ask is keyword search over the current notes, including an Obsidian edit, and the result says it is not a Claude answer. The original is served from the vault id, not from a client path. The process does not read a Claude key.
+
+### Automated results
+
+Candidate environment: Linux sandbox, rustc 1.99.0. The default `cargo` on that sandbox was 1.83 and cannot compile the lockfile; the command used the stable toolchain. Synthetic PNG and JPEG bytes only. No private notes. No Tailscale account. No paid model call.
+
+| Suite | Result |
+| --- | --- |
+| `cd apps/desktop/src-tauri && cargo test --lib phone::` | 9 passed |
+| `cd apps/desktop/src-tauri && cargo test --lib` | 130 passed, 0 failed |
+| `cd apps/desktop/src-tauri && cargo check --bins --tests` | succeeded, including `recall-phone` |
+
+The phone tests cover loopback-by-default, Tailscale address selection, refusal of `0.0.0.0`, an absolute vault path, a matching desktop selection file, a mismatched vault id, capture into `Recall/Sources` and `Recall/Memories`, identical retry, a rejected changed retry, a preserved Obsidian edit, keyword hits and abstention, no fixture memories, HTML escaping, cross-site refusal, path traversal refusal, a per-minute capture limit, and an HTTP loopback save that returns the original bytes.
+
+Headless Chrome on this Linux sandbox opened `http://127.0.0.1:8787/`, uploaded a synthetic PNG with the note `pump house, uncertain?`, and showed **Saved in the desktop vault** and **Claude was not called**. Asking `what about the pump house` returned that note, the `Recall/Memories` and `Recall/Sources` paths, and the original image. The page had no email, password, or sign-in field. That check is not an iPhone and not a Tailscale session.
+
+### Open gates
+
+- **Real iPhone on Tailscale.** Not run. Safari, Add to Home Screen, the camera sheet, and a tailnet ACL were not exercised on hardware.
+- **HTTPS.** Not implemented. The page is HTTP.
+- **Offline phone queue.** Not implemented. A page that does not load did not save a photo.
+- **Claude from the phone.** Not implemented. The desktop consent path is unchanged.
+- **Windows firewall and an installed companion service.** Not run. The process is a console binary, not a Windows service.
