@@ -1,4 +1,4 @@
-//! Phone capture and ask for the desktop Obsidian vault.
+//! Phone capture and ask for the desktop Recall vault.
 //!
 //! This process is the Tailscale companion. It serves one mobile page and writes
 //! through the same vault the desktop app uses. It does not call Claude, does not
@@ -875,7 +875,7 @@ fn home_page() -> String {
     page(
         "Recall",
         &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. The desktop app can read a saved photo with Claude later; this page does not.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Recall vault on the desktop. There is no account. A photo is optional. No title, folder, or tags are required. The desktop app can read a saved photo with Claude later; this page does not.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
             capture_form(&Uuid::new_v4().to_string(), ""),
             ask_form("")
         ),
@@ -1596,6 +1596,10 @@ mod tests {
         assert!(!page.to_lowercase().contains("sign-in"));
         assert!(!page.contains("type=\"email\""));
         assert!(!page.contains("Brooks Campus"));
+        assert!(!page.contains("name=\"title\""));
+        assert!(!page.contains("name=\"folder\""));
+        assert!(!page.contains("name=\"tags\""));
+        assert!(page.contains("No title, folder, or tags"));
         assert!(!page.contains("300MW"));
         assert!(page.contains("script-src 'none'") || !page.contains("<script"));
     }

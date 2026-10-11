@@ -1,11 +1,11 @@
 # Developer setup and real-device acceptance (RCL-001)
 
-> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+> **2026-10-11 product center.** The [pilot amendment](PILOT-CONTRACT.md) is normative. The desktop Memory Surface and the phone companion keep memory in Recall's vault ([RECALL-STORE](RECALL-STORE.md)). Obsidian is not required. Keyword ask does not require Claude. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg). The 2026-10-09 PWA-only notes are historical.
 
 
 ## Desktop Memory Surface (current product)
 
-The desktop app opens onto the Memory Surface. It does not ask for an email, password, or sign-in link. Memory for this path is a local Obsidian vault.
+The desktop app opens onto the Memory Surface. It does not ask for an email, password, or sign-in link. Memory for this path is Recall's local vault.
 
 ```bash
 cd apps/desktop
@@ -27,7 +27,7 @@ Recall/History/     append-only revisions
 Recall/_meta/       manifest, journal, commit receipts, preserved local edits
 ```
 
-Open that parent folder in Obsidian. A note edited there is not silently replaced. Import writes the original before the note. An optional note is your words, not a reading of the page. Ask searches those notes and can open the original. The result is labeled keyword search. It is not a Claude answer.
+Review the notes in Recall's Memories browser. A note edited in the files is not silently replaced. Import writes the original before the note. An optional note is your words, not a reading of the page. Save does not ask for a title, folder, or tags. Ask searches those notes, cites the note, and can open the original. The result is labeled keyword search. It works with no Claude key. It is not a Claude answer.
 
 ### Enabling Claude reading
 
@@ -53,7 +53,7 @@ When no vault is open, or the vault has no memories, the surface shows the synth
 
 ## Phone companion over Tailscale
 
-The phone is a capture and ask page served by a small process on the same computer as the desktop app. It writes the same Obsidian vault. It does not show a login, sign-up, password, or email field. It does not use Cloud Postgres, and it does not call Claude. A photo saved here stays in the vault until someone opens it in the desktop app and consents to a reading there. The Claude key, when set, stays in the desktop process. It is not in this page.
+The phone is a capture and ask page served by a small process on the same computer as the desktop app. It writes the same Recall vault. It does not show a login, sign-up, password, or email field, and it does not ask for a title, folder, or tags. It does not use Cloud Postgres, and it does not call Claude. A photo saved here stays in the vault until someone opens it in the desktop app and consents to a reading there. The Claude key, when set, stays in the desktop process. It is not in this page.
 
 Build and run it from the desktop crate:
 

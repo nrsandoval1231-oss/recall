@@ -1,22 +1,22 @@
 # Recall architecture
 
-> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+> **2026-10-11 product center.** The [pilot amendment](PILOT-CONTRACT.md) is normative. The desktop Memory Surface and the phone companion keep memory in Recall's vault ([RECALL-STORE](RECALL-STORE.md)). Obsidian is not required. Keyword ask does not require Claude. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg). The 2026-10-09 PWA-only notes are historical.
 
 
 ## Desktop vault slice
 
-The Tauri desktop opens the Memory Surface with no account, password, or email link. For that path the memory is the Obsidian vault the user chooses, or `Documents/Recall` when they ask for the default folder. The webview cannot supply the path.
+The Tauri desktop opens the Memory Surface with no account, password, or email link. For that path the memory is the Recall vault the user chooses, or `Documents/Recall` when they ask for the default folder. The webview cannot supply the path. Markdown files are the note format. Another app is not required to review them.
 
 - Original photo bytes are written once under `Recall/Sources` and hashed.
 - The Markdown note is under `Recall/Memories` and points at the original. The note is human text, not an OCR claim.
 - A correction appends history and publishes only when the expected revision still matches. A note edited outside Recall is kept.
-- Ask is keyword search of those notes. It opens the original. It is not a Claude answer. This slice does not call a live model.
+- Ask is keyword search of those notes, with a citation, including when no Claude key is set. It opens the original. It is not a Claude answer.
 - The phone companion is a separate `recall-phone` process on that same computer. It serves one Capture and Ask page and calls the same vault writer. It listens on the machine's Tailscale IPv4 when that address is available, or on loopback when it is not. Listening on every interface requires an explicit setting. It does not call Claude and does not consult Cloud Postgres. A real iPhone session is still an open check. See [DEVELOPMENT](DEVELOPMENT.md).
 - Cloud Postgres is not consulted. The web companion and `?mode=legacy-cloud` still use the server model described below.
 
 ## V1 implementation update
 
-The 2026-10-09 web pilot client, continued by PR #16, is a responsive React web app served by a Cloudflare Worker. The 2026-10-10 amendment moves the product center to the desktop Memory Surface and a local Obsidian vault; this paragraph records the web companion, not the launch path. The Worker must hold secure HttpOnly revocable provisioned-device sessions and proxy only the fixed Recall API origin. The existing Supabase email callback is legacy behavior and must be removed from the active pilot flow after replacement and negative security tests. Browser tokens are removed from callback URLs before network redemption. Canonical PostgreSQL, private originals, and the Python API/worker remain unchanged. Browser IndexedDB is a workspace-scoped original-draft outbox, not the native SQLite cache or an offline generative service. Pending drafts survive logout and have explicit confirmed removal controls. Deployment and live browser acceptance are tracked separately in V1-STATUS.
+The 2026-10-09 web pilot client, continued by PR #16, is a responsive React web app served by a Cloudflare Worker. The 2026-10-11 amendment keeps the product center on the desktop Memory Surface and Recall's local vault; this paragraph records the web companion, not the launch path. The Worker must hold secure HttpOnly revocable provisioned-device sessions and proxy only the fixed Recall API origin. The existing Supabase email callback is legacy behavior and must be removed from the active pilot flow after replacement and negative security tests. Browser tokens are removed from callback URLs before network redemption. Canonical PostgreSQL, private originals, and the Python API/worker remain unchanged. Browser IndexedDB is a workspace-scoped original-draft outbox, not the native SQLite cache or an offline generative service. Pending drafts survive logout and have explicit confirmed removal controls. Deployment and live browser acceptance are tracked separately in V1-STATUS.
 
 Migrations 0003–0006 extend the accepted capture/worker architecture. Canonical entities, mentions, relationships, claims and append-only claim revisions remain relational PostgreSQL records. User overrides take precedence when rebuilding interpretations and search projections. Retrieval combines authorized keyword, alias/entity and optional pgvector lanes; configuration/revision/hash checks exclude incompatible or stale vectors.
 

@@ -1,8 +1,43 @@
 # Recall pilot product contract
 
-## Amendment — 2026-10-10 (current)
+## Amendment — 2026-10-11 (current)
 
-Status: **CURRENT OWNER DECISION — normative for the product center.** This amendment supersedes conflicting parts of the 2026-10-09 PWA-only pilot contract preserved below, and conflicting pilot-center sentences in older requirements, designs, implementation notes, acceptance ledgers, and builder handoffs. The 2026-10-09 text stays in this file, labeled historical. PR #16 stays in the repository.
+Status: **CURRENT OWNER DECISION — normative for the product center.** This amendment supersedes the 2026-10-10 sentences that make Obsidian the place memory lives and that make Claude part of the default loop. The 2026-10-10 amendment stays below, labeled previous. Visual authority for the desktop Memory Surface, zero login UX, the phone as a capture and ask companion, and PR #16 as an optional companion are unchanged.
+
+### Owner direction
+
+Nick Sandoval, 2026-10-11: Recall is the whole product. It captures, stores, reviews, and answers. Obsidian is not on the product path. Claude is not required for the default loop.
+
+Recall gives:
+
+- Effortless capture. A photo or a note is enough. Save does not ask for a title, a folder, or tags.
+- A local vault that Recall owns. Original photos live in `Recall/Sources`. Notes live in `Recall/Memories`. History is append-only under `Recall/History`. Receipts live in `Recall/_meta`. Markdown is the note format. Another editor may open those files. Recall does not require one, and it does not silently replace a file a person edited.
+- An in-app Memories browser, so review happens in Recall.
+- The desktop Memory Surface for ask, the board, related notes, and the timeline.
+- Keyword ask over the notes on this device, with a citation back to the note, when no model key is configured. A Claude reading stays optional and off until a person consents on one photo.
+
+You capture and ask. Recall keeps the memory.
+
+### Product center
+
+- **The desktop Memory Surface is the primary shell.** The visual target remains the owner-supplied reference [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+- **The local vault is the memory Recall keeps.** Layout and rules are in [RECALL-STORE](RECALL-STORE.md).
+- **The phone is the capture and ask companion** for that same vault. It does not require another notes app.
+- **The installable web app from PR #16 remains an optional companion and enrollment transport.** Do not deploy it as the way to start using Recall.
+- **No login and no email-auth UX.** The access rules in the 2026-10-10 amendment still apply.
+
+### What this amendment does not change
+
+- A question mark, hypothesis, illegible number, or unresolved first name stays uncertain.
+- A note edited in the vault files is never silently replaced.
+- Keyword ask is not described as a Claude answer.
+- Original bytes are saved durably before any optional reading.
+- Model output stays untrusted. The model cannot choose permissions, paths, SQL, or arbitrary tools.
+- Nothing here deploys the web app, claims a live iPhone session, or claims installed-Windows acceptance.
+
+## Amendment — 2026-10-10 (previous)
+
+Status: **PREVIOUS OWNER DECISION.** Superseded for product center by the 2026-10-11 amendment above. It still records the move off the 2026-10-09 PWA-only pilot, the Memory Surface reference, and zero login UX. Sentences below that say Obsidian holds the memory, or that the next slice must write an Obsidian vault and use Claude for ask, are not the current product path.
 
 ### Owner vision
 

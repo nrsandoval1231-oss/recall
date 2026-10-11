@@ -1,6 +1,6 @@
 # Security, privacy, and operations
 
-> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+> **2026-10-11 product center.** The [pilot amendment](PILOT-CONTRACT.md) is normative. The desktop Memory Surface and the phone companion keep memory in Recall's vault ([RECALL-STORE](RECALL-STORE.md)). Obsidian is not required. Keyword ask does not require Claude. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg). The 2026-10-09 PWA-only notes are historical.
 
 ## Desktop vault
 

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LocalVault, VaultMemory, VaultRevision, VaultStatus } from "../platform/local-vault";
+import { relatedTo, type RelatedGroups } from "./backlinks";
 import { brooks, FIXTURE_BANNER, fixtureDocuments, fixtureMemory, type FixtureMemory } from "./brooks-fixture";
-import { KEYWORD_LABEL, keywordSearch, type KeywordAnswer } from "./keyword";
+import { KEYWORD_LABEL, keywordSearch, keywordTerms, type KeywordAnswer, type SearchDoc } from "./keyword";
 import { unavailableLibrarian, type Librarian, type Reading } from "./librarian";
 
-type Section = "home" | "ask" | "recent" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
+type Section = "home" | "ask" | "recent" | "memories" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
 type Panel = "overview" | "timeline" | "people" | "places" | "equipment" | "related";
 interface Selected { root: string; vault_id: string; vault_identity: string }
 interface PendingCapture { operationId: string; note: string }
@@ -14,6 +15,7 @@ const RAIL: { id: Section; label: string }[] = [
   { id: "ask", label: "Ask Recall" },
   { id: "home", label: "Home" },
   { id: "recent", label: "Recent" },
+  { id: "memories", label: "Memories" },
   { id: "people", label: "People" },
   { id: "places", label: "Places" },
   { id: "projects", label: "Projects" },
@@ -23,6 +25,7 @@ const RAIL: { id: Section; label: string }[] = [
 ];
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -150,6 +153,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [reader, setReader] = useState(librarian);
   const [readOp, setReadOp] = useState<string | null>(null);
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
+  const [browserId, setBrowserId] = useState<string | null>(null);
+  const [browserDraft, setBrowserDraft] = useState("");
   const askRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
   const previewRef = useRef<Preview | null>(null);
@@ -264,12 +269,21 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setAnswer(keywordSearch(query, fixtureDocuments()));
       return;
     }
+    const terms = keywordTerms(query);
+    if (!terms.length || query.length > 4096) {
+      setVaultHits([]);
+      setAnswer(keywordSearch(query, []));
+      return;
+    }
     setBusy(true);
     try {
-      const hits = await vault.list(selected.vault_id, query);
+      const hits = await vault.list(selected.vault_id, terms.join(" "));
       if (!alive.current) return;
-      setVaultHits(hits);
-      setAnswer(null);
+      const docs = hits.filter((memory) => memory.state === "active" && !memory.conflict).map(memoryDocument);
+      const next = keywordSearch(query, docs);
+      setAnswer(next);
+      const matched = next.kind === "matches" ? new Set(next.hits.map((hit) => hit.id)) : new Set<string>();
+      setVaultHits(hits.filter((memory) => matched.has(memory.id)));
     } catch (askError) {
       if (alive.current) setError(message(askError));
     } finally {
@@ -463,8 +477,47 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     }
   }
 
+  async function saveBrowserNote() {
+    if (!selected || !browserId) return;
+    const memory = kept.find((row) => row.id === browserId);
+    if (!memory || memory.state !== "active" || memory.conflict) return;
+    setBusy(true); setError("");
+    try {
+      const saved = await vault.correct(selected.vault_id, memory.id, memory.revision, operationId(), browserDraft);
+      if (!alive.current) return;
+      setItems((rows) => rows.map((row) => row.id === saved.id ? saved : row));
+      setBrowserDraft(saved.note);
+      setCorrection(saved.note);
+      setNotice("Note saved in the vault. The original photo is unchanged. This is your note, not a verified fact.");
+    } catch (saveError) {
+      if (alive.current) setError(`${message(saveError)} The draft is still here. Reload the note before saving again.`);
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  }
+
+  function openInBrowser(id: string) {
+    if (demo) {
+      const sample = fixtureMemory(id);
+      if (sample) openDemoMemory(sample);
+      return;
+    }
+    const memory = kept.find((row) => row.id === id);
+    if (!memory) return;
+    setBrowserId(memory.id);
+    setBrowserDraft(memory.note);
+    setSection("memories");
+    setEvidenceId(null);
+    setAnswer(null);
+    setVaultHits(null);
+  }
+
   const demoMemories = brooks.memories;
   const vaultMemories = kept;
+  const focusMemory = kept.find((memory) => memory.id === browserId) ?? featured;
+  const related: RelatedGroups = !demo && focusMemory
+    ? relatedTo(focusMemory.id, active.map((memory) => ({ id: memory.id, title: titleOf(memory), text: memory.note })))
+    : { linked: [], mentioned: [] };
   const evidenceMemory = kept.find((memory) => memory.id === evidenceId) ?? null;
   const demoEvidence = demo ? fixtureMemory(evidenceId ?? "") : undefined;
   const ticks: TimelineTick[] = demo ? brooks.months.map((month) => ({ id: month, label: month })) : vaultTicks(kept);
@@ -547,7 +600,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
             </section>
           ) : (
             <>
-              <div className={demo ? "ms-columns" : "ms-columns ms-columns-solo"}>
+              <div className={demo ? "ms-columns" : "ms-columns ms-columns-vault"}>
                 {demo && (
                   <div className="ms-side">
                     <ContextCard title="People" icon={<PeopleMark />}>
@@ -569,7 +622,21 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                   </div>
                 )}
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
-                  {section === "ask" ? <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
+                  {section === "ask" ? <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : section === "memories" ? (
+                    <MemoriesBrowser
+                      demo={demo}
+                      rows={demo ? fixtureBrowserRows() : vaultBrowserRows(vaultMemories)}
+                      selectedId={browserId}
+                      draft={browserDraft}
+                      busy={busy}
+                      editable={!demo}
+                      onSelect={openInBrowser}
+                      onDraft={setBrowserDraft}
+                      onSave={() => void saveBrowserNote()}
+                      onOpenOriginal={() => { const memory = kept.find((row) => row.id === browserId); if (memory) void openVaultMemory(memory); }}
+                      onBack={() => setBrowserId(null)}
+                    />
+                  ) : (
                     <>
                       <div className="ms-project-head">
                         <p className="ms-kicker"><ProjectMark />{demo ? brooks.kicker : "MEMORY"}</p>
@@ -583,7 +650,9 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       {panel === "people" && !detail && <SimpleList demo={demo} rows={brooks.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
                       {panel === "places" && !detail && <SimpleList demo={demo} rows={brooks.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
                       {panel === "equipment" && <SimpleList demo={demo} rows={brooks.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
-                      {panel === "related" && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
+                      {panel === "related" && (demo
+                        ? <SimpleList demo rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />
+                        : <RelatedLists groups={related} onOpen={openInBrowser} />)}
                       <dl className="ms-stats">
                         <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : active.length}</dd></div>
                         {demo && (
@@ -611,6 +680,11 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                     <blockquote className="glass ms-quote">{brooks.quote}</blockquote>
                   </div>
                 )}
+                {!demo && (
+                  <div className="ms-side">
+                    <RelatedCard focus={focusMemory ? titleOf(focusMemory) : "this note"} groups={related} onOpen={openInBrowser} />
+                  </div>
+                )}
               </div>
               {ticks.length > 0 && <TimelineStrip ticks={ticks} active={activeMonth} onSelect={selectMonth} />}
             </>
@@ -626,6 +700,80 @@ function titleOf(memory: VaultMemory): string {
   const name = memory.source_name.replace(/\.[a-z0-9]+$/i, "");
   return name || "Untitled page";
 }
+
+function originLabel(origin: string): string {
+  if (origin === "human:recall") return "saved in Recall";
+  if (origin === "human:obsidian") return "edited in the note file";
+  return origin;
+}
+
+function memoryDocument(memory: VaultMemory): SearchDoc {
+  const path = memory.note_path ? `Recall/Memories/${memory.note_path}` : "Recall/Memories";
+  const source = memory.source_name ? memory.source_name : "no original photo";
+  return {
+    id: memory.id,
+    title: titleOf(memory),
+    text: memory.note,
+    citation: `${displayDate(memory.captured_at)} · ${path} · ${source}`,
+  };
+}
+
+function lead(text: string): string {
+  const line = text.split("\n").map((part) => part.trim()).find(Boolean) ?? "";
+  if (!line) return "No note added.";
+  return line.length > 140 ? `${line.slice(0, 139)}…` : line;
+}
+
+function monthHeading(id: string): string {
+  const match = /^(\d{4})-(\d+)$/.exec(id);
+  if (!match) return "Undated";
+  const name = MONTH_NAMES[Number(match[2]) - 1];
+  return name ? `${name} ${match[1]}` : "Undated";
+}
+
+interface BrowserRow {
+  id: string;
+  monthId: string;
+  monthLabel: string;
+  date: string;
+  title: string;
+  excerpt: string;
+  meta: string;
+  note: string;
+}
+
+function vaultBrowserRows(memories: VaultMemory[]): BrowserRow[] {
+  return [...memories]
+    .sort((a, b) => b.captured_at.localeCompare(a.captured_at) || a.id.localeCompare(b.id))
+    .map((memory) => {
+      const monthId = memoryTickId(memory.captured_at) ?? "undated";
+      const photo = memory.source_name ? `Photo · ${memory.source_name}` : "Note";
+      return {
+        id: memory.id,
+        monthId,
+        monthLabel: monthHeading(monthId),
+        date: displayDate(memory.captured_at),
+        title: titleOf(memory),
+        excerpt: lead(memory.note),
+        meta: `${photo} · updated ${displayDate(memory.updated_at)}`,
+        note: memory.note,
+      };
+    });
+}
+
+function fixtureBrowserRows(): BrowserRow[] {
+  const labels: Record<string, string> = { MAY: "May 2026", JUN: "June 2026", JUL: "July 2026", AUG: "August 2026", SEP: "September 2026", OCT: "October 2026" };
+  return brooks.memories.map((memory) => ({
+    id: memory.id,
+    monthId: memory.month,
+    monthLabel: labels[memory.month] ?? memory.month,
+    date: memory.date,
+    title: memory.title,
+    excerpt: lead(memory.text),
+    meta: `${memory.kind} · sample`,
+    note: memory.text,
+  }));
+}
 function detailFrom(id: string): { title: string; text: string } | null {
   const docs = fixtureDocuments();
   const doc = docs.find((item) => item.id === id);
@@ -638,6 +786,7 @@ function RailIcon({ id }: { id: Section }) {
       {id === "ask" && <path d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm7 2-3.5-3.5" />}
       {id === "home" && <path d="M4 11.5 12 4l8 7.5V20H4v-8.5Z" />}
       {id === "recent" && <path d="M12 7v6l4 2M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18Z" />}
+      {id === "memories" && <path d="M6 4h9l3 3v13H6V4Zm9 0v3h3M8 11h8M8 15h6" />}
       {id === "people" && <path d="M8 14a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3ZM2 20a6 6 0 0 1 12 0M14 20a5 5 0 0 1 8 0" />}
       {id === "places" && <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />}
       {id === "projects" && <path d="M4 7h16v12H4V7Zm0 0 2-3h12l2 3" />}
@@ -734,27 +883,119 @@ function AskResults({ demo, answer, hits, onOpenDemo, onOpenVault }: { demo: boo
     <div>
       <p className="ms-kicker">ASK</p>
       <h1>Notes that match</h1>
-      <p className="ms-fine">{KEYWORD_LABEL}{demo ? " Searched the synthetic Brooks Campus fixture." : " Searched the Markdown notes in your vault."}</p>
+      <p className="ms-fine">{KEYWORD_LABEL}{demo ? " Searched the synthetic Brooks Campus fixture." : " Searched the Markdown notes in your vault. No API key is required."}</p>
       {answer?.kind === "abstain" && <p role="status">{answer.message}</p>}
       {answer?.kind === "matches" && (
         <>
           <p className="ms-fine">{answer.hits.length} matching notes. Showing the first {Math.min(6, answer.hits.length)}.</p>
           <ul className="ms-hits">
-            {answer.hits.slice(0, 6).map((hit) => (
-              <li key={hit.id} className="ms-hit"><strong>{hit.title}</strong><p>{hit.excerpt}</p><button type="button" onClick={() => onOpenDemo(hit.id)}>Open {hit.title}</button></li>
-            ))}
+            {answer.hits.slice(0, 6).map((hit) => {
+              const memory = hits?.find((item) => item.id === hit.id);
+              return (
+                <li key={hit.id} className="ms-hit">
+                  <strong>{hit.title}</strong>
+                  <p>{hit.excerpt}</p>
+                  {hit.citation && <p className="ms-cite">{hit.citation}</p>}
+                  <button type="button" onClick={() => memory ? onOpenVault(memory) : onOpenDemo(hit.id)}>{memory ? `Open original: ${hit.title}` : `Open ${hit.title}`}</button>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
-      {hits && hits.length === 0 && <p role="status">Nothing in the notes matches that. This is keyword search on this device, not a Claude answer.</p>}
-      {hits && hits.length > 0 && (
-        <ul className="ms-hits">
-          {hits.map((hit) => (
-            <li key={hit.id} className="ms-hit"><strong>{titleOf(hit)}</strong><p className="ms-note">{hit.note || "No note added."}</p><button type="button" onClick={() => onOpenVault(hit)}>Open original: {titleOf(hit)}</button></li>
-          ))}
-        </ul>
-      )}
+      {hits && hits.length === 0 && answer?.kind !== "abstain" && <p role="status">Nothing in the notes matches that. This is keyword search on this device, not a Claude answer.</p>}
       {empty === false && answer === null && hits === null && <p role="status">Type a question to search the notes.</p>}
+    </div>
+  );
+}
+
+function MemoriesBrowser({ demo, rows, selectedId, draft, busy, editable, onSelect, onDraft, onSave, onOpenOriginal, onBack }: {
+  demo: boolean;
+  rows: BrowserRow[];
+  selectedId: string | null;
+  draft: string;
+  busy: boolean;
+  editable: boolean;
+  onSelect: (id: string) => void;
+  onDraft: (value: string) => void;
+  onSave: () => void;
+  onOpenOriginal: () => void;
+  onBack: () => void;
+}) {
+  const selected = rows.find((row) => row.id === selectedId) ?? null;
+  const groups: { id: string; label: string; rows: BrowserRow[] }[] = [];
+  for (const row of rows) {
+    const group = groups.find((item) => item.id === row.monthId);
+    if (group) group.rows.push(row);
+    else groups.push({ id: row.monthId, label: row.monthLabel, rows: [row] });
+  }
+  return (
+    <div className="ms-browser">
+      <p className="ms-kicker">MEMORIES</p>
+      {selected ? (
+        <article aria-label={selected.title}>
+          <button type="button" onClick={onBack}>Back to memories</button>
+          <h1>{selected.title}</h1>
+          <p className="ms-cite">{selected.date} · {selected.meta}</p>
+          <p className="ms-note">{selected.note || "No note added."}</p>
+          {editable ? (
+            <form className="ms-form" onSubmit={(event) => { event.preventDefault(); onSave(); }}>
+              <label htmlFor="memory-edit">Edit note</label>
+              <textarea id="memory-edit" value={draft} onChange={(event) => onDraft(event.target.value)} />
+              <button className="ms-primary" type="submit" disabled={busy}>Save note</button>
+            </form>
+          ) : <p className="ms-fine">Synthetic sample. It is not in a vault.</p>}
+          {editable && <div className="ms-actions"><button type="button" onClick={onOpenOriginal}>Open original: {selected.title}</button></div>}
+        </article>
+      ) : (
+        <>
+          <h1>{demo ? "Sample notes" : "Your notes"}</h1>
+          <p className="ms-fine">{demo ? "Grouped by month. These are the design fixture, not your vault." : "Grouped by the month they were captured. No title, folder, or tags were required to save them."}</p>
+          {groups.length === 0 && <p role="status">Nothing saved yet. Import a photo from Capture.</p>}
+          {groups.map((group) => (
+            <section key={group.id} aria-label={group.label}>
+              <h2>{group.label}</h2>
+              <ul className="ms-list ms-memories">
+                {group.rows.map((row) => (
+                  <li key={row.id}>
+                    <button type="button" onClick={() => onSelect(row.id)}>
+                      <span className="ms-person"><strong>{row.date} · {row.title}</strong><small className="ms-role">{row.excerpt}</small><small className="ms-role">{row.meta}</small></span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function RelatedCard({ focus, groups, onOpen }: { focus: string; groups: RelatedGroups; onOpen: (id: string) => void }) {
+  return (
+    <section className="glass ms-card" aria-label="Related">
+      <header className="ms-card-head">
+        <span className="ms-card-icon" aria-hidden="true"><RelatedMark /></span>
+        <h2>Related</h2>
+      </header>
+      <p className="ms-fine">Related to {focus}</p>
+      <RelatedLists groups={groups} onOpen={onOpen} />
+    </section>
+  );
+}
+
+function RelatedLists({ groups, onOpen }: { groups: RelatedGroups; onOpen: (id: string) => void }) {
+  return (
+    <div>
+      <h3>Linked</h3>
+      {groups.linked.length === 0
+        ? <p className="ms-fine">No explicit links yet. A [[title]] or a markdown link to another note shows up here.</p>
+        : <ul className="ms-list">{groups.linked.map((item) => <li key={item.id}><button type="button" onClick={() => onOpen(item.id)}><span className="ms-person"><strong>{item.title}</strong><small className="ms-role">{item.excerpt}</small></span></button></li>)}</ul>}
+      <h3>Mentioned</h3>
+      {groups.mentioned.length === 0
+        ? <p className="ms-fine">No title mentions yet. Naming another note's title, without a link, shows up here.</p>
+        : <ul className="ms-list">{groups.mentioned.map((item) => <li key={item.id}><button type="button" onClick={() => onOpen(item.id)}><span className="ms-person"><strong>{item.title}</strong><small className="ms-role">{item.excerpt}</small></span></button></li>)}</ul>}
     </div>
   );
 }
@@ -824,7 +1065,7 @@ function Evidence(props: {
             </div>
             {props.history && (
               <ol className="ms-hits">
-                {props.history.map((revision) => <li key={revision.revision} className="ms-hit"><strong>Revision {revision.revision}</strong><p className="ms-note">{revision.note || "No note added."}</p><small>{revision.kind} · {revision.origin} · {revision.recorded_at}</small></li>)}
+                {props.history.map((revision) => <li key={revision.revision} className="ms-hit"><strong>Revision {revision.revision}</strong><p className="ms-note">{revision.note || "No note added."}</p><small>{revision.kind} · {originLabel(revision.origin)} · {revision.recorded_at}</small></li>)}
               </ol>
             )}
             <label className="ms-check"><input type="checkbox" checked={props.confirmRemove} onChange={(event) => props.onConfirmRemove(event.target.checked)} /> Remove from Recall. The photo and history stay in the vault.</label>

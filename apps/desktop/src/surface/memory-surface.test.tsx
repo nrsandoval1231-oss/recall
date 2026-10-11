@@ -63,7 +63,7 @@ describe("Memory Surface", () => {
     const { container } = render(<MemorySurface vault={preview} />);
     expect(screen.getByText("RECALL")).toBeTruthy();
     expect(screen.getByText("Your life remembers itself.")).toBeTruthy();
-    for (const label of ["Ask Recall", "Home", "Recent", "People", "Places", "Projects", "Equipment", "Timeline", "Capture"]) {
+    for (const label of ["Ask Recall", "Home", "Recent", "Memories", "People", "Places", "Projects", "Equipment", "Timeline", "Capture"]) {
       expect(screen.getByRole("button", { name: label })).toBeTruthy();
     }
     expect(screen.getByRole("heading", { name: "Brooks Campus" })).toBeTruthy();
@@ -138,13 +138,18 @@ describe("Memory Surface", () => {
     expect(screen.queryByRole("region", { name: "People" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Locations" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Key Topics" })).toBeNull();
-    expect(screen.queryByRole("region", { name: "Related" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Related" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Linked" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Mentioned" })).toBeTruthy();
+    expect(screen.queryByText("FingerMotion")).toBeNull();
     expect(screen.getByRole("region", { name: "Timeline" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "AUG" })).toBeTruthy();
     expect(screen.getByText("1")).toBeTruthy();
     await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "laydown");
     await user.click(screen.getByRole("button", { name: "Ask" }));
     expect(screen.getByText(/Markdown notes in your vault/)).toBeTruthy();
+    expect(screen.getByText(/No API key is required/)).toBeTruthy();
+    expect(screen.getByText(/Recall\/Memories\/11111111-1111-4111-8111-111111111111\.md/)).toBeTruthy();
     expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Open original: north-lot" }));
     expect(client.source).toHaveBeenCalledWith("session-token", page.id);
@@ -287,6 +292,80 @@ describe("Memory Surface", () => {
     await user.click(screen.getByRole("button", { name: "Ask" }));
     expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
     expect(client.list).toHaveBeenCalledWith("session-token", "laydown");
+  });
+
+  it("answers a natural question from the vault when Claude is off", async () => {
+    const user = userEvent.setup();
+    const page = memory();
+    const client = vault({}, [page]);
+    const read = vi.fn(async () => {
+      throw new Error("Claude was not required");
+    });
+    render(<MemorySurface vault={client} librarian={{ mode: "unavailable", notice: "Claude reading is off. Recall will not send this photo anywhere.", read }} />);
+    await screen.findByRole("heading", { name: "north-lot" });
+    await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "What do you know about the gate?");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    expect(client.list).toHaveBeenCalledWith("session-token", "gate");
+    expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
+    expect(screen.getByText(/north-lot\.png/)).toBeTruthy();
+    expect(read).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Read this photo with Claude" })).toBeNull();
+  });
+
+  it("lists memories by month and saves a light edit", async () => {
+    const user = userEvent.setup();
+    const page = memory();
+    const linked = memory({
+      id: "22222222-2222-4222-8222-222222222222",
+      note_path: "22222222-2222-4222-8222-222222222222.md",
+      note: "See [[north-lot]] before Friday.",
+      source_name: "sketch.png",
+      captured_at: "2026-09-03T12:00:00Z",
+      updated_at: "2026-09-03T12:00:00Z",
+    });
+    const mentioned = memory({
+      id: "33333333-3333-4333-8333-333333333333",
+      note_path: "33333333-3333-4333-8333-333333333333.md",
+      note: "The north-lot walk is still tentative.",
+      source_name: "walk.png",
+      captured_at: "2026-09-04T12:00:00Z",
+      updated_at: "2026-09-04T12:00:00Z",
+    });
+    const client = vault({}, [page, linked, mentioned]);
+    render(<MemorySurface vault={client} />);
+    expect(await screen.findByRole("heading", { name: "Linked" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /sketch/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Mentioned" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /walk/ })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: /title/i })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Memories" }));
+    expect(screen.getByRole("heading", { name: "September 2026" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "August 2026" })).toBeTruthy();
+    expect(screen.getByText(/No title, folder, or tags were required/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Aug 21, 2026 · north-lot/ }));
+    const field = await screen.findByRole("textbox", { name: "Edit note" });
+    await user.clear(field);
+    await user.type(field, "The gate code was not legible.");
+    await user.click(screen.getByRole("button", { name: "Save note" }));
+    expect(client.correct).toHaveBeenCalledWith("session-token", page.id, 1, expect.stringMatching(/^[0-9a-f-]{36}$/i), "The gate code was not legible.");
+    expect(await screen.findByText(/Note saved in the vault/)).toBeTruthy();
+  });
+
+  it("imports a photo without asking for a title, folder, or tags", async () => {
+    const user = userEvent.setup();
+    const saved = memory({ note: "" });
+    const capture = vi.fn(async () => saved);
+    const client = vault({ capture, status: async () => chosen }, []);
+    render(<MemorySurface vault={client} />);
+    expect(await screen.findByText(/no active memories/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Capture" }));
+    expect(screen.queryByRole("textbox", { name: /title/i })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: /folder/i })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: /tag/i })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Optional note" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Import photo" }));
+    expect((await screen.findAllByText(/Saved in your vault/)).length).toBeGreaterThan(0);
+    expect(capture).toHaveBeenCalledWith("session-token", expect.stringMatching(/^[0-9a-f-]{36}$/i), "");
   });
 
   it("refuses a mismatched original hash", async () => {

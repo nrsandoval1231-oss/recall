@@ -190,6 +190,15 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
   grid-template-columns: minmax(0, 760px);
   justify-content: center;
 }
+.ms-columns-vault {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  justify-content: stretch;
+}
+.ms-browser { display: grid; gap: 14px; }
+.ms-browser h2 { margin: 16px 0 0; font-size: 13px; letter-spacing: 0.04em; color: var(--quiet); font-weight: 600; }
+.ms-browser h1, .ms-card h3 { font-family: "Iowan Old Style", Palatino, Georgia, serif; }
+.ms-card h3 { margin: 12px 0 0; font-size: 15px; font-weight: 600; }
+.ms-cite { margin: 4px 0 0; color: var(--quiet); font-size: 12px; line-height: 1.4; }
 .ms-side { display: grid; gap: 12px; align-content: start; }
 .glass {
   position: relative;
@@ -459,7 +468,7 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
   .ms-tagline, .ms-root, .ms-editorial { display: none; }
   .ms-mast { grid-template-columns: 1fr; }
   .ms-askrow { grid-column: 1; }
-  .ms-columns, .ms-columns-solo, .ms-evidence { grid-template-columns: 1fr; }
+  .ms-columns, .ms-columns-solo, .ms-columns-vault, .ms-evidence { grid-template-columns: 1fr; }
   .ms-columns-solo { justify-content: stretch; }
   .ms-side { grid-template-columns: 1fr 1fr; }
   .ms-project h1 { font-size: 40px; }

@@ -1,10 +1,10 @@
 # Recall desktop
 
-The product path is the Memory Surface. It opens without an email, password, or sign-in link and keeps memory in a local Obsidian vault. Run it from [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+The product path is the Memory Surface. It opens without an email, password, or sign-in link and keeps memory in Recall's local vault. Obsidian is not required. Run it from [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
 
 `npm run dev` is a browser preview of that surface. It shows the synthetic Brooks Campus fixture and cannot write files. `npx tauri dev` chooses a vault folder, or creates `Documents/Recall`, then imports a photo into `Recall/Sources` and a Markdown note into `Recall/Memories`.
 
-Ask searches note text and opens the original. It is keyword search, not a Claude answer. Claude reading stays off unless the desktop process has `RECALL_CLAUDE_API_KEY`, a model, prices, and budgets. A consented read stores an unreviewed proposal and does not replace the note until you save a correction. Tests use a fake provider and do not make a network call.
+Ask searches note text, cites the note, and opens the original. It is keyword search and works with no API key. It is not a Claude answer. Claude reading stays off unless the desktop process has `RECALL_CLAUDE_API_KEY`, a model, prices, and budgets. A consented read stores an unreviewed proposal and does not replace the note until you save a correction. Tests use a fake provider and do not make a network call.
 
 `cargo run --bin recall-phone` from `src-tauri` serves the phone Capture and Ask page for the same vault. It is meant for the Tailscale address of this computer. Steps and the HTTPS, offline, and Claude gaps are in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
 

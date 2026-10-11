@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fixtureDocuments } from "./brooks-fixture";
-import { KEYWORD_LABEL, keywordSearch } from "./keyword";
+import { KEYWORD_LABEL, keywordSearch, keywordTerms } from "./keyword";
 
 describe("keyword search", () => {
   const docs = fixtureDocuments();
@@ -34,5 +34,21 @@ describe("keyword search", () => {
   it("requires every word", () => {
     expect(keywordSearch("Pecos permit", docs).kind).toBe("abstain");
     expect(keywordSearch("   ", docs).kind).toBe("abstain");
+  });
+
+  it("drops question words and keeps a citation with the excerpt", () => {
+    expect(keywordTerms("What do you know about the gate?")).toEqual(["gate"]);
+    const answer = keywordSearch("What do you know about the gate?", [
+      {
+        id: "lot",
+        title: "north-lot",
+        text: "North lot laydown yard. Gate code 48?",
+        citation: "Aug 21, 2026 · Recall/Memories/lot.md · north-lot.png",
+      },
+    ]);
+    expect(answer.kind).toBe("matches");
+    if (answer.kind !== "matches") return;
+    expect(answer.hits[0]?.excerpt).toMatch(/Gate code 48\?/);
+    expect(answer.hits[0]?.citation).toMatch(/Recall\/Memories\/lot\.md/);
   });
 });

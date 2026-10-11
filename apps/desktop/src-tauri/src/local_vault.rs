@@ -1743,7 +1743,7 @@ impl Vault {
 
 /// Vault root chosen by the desktop process, never by a path from the webview.
 /// `RECALL_VAULT_DIR`, when set, must be absolute. Otherwise the folder is
-/// `Documents/Recall`, which Obsidian can open as a vault.
+/// `Documents/Recall`. Markdown is the note format. Recall does not require another notes app.
 pub fn default_vault_directory(override_dir: Option<&str>, documents: &Path) -> Result<PathBuf> {
     let override_dir = override_dir.map(str::trim).filter(|value| !value.is_empty());
     if let Some(value) = override_dir {

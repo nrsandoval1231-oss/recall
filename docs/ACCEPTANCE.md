@@ -1,6 +1,6 @@
 # Recall acceptance and evaluation
 
-> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+> **2026-10-11 product center.** The [pilot amendment](PILOT-CONTRACT.md) is normative. The desktop Memory Surface and the phone companion keep memory in Recall's vault ([RECALL-STORE](RECALL-STORE.md)). Obsidian is not required. Keyword ask does not require Claude. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg). The 2026-10-09 PWA-only notes are historical.
 
 
 Version: 0.3 | Automated evidence and OPEN live gates
@@ -249,6 +249,37 @@ Rust coverage includes original-before-note writes, identical retries, rejected 
 - **Phone companion.** The local Tailscale page is covered in the next section. A real iPhone is still open.
 - **Visual fidelity.** The surface keeps the owner reference layout: left rail, ask bar, project board, and context cards. The owner removed the bottom timeline strip, the recent-memory thumbnails, the site image on the project board, and the notebook/desk photograph behind the glass. The stage background is a flat charcoal field. That board is text, stats, and tabs. Demo stats are fixture counts. The opened sample note still shows its text; that note is not a backdrop.
 - **Real Obsidian on a person's machine.** Not run. The folder layout is what Obsidian can open; Obsidian itself was not launched.
+
+## Recall owns the store (2026-10-11)
+
+This section is the self-contained slice: the local vault is Recall's store, Memories can be reviewed in the app, and Ask is keyword search with a citation when no Claude key is set. It is synthetic and automated. It is not an installed Windows app, a real iPhone session, or a live Claude reading.
+
+The [2026-10-11 amendment](PILOT-CONTRACT.md) and [RECALL-STORE](RECALL-STORE.md) are the product-center notes. Obsidian is not on the path. Markdown stays the note format. A locally edited file is still not silently replaced.
+
+### What the code does
+
+The Memory Surface rail keeps Ask, the board, Related, and the timeline. Memories lists notes by capture month, opens one note, and can save a light edit through the existing correction path. Related, for a real vault, splits explicit `[[title]]` or markdown links (Linked) from plain title mentions (Mentioned). Ask drops question words, searches the vault notes, and shows the date, `Recall/Memories` path, and source name. Capture on the desktop and the phone page still saves without a title, folder, or tags. Claude reading stays optional and off unless the desktop process is configured and the person consents.
+
+### Automated results
+
+Environment: Linux sandbox, Node 22.14.0, rustc 1.99.0 (`cargo +stable`; the default Cargo 1.83 cannot parse the lockfile). Synthetic notes only. No private captures. No Claude key. No paid call.
+
+| Suite | Result |
+| --- | --- |
+| `npm test --workspace @recall/desktop` | 67 passed (10 files) |
+| `npx tsc -p apps/desktop/tsconfig.json` | clean |
+| `npx eslint` on the desktop surface files touched in this slice | clean |
+| `cd apps/desktop/src-tauri && cargo +stable test --locked --lib` | 132 passed |
+| `cd apps/desktop/src-tauri && cargo +stable check --locked --bins` | succeeded; package `default_run` is `recall-desktop` |
+
+Desktop tests cover keyword ask with a citation and no reader call, the month-grouped Memories browser and a saved edit, Linked versus Mentioned, and a photo import with an empty note and no title, folder, or tags fields. Phone tests cover the home page saying no title, folder, or tags are required, and the existing keyword ask that cites `Recall/Memories`.
+
+### Open gates
+
+- **Installed Windows and a native Tauri window.** Not run. `npm run dev` still cannot write a vault.
+- **Real iPhone.** Not run. The phone page was exercised by the Rust tests, not by Safari on hardware.
+- **Live Claude.** Not called. Ask does not need it. A consented reading is still the optional path.
+- **In-app browser as a full editor.** Light edit of the note text is in. Rich markdown, folders, and tags are not part of this slice.
 
 ## Phone companion over Tailscale (2026-10-11)
 

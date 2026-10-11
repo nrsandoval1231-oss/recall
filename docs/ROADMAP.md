@@ -1,11 +1,11 @@
 # Recall build roadmap
 
-> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+> **2026-10-11 product center.** The [pilot amendment](PILOT-CONTRACT.md) is normative. The desktop Memory Surface and the phone companion keep memory in Recall's vault ([RECALL-STORE](RECALL-STORE.md)). Obsidian is not required. Keyword ask does not require Claude. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg). The 2026-10-09 PWA-only notes are historical.
 
 
 Version: 0.3 | Dependency-ordered, not delivery-date promises
 
-**Historical path, 2026-10-09, implemented by PR #16 and superseded 2026-10-10.** That path was the Cloudflare-served, installable iPhone Home Screen PWA and Windows browser, with zero login UI and private provisioned device access. The web app has a manifest, service worker, and operator enrollment with synthetic negative tests; Add to Home Screen, a real Windows browser, and deployment acceptance remain open and are not the launch gate. The active product center is the desktop Memory Surface and a local Obsidian vault. See the [realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md). Browser implementation/local verification recorded in V1-STATUS before 2026-10-10 is historical.
+**Historical path, 2026-10-09, implemented by PR #16 and superseded 2026-10-10.** That path was the Cloudflare-served, installable iPhone Home Screen PWA and Windows browser, with zero login UI and private provisioned device access. The web app has a manifest, service worker, and operator enrollment with synthetic negative tests; Add to Home Screen, a real Windows browser, and deployment acceptance remain open and are not the launch gate. The active product center is the desktop Memory Surface and Recall's local vault. See the [2026-10-11 amendment](PILOT-CONTRACT.md). See the [realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md). Browser implementation/local verification recorded in V1-STATUS before 2026-10-10 is historical.
 
 ## Foundation
 

@@ -1,11 +1,11 @@
 # Recall — Product Requirements Document
 
-> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+> **2026-10-11 product center.** The [pilot amendment](PILOT-CONTRACT.md) is normative. The desktop Memory Surface and the phone companion keep memory in Recall's vault ([RECALL-STORE](RECALL-STORE.md)). Obsidian is not required. Keyword ask does not require Claude. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg). The 2026-10-09 PWA-only notes are historical.
 
 
 Version: 0.3 | Date: 2026-10-07 | Product owner: Nick Sandoval
 
-Status: universal vision approved; initial V1 features exist as code. The desktop Memory Surface writes into a local Obsidian vault without login. Ask on that path is keyword search with the original still reachable. A phone on the same Tailscale network can capture and ask into that vault through a local page on the desktop machine; a real iPhone session is still open. Live Claude and an installed Windows run are open. The no-login PWA in PR #16 remains an optional companion, not the start-using-it product.
+Status: universal vision approved; initial V1 features exist as code. The desktop Memory Surface writes into Recall's local vault without login. Ask on that path is keyword search with a citation and does not require Claude. Review is the in-app Memories browser. A phone on the same Tailscale network can capture and ask into that vault through a local page on the desktop machine; a real iPhone session is still open. Live Claude and an installed Windows run are open. The no-login PWA in PR #16 remains an optional companion, not the start-using-it product.
 
 ## 1. Product thesis
 
@@ -65,7 +65,7 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 7. AI proposes; deterministic software commits.
 8. Source access is part of recall.
 9. Complexity stays behind the glass.
-10. Portability and privacy are product features. Historical 2026-10-07 wording said Obsidian is optional. The 2026-10-10 amendment makes the Obsidian vault the memory the user keeps.
+10. Portability and privacy are product features. The 2026-10-11 amendment keeps memory in Recall's vault as markdown files. A separate notes app is not required.
 11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.
 12. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
@@ -189,7 +189,7 @@ Deferred:
 | ACT-01 | Suggested actions/commitments do not become obligations automatically |
 | SYN-01 | One canonical server state with conflict-safe sync |
 | OFF-01 | Desktop cached browsing/search and durable outbox |
-| EXP-01 | Portable export. Historical wording: Obsidian is an optional adapter. The 2026-10-10 amendment makes the vault the memory the user keeps. |
+| EXP-01 | Portable export. The 2026-10-11 amendment keeps memory in Recall's vault as markdown. A separate notes app is not required. |
 | PRIV-01 | Workspace isolation and owner control |
 | OPS-01 | Backup, restore, deletion, independently readable export |
 
@@ -208,7 +208,7 @@ Evaluation includes both Paul-style difficult handwriting and general-domain cas
 
 ## 14. Architecture constraints
 
-Cloud Postgres + pgvector is canonical structured state in the code on `main`. Private object storage holds original evidence. Desktop SQLite is a rebuildable cache/outbox. Markdown/JSON/original export is the portability layer in that code. Historical wording called Obsidian one optional consumer. The 2026-10-10 amendment makes the vault the memory the user keeps; the vault slice updates this section with the implementation.
+Cloud Postgres + pgvector is canonical structured state in the code on `main`. Private object storage holds original evidence. Desktop SQLite is a rebuildable cache/outbox. Markdown/JSON/original export is the portability layer in that code. The 2026-10-11 amendment makes Recall's vault the memory for the desktop product. Cloud Postgres remains the store for the web companion and the legacy cloud desktop.
 
 Mobile and desktop use the same authenticated Memory API. Neither receives database-owner or AI-provider secrets. AI remains replaceable derived machinery.
 

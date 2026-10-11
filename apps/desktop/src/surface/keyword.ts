@@ -2,12 +2,14 @@ export interface SearchDoc {
   id: string;
   title: string;
   text: string;
+  citation?: string;
 }
 
 export interface SearchHit {
   id: string;
   title: string;
   excerpt: string;
+  citation?: string;
 }
 
 export type KeywordAnswer =
@@ -27,13 +29,18 @@ const QUESTION_WORDS = new Set([
 const ABSTAIN =
   "Nothing in the notes matches that. This is keyword search on this device, not a Claude answer.";
 
-/** Every remaining term must occur. Question words are ignored. This does not paraphrase or call a model. */
-export function keywordSearch(query: string, docs: readonly SearchDoc[]): KeywordAnswer {
-  const terms = query
+/** Question words are dropped. What remains is what the vault is searched for. */
+export function keywordTerms(query: string): string[] {
+  return query
     .toLowerCase()
     .split(/\s+/)
     .map((term) => term.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
     .filter((term) => term.length > 1 && !QUESTION_WORDS.has(term));
+}
+
+/** Every remaining term must occur. Question words are ignored. This does not paraphrase or call a model. */
+export function keywordSearch(query: string, docs: readonly SearchDoc[]): KeywordAnswer {
+  const terms = keywordTerms(query);
   if (!query.trim()) return { kind: "abstain", message: "Type a question to search the notes." };
   if (!terms.length) return { kind: "abstain", message: "Type a question that includes a word from the notes." };
   if (query.length > 4096) return { kind: "abstain", message: "That question is too long to search." };
@@ -42,7 +49,12 @@ export function keywordSearch(query: string, docs: readonly SearchDoc[]): Keywor
     const haystack = `${doc.title}\n${doc.text}`.toLowerCase();
     if (!terms.every((term) => haystack.includes(term))) continue;
     const term = terms[0] ?? "";
-    hits.push({ id: doc.id, title: doc.title, excerpt: excerpt(doc.text, term) });
+    hits.push({
+      id: doc.id,
+      title: doc.title,
+      excerpt: excerpt(doc.text, term),
+      ...(doc.citation ? { citation: doc.citation } : {}),
+    });
   }
   if (!hits.length) return { kind: "abstain", message: ABSTAIN };
   return { kind: "matches", hits };

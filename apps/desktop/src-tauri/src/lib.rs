@@ -198,7 +198,7 @@ fn vault_select(
     state: tauri::State<'_, local_vault::LocalVaultState>,
 ) -> Result<Option<local_vault::VaultStatus>, String> {
     let Some(root) = rfd::FileDialog::new()
-        .set_title("Choose your Obsidian vault folder")
+        .set_title("Choose your Recall vault folder")
         .pick_folder()
     else {
         return Ok(None);
