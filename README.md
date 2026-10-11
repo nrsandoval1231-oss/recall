@@ -70,7 +70,7 @@ V1 proves trusted photo capture and grounded recall. Typed text joins voice, scr
 - Mobile: Expo / React Native / TypeScript, iPhone first.
 - Desktop: Tauri 2 / React / TypeScript, Windows first.
 - Backend: FastAPI + durable worker.
-- Canonical state: managed PostgreSQL + pgvector.
+- Active desktop state: owner-selected Obsidian vault; SQLite may hold rebuildable indexes and local operational state. Legacy cloud state: managed PostgreSQL + pgvector.
 - Original evidence: private object storage.
 - Desktop offline state: SQLite.
 - AI: one evaluated multimodal configuration plus embeddings; no model router or autonomous agent framework in V1.
