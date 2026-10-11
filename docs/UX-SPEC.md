@@ -17,16 +17,27 @@ File: [docs/assets/memory-surface-reference-2026-10-10.jpg](assets/memory-surfac
 
 The picture is a desktop desk. Glass understanding sits over a physical notebook and site photographs. Brooks Campus names, counts, and dates in the image are the existing synthetic design fixture, not customer evidence. Do not hard-code that fixture as a production screen.
 
-Components visible in the reference, and therefore part of the desktop Memory Surface:
+Components visible in the reference. The desktop Memory Surface follows this composition except for the [owner cuts](#owner-cuts-2026-10-11) below:
 
 - **Left rail.** Wordmark “RECALL” and “Your life remembers itself.” Entries: Ask Recall, Home, Recent, People, Places, Projects, Equipment, Timeline, Capture. This rail is the approved desktop navigation. It is how the surface is entered. It is not a taxonomy the user must maintain.
 - **Ask.** A top field with the question “What do you know about Brooks Campus?” plus a voice control. Ask stays the way a vague recollection reconstructs memory.
-- **Project glass board.** Centered primary board: project label, title, place line, short grounded summary, counts (memories, people, locations, key topics), a photograph of the subject, and tabs Overview, Timeline, People, Equipment, Related. “Last updated” and a quiet overflow control sit on the board.
-- **Floating context.** People (name and role, plus a more-people affordance), Locations (place and locality, plus a more-locations affordance), Key Topics (label and count), Related (connected names and counts). These panels are the approved contextual glass beside the focused board.
+- **Project glass board.** Centered primary board: project label, title, place line, short grounded summary, counts (memories, people, locations, key topics), and tabs Overview, Timeline, People, Equipment, Related. “Last updated” sits on the board. The subject photograph in the reference is not a product hero.
+- **Floating context.** People (name and role, plus a more-people affordance), Locations (place and locality, plus a more-locations affordance), Key Topics (label and count), Related (connected names and counts). These panels are the approved contextual glass beside the focused board when that context exists. Hide them when the vault has no such records. Do not fill them with invented people, places, or counts.
 - **Timeline strip.** Months across the bottom with a position marker, labeled Timeline.
-- **Recent memories.** Thumbnail row under the timeline: dated items with a kind (notebook, photo, email, document) and a “view all” affordance.
-- **Physical original under the glass.** An open handwritten notebook, loose photographs, and the desk remain visible through and around the panels. Evidence is not a generic attachment icon.
+- **Recent memories.** The reference shows a thumbnail row under the timeline. That strip is cut. Do not build it.
+- **Physical original under the glass.** The reference shows a handwritten notebook and loose site photographs as the desk. Those decorative backgrounds are cut. A saved vault photo is shown when the person opens that memory. It is not a stage backdrop, and evidence is not a generic attachment icon.
 - **Footer loop.** CAPTURE · UNDERSTAND · CONNECT · REMEMBER · RECALL · ACT.
+
+### Owner cuts (2026-10-11)
+
+The reference photo remains layout and material inspiration. These pieces in the photograph are cut from the desktop product and override the picture where they conflict:
+
+- No bottom “Recent memories” glass board or thumbnail strip. The timeline month strip stays.
+- No decorative site photograph or stock image as the environment background or as a board hero.
+- No decorative paper notebook or handwriting scene under the glass.
+- The stage is a calm warm ivory/charcoal glass surface. Original evidence appears from vault content the person saved.
+
+Opening a saved photo still brings that original forward. The home stage does not fake that layer with a stock desk.
 
 The reference also shows a short editorial line (“Some notes. A sharper tomorrow.”) and a quote card about captured detail becoming later clarity. Those are tone, not extra product modules.
 
@@ -102,7 +113,7 @@ Reduced-motion mode must preserve the same hierarchy through opacity/layout chan
 
 ## 5. Canonical desktop journey
 
-The desktop composition for this journey is the [owner visual reference](assets/memory-surface-reference-2026-10-10.jpg). The rail, project board, floating context, timeline, recent memories, and the notebook under the glass are in that picture. The first production-quality vertical slice is:
+The desktop composition for this journey is the [owner visual reference](assets/memory-surface-reference-2026-10-10.jpg). The rail, project board, floating context, and timeline are in that picture. The [2026-10-11 owner cuts](#owner-cuts-2026-10-11) remove the recent-memories strip, decorative site photography, and the notebook backdrop from the product UI. The first production-quality vertical slice is:
 
 ```text
 Home

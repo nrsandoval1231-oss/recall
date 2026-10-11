@@ -75,6 +75,56 @@ function panelFor(section: Section): Panel {
   return "overview";
 }
 
+interface TimelineTick { id: string; label: string }
+
+function memoryTickId(iso: string): string | null {
+  const match = /^(\d{4})-(\d{2})/.exec(iso);
+  if (!match) return null;
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  return `${match[1]}-${month}`;
+}
+
+function vaultTicks(memories: VaultMemory[]): TimelineTick[] {
+  const points: { year: number; month: number }[] = [];
+  const seen = new Set<string>();
+  for (const memory of memories) {
+    const id = memoryTickId(memory.captured_at);
+    const match = /^(\d{4})-(\d{2})/.exec(memory.captured_at);
+    if (!id || !match || seen.has(id)) continue;
+    seen.add(id);
+    points.push({ year: Number(match[1]), month: Number(match[2]) });
+  }
+  if (points.length === 0) return [];
+  points.sort((a, b) => a.year - b.year || a.month - b.month);
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (!first || !last) return [];
+  const span = (last.year - first.year) * 12 + (last.month - first.month);
+  const multi = first.year !== last.year;
+  const ticks: TimelineTick[] = [];
+  const push = (year: number, month: number) => {
+    const name = MONTHS[month - 1] ?? "";
+    ticks.push({ id: `${year}-${month}`, label: multi ? `${name} ${String(year).slice(2)}` : name });
+  };
+  if (span <= 8) {
+    for (let index = 0; index <= span; index += 1) {
+      const monthIndex = first.month - 1 + index;
+      push(first.year + Math.floor(monthIndex / 12), (monthIndex % 12) + 1);
+    }
+  } else {
+    for (const point of points) push(point.year, point.month);
+  }
+  return ticks;
+}
+
+function monthPhrase(label: string): string {
+  const [name, year] = label.split(" ");
+  if (!name) return label;
+  const pretty = `${name[0] ?? ""}${name.slice(1).toLowerCase()}`;
+  return year ? `${pretty} ${year}` : pretty;
+}
+
 export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vault: LocalVault; librarian?: Librarian }) {
   const [status, setStatus] = useState<VaultStatus | null>(null);
   const [items, setItems] = useState<VaultMemory[]>([]);
@@ -99,6 +149,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [reading, setReading] = useState<Reading | null>(null);
   const [reader, setReader] = useState(librarian);
   const [readOp, setReadOp] = useState<string | null>(null);
+  const [focusMonth, setFocusMonth] = useState<string | null>(null);
   const askRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
   const previewRef = useRef<Preview | null>(null);
@@ -176,6 +227,13 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     if (next === "people" || next === "places" || next === "equipment" || next === "timeline" || next === "recent") setPanel(panelFor(next));
   }
 
+  function selectMonth(id: string) {
+    setFocusMonth(id);
+    setPanel("timeline");
+    setDetail(null);
+    if (section === "ask") setSection("home");
+  }
+
   async function choose(kind: "select" | "default") {
     setBusy(true); setError("");
     try {
@@ -187,6 +245,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setItems(chosen ? await vault.list(chosen.vault_id, "") : []);
       setNotice(kind === "default" ? "Opened the default vault folder." : "Opened the folder you chose.");
       setSection("home");
+      setFocusMonth(null);
     } catch (chooseError) {
       if (alive.current) setError(message(chooseError));
     } finally {
@@ -408,6 +467,9 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const vaultMemories = kept;
   const evidenceMemory = kept.find((memory) => memory.id === evidenceId) ?? null;
   const demoEvidence = demo ? fixtureMemory(evidenceId ?? "") : undefined;
+  const ticks: TimelineTick[] = demo ? brooks.months.map((month) => ({ id: month, label: month })) : vaultTicks(kept);
+  const activeMonth = focusMonth && ticks.some((tick) => tick.id === focusMonth) ? focusMonth : (demo ? brooks.marker : ticks[ticks.length - 1]?.id ?? "");
+  const activeLabel = ticks.find((tick) => tick.id === activeMonth)?.label ?? activeMonth;
 
   return (
     <div className="ms" data-mode={demo ? "demo" : "vault"}>
@@ -429,21 +491,24 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
         </div>
       </aside>
       <div className="ms-stage">
+        <div className="ms-atmosphere" aria-hidden="true" />
         <div className="ms-ui">
           {checking && <p className="ms-notice" role="status">Checking this device…</p>}
           {demo && !checking && <p className="ms-banner" role="status">{FIXTURE_BANNER}{selected ? " This vault has no active memories yet." : ""}</p>}
           {error && <p className="ms-error" role="alert">{error}</p>}
           {notice && <p className="ms-notice" role="status">{notice}</p>}
-          <div className="ms-toprow">{demo && <p className="ms-editorial">{brooks.editorial}</p>}</div>
-          <div className="ms-askrow">
-            <form className="ms-ask" role="search" onSubmit={(event) => void ask(event)}>
-              <SearchIcon />
-              <label className="ms-sr" htmlFor="recall-ask">Ask Recall</label>
-              <input id="recall-ask" ref={askRef} type="search" value={query} placeholder={demo ? "What do you know about Brooks Campus?" : "Ask your notes"} onChange={(event) => setQuery(event.target.value)} />
-              <button type="submit" disabled={busy} aria-label="Ask"><span aria-hidden="true">→</span></button>
-            </form>
-            <button className="ms-mic" type="button" disabled aria-label="Voice ask is not available in this build">Voice</button>
-          </div>
+          <header className="ms-mast">
+            {demo && <p className="ms-editorial">{brooks.editorial}</p>}
+            <div className="ms-askrow">
+              <form className="ms-ask" role="search" onSubmit={(event) => void ask(event)}>
+                <SearchIcon />
+                <label className="ms-sr" htmlFor="recall-ask">Ask Recall</label>
+                <input id="recall-ask" ref={askRef} type="search" value={query} placeholder={demo ? "What do you know about Brooks Campus?" : "Ask your notes"} onChange={(event) => setQuery(event.target.value)} />
+                <button type="submit" disabled={busy} aria-label="Ask"><span aria-hidden="true">→</span></button>
+              </form>
+              <button className="ms-mic" type="button" disabled aria-label="Voice ask is not available in this build"><WaveIcon /></button>
+            </div>
+          </header>
 
           {section === "evidence" ? (
             <Evidence
@@ -482,46 +547,52 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
             </section>
           ) : (
             <>
-              <div className="ms-columns">
-                <div className="ms-side">
-                  <ContextCard title="People" demo={demo} empty="Names in your notes stay as you wrote them. Recall does not turn a first name into a person record.">
-                    <ul className="ms-list">
-                      {brooks.people.map((person) => (
-                        <li key={person.name}><button type="button" onClick={() => { setDetail({ title: person.name, text: `${person.role}. ${person.note}` }); setPanel("people"); setSection("people"); }}><i className="ms-avatar" aria-hidden="true">{initials(person.name)}</i><span className="ms-person"><strong>{person.name}</strong><small className="ms-role">{person.role}</small></span></button></li>
-                      ))}
-                    </ul>
-                    <p className="ms-more">+ {brooks.morePeople}</p>
-                  </ContextCard>
-                  <ContextCard title="Locations" demo={demo} empty="Places are not split out of your notes in this build.">
-                    <ul className="ms-list">
-                      {brooks.places.map((place) => (
-                        <li key={place.name}><button type="button" onClick={() => { setDetail({ title: place.name, text: `${place.locality}. ${place.note}` }); setPanel("places"); setSection("places"); }}><PinIcon /><span className="ms-person"><strong>{place.name}</strong><small className="ms-role">{place.locality}</small></span></button></li>
-                      ))}
-                    </ul>
-                    <p className="ms-more">+ {brooks.morePlaces}</p>
-                  </ContextCard>
-                </div>
+              <div className={demo ? "ms-columns" : "ms-columns ms-columns-solo"}>
+                {demo && (
+                  <div className="ms-side">
+                    <ContextCard title="People" icon={<PeopleMark />}>
+                      <ul className="ms-list">
+                        {brooks.people.map((person) => (
+                          <li key={person.name}><button type="button" onClick={() => { setDetail({ title: person.name, text: `${person.role}. ${person.note}` }); setPanel("people"); setSection("people"); }}><i className={avatarTone(person.name)} aria-hidden="true">{initials(person.name)}</i><span className="ms-person"><strong>{person.name}</strong><small className="ms-role">{person.role}</small></span></button></li>
+                        ))}
+                      </ul>
+                      <p className="ms-more">+ {brooks.morePeople}</p>
+                    </ContextCard>
+                    <ContextCard title="Locations" icon={<LocationMark />}>
+                      <ul className="ms-list">
+                        {brooks.places.map((place) => (
+                          <li key={place.name}><button type="button" onClick={() => { setDetail({ title: place.name, text: `${place.locality}. ${place.note}` }); setPanel("places"); setSection("places"); }}><PinIcon /><span className="ms-person"><strong>{place.name}</strong><small className="ms-role">{place.locality}</small></span></button></li>
+                        ))}
+                      </ul>
+                      <p className="ms-more">+ {brooks.morePlaces}</p>
+                    </ContextCard>
+                  </div>
+                )}
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
                   {section === "ask" ? <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
                     <>
                       <div className="ms-project-head">
-                        <p className="ms-kicker">{demo ? brooks.kicker : "MEMORY"}</p>
-                        <p className="ms-updated">{demo ? `Last updated ${brooks.updated}` : featured ? `Last updated ${displayDate(featured.updated_at)}` : "Nothing saved yet"}</p>
+                        <p className="ms-kicker"><ProjectMark />{demo ? brooks.kicker : "MEMORY"}</p>
+                        <UpdatedLine value={demo ? `Last updated ${brooks.updated}` : featured ? `Last updated ${displayDate(featured.updated_at)}` : "Nothing saved yet"} />
                       </div>
                       <h1>{detail?.title ?? (demo ? brooks.project : featured ? titleOf(featured) : "Your vault")}</h1>
                       <p className="ms-place">{demo ? brooks.place : selected ? selected.root : "No vault open"}</p>
                       {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : featured?.note || "Import a photo to keep the original and a note in this vault."}</p>}
                       {demo && panel === "overview" && !detail && <p className="ms-fine">{brooks.caveat}</p>}
-                      {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
+                      {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} month={activeMonth} monthLabel={activeLabel} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
                       {panel === "people" && !detail && <SimpleList demo={demo} rows={brooks.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
                       {panel === "places" && !detail && <SimpleList demo={demo} rows={brooks.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
                       {panel === "equipment" && <SimpleList demo={demo} rows={brooks.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
                       {panel === "related" && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
                       <dl className="ms-stats">
                         <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : active.length}</dd></div>
-                        <div><dt>People</dt><dd>{demo ? brooks.stats.people : "—"}</dd></div>
-                        <div><dt>Locations</dt><dd>{demo ? brooks.stats.locations : "—"}</dd></div>
-                        <div><dt>Key Topics</dt><dd>{demo ? brooks.stats.topics : "—"}</dd></div>
+                        {demo && (
+                          <>
+                            <div><dt>People</dt><dd>{brooks.stats.people}</dd></div>
+                            <div><dt>Locations</dt><dd>{brooks.stats.locations}</dd></div>
+                            <div><dt>Key Topics</dt><dd>{brooks.stats.topics}</dd></div>
+                          </>
+                        )}
                       </dl>
                       {demo && <p className="ms-fine">{brooks.statsNote}</p>}
                       <div className="ms-tabs" role="tablist" aria-label="Project">
@@ -533,12 +604,15 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                     </>
                   )}
                 </article>
-                <div className="ms-side">
-                  <CountCard title="Key Topics" demo={demo} rows={brooks.topics} empty="Topics are not counted from your notes in this build." onOpen={(label, note) => { setDetail({ title: label, text: note }); setPanel("overview"); }} />
-                  <CountCard title="Related" demo={demo} rows={brooks.related} empty="Connections are not inferred. Ask searches the note text you saved." onOpen={(label, note) => { setDetail({ title: label, text: note }); setPanel("related"); setSection("projects"); }} />
-                  {demo && <p className="ms-quote glass">{brooks.quote}</p>}
-                </div>
+                {demo && (
+                  <div className="ms-side">
+                    <CountCard title="Key Topics" icon={<TopicMark />} rows={brooks.topics} onOpen={(label, note) => { setDetail({ title: label, text: note }); setPanel("overview"); }} />
+                    <CountCard title="Related" icon={<RelatedMark />} rows={brooks.related} onOpen={(label, note) => { setDetail({ title: label, text: note }); setPanel("related"); setSection("projects"); }} />
+                    <blockquote className="glass ms-quote">{brooks.quote}</blockquote>
+                  </div>
+                )}
               </div>
+              {ticks.length > 0 && <TimelineStrip ticks={ticks} active={activeMonth} onSelect={selectMonth} />}
             </>
           )}
           <p className="ms-footer">CAPTURE · UNDERSTAND · CONNECT · REMEMBER · RECALL · ACT</p>
@@ -574,26 +648,54 @@ function RailIcon({ id }: { id: Section }) {
   );
 }
 
-function ContextCard({ title, demo, empty, children }: { title: string; demo: boolean; empty: string; children: ReactNode }) {
+function ContextCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <section className="glass" aria-label={title}>
-      <h2>{title}</h2>
-      {demo ? children : <p>{empty}</p>}
+    <section className="glass ms-card" aria-label={title}>
+      <header className="ms-card-head">
+        <span className="ms-card-icon" aria-hidden="true">{icon}</span>
+        <h2>{title}</h2>
+      </header>
+      {children}
     </section>
   );
 }
 
-function CountCard({ title, demo, rows, empty, onOpen }: { title: string; demo: boolean; rows: { label: string; count: number; note: string }[]; empty: string; onOpen: (label: string, note: string) => void }) {
+function CountCard({ title, icon, rows, onOpen }: { title: string; icon: ReactNode; rows: { label: string; count: number; note: string }[]; onOpen: (label: string, note: string) => void }) {
   return (
-    <section className="glass" aria-label={title}>
-      <h2>{title}</h2>
-      {demo ? (
-        <ul className="ms-list">
-          {rows.map((row) => (
-            <li key={row.label}><button type="button" onClick={() => onOpen(row.label, row.note)}><span>{row.label}</span><span className="ms-count">{row.count}</span></button></li>
-          ))}
-        </ul>
-      ) : <p>{empty}</p>}
+    <section className="glass ms-card" aria-label={title}>
+      <header className="ms-card-head">
+        <span className="ms-card-icon" aria-hidden="true">{icon}</span>
+        <h2>{title}</h2>
+      </header>
+      <ul className="ms-list">
+        {rows.map((row) => (
+          <li key={row.label}><button type="button" onClick={() => onOpen(row.label, row.note)}><span>{row.label}</span><span className="ms-count">{row.count}</span></button></li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function UpdatedLine({ value }: { value: string }) {
+  const match = /^Last updated (.+)$/.exec(value);
+  if (!match) return <p className="ms-updated">{value}</p>;
+  return <p className="ms-updated"><span>Last updated</span>{match[1]}</p>;
+}
+
+function TimelineStrip({ ticks, active, onSelect }: { ticks: TimelineTick[]; active: string; onSelect: (id: string) => void }) {
+  return (
+    <section className="glass ms-timeline" aria-label="Timeline">
+      <div className="ms-timeline-label"><TimelineGlyph /><span>Timeline</span></div>
+      <ol className="ms-months">
+        {ticks.map((tick) => (
+          <li key={tick.id}>
+            <button type="button" aria-current={tick.id === active ? "true" : undefined} onClick={() => onSelect(tick.id)}>
+              <span className="ms-tick-slot" aria-hidden="true"><span className="ms-tick" /></span>
+              {tick.label}
+            </button>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -607,17 +709,21 @@ function SimpleList({ demo, rows, empty }: { demo: boolean; rows: { label: strin
   );
 }
 
-function MemoryList({ demo, demoMemories, vaultMemories, onDemo, onVault }: { demo: boolean; demoMemories: FixtureMemory[]; vaultMemories: VaultMemory[]; onDemo: (memory: FixtureMemory) => void; onVault: (memory: VaultMemory) => void }) {
+function MemoryList({ demo, demoMemories, vaultMemories, month, monthLabel, onDemo, onVault }: { demo: boolean; demoMemories: FixtureMemory[]; vaultMemories: VaultMemory[]; month: string; monthLabel: string; onDemo: (memory: FixtureMemory) => void; onVault: (memory: VaultMemory) => void }) {
   if (demo) {
+    const rows = month ? demoMemories.filter((memory) => memory.month === month) : demoMemories;
+    if (rows.length === 0) return <p className="ms-fine">No sample notes fall in {monthPhrase(monthLabel)}.</p>;
     return (
-      <ul className="ms-list">
-        {demoMemories.map((memory) => <li key={memory.id}><button type="button" onClick={() => onDemo(memory)}>{memory.date} · {memory.title}</button></li>)}
+      <ul className="ms-list ms-memories">
+        {rows.map((memory) => <li key={memory.id}><button type="button" onClick={() => onDemo(memory)}>{memory.date} · {memory.title}</button></li>)}
       </ul>
     );
   }
+  const rows = month ? vaultMemories.filter((memory) => memoryTickId(memory.captured_at) === month) : vaultMemories;
+  if (rows.length === 0) return <p className="ms-fine">No notes fall in {monthPhrase(monthLabel)}.</p>;
   return (
-    <ul className="ms-list">
-      {vaultMemories.map((memory) => <li key={memory.id}><button type="button" onClick={() => onVault(memory)}>{displayDate(memory.captured_at)} · {titleOf(memory)}</button></li>)}
+    <ul className="ms-list ms-memories">
+      {rows.map((memory) => <li key={memory.id}><button type="button" onClick={() => onVault(memory)}>{displayDate(memory.captured_at)} · {titleOf(memory)}</button></li>)}
     </ul>
   );
 }
@@ -757,6 +863,12 @@ function initials(name: string): string {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase();
 }
 
+function avatarTone(name: string): string {
+  const tones = ["a", "b", "c", "d"];
+  const index = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % tones.length;
+  return `ms-avatar ms-avatar-${tones[index]}`;
+}
+
 function SearchIcon() {
   return (
     <svg className="ms-search" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -771,6 +883,73 @@ function PinIcon() {
     <svg className="ms-pin" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
       <circle cx="12" cy="10" r="2.2" />
+    </svg>
+  );
+}
+
+function WaveIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <rect x="3.5" y="9" width="2" height="6" rx="1" />
+      <rect x="7.5" y="5.5" width="2" height="13" rx="1" />
+      <rect x="11.5" y="3" width="2" height="18" rx="1" />
+      <rect x="15.5" y="5.5" width="2" height="13" rx="1" />
+      <rect x="19.5" y="9" width="2" height="6" rx="1" />
+    </svg>
+  );
+}
+
+function ProjectMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2h5.5A2.5 2.5 0 0 1 20 9.5v8A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-10Z" />
+    </svg>
+  );
+}
+
+function LocationMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.2" />
+    </svg>
+  );
+}
+
+function PeopleMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M9 13a3.5 3.5 0 1 0-3.5-3.5A3.5 3.5 0 0 0 9 13Zm7.5 0a2.8 2.8 0 1 0-2.8-2.8A2.8 2.8 0 0 0 16.5 13ZM2.5 19.5a6.5 6.5 0 0 1 13 0M14 19.5a5 5 0 0 1 7.5 0" />
+    </svg>
+  );
+}
+
+function TopicMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.1" />
+      <path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1" />
+    </svg>
+  );
+}
+
+function RelatedMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="6" cy="12" r="2.2" />
+      <circle cx="17" cy="7" r="2.2" />
+      <circle cx="17" cy="17" r="2.2" />
+      <path d="M8.1 11.2 14.8 8.2M8.1 12.8l6.7 3" />
+    </svg>
+  );
+}
+
+function TimelineGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M3 12h18" />
+      <circle cx="8" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="16" cy="12" r="1.6" />
     </svg>
   );
 }
