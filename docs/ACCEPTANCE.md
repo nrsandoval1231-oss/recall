@@ -258,7 +258,7 @@ This section is the local phone page. It is synthetic and automated, plus a loop
 
 `recall-phone` serves one mobile page from the desktop machine. With Tailscale's IPv4 available it binds that address. Without it, or when tests ask for loopback, it binds `127.0.0.1`. `0.0.0.0` is refused unless `RECALL_PHONE_ALLOW_ALL_INTERFACES=1`. The page has no login, email, or password field, and it does not show the Brooks Campus fixture.
 
-A photo upload calls the desktop vault writer. The original bytes land in `Recall/Sources` and the Markdown note in `Recall/Memories`. The same capture id and the same bytes are idempotent. A changed note on that id is rejected and the first note stays. A filename with a Windows path is not used as a destination. A cross-site `Origin` does not write. Ask is keyword search over the current notes, including an Obsidian edit, and the result says it is not a Claude answer. The original is served from the vault id, not from a client path. The process does not read a Claude key.
+A photo upload calls the desktop vault writer. The original bytes land in `Recall/Sources` and the Markdown note in `Recall/Memories`. A note with no photo is saved under `Recall/Memories` and does not create a file in `Recall/Sources`. The same capture id and the same bytes, or the same text, are idempotent. A changed note on that id is rejected and the first note stays. A filename with a Windows path is not used as a destination. A cross-site `Origin` does not write. Ask is keyword search over the current notes, including a text-only note and an Obsidian edit, and the result says it is not a Claude answer. A photo original is served from the vault id, not from a client path. A text-only note has no original to open. The process does not read a Claude key.
 
 ### Automated results
 
@@ -266,11 +266,11 @@ Candidate environment: Linux sandbox, rustc 1.99.0. The default `cargo` on that 
 
 | Suite | Result |
 | --- | --- |
-| `cd apps/desktop/src-tauri && cargo test --lib phone::` | 9 passed |
-| `cd apps/desktop/src-tauri && cargo test --lib` | 130 passed, 0 failed |
-| `cd apps/desktop/src-tauri && cargo check --bins --tests` | succeeded, including `recall-phone` |
+| `cd apps/desktop/src-tauri && cargo +stable test --lib phone::` | 10 passed |
+| `cd apps/desktop/src-tauri && cargo +stable test --lib` | 132 passed, 0 failed |
+| `cd apps/desktop/src-tauri && cargo +stable check --bins --tests` | succeeded, including `recall-phone` |
 
-The phone tests cover loopback-by-default, Tailscale address selection, refusal of `0.0.0.0`, an absolute vault path, a matching desktop selection file, a mismatched vault id, capture into `Recall/Sources` and `Recall/Memories`, identical retry, a rejected changed retry, a preserved Obsidian edit, keyword hits and abstention, no fixture memories, HTML escaping, cross-site refusal, path traversal refusal, a per-minute capture limit, and an HTTP loopback save that returns the original bytes.
+The phone tests cover loopback-by-default, Tailscale address selection, refusal of `0.0.0.0`, an absolute vault path, a matching desktop selection file, a mismatched vault id, capture into `Recall/Sources` and `Recall/Memories`, a text-only note with no source file, an ask hit on that note, identical retry, a rejected changed retry, a preserved Obsidian edit, keyword hits and abstention, no fixture memories, HTML escaping, cross-site refusal, path traversal refusal, a per-minute capture limit, and an HTTP loopback save that returns the original bytes. The default `cargo` on this sandbox is 1.83; the commands above used the stable toolchain, rustc 1.99.0.
 
 Headless Chrome on this Linux sandbox opened `http://127.0.0.1:8787/`, uploaded a synthetic PNG with the note `pump house, uncertain?`, and showed **Saved in the desktop vault** and **Claude was not called**. Asking `what about the pump house` returned that note, the `Recall/Memories` and `Recall/Sources` paths, and the original image. The page had no email, password, or sign-in field. That check is not an iPhone and not a Tailscale session.
 
@@ -278,6 +278,7 @@ Headless Chrome on this Linux sandbox opened `http://127.0.0.1:8787/`, uploaded 
 
 - **Real iPhone on Tailscale.** Not run. Safari, Add to Home Screen, the camera sheet, and a tailnet ACL were not exercised on hardware.
 - **HTTPS.** Not implemented. The page is HTTP.
-- **Offline phone queue.** Not implemented. A page that does not load did not save a photo.
+- **Offline phone queue.** Not implemented. A page that does not load did not save a photo or a note.
+- **Desktop evidence for a text-only note.** Not redesigned. Opening that note on the desktop reports that there is no original photo. The Markdown note stays in the vault, and phone keyword search finds it.
 - **Claude from the phone.** Not implemented. The desktop consent path is unchanged.
 - **Windows firewall and an installed companion service.** Not run. The process is a console binary, not a Windows service.
