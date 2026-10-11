@@ -339,7 +339,7 @@ fn librarian_read(
     }
     let (root, input) = state.with(&expected_vault_id, |vault| {
         let memory = vault
-            .list("")?
+            .list_with_deleted("", false)?
             .into_iter()
             .find(|item| item.id == memory_id)
             .ok_or_else(|| "That memory is not in this vault. Recall did not send this photo.".to_string())?;
