@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Recall desktop (RCL-001: trusted capture viewer)"
 edition = "2021"
 publish = false
+default-run = "recall-desktop"
 
 [lib]
 name = "recall_desktop_lib"
