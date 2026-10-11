@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { webcrypto } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -68,14 +70,40 @@ describe("Memory Surface", () => {
     expect(screen.getByRole("button", { name: /Blake Combs/ })).toBeTruthy();
     expect(screen.getByText(/Synthetic demo/)).toBeTruthy();
     expect(screen.getAllByText(/Potential 300MW \(phased\)/).length).toBeGreaterThan(0);
-    expect(container.querySelector(".ms-desk, .ms-paper, .ms-polaroid, .ms-mug")).toBeNull();
+    expect(container.querySelector(".ms-desk, .ms-paper, .ms-polaroid, .ms-mug, .ms-recent, img")).toBeNull();
     expect(screen.queryByText("Important conversations deserve a long memory.")).toBeNull();
     expect(screen.queryByRole("img", { name: /site illustration/i })).toBeNull();
     expect(screen.queryByText("Synthetic site illustration")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Recent Memories" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Timeline and recent memories" })).toBeNull();
+    expect(screen.queryByText(/View all/i)).toBeNull();
+    expect(screen.getByRole("region", { name: "Timeline" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "AUG" }).getAttribute("aria-current")).toBe("true");
+    expect(screen.getByRole("region", { name: "People" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Locations" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Key Topics" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Related" })).toBeTruthy();
     expect(screen.queryByText("Email me a sign-in link")).toBeNull();
     expect((screen.getByRole("button", { name: "Voice ask is not available in this build" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps decorative desk images out of the surface stylesheet", () => {
+    const cssPath = [resolve("src/surface/memory-surface.css"), resolve("apps/desktop/src/surface/memory-surface.css")].find((path) => existsSync(path));
+    expect(cssPath).toBeTruthy();
+    const css = readFileSync(cssPath ?? "", "utf8");
+    expect(css).not.toMatch(/url\s*\(/i);
+    expect(css).not.toMatch(/memory-surface-reference|\.jpg|\.png|\.webp/i);
+  });
+
+  it("moves the timeline marker without a recent-memories strip", async () => {
+    const user = userEvent.setup();
+    render(<MemorySurface vault={preview} />);
+    await user.click(screen.getByRole("button", { name: "SEP" }));
+    expect(screen.getByRole("button", { name: "SEP" }).getAttribute("aria-current")).toBe("true");
+    expect(screen.getByRole("button", { name: /Utility Discussion/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Preliminary Plan/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Meeting Notes/ })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Recent Memories" })).toBeNull();
   });
 
   it("answers the reference question from the fixture and opens the sample notebook", async () => {
@@ -107,6 +135,13 @@ describe("Memory Surface", () => {
     expect(await screen.findByRole("heading", { name: "north-lot" })).toBeTruthy();
     expect(screen.queryByText("Blake Combs")).toBeNull();
     expect(screen.queryByText(/Synthetic demo/)).toBeNull();
+    expect(screen.queryByRole("region", { name: "People" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Locations" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Key Topics" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Related" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Timeline" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "AUG" })).toBeTruthy();
+    expect(screen.getByText("1")).toBeTruthy();
     await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "laydown");
     await user.click(screen.getByRole("button", { name: "Ask" }));
     expect(screen.getByText(/Markdown notes in your vault/)).toBeTruthy();
