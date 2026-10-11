@@ -2,7 +2,7 @@
 
 ## Start here
 
-Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository starts as documentation and a scaffold, not an existing working app.
+Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository contains implemented desktop, phone, and legacy cloud components. Verify current code and acceptance evidence before claiming a feature works.
 
 Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. The primary shell is the desktop Memory Surface. The phone is a capture and ask companion. Organized notes live in Obsidian, and originals stay preserved. The installable web app (PR #16) is an optional companion and enrollment transport, not the product people start using. Do not rebuild a general productivity suite. The 2026-10-10 amendment in `docs/PILOT-CONTRACT.md` is the product-center authority.
 
