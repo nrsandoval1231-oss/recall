@@ -1,5 +1,10 @@
 # Security, privacy, and operations
 
+## Active pilot security boundary (2026-10-11)
+
+The desktop vault is local and has no Recall login UI. The phone companion has no app-level login and serves over HTTP; network reachability through Tailscale ACLs and host firewall rules is therefore a security-critical gate, not proof of authorization merely because Tailscale is installed. Verify denied-peer access before real notes. Cloud account/RLS/auth operations below are for the optional legacy path, not required for the active local-vault pilot. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
+
+
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 ## Desktop vault
