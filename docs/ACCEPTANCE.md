@@ -1,5 +1,13 @@
 # Recall acceptance and evaluation
 
+## RCL-INT-001B first Jev boundary — 2026-10-12
+
+OPEN: bounded native text parser and real documented HTTPS transport implemented; durable provider jobs/budgets, photo transcription provenance, multiword entity extraction, live execution, complete pipeline/restart and UI wiring remain open. No model request sent. This is the next small reviewable slice, not stage completion.
+
+Focused Rust harness compiles the byte-identical native `jev.rs` with existing production dependencies. 15 tests pass: exact UTF-8 spans, decimals, uncertain December, crossed-out scope, source digest/change rejection, supported request shape, candidate entity/quantity offsets, malformed/missing/extra answers, distributions, pinned response model, absent consent/key and request-byte bounds. Synthetic responses are clearly marked and only test validation. Independent adversarial review independently reproduced 12 tests, found model mismatch and mutable Prepared evidence; follow-up fixes make Prepared opaque, bind concrete models, retain input/output usage, and conservatively extend retraction scope. Independent follow-up reproduced 14 tests and approved this disconnected boundary. Version syntax and output-token bounds were subsequently tightened with a failing-then-passing regression. Exact-head repository CI required before merge. Existing vault/phone/librarian/validator modules also passed 116 tests in a byte-identical native-core harness, independently reproduced; this includes restart/reopen, injected interruption recovery, external edits, stale revisions and duplicate operations, not full intelligent-pipeline persistence.
+
+The mandatory meeting note was used as a source-span test fixture, not run through real Jev/Claude or published as a real memory. No vague AI answer or organized Obsidian result is claimed. Missing credentials and the canonical UI PNG remain external gates; installed Windows/iPhone/Tailscale acceptance is unavailable on this Linux machine.
+
 ## Claude reader recovery prerequisite — 2026-10-12
 
 Independent work while real Jev/Claude credentials are unavailable. This repairs the existing photo reader, not the unimplemented librarian organization stage. The actual Claude transport now treats delivery errors as uncertain, keeps their reservation and avoids automatic repeat. It bounds responses to 128 KiB, omits provider error bodies, and excludes the key from configuration Debug output. Provider budget/reading files reuse native checked-path, flushed staging and atomic Windows write-through replacement rather than deleting the prior record on rename failure. A vault writer lock serializes reservation/replay and provider calls so concurrent reads cannot overspend the same ledger. Capture may return busy during a reading (up to its 45-second timeout); original data remains intact.
@@ -8,6 +16,8 @@ Six meaningful regressions reproduced failures before fixes: credential Debug le
 
 
 ## RCL-INT-001A validator review — 2026-10-12
+
+PR #28 merged as `f28d07f02f88b811dc01c43883f9dd6845f3cf28` after all five CI jobs passed on candidate `0b5f018fb5d2759b03f03d737152a68ef25cfdd3` (run `38197994123`), including Windows tests/check/unsigned installer. Independent review reproduced 17 validator tests. This is not installed Windows acceptance.
 
 PR #28 original head `2819d6208f35bbd4b4ae1780b1575055e57dbef9` was reviewed against main `3cea9ff9ddb36bdafbe5a323c5996ef71a585ddb`. PR #26 was neither fetched nor incorporated. PR #27 remains draft; its required canonical PNG is absent.
 

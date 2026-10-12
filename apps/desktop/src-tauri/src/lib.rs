@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+mod jev;
 mod librarian;
 #[allow(dead_code)]
 mod organization_plan;
