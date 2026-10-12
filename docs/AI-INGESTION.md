@@ -1,5 +1,10 @@
 # AI ingestion and grounded retrieval
 
+## Active Jev → Claude organization contract
+
+The next product slice is [Meeting to Memory](MEETING-TO-MEMORY.md). Jev parses messy source material into bounded evidence-linked structured candidates. Claude receives only authorized context and proposes stable folders, native Obsidian YAML frontmatter, wikilinks and readable notes. The deterministic writer validates and commits, preserving source, uncertainty and human corrections. Do not confuse current opt-in photo reading with a completed librarian workflow.
+
+
 ## Active Claude librarian status (2026-10-11)
 
 The active desktop-vault product intends consented Claude interpretation of handwritten notes, source-grounded organization, cross-note relationships, and vague retrieval. Current keyword matching is not generative recall. Existing provider-independent contracts and cloud embeddings below are reusable safety guidance, not evidence that live Claude or pgvector are integrated into the active vault path. Validate real handwriting, ambiguity, source citations, correction precedence, and abstention before claiming the librarian works. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
