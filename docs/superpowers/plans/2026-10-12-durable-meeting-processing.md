@@ -23,18 +23,18 @@ Keep PR #26 isolated. Preserve originals before provider calls. No PostgreSQL, l
 
 Files: local_vault.rs and native tests.
 Produces: processing_snapshot(memory_id, expected_revision) -> ProcessingSnapshot, containing current VaultMemory, verified VaultSource and human-correction flag. Legacy text evidence comes from the immutable first capture record and is preserved as Recall/Sources/<UUID>.txt.
-- [ ] Write original-byte/restart, source-tamper, stale revision and human-correction regressions; observe failures.
-- [ ] Implement source snapshot under the existing writer lock; retain old capture/history format.
-- [ ] Run the full native-core harness, inspect results, commit.
+- [x] Write original-byte/restart, source-tamper, stale revision and human-correction regressions; observe failures.
+- [x] Implement source snapshot under the existing writer lock; retain old capture/history format.
+- [x] Run the full native-core harness, inspect results, commit.
 
 ## Task 2 — parser job and budget
 
 Files: processing.rs, jev.rs validation, librarian.rs currency/date helper visibility, lib.rs commands.
 Consumes: processing_snapshot and the documented jev::parse API.
 Produces: parse_note(vault, config, operation, memory, revision, consent, transport) -> Job; status(vault, operation) -> Job. Stored Job is strict, source-bound and contains original/transcription hashes, model, reservation and validated parsed output.
-- [ ] Write replay/restart, uncertain delivery, budget limit, missing config/consent, malformed output, metadata tamper and stale-source regressions; observe failures.
-- [ ] Implement safe atomic job records, exclusive native job locking and conservative 100,000-input-token reservations. Validate results before persisting them. Do not expose secrets through status.
-- [ ] Bind native selected-vault commands and actual ureq transport; preserve unavailable-photo-transcription state honestly.
+- [x] Write replay/restart, uncertain delivery, budget limit, missing config/consent, malformed output, metadata tamper and stale-source regressions; observe failures.
+- [x] Implement safe atomic job records, exclusive native job locking and conservative 100,000-input-token reservations. Validate results before persisting them. Do not expose secrets through status.
+- [x] Bind native selected-vault commands and actual ureq transport; preserve unavailable-photo-transcription state honestly.
 - [ ] Run full native-core tests and remote exact-head CI; obtain independent review; update ACCEPTANCE/DEVELOPMENT and open focused PR.
 
 Ruling: this slice persists parser output but does not publish organization. Photo inputs remain pending transcription until the existing Claude reader is connected in the next dependent slice. This avoids pretending Jev accepts images.

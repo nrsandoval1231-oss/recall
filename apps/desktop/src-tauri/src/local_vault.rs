@@ -164,6 +164,7 @@ pub struct Vault {
     pub id: String,
 }
 impl Vault {
+    pub(crate) fn validate_for_processing(&self) -> Result<()> { self.validate() }
     pub(crate) fn root(&self) -> &Path {
         &self.root
     }
