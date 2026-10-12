@@ -3,6 +3,10 @@
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
+## Current local-first acceptance interpretation (2026-10-11)
+
+The active product is the Obsidian-vault desktop plus Tailscale phone companion. Jev parsing and Claude organization are required product capabilities, not verified live integrations. PostgreSQL, Supabase, Expo and hosted PWA acceptance below is retained historical evidence only; those gates do not block the local-first pilot. Installed Windows, real iPhone/Tailscale and denied-peer tests, live Jev-to-Claude-to-validated-Markdown/YAML writing, correction-safe reprocessing, and vague evidence-backed Ask remain OPEN. The visual timeline remains required under UX-SPEC's 2026-10-11 owner cuts; older acceptance prose saying it was removed is superseded. PR #26 remains isolated. See CANONICAL-FOUNDATION.md.
+
 Version: 0.3 | Automated evidence and OPEN live gates
 
 ## Evidence standard
