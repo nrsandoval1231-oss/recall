@@ -2158,3 +2158,23 @@ fn recovery_cannot_publish_after_related_context_edit(){
     assert_eq!(fs::read_dir(t.0.join(format!("Recall/History/{memory}"))).unwrap().count(),1);
     assert!(!fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap().starts_with("---"));
 }
+
+#[test]
+fn interrupted_photo_publication_recovers_both_evidence_references(){
+    for point in ["before_note","publish_before","publish_after","before_history","before_receipt"]{
+        let (t,v,parser,organization,memory)=crate::processing::tests::photo_fixture();let publication=op();
+        let fault=FaultGuard::set(move |at,_|if at==point{Err("INJECTED photo publication interruption".into())}else{Ok(())});
+        assert!(v.publish_meeting(&parser,&organization,&publication).is_err());drop(fault);
+        let reopened=Vault::open(&t.0).unwrap();let saved=reopened.publish_meeting(&parser,&organization,&publication).unwrap();assert_eq!(saved.revision,2);
+        assert_eq!(reopened.history(&memory).unwrap().len(),2);assert!(saved.note.contains("visual_status: unreviewed"));assert!(saved.note.contains("Original photo]]"));assert!(saved.note.contains("Unreviewed machine transcription]]"));
+        assert_eq!(reopened.source(&memory).unwrap().sha256,reopened.captured_source_while_locked(&memory).unwrap().sha256);
+    }
+}
+#[test]
+fn photo_recovery_refuses_tampered_transcription_before_publication(){
+    let (t,v,parser,organization,memory)=crate::processing::tests::photo_fixture();let publication=op();
+    let fault=FaultGuard::set(|point,_|if point=="before_note"{Err("INJECTED photo pending".into())}else{Ok(())});assert!(v.publish_meeting(&parser,&organization,&publication).is_err());drop(fault);
+    fs::write(t.0.join(format!("Recall/Sources/{memory}-{parser}.txt")),"Forged machine transcription").unwrap();
+    let reopened=Vault::open(&t.0).unwrap();assert!(reopened.list("").unwrap()[0].conflict.is_some());assert_eq!(fs::read_dir(t.0.join(format!("Recall/History/{memory}"))).unwrap().count(),1);
+    assert!(!fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap().starts_with("---"));
+}

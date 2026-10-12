@@ -27,8 +27,14 @@ pub struct Config {
 }
 impl Config {
     #[cfg(test)]
-    pub(crate) fn synthetic_test_config()->Self {
-        Self {api_key:Some("synthetic-key".into()),model:Some("jev-1.13.0".into()),price_micros:Some(42_000),daily_micros:Some(1_000_000),monthly_micros:Some(10_000_000)}
+    pub(crate) fn synthetic_test_config() -> Self {
+        Self {
+            api_key: Some("synthetic-key".into()),
+            model: Some("jev-1.13.0".into()),
+            price_micros: Some(42_000),
+            daily_micros: Some(1_000_000),
+            monthly_micros: Some(10_000_000),
+        }
     }
     pub fn from_env() -> Self {
         let value = |name: &str| {
@@ -78,6 +84,12 @@ struct Attempt {
     format: String,
     input_sha256: String,
     model: String,
+    #[serde(
+        default,
+        deserialize_with = "present_sha",
+        skip_serializing_if = "Option::is_none"
+    )]
+    transcription_sha256: Option<String>,
     price_micros: i64,
     reserved_micros: i64,
     day: String,
@@ -91,6 +103,81 @@ struct Completed {
     attempt_sha256: String,
     parsed: jev::ParsedSource,
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Transcription {
+    format: String,
+    input_sha256: String,
+    transcription_sha256: String,
+    reading: librarian::StoredReading,
+}
+fn present_sha<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<Option<String>, D::Error> {
+    String::deserialize(d).map(Some)
+}
+fn visual_operation(operation: &str) -> String {
+    let hash = Sha256::digest(format!("recall-visual-v1:{operation}").as_bytes());
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&hash[..16]);
+    bytes[6] = (bytes[6] & 0x0f) | 0x50;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    Uuid::from_bytes(bytes).to_string()
+}
+fn transcription(vault: &Vault, dir: &Path, input: &Input) -> Result<Option<Transcription>> {
+    let Some(record) =
+        read_optional::<Transcription>(&path(dir, "transcriptions", &input.operation_id)?)?
+    else {
+        return Ok(None);
+    };
+    if input.mime_type == "text/plain"
+        || record.format != "recall-visual-transcription-v1"
+        || record.input_sha256 != digest(&json(input)?)
+        || record.reading.operation_id != visual_operation(&input.operation_id)
+        || record.reading.memory_id != input.memory_id
+        || record.reading.expected_revision != input.revision
+        || record.reading.source_sha256 != input.source_sha256
+        || record.reading.status != "unreviewed"
+        || record.transcription_sha256 != digest(record.reading.transcription.as_bytes())
+    {
+        return Err("Visual transcription identity mismatch".into());
+    }
+    let reading =
+        librarian::load_reading(vault.root(), &input.memory_id, &record.reading.operation_id)?
+            .ok_or("Native visual reading missing")?;
+    if json(&reading)? != json(&record.reading)? {
+        return Err("Visual transcription disagrees with native reading".into());
+    }
+    let saved = local_vault::read(
+        &vault.root().join(format!(
+            "Recall/Sources/{}-{}.txt",
+            input.memory_id, input.operation_id
+        )),
+        16 * 1024,
+    )?;
+    if saved != record.reading.transcription.as_bytes() {
+        return Err("Preserved visual transcript changed".into());
+    }
+    Ok(Some(record))
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct VisualEvidence {
+    pub transcription_sha256: String,
+    pub mime_type: String,
+    pub reader_model: String,
+    pub uncertainties: Vec<String>,
+    pub transcript_basename: String,
+}
+fn with_visual(mut job: Job, input: &Input, visual: Option<&Transcription>) -> Job {
+    job.visual = visual.map(|v| VisualEvidence {
+        transcription_sha256: v.transcription_sha256.clone(),
+        mime_type: input.mime_type.clone(),
+        reader_model: v.reading.model.clone(),
+        uncertainties: v.reading.uncertainties.clone(),
+        transcript_basename: format!("{}-{}.txt", input.memory_id, input.operation_id),
+    });
+    job
+}
 #[derive(Clone, Debug, Serialize)]
 pub struct Job {
     pub operation_id: String,
@@ -102,6 +189,7 @@ pub struct Job {
     pub model: Option<String>,
     pub reserved_micros: i64,
     pub parsed: Option<jev::ParsedSource>,
+    pub visual: Option<VisualEvidence>,
 }
 pub trait ParserTransport {
     fn parse(
@@ -147,7 +235,7 @@ fn root(vault: &Vault) -> Result<PathBuf> {
     if !path.exists() {
         fs::create_dir(&path).map_err(|_| "Could not create parser state directory")?;
     }
-    for name in ["inputs", "attempts", "results"] {
+    for name in ["inputs", "attempts", "results", "transcriptions"] {
         let dir = path.join(name);
         local_vault::safe(&dir)?;
         if !dir.exists() {
@@ -252,7 +340,10 @@ fn valid_completed(input: &Input, attempt: &Attempt, result: &Completed) -> Resu
         &result.parsed,
         &input.memory_id,
         &result.parsed.transcription,
-        &input.source_sha256,
+        attempt
+            .transcription_sha256
+            .as_deref()
+            .unwrap_or(&input.source_sha256),
         &attempt.model,
     )
 }
@@ -260,6 +351,11 @@ fn valid_attempt(input: &Input, attempt: &Attempt) -> Result<()> {
     if attempt.format != FORMAT
         || attempt.input_sha256 != digest(&json(input)?)
         || attempt.model.len() > 80
+        || (input.mime_type != "text/plain") != attempt.transcription_sha256.is_some()
+        || attempt
+            .transcription_sha256
+            .as_ref()
+            .is_some_and(|s| s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()))
         || attempt.reserved_micros != reservation(attempt.price_micros)?
         || attempt.day.len() != 10
         || attempt.month.len() != 7
@@ -314,6 +410,13 @@ fn budget(vault: &Vault, dir: &Path, input: &Input, config: &Config, required: i
         let completed = read_optional::<Completed>(&path(dir, "results", id)?)?;
         if let Some(result) = &completed {
             valid_completed(&original, &attempt, result)?;
+            if original.mime_type != "text/plain" {
+                let visual = transcription(vault, dir, &original)?
+                    .ok_or("Visual budget result has no transcription")?;
+                if attempt.transcription_sha256.as_deref() != Some(&visual.transcription_sha256) {
+                    return Err("Visual budget transcription changed".into());
+                }
+            }
         }
         if original.source_sha256 == input.source_sha256 && completed.is_none() {
             return Err(
@@ -350,6 +453,7 @@ fn job(
         model: attempt.map(|a| a.model.clone()),
         reserved_micros: attempt.map_or(0, |a| a.reserved_micros),
         parsed,
+        visual: None,
     }
 }
 fn read_job(vault: &Vault, dir: &Path, input: &Input) -> Result<Job> {
@@ -361,27 +465,43 @@ fn read_job(vault: &Vault, dir: &Path, input: &Input) -> Result<Job> {
     {
         return Err("Parser source changed".into());
     }
+    let visual = transcription(vault, dir, input)?;
     let attempt: Option<Attempt> = read_optional(&path(dir, "attempts", &input.operation_id)?)?;
     let result: Option<Completed> = read_optional(&path(dir, "results", &input.operation_id)?)?;
     if let Some(a) = &attempt {
         valid_attempt(input, a)?;
         if let Some(result) = result {
             valid_completed(input, a, &result)?;
-            let text = std::str::from_utf8(&snap.source.bytes)
-                .map_err(|_| "Parser result is not a text source")?;
+            let text = if let Some(visual) = &visual {
+                visual.reading.transcription.as_str()
+            } else {
+                std::str::from_utf8(&snap.source.bytes)
+                    .map_err(|_| "Parser result is not a text source")?
+            };
+            if a.transcription_sha256.as_deref()
+                != visual.as_ref().map(|v| v.transcription_sha256.as_str())
+            {
+                return Err("Parser visual hash mismatch".into());
+            }
             jev::validate_parsed(
                 &result.parsed,
                 &input.memory_id,
                 text,
-                &input.source_sha256,
+                a.transcription_sha256
+                    .as_deref()
+                    .unwrap_or(&input.source_sha256),
                 &a.model,
             )?;
-            return Ok(job(
+            return Ok(with_visual(
+                job(
+                    input,
+                    "parsed",
+                    "Source parsed; Claude organization is pending",
+                    Some(a),
+                    Some(result.parsed),
+                ),
                 input,
-                "parsed",
-                "Source parsed; Claude organization is pending",
-                Some(a),
-                Some(result.parsed),
+                visual.as_ref(),
             ));
         }
         return Ok(job(
@@ -404,7 +524,7 @@ fn read_job(vault: &Vault, dir: &Path, input: &Input) -> Result<Job> {
             None,
         ));
     }
-    if input.mime_type != "text/plain" {
+    if input.mime_type != "text/plain" && visual.is_none() {
         return Ok(job(
             input,
             "needs_transcription",
@@ -423,18 +543,52 @@ fn read_job(vault: &Vault, dir: &Path, input: &Input) -> Result<Job> {
 }
 /// Read immutable parser evidence without acquiring the processing lock.
 /// Caller publication holds the writer lock; never infer current revision from this archive.
-pub(crate) fn archived_result(vault:&Vault,operation:&str)->Result<Job> {
-    let dir=root(vault)?;
-    let input:Input=read_optional(&path(&dir,"inputs",operation)?)?.ok_or("Parser input missing")?;
-    valid_input(vault,&input,operation)?;
-    if input.human_corrected || input.mime_type!="text/plain" {return Err("Parser source is not authorized for automatic publication".into());}
-    let attempt:Attempt=read_optional(&path(&dir,"attempts",operation)?)?.ok_or("Parser attempt missing")?;
-    valid_attempt(&input,&attempt)?;
-    let completed:Completed=read_optional(&path(&dir,"results",operation)?)?.ok_or("Validated parser result missing")?;
-    valid_completed(&input,&attempt,&completed)?;
-    let original=local_vault::read(&vault.root().join(format!("Recall/Sources/{}.txt",input.memory_id)),16*1024)?;
-    if original!=vault.captured_text_while_locked(&input.memory_id)? || digest(&original)!=input.source_sha256 || original!=completed.parsed.transcription.as_bytes(){return Err("Archived parser original mismatch".into());}
-    Ok(job(&input,"parsed","Archived validated parser evidence",Some(&attempt),Some(completed.parsed)))
+pub(crate) fn archived_result(vault: &Vault, operation: &str) -> Result<Job> {
+    let dir = root(vault)?;
+    let input: Input =
+        read_optional(&path(&dir, "inputs", operation)?)?.ok_or("Parser input missing")?;
+    valid_input(vault, &input, operation)?;
+    if input.human_corrected {
+        return Err("Parser source is not authorized for automatic publication".into());
+    }
+    let attempt: Attempt =
+        read_optional(&path(&dir, "attempts", operation)?)?.ok_or("Parser attempt missing")?;
+    valid_attempt(&input, &attempt)?;
+    let completed: Completed = read_optional(&path(&dir, "results", operation)?)?
+        .ok_or("Validated parser result missing")?;
+    valid_completed(&input, &attempt, &completed)?;
+    let original = vault
+        .captured_source_while_locked(&input.memory_id)
+        .map_err(|_| "Archived parser original mismatch")?;
+    if original.sha256 != input.source_sha256 || original.mime_type != input.mime_type {
+        return Err("Archived parser original mismatch".into());
+    }
+    let visual = transcription(vault, &dir, &input)?;
+    if input.mime_type == "text/plain" {
+        if original.bytes != completed.parsed.transcription.as_bytes() {
+            return Err("Archived parser original mismatch".into());
+        }
+    } else {
+        let reading = visual
+            .as_ref()
+            .ok_or("Archived visual transcription missing")?;
+        if attempt.transcription_sha256.as_deref() != Some(&reading.transcription_sha256)
+            || completed.parsed.transcription != reading.reading.transcription
+        {
+            return Err("Archived visual transcription mismatch".into());
+        }
+    }
+    Ok(with_visual(
+        job(
+            &input,
+            "parsed",
+            "Archived validated parser evidence",
+            Some(&attempt),
+            Some(completed.parsed),
+        ),
+        &input,
+        visual.as_ref(),
+    ))
 }
 
 pub fn status(vault: &Vault, operation: &str) -> Result<Job> {
@@ -452,6 +606,24 @@ pub fn parse_note(
     revision: u64,
     consent: bool,
     transport: &impl ParserTransport,
+) -> Result<Job> {
+    parse_with_visual(
+        vault, config, operation, memory, revision, consent, transport, None,
+    )
+}
+
+pub fn parse_with_visual(
+    vault: &Vault,
+    config: &Config,
+    operation: &str,
+    memory: &str,
+    revision: u64,
+    consent: bool,
+    transport: &impl ParserTransport,
+    visual_adapter: Option<(
+        &librarian::LibrarianConfig,
+        &dyn librarian::ReadingTransport,
+    )>,
 ) -> Result<Job> {
     stable_id(operation)?;
     stable_id(memory)?;
@@ -477,20 +649,84 @@ pub fn parse_note(
         return Err("Parser retention capacity reached".into());
     }
     immutable(&path(&dir, "inputs", operation)?, &input)?;
-    let prior = read_job(vault, &dir, &input)?;
-    if prior.state != "pending" || !consent || !config.ready() {
+    let mut prior = read_job(vault, &dir, &input)?;
+    if !config.ready() && ["pending", "needs_transcription"].contains(&prior.state.as_str()) {
+        prior.message="Original saved. Native Jev key, supported pinned model, positive price and budgets must be configured before processing.".into();
+    }
+    if !["pending", "needs_transcription"].contains(&prior.state.as_str())
+        || !consent
+        || !config.ready()
+    {
         return Ok(prior);
     }
-    let text = std::str::from_utf8(&snap.source.bytes).map_err(|_| "Original text is not UTF-8")?;
     let model = config.model.as_deref().ok_or("Parser model unavailable")?;
-    jev::prepare(memory, text, &input.source_sha256, model)?;
+    jev::prepare(memory, "validation", &digest(b"validation"), model)?;
     let required = reservation(config.price_micros.ok_or("Parser price unavailable")?)?;
+    budget(vault, &dir, &input, config, required)?;
+    let mut visual = transcription(vault, &dir, &input)?;
+    if input.mime_type != "text/plain" && visual.is_none() {
+        let Some((reader_config, reader)) = visual_adapter else {
+            return Ok(prior);
+        };
+        let reading = librarian::read_for_processing(
+            vault.root(),
+            reader_config,
+            &librarian::ReadInput {
+                consent: true,
+                operation_id: visual_operation(operation),
+                memory_id: memory.into(),
+                expected_revision: revision,
+                source_sha256: input.source_sha256.clone(),
+                mime_type: input.mime_type.clone(),
+                bytes: snap.source.bytes.clone(),
+            },
+            reader,
+        )?;
+        let latest = vault.processing_snapshot(memory, revision)?;
+        if latest.human_corrected || latest.source.sha256 != input.source_sha256 {
+            return Err("Photo changed during visual transcription".into());
+        }
+        let transcript_path = vault
+            .root()
+            .join(format!("Recall/Sources/{memory}-{operation}.txt"));
+        match fs::symlink_metadata(&transcript_path) {
+            Ok(_) => {
+                if local_vault::read(&transcript_path, 16 * 1024)?
+                    != reading.transcription.as_bytes()
+                {
+                    return Err("Visual transcript operation reused".into());
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                local_vault::create(&transcript_path, reading.transcription.as_bytes())?
+            }
+            Err(_) => return Err("Visual transcript inspection failed".into()),
+        }
+        let record = Transcription {
+            format: "recall-visual-transcription-v1".into(),
+            input_sha256: digest(&json(&input)?),
+            transcription_sha256: digest(reading.transcription.as_bytes()),
+            reading,
+        };
+        immutable(&path(&dir, "transcriptions", operation)?, &record)?;
+        visual = transcription(vault, &dir, &input)?;
+    }
+    let text = if let Some(visual) = &visual {
+        visual.reading.transcription.as_str()
+    } else {
+        std::str::from_utf8(&snap.source.bytes).map_err(|_| "Original text is not UTF-8")?
+    };
+    let parsed_sha = visual.as_ref().map_or(input.source_sha256.as_str(), |v| {
+        v.transcription_sha256.as_str()
+    });
+    jev::prepare(memory, text, parsed_sha, model)?;
     budget(vault, &dir, &input, config, required)?;
     let (day, month) = librarian::utc_day_month();
     let attempt = Attempt {
         format: FORMAT.into(),
         input_sha256: digest(&json(&input)?),
         model: model.into(),
+        transcription_sha256: visual.as_ref().map(|v| v.transcription_sha256.clone()),
         price_micros: config.price_micros.unwrap_or(0),
         reserved_micros: required,
         day,
@@ -503,9 +739,9 @@ pub fn parse_note(
         consent: true,
         max_request_bytes: 128 * 1024,
     };
-    let output = transport.parse(&c, memory, text, &input.source_sha256);
+    let output = transport.parse(&c, memory, text, parsed_sha);
     if let Ok(parsed) = output {
-        if jev::validate_parsed(&parsed, memory, text, &input.source_sha256, model).is_ok() {
+        if jev::validate_parsed(&parsed, memory, text, parsed_sha, model).is_ok() {
             // Revalidate revision/source after the provider call before accepting derived state.
             let latest = vault.processing_snapshot(memory, revision)?;
             if latest.source.sha256 != input.source_sha256 || latest.human_corrected {
@@ -524,14 +760,14 @@ pub fn parse_note(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::{
         fs,
         sync::atomic::{AtomicUsize, Ordering},
     };
     const NOTE: &str="Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.";
-    struct Temp(std::path::PathBuf);
+    pub(crate) struct Temp(pub(crate) std::path::PathBuf);
     impl Temp {
         fn new() -> Self {
             let p = std::env::temp_dir().join(format!("recall-synthetic-job-{}", Uuid::new_v4()));
@@ -775,17 +1011,351 @@ mod tests {
         );
         assert_eq!(p.calls.load(Ordering::SeqCst), 0);
     }
+    struct Visual {
+        calls: AtomicUsize,
+        fail: bool,
+    }
+    impl librarian::ReadingTransport for Visual {
+        fn complete(
+            &self,
+            _: &librarian::ProviderRequest<'_>,
+        ) -> std::result::Result<librarian::ProviderOutput, librarian::CallError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.fail {
+                return Err(librarian::CallError::Uncertain(
+                    "Synthetic visual delivery failure".into(),
+                ));
+            }
+            Ok(librarian::ProviderOutput {
+                transcription: NOTE.into(),
+                uncertainties: vec![
+                    "Synthetic visual reading; handwriting was not evaluated.".into()
+                ],
+                model: "synthetic-visual-model".into(),
+                input_tokens: Some(100),
+                output_tokens: Some(100),
+            })
+        }
+    }
+    fn visual() -> Visual {
+        Visual {
+            calls: AtomicUsize::new(0),
+            fail: false,
+        }
+    }
+    fn photo(v: &Vault) -> local_vault::VaultMemory {
+        v.capture(
+            &id(),
+            "synthetic.png",
+            b"\x89PNG\r\n\x1a\nSYNTHETIC-NOT-HANDWRITING",
+            "",
+        )
+        .unwrap()
+    }
+    pub(crate) fn photo_fixture() -> (Temp, Vault, String, String, String) {
+        use crate::librarian::organization_tests as fixture;
+        let t = Temp::new();
+        let v = t.vault();
+        let m = photo(&v);
+        let op = id();
+        let c = fixture::config();
+        parse_with_visual(
+            &v,
+            &configured(),
+            &op,
+            &m.id,
+            1,
+            true,
+            &parser(),
+            Some((&c, &visual())),
+        )
+        .unwrap();
+        let organization = id();
+        librarian::organize_selected(&v, &c, &op, &organization, true, &fixture::claude()).unwrap();
+        (t, v, op, organization, m.id)
+    }
     #[test]
-    fn consistent_parser_archive_tampering_cannot_replace_native_original(){
-        let t=Temp::new();let v=t.vault();let m=v.capture_note(&id(),NOTE).unwrap();let op=id();parse_note(&v,&configured(),&op,&m.id,1,true,&parser()).unwrap();
-        let dir=root(&v).unwrap();let altered=NOTE.replace("Utility late.","Utility next.");let sha=digest(altered.as_bytes());
-        let mut input:Input=read_optional(&path(&dir,"inputs",&op).unwrap()).unwrap().unwrap();input.source_sha256=sha.clone();
-        let mut attempt:Attempt=read_optional(&path(&dir,"attempts",&op).unwrap()).unwrap().unwrap();attempt.input_sha256=digest(&json(&input).unwrap());
-        let mut completed:Completed=read_optional(&path(&dir,"results",&op).unwrap()).unwrap().unwrap();completed.input_sha256=attempt.input_sha256.clone();completed.attempt_sha256=digest(&json(&attempt).unwrap());completed.parsed.source_sha256=sha;completed.parsed.transcription=altered.clone();
-        for (candidate,span) in completed.parsed.candidates.iter_mut().zip(jev::candidates(&altered).unwrap()){candidate.span=span;}
-        fs::write(path(&dir,"inputs",&op).unwrap(),json(&input).unwrap()).unwrap();fs::write(path(&dir,"attempts",&op).unwrap(),json(&attempt).unwrap()).unwrap();fs::write(path(&dir,"results",&op).unwrap(),json(&completed).unwrap()).unwrap();
-        fs::write(t.0.join(format!("Recall/Sources/{}.txt",m.id)),altered).unwrap();
-        let _lock=v.lock().unwrap();assert!(archived_result(&v,&op).unwrap_err().contains("original mismatch"));
+    fn librarian_evidence_includes_visual_uncertainties_and_provenance() {
+        let t = Temp::new();
+        let v = t.vault();
+        let m = photo(&v);
+        let op = id();
+        let c = crate::librarian::organization_tests::config();
+        let job = parse_with_visual(
+            &v,
+            &configured(),
+            &op,
+            &m.id,
+            1,
+            true,
+            &parser(),
+            Some((&c, &visual())),
+        )
+        .unwrap();
+        let evidence = crate::meeting::evidence_for_source(
+            job.parsed.as_ref().unwrap(),
+            &[],
+            &job.source_sha256,
+            job.visual.as_ref(),
+        );
+        assert_eq!(evidence["visual_evidence"]["human_review_required"], true);
+        assert_eq!(evidence["visual_evidence"]["status"], "unreviewed");
+        assert_eq!(
+            evidence["visual_evidence"]["uncertainties"][0],
+            "Synthetic visual reading; handwriting was not evaluated."
+        );
+        assert_eq!(evidence["original_source_sha256"], m.source_sha256);
+    }
+    #[test]
+    fn photo_pipeline_persists_distinct_evidence_and_unreviewed_transcript_hashes() {
+        use crate::librarian::organization_tests as fixture;
+        let t = Temp::new();
+        let v = t.vault();
+        let m = photo(&v);
+        let op = id();
+        let reader = visual();
+        let parser = parser();
+        let c = fixture::config();
+        let parsed = parse_with_visual(
+            &v,
+            &configured(),
+            &op,
+            &m.id,
+            1,
+            true,
+            &parser,
+            Some((&c, &reader)),
+        )
+        .unwrap();
+        assert_eq!(parsed.state, "parsed");
+        assert_eq!(parsed.source_sha256, m.source_sha256);
+        assert_eq!(
+            parsed.parsed.as_ref().unwrap().source_sha256,
+            digest(NOTE.as_bytes())
+        );
+        assert_ne!(
+            parsed.source_sha256,
+            parsed.parsed.as_ref().unwrap().source_sha256
+        );
+        let organization = id();
+        librarian::organize_selected(&v, &c, &op, &organization, true, &fixture::claude()).unwrap();
+        let publication = id();
+        let published = v.publish_meeting(&op, &organization, &publication).unwrap();
+        assert_eq!(published.revision, 2);
+        assert!(published.note.contains("visual_status: unreviewed"));
+        assert!(published.note.contains("Original photo]]"));
+        assert!(published
+            .note
+            .contains("Unreviewed machine transcription]]"));
+        assert!(published.note.contains("No visual accuracy is claimed"));
+        assert!(published.note.contains(&m.source_sha256));
+        assert!(published.note.contains(&digest(NOTE.as_bytes())));
+        assert!(!published
+            .note
+            .split("## Retracted")
+            .next()
+            .unwrap()
+            .contains("8 MW confirmed"));
+        assert_eq!(
+            t.vault()
+                .publish_meeting(&op, &organization, &publication)
+                .unwrap()
+                .revision,
+            2
+        );
+        assert_eq!(reader.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(v.source(&m.id).unwrap().sha256, m.source_sha256);
+    }
+    #[test]
+    fn photo_consent_parser_config_and_pinned_model_gate_visual_call() {
+        use crate::librarian::organization_tests as fixture;
+        let t = Temp::new();
+        let v = t.vault();
+        let m = photo(&v);
+        let reader = visual();
+        let parser = parser();
+        let c = fixture::config();
+        assert_eq!(
+            parse_with_visual(
+                &v,
+                &configured(),
+                &id(),
+                &m.id,
+                1,
+                false,
+                &parser,
+                Some((&c, &reader))
+            )
+            .unwrap()
+            .state,
+            "needs_transcription"
+        );
+        assert_eq!(
+            parse_with_visual(
+                &v,
+                &Config::default(),
+                &id(),
+                &m.id,
+                1,
+                true,
+                &parser,
+                Some((&c, &reader))
+            )
+            .unwrap()
+            .state,
+            "needs_transcription"
+        );
+        let mut invalid = configured();
+        invalid.model = Some("imaginary-model".into());
+        assert!(parse_with_visual(
+            &v,
+            &invalid,
+            &id(),
+            &m.id,
+            1,
+            true,
+            &parser,
+            Some((&c, &reader))
+        )
+        .is_err());
+        assert_eq!(reader.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 0);
+    }
+    #[test]
+    fn uncertain_visual_delivery_blocks_new_provider_attempts() {
+        use crate::librarian::organization_tests as fixture;
+        let t = Temp::new();
+        let v = t.vault();
+        let m = photo(&v);
+        let reader = Visual {
+            calls: AtomicUsize::new(0),
+            fail: true,
+        };
+        let parser = parser();
+        let c = fixture::config();
+        assert!(parse_with_visual(
+            &v,
+            &configured(),
+            &id(),
+            &m.id,
+            1,
+            true,
+            &parser,
+            Some((&c, &reader))
+        )
+        .is_err());
+        assert!(parse_with_visual(
+            &t.vault(),
+            &configured(),
+            &id(),
+            &m.id,
+            1,
+            true,
+            &parser,
+            Some((&c, &reader))
+        )
+        .is_err());
+        assert_eq!(reader.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 0);
+    }
+    #[test]
+    fn uncertain_photo_parser_blocks_another_visual_call_and_transcript_tampering() {
+        use crate::librarian::organization_tests as fixture;
+        let t = Temp::new();
+        let v = t.vault();
+        let m = photo(&v);
+        let reader = visual();
+        let parser = FixtureParser {
+            calls: AtomicUsize::new(0),
+            fail: true,
+            wrong_source: false,
+        };
+        let c = fixture::config();
+        let op = id();
+        assert_eq!(
+            parse_with_visual(
+                &v,
+                &configured(),
+                &op,
+                &m.id,
+                1,
+                true,
+                &parser,
+                Some((&c, &reader))
+            )
+            .unwrap()
+            .state,
+            "uncertain"
+        );
+        assert!(parse_with_visual(
+            &t.vault(),
+            &configured(),
+            &id(),
+            &m.id,
+            1,
+            true,
+            &parser,
+            Some((&c, &reader))
+        )
+        .is_err());
+        assert_eq!(reader.calls.load(Ordering::SeqCst), 1);
+        fs::write(
+            t.0.join(format!("Recall/Sources/{}-{op}.txt", m.id)),
+            "tampered transcript",
+        )
+        .unwrap();
+        assert!(status(&v, &op).is_err());
+    }
+    #[test]
+    fn consistent_parser_archive_tampering_cannot_replace_native_original() {
+        let t = Temp::new();
+        let v = t.vault();
+        let m = v.capture_note(&id(), NOTE).unwrap();
+        let op = id();
+        parse_note(&v, &configured(), &op, &m.id, 1, true, &parser()).unwrap();
+        let dir = root(&v).unwrap();
+        let altered = NOTE.replace("Utility late.", "Utility next.");
+        let sha = digest(altered.as_bytes());
+        let mut input: Input = read_optional(&path(&dir, "inputs", &op).unwrap())
+            .unwrap()
+            .unwrap();
+        input.source_sha256 = sha.clone();
+        let mut attempt: Attempt = read_optional(&path(&dir, "attempts", &op).unwrap())
+            .unwrap()
+            .unwrap();
+        attempt.input_sha256 = digest(&json(&input).unwrap());
+        let mut completed: Completed = read_optional(&path(&dir, "results", &op).unwrap())
+            .unwrap()
+            .unwrap();
+        completed.input_sha256 = attempt.input_sha256.clone();
+        completed.attempt_sha256 = digest(&json(&attempt).unwrap());
+        completed.parsed.source_sha256 = sha;
+        completed.parsed.transcription = altered.clone();
+        for (candidate, span) in completed
+            .parsed
+            .candidates
+            .iter_mut()
+            .zip(jev::candidates(&altered).unwrap())
+        {
+            candidate.span = span;
+        }
+        fs::write(path(&dir, "inputs", &op).unwrap(), json(&input).unwrap()).unwrap();
+        fs::write(
+            path(&dir, "attempts", &op).unwrap(),
+            json(&attempt).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            path(&dir, "results", &op).unwrap(),
+            json(&completed).unwrap(),
+        )
+        .unwrap();
+        fs::write(t.0.join(format!("Recall/Sources/{}.txt", m.id)), altered).unwrap();
+        let _lock = v.lock().unwrap();
+        assert!(archived_result(&v, &op)
+            .unwrap_err()
+            .contains("original mismatch"));
     }
     #[test]
     fn tampered_classification_cannot_be_replayed_as_a_decision() {

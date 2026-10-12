@@ -1090,15 +1090,15 @@ impl Vault {
         let archive=crate::processing::archived_result(self,&binding.parser_operation_id)?;
         let parsed=archive.parsed.ok_or("Missing archived parsing")?;
         let stored:crate::librarian::StoredOrganization=serde_json::from_slice(&read(&self.path(&format!("_meta/organizations/{}.json",binding.organization_operation_id)),128*1024)?).map_err(|_|"Invalid organization recovery record")?;
-        let evidence=crate::meeting::evidence(&parsed,&stored.context);
+        let evidence=crate::meeting::evidence_for_source(&parsed,&stored.context,&archive.source_sha256,archive.visual.as_ref());
         let identity=hash(&json(&("recall-organization-input-v1",&binding.organization_operation_id,&binding.parser_operation_id,archive.expected_revision,&evidence))?);
         if stored.format!="recall-organization-v1" || stored.operation_id!=binding.organization_operation_id
             || stored.parser_operation_id!=binding.parser_operation_id || stored.memory_id!=e.memory.id
-            || parsed.source_id!=e.memory.id || stored.source_sha256!=parsed.source_sha256
+            || parsed.source_id!=e.memory.id || stored.source_sha256!=archive.source_sha256
             || stored.expected_revision!=e.expected_revision || archive.expected_revision!=e.expected_revision
             || stored.payload_sha256!=identity || stored.model.is_empty() || stored.model.len()>200
             || stored.model.chars().any(char::is_control) || stored.recorded_at.len()!=20 {return Err("Organization recovery identity mismatch".into());}
-        let document=crate::meeting::render(&stored.layout,&parsed,&stored.context)?;
+        let document=crate::meeting::render_for_evidence(&stored.layout,&parsed,&stored.context,&archive.source_sha256,archive.visual.as_ref())?;
         let marker=modern_identity(&parsed.source_id);
         let metadata=format!("{}librarian_model: {}\nparser_operation_id: {}\norganization_operation_id: {}\n",marker,serde_json::to_string(&stored.model).map_err(fail)?,serde_json::to_string(&binding.parser_operation_id).map_err(fail)?,serde_json::to_string(&binding.organization_operation_id).map_err(fail)?);
         if document.replacen(&marker,&metadata,1)!=e.markdown {return Err("Organization recovery document mismatch".into());}
@@ -1674,16 +1674,16 @@ impl Vault {
         let parsed=archive.parsed.ok_or("Missing parsed evidence")?;
         let path=self.path(&format!("_meta/organizations/{organization_operation}.json"));
         let stored:crate::librarian::StoredOrganization=serde_json::from_slice(&read(&path,128*1024)?).map_err(|_|"Invalid organization record")?;
-        let evidence=crate::meeting::evidence(&parsed,&stored.context);
+        let evidence=crate::meeting::evidence_for_source(&parsed,&stored.context,&archive.source_sha256,archive.visual.as_ref());
         let identity=hash(&json(&("recall-organization-input-v1",organization_operation,parser_operation,archive.expected_revision,&evidence))?);
         if stored.format!="recall-organization-v1" || stored.operation_id!=organization_operation
             || stored.parser_operation_id!=parser_operation || stored.memory_id!=parsed.source_id
-            || stored.expected_revision!=archive.expected_revision || stored.source_sha256!=parsed.source_sha256
+            || stored.expected_revision!=archive.expected_revision || stored.source_sha256!=archive.source_sha256
             || stored.payload_sha256!=identity || stored.model.is_empty() || stored.model.len()>200
             || stored.model.chars().any(char::is_control) || stored.recorded_at.len()!=20 {
             return Err("Organization source, revision or identity mismatch".into());
         }
-        let mut document=crate::meeting::render(&stored.layout,&parsed,&stored.context)?;
+        let mut document=crate::meeting::render_for_evidence(&stored.layout,&parsed,&stored.context,&archive.source_sha256,archive.visual.as_ref())?;
         let marker=modern_identity(&parsed.source_id);
         let metadata=format!("{}librarian_model: {}\nparser_operation_id: {}\norganization_operation_id: {}\n",marker,serde_json::to_string(&stored.model).map_err(fail)?,serde_json::to_string(parser_operation).map_err(fail)?,serde_json::to_string(organization_operation).map_err(fail)?);
         document=document.replacen(&marker,&metadata,1);
@@ -1695,7 +1695,7 @@ impl Vault {
             return self.current(&event.memory.id,&pending);
         }
         let snapshot=self.processing_snapshot_while_locked(&parsed.source_id,archive.expected_revision)?;
-        if snapshot.human_corrected || snapshot.source.sha256!=parsed.source_sha256 {return Err("Source correction or mismatch; publication withheld".into());}
+        if snapshot.human_corrected || snapshot.source.sha256!=archive.source_sha256 {return Err("Source correction or mismatch; publication withheld".into());}
         let current=self.list_while_locked("",false)?;
         for context in &stored.context {
             let m=current.iter().find(|m|m.id==context.id && m.state=="active" && m.conflict.is_none()).ok_or("Related memory no longer eligible")?;
@@ -1835,6 +1835,14 @@ impl Vault {
         self.processing_snapshot_while_locked(memory_id, revision)
     }
     /// Caller must hold the native writer lock; rechecks disk/source state.
+    pub(crate) fn captured_source_while_locked(&self,memory_id:&str)->Result<VaultSource> {
+        id(memory_id)?;let records=self.records(memory_id)?;let capture=records.first().ok_or("Missing native capture history")?;
+        if absent_original(&capture.memory) {
+            let bytes=read(&self.path(&format!("Sources/{memory_id}.txt")),MAX_NOTE as u64)?;
+            if bytes!=capture.memory.note.as_bytes(){return Err("Native original text mismatch".into());}
+            Ok(VaultSource{sha256:hash(&bytes),bytes,mime_type:"text/plain".into()})
+        }else{self.verify_source(&capture.memory)}
+    }
     pub(crate) fn captured_text_while_locked(&self,memory_id:&str)->Result<Vec<u8>> {
         id(memory_id)?;
         let records=self.records(memory_id)?;

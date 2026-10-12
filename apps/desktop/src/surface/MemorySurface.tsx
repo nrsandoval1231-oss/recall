@@ -381,6 +381,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setEvidenceId(saved.id);
       setCorrection(saved.note);
       await loadSource(selected.vault_id, saved);
+      await organizeMemory(saved);
     } catch (importError) {
       if (alive.current) setError(`${message(importError)} Retry uses the same import, so a completed save is not duplicated.`);
     } finally {

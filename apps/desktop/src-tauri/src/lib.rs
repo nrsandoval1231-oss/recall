@@ -396,8 +396,11 @@ async fn processing_parse(
 ) -> Result<processing::Job, String> {
     let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
     tauri::async_runtime::spawn_blocking(move || {
-        processing::parse_note(&vault, &processing::Config::from_env(), &operation_id,
-            &memory_id, expected_revision, consent, &processing::NativeJev)
+        let parser_config=processing::Config::from_env();
+        let reader_config=librarian::config_from_env();
+        processing::parse_with_visual(&vault, &parser_config, &operation_id,
+            &memory_id, expected_revision, consent, &processing::NativeJev,
+            Some((&reader_config, &librarian::ClaudeTransport)))
     }).await.map_err(|_| "Parser worker stopped; inspect the saved operation before retrying".to_string())?
 }
 
