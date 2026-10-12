@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
 import { brooks, FIXTURE_BANNER, fixtureDocuments, fixtureMemory, type FixtureMemory } from "./brooks-fixture";
 import { KEYWORD_LABEL, keywordSearch, type KeywordAnswer } from "./keyword";
-import { processMeeting } from "./meeting-workflow";
+import { hasPendingMeeting, processMeeting } from "./meeting-workflow";
 import { unavailableLibrarian, type Librarian, type Reading } from "./librarian";
 
 type Section = "home" | "ask" | "recent" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
@@ -143,6 +143,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [sourceAnswer, setSourceAnswer] = useState<SourceAnswer | null>(null);
   const [processingConsent, setProcessingConsent] = useState(false);
   const [processingState, setProcessingState] = useState("");
+  const [reviewRetryAcknowledged, setReviewRetryAcknowledged] = useState(false);
   const [vaultHits, setVaultHits] = useState<VaultMemory[] | null>(null);
   const [detail, setDetail] = useState<{ title: string; text: string } | null>(null);
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
@@ -265,7 +266,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       if (!alive.current) return;
       if (!next) { setNotice("Folder choice cancelled. Nothing was written."); return; }
       clearPreview(); evidenceRef.current = null; askRequest.current += 1;
-      setSourceAnswer(null); setProcessingState(""); setProcessingConsent(false);
+      setSourceAnswer(null); setProcessingState(""); setProcessingConsent(false); setReviewRetryAcknowledged(false);
       sourceRequest.current += 1;
       setStatus(next);
       const chosen = selectedFrom(next);
@@ -312,19 +313,21 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     }
   }
 
-  async function organizeMemory(memory: VaultMemory) {
+  async function organizeMemory(memory: VaultMemory, reviewRetry = false) {
     if (!selected) return;
     const scope = selected;
     const draftVersion = correctionVersion.current;
+    const acknowledged = reviewRetryAcknowledged;
+    setReviewRetryAcknowledged(false);
     setBusy(true); setError("");
     try {
-      const published = await processMeeting(vault, scope, memory, processingConsent, (state) => { if (inScope(scope.vault_id)) setProcessingState(state); });
+      const published = await processMeeting(vault, scope, memory, processingConsent, (state) => { if (inScope(scope.vault_id)) setProcessingState(state); }, reviewRetry ? { reviewRetry: true, acknowledgeUncertainty: acknowledged } : undefined);
       if (!inScope(scope.vault_id) || !published) return;
       setItems((rows) => rows.map((row) => row.id === published.id ? published : row));
       if (evidenceRef.current === published.id) {
         if (correctionVersion.current === draftVersion) setCorrection(noteBody(published));
         else setNotice("Organization saved. Your newer unsaved correction draft is preserved; review the saved note before applying it.");
-        setHistory(null); setProcessingConsent(false);
+        setHistory(null); setProcessingConsent(false); setReviewRetryAcknowledged(false);
       }
     } catch (processingError) {
       if (inScope(scope.vault_id)) setError(message(processingError));
@@ -413,7 +416,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     if (!selected || !openable(memory)) return;
     setBusy(true); setError("");
     setHistory(null);
-    setProcessingState(""); setProcessingConsent(false);
+    setProcessingState(""); setProcessingConsent(false); setReviewRetryAcknowledged(false);
     clearPreview();
     setReading(null);
     setConsent(false);
@@ -622,6 +625,10 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               onProcessingConsent={setProcessingConsent}
               onOrganize={() => evidenceMemory && void organizeMemory(evidenceMemory)}
               canProcess={Boolean(vault.parse)}
+              canReviewOrganization={Boolean(vault.reviewedOrganize && selected && evidenceMemory && hasPendingMeeting(selected, evidenceMemory))}
+              reviewRetryAcknowledged={reviewRetryAcknowledged}
+              onReviewRetryAcknowledged={setReviewRetryAcknowledged}
+              onReviewedRetry={() => evidenceMemory && void organizeMemory(evidenceMemory, true)}
             />
           ) : section === "capture" ? (
             <section className="glass ms-project" aria-label="Capture">
@@ -894,6 +901,10 @@ function Evidence(props: {
   processingConsent: boolean;
   onProcessingConsent: (value: boolean) => void;
   onOrganize: () => void;
+  canReviewOrganization: boolean;
+  reviewRetryAcknowledged: boolean;
+  onReviewRetryAcknowledged: (value: boolean) => void;
+  onReviewedRetry: () => void;
 }) {
   const { demo, demoMemory, memory, preview, librarian } = props;
   return (
@@ -943,6 +954,7 @@ function Evidence(props: {
             <label className="ms-check"><input type="checkbox" checked={props.confirmRemove} onChange={(event) => props.onConfirmRemove(event.target.checked)} /> Remove from Recall. The photo and history stay in the vault.</label>
             <button type="button" disabled={props.busy || !props.confirmRemove} onClick={props.onRemove}>Remove from Recall</button>
             {props.canProcess && <section aria-label="Meeting processing"><h2>Organize in Obsidian</h2><label className="ms-check"><input type="checkbox" checked={props.processingConsent} onChange={(event) => props.onProcessingConsent(event.target.checked)} /> Send this source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type="button" disabled={props.busy || !props.processingConsent || memory.state !== "active" || Boolean(memory.conflict)} onClick={props.onOrganize}>Organize this memory</button></section>}
+            {props.canReviewOrganization && <section aria-label="Reviewed organization retry"><h2>Review an organization retry</h2><p>The previous request may have incurred charges. Its record and reserved budget stay intact. Review authorizes one new Claude operation using the saved Jev result.</p><label className="ms-check"><input type="checkbox" disabled={props.busy} checked={props.reviewRetryAcknowledged} onChange={(event) => props.onReviewRetryAcknowledged(event.target.checked)} /> I reviewed the failed attempt and acknowledge that another request may incur additional charges.</label><button type="button" disabled={props.busy || !props.processingConsent || !props.reviewRetryAcknowledged} onClick={props.onReviewedRetry}>Review and retry organization</button></section>}
             {memory.source_name && <ReadingBlock librarian={librarian} busy={props.busy} consent={props.consent} reading={props.reading} onConsent={props.onConsent} onRead={props.onRead} />}
           </>
         )}

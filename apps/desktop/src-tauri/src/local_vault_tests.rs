@@ -1,5 +1,43 @@
 use super::*;
 struct Fixture(PathBuf);
+#[test]
+fn reviewed_organization_audit_survives_interrupted_reservation_and_rejects_tampering() {
+    use crate::librarian::{self,CallError,OrganizationTransport};
+    struct Rejected;
+    impl OrganizationTransport for Rejected {
+        fn organize(&self,_:&str,_:&str,_:&serde_json::Value)->std::result::Result<crate::meeting::Layout,CallError>{Err(CallError::HttpStatus(400))}
+    }
+    struct Count(std::cell::Cell<u32>);
+    impl OrganizationTransport for Count {
+        fn organize(&self,model:&str,key:&str,evidence:&serde_json::Value)->std::result::Result<crate::meeting::Layout,CallError>{
+            self.0.set(self.0.get()+1);librarian::organization_tests::claude().organize(model,key,evidence)
+        }
+    }
+    for tamper in [false,true] {
+        let (_t,v,parser,_)=librarian::organization_tests::setup();let cfg=librarian::organization_tests::config();let prior=op();let next=op();
+        assert!(librarian::organize_selected(&v,&cfg,&parser,&prior,true,&Rejected).is_err());
+        let budget=v.root().join("Recall/_meta/librarian-budget.json");let before=fs::read(&budget).unwrap();
+        let audit=v.root().join(format!("Recall/_meta/organization-reviews/{next}.json"));
+        let hit=std::rc::Rc::new(std::cell::Cell::new(false));let seen=hit.clone();
+        let fault=FaultGuard::set(move |point,path| {
+            if point=="create_before" && path.file_name().and_then(|s|s.to_str()).is_some_and(|s|s.starts_with("librarian-budget.stage-")) {
+                seen.set(true);return Err("SYNTHETIC interruption before reservation write".into());
+            } Ok(())
+        });
+        let provider=Count(std::cell::Cell::new(0));
+        assert!(librarian::organize_selected_reviewed(&v,&cfg,&parser,&prior,&next,true,true,&provider).is_err());
+        assert!(hit.get());assert!(audit.exists());assert_eq!(fs::read(&budget).unwrap(),before);assert_eq!(provider.0.get(),0);drop(fault);
+        let reopened=Vault::open(v.root()).unwrap();
+        assert!(librarian::organize_selected(&reopened,&cfg,&parser,&next,true,&provider).is_err());assert_eq!(provider.0.get(),0);
+        if tamper {
+            let mut review:serde_json::Value=serde_json::from_slice(&fs::read(&audit).unwrap()).unwrap();review["acknowledged_uncertainty"]=false.into();fs::write(&audit,serde_json::to_vec(&review).unwrap()).unwrap();
+            assert!(librarian::organize_selected_reviewed(&reopened,&cfg,&parser,&prior,&next,true,true,&provider).is_err());assert_eq!(provider.0.get(),0);assert_eq!(fs::read(&budget).unwrap(),before);
+        } else {
+            librarian::organize_selected_reviewed(&reopened,&cfg,&parser,&prior,&next,true,false,&provider).unwrap();assert_eq!(provider.0.get(),1);
+            let ledger:serde_json::Value=serde_json::from_slice(&fs::read(&budget).unwrap()).unwrap();let old:serde_json::Value=serde_json::from_slice(&before).unwrap();assert_eq!(ledger["entries"][0],old["entries"][0]);
+        }
+    }
+}
 impl Fixture {
     fn new() -> Self {
         let p = std::env::temp_dir().join(format!("recall-synthetic-{}", Uuid::new_v4()));

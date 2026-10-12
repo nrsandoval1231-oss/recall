@@ -59,6 +59,28 @@ function vault(over: Partial<LocalVault> = {}, memories: VaultMemory[] = []): Lo
 
 const preview: LocalVault = { ...vault(), available: false, status: async () => emptyStatus };
 
+it("requires separate source consent and unchecked cost review for the retained failed organization", async () => {
+  const initial = memory({ source_name: "Draft.png", note: "Utility late." });
+  const parser = "22222222-2222-4222-8222-222222222222", prior = "33333333-3333-4333-8333-333333333333";
+  localStorage.setItem(`recall.meeting.v1:${chosen.vault_identity}:${initial.id}`, JSON.stringify({ parser, organizer: prior, publisher: "44444444-4444-4444-8444-444444444444", revision: 1, published: false }));
+  const client = vault({
+    parse: vi.fn(async (_scope,id,revision,operation) => ({ memory_id:id,expected_revision:revision,operation_id:operation,source_sha256:initial.source_sha256,state:"parsed",message:"Synthetic saved parse" })),
+    organize: vi.fn(), reviewedOrganize: vi.fn(async () => ({})), reviewOrganization: vi.fn(async (_scope,_parser,prior) => ({prior_operation_id:prior,reuse_operation:false})),
+    publish: vi.fn(async () => ({ ...initial, revision:2,note:`---\nrecall_id: "${initial.id}"\n---\n\nUtility late.` })),
+  }, [initial]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name:"Open original: Draft" }));
+  const review = screen.getByRole("button", { name:"Review and retry organization" }) as HTMLButtonElement;
+  const acknowledgement = screen.getByLabelText(/I reviewed the failed attempt/) as HTMLInputElement;
+  expect(acknowledgement.checked).toBe(false); expect(review.disabled).toBe(true);
+  await user.click(acknowledgement); expect(review.disabled).toBe(true);
+  await user.click(screen.getByLabelText(/Send this source to Jev and Claude/)); expect(review.disabled).toBe(false);
+  await user.click(review); await screen.findByText("Organized in Obsidian. Uncertainty and original evidence preserved.");
+  expect(client.organize).not.toHaveBeenCalled();
+  expect(client.reviewedOrganize).toHaveBeenCalledWith("session-token",parser,prior,expect.any(String),true,true);
+  expect(screen.queryByRole("button", { name:"Review and retry organization" })).toBeNull();
+});
+
 describe("Memory Surface", () => {
   it("shows the synthetic Brooks Campus surface when no vault is open", () => {
     const { container } = render(<MemorySurface vault={preview} />);
