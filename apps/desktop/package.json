@@ -9,14 +9,17 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "tauri": "tauri",
-    "phone": "cargo run --manifest-path src-tauri/Cargo.toml --bin recall-phone"
+    "phone": "cargo run --manifest-path src-tauri/Cargo.toml --bin recall-phone",
+    "test:visual": "node scripts/verify-ui.mjs"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@recall/api-client": "*",
     "@recall/design-tokens": "*",
     "@tauri-apps/api": "^2.12.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.1",

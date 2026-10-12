@@ -46,3 +46,9 @@ it("refuses to build corrections from malformed native properties", () => {
   expect(noteBody(memory)).toBe(memory.note);
   expect(() => noteWithBody(memory, "replacement")).toThrow(/properties need review/);
 });
+
+it("reads topic tags only from frontmatter and never from body examples", () => {
+  const tagged = source("a");
+  tagged.note = tagged.note.replace('recall_id: "a"\n', 'recall_id: "a"\ntags: [recall/meeting, power]\n') + "\ntags: [invented-body-tag]\n";
+  expect(vaultContext([tagged]).topics.map(row => row.label)).toEqual(["recall/meeting", "power"]);
+});

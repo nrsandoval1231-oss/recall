@@ -1,20 +1,13 @@
-/* Warm ivory/charcoal glass. No decorative image URLs: evidence is vault content. */
+/* Warm ivory/charcoal glass. Decorative workspace imagery is separate from original evidence. */
 html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; background: #100e0c; }
 .ms {
   --ink: #f7f1e6;
-  --muted: #ddd2c2;
-  --quiet: #cbbfae;
-  --line: rgba(255, 236, 214, 0.2);
-  --glass: rgba(32, 27, 23, 0.78);
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 228px minmax(0, 1fr);
   color: var(--ink);
   background: #100e0c;
-  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
-  font-size: 14px;
   accent-color: #e7d3b0;
   -webkit-font-smoothing: antialiased;
 }
@@ -31,38 +24,24 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 .ms-rail {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-height: 0;
   overflow: auto;
-  padding: 26px 16px 18px;
-  background: linear-gradient(180deg, rgba(8, 7, 6, 0.94), rgba(16, 13, 11, 0.9));
   border-right: 1px solid rgba(255, 236, 214, 0.08);
 }
-.ms-mark {
-  margin: 0 0 0 10px;
-  letter-spacing: 0.46em;
-  font-size: 12px;
-  font-weight: 560;
-}
 .ms-tagline {
-  margin: 8px 10px 26px;
   color: var(--quiet);
   font-size: 12.5px;
   font-style: italic;
   font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
 }
-.ms-nav { display: grid; gap: 2px; }
+.ms-nav { display: grid; }
 .ms-nav button, .ms-rail-actions button {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 0 12px; border-radius: 12px; text-align: left; color: rgba(247, 241, 230, 0.9);
 }
-.ms-nav button[aria-current="page"] {
-  background: rgba(255, 244, 224, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 244, 224, 0.18);
-}
 .ms-nav button:hover { background: rgba(255, 244, 224, 0.06); }
 .ms-nav svg { flex: 0 0 auto; opacity: 0.92; }
-.ms-rail-actions { margin-top: auto; display: grid; gap: 8px; padding-top: 18px; }
+.ms-rail-actions { margin-top: auto; gap: 8px; padding-top: 18px; }
 .ms-rail-actions button {
   min-height: 40px;
   justify-content: center;
@@ -80,19 +59,12 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
   overflow: auto;
   display: flex;
   flex-direction: column;
-  padding: 18px 26px 14px;
-  background: #14110e;
   scrollbar-color: rgba(255, 236, 214, 0.28) transparent;
 }
 .ms-atmosphere {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(980px 540px at 84% -8%, rgba(255, 206, 148, 0.2), transparent 58%),
-    radial-gradient(720px 520px at 6% 108%, rgba(132, 92, 54, 0.28), transparent 64%),
-    radial-gradient(540px 340px at 46% 42%, rgba(255, 244, 224, 0.05), transparent 72%),
-    linear-gradient(180deg, rgba(74, 58, 42, 0.42), rgba(20, 16, 13, 0.15) 42%, rgba(10, 8, 7, 0.35));
 }
 .ms-ui {
   position: relative;
@@ -101,7 +73,6 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 .ms-banner, .ms-notice, .ms-error {
   margin: 0;
@@ -119,10 +90,7 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 
 .ms-mast {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 640px) minmax(120px, 1fr);
   align-items: center;
-  gap: 18px;
-  min-height: 72px;
 }
 .ms-editorial {
   grid-column: 3;
@@ -137,34 +105,23 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
   line-height: 1.35;
   text-align: right;
 }
-.ms-askrow { grid-column: 2; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ms-askrow { display: flex; align-items: center; min-width: 0; }
 .ms-ask {
   display: flex;
   align-items: center;
-  gap: 10px;
   flex: 1;
   min-width: 0;
-  min-height: 52px;
-  padding: 6px 8px 6px 18px;
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, rgba(255, 244, 224, 0.14), rgba(255, 244, 224, 0.03) 40%),
-    rgba(42, 36, 31, 0.72);
   border: 1px solid rgba(255, 236, 214, 0.28);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 244, 224, 0.38);
-  backdrop-filter: blur(18px) saturate(1.2);
 }
 .ms-search { opacity: 0.85; flex: 0 0 auto; }
 .ms-ask input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
   border: 0;
   background: transparent;
   padding: 0;
-  font-size: 15px;
 }
-.ms-ask input::placeholder { color: rgba(247, 241, 230, 0.62); }
 .ms-ask button, .ms-mic {
   width: 40px;
   min-width: 40px;
@@ -193,23 +150,12 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 .ms-side { display: grid; gap: 12px; align-content: start; }
 .glass {
   position: relative;
-  background:
-    linear-gradient(180deg, rgba(255, 244, 224, 0.16), rgba(255, 244, 224, 0.04) 22%, rgba(255, 244, 224, 0) 46%),
-    var(--glass);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow:
-    0 22px 56px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 244, 224, 0.42),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(22px) saturate(1.2);
-  padding: 16px 16px 14px;
 }
-.ms-card-head { display: flex; align-items: center; gap: 8px; }
+.ms-card-head { display: flex; align-items: center; }
 .ms-card-icon { width: 18px; height: 18px; display: grid; place-items: center; color: rgba(247, 241, 230, 0.86); }
-.ms-side h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
-.ms-more { margin: 10px 2px 2px; color: var(--quiet); font-size: 12px; line-height: 1.4; }
-.ms-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 1px; }
+.ms-side h2 { margin: 0; letter-spacing: -0.01em; }
+.ms-more { color: var(--quiet); line-height: 1.4; }
+.ms-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
 .ms-list button {
   width: 100%;
   display: flex;
@@ -222,20 +168,14 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 }
 .ms-list button:hover { background: rgba(255, 244, 224, 0.06); }
 .ms-person { display: grid; line-height: 1.25; min-width: 0; }
-.ms-person strong { font-weight: 600; }
 .ms-role, .ms-fine { color: var(--quiet); }
 .ms-side p { color: var(--quiet); }
-.ms-role { font-size: 12px; }
 .ms-avatar, .ms-pin {
-  width: 32px;
-  height: 32px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  flex: 0 0 auto;
   background: rgba(255, 244, 224, 0.1);
   font-style: normal;
-  font-size: 11px;
   letter-spacing: 0.04em;
 }
 .ms-avatar-a { background: rgba(232, 196, 150, 0.22); }
@@ -245,8 +185,6 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 .ms-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .ms-project {
-  padding: 22px 26px 18px;
-  border-radius: 26px;
   box-shadow:
     0 30px 70px rgba(0, 0, 0, 0.38),
     inset 0 1px 0 rgba(255, 244, 224, 0.5),
@@ -257,65 +195,42 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
   align-items: center;
   gap: 8px;
   margin: 0;
-  letter-spacing: 0.22em;
-  font-size: 11px;
   color: var(--muted);
 }
 .ms-project-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
 .ms-project h1 {
-  margin: 8px 0 6px;
   font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
-  font-size: clamp(40px, 4.4vw, 58px);
   font-weight: 500;
-  letter-spacing: -0.03em;
   line-height: 0.96;
 }
-.ms-place { margin: 0 0 12px; color: rgba(247, 241, 230, 0.82); font-size: 15px; }
+.ms-place { color: rgba(247, 241, 230, 0.82); }
 .ms-updated {
   display: grid;
   justify-items: end;
-  gap: 2px;
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
   text-align: right;
   line-height: 1.3;
 }
-.ms-updated span { color: var(--quiet); font-size: 11px; }
-.ms-summary { margin: 0 0 8px; max-width: 62ch; line-height: 1.5; color: rgba(247, 241, 230, 0.92); text-wrap: pretty; }
-.ms-fine { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; }
-.ms-stats { display: flex; flex-wrap: wrap; gap: 22px 28px; margin: 18px 0 4px; padding: 0; }
+.ms-updated span { color: var(--quiet); }
+.ms-summary { max-width: 62ch; color: rgba(247, 241, 230, 0.92); text-wrap: pretty; }
+.ms-fine { margin: 4px 0 0; }
+.ms-stats { flex-wrap: wrap; }
 .ms-stats div { display: grid; gap: 4px; }
 .ms-stats dd {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 560;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
   line-height: 1;
 }
-.ms-stats dt { color: var(--quiet); font-size: 12px; }
 .ms-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin: 16px 0 2px;
-  padding: 4px;
-  width: fit-content;
   max-width: 100%;
-  border-radius: 999px;
-  background: rgba(255, 244, 224, 0.08);
-  border: 1px solid rgba(255, 236, 214, 0.08);
 }
-.ms-tabs button { border-radius: 999px; padding: 0 14px; min-height: 32px; font-size: 13px; color: var(--muted); }
+.ms-tabs button { color: var(--muted); }
 .ms-tabs button[aria-selected="true"] {
-  background: rgba(255, 244, 224, 0.16);
   color: var(--ink);
-  box-shadow: inset 0 1px 0 rgba(255, 244, 224, 0.28);
 }
 .ms-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .ms-actions button, .ms-primary {
-  border-radius: 999px;
   padding: 0 14px;
   background: rgba(255, 244, 224, 0.08);
   border: 1px solid var(--line);
@@ -472,4 +387,170 @@ html:has(.ms), body:has(.ms), #root:has(.ms) { margin: 0; height: 100%; backgrou
 }
 @media (prefers-reduced-motion: reduce) {
   .ms * { transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Canonical owner reference, 2026-10-11. Decorative imagery is never evidence. */
+.ms { --line: rgba(255, 248, 234, .48); --quiet: #e0d8cc; --muted: #ece5d9; grid-template-columns: 15.75% minmax(0, 1fr); background-size: cover; background-position: center; font-family: "Segoe UI", Arial, sans-serif; font-size: 13px; }
+.ms-rail { padding: 48px 10px 22px; gap: 0; background: rgba(14, 15, 14, .78); backdrop-filter: blur(22px); border: 0; overflow-y: auto; }
+.ms-brand { display: flex; align-items: center; gap: 14px; margin: 0 5px 28px; }
+.ms-brand-logo { width: 36px; height: 36px; flex: 0 0 36px; background-repeat: no-repeat; background-position: -15px -48px; }
+.ms-mark { margin: 0; font-size: 13px; letter-spacing: .45em; font-weight: 400; }
+.ms-tagline { margin: 6px 0 0; font: 9px "Segoe UI", sans-serif; white-space: nowrap; }
+.ms-nav button { border-radius: 7px; padding: 0 10px; gap: 18px; font-size: 14px; font-weight: 400; }
+.ms-nav button[aria-current="page"] { background: rgba(217, 192, 158, .30); box-shadow: none; }
+.ms-rail-bottom { border-top: 1px solid rgba(237, 225, 206, .19); margin: 16px 9px 0; padding-top: 12px; display: grid; gap: 5px; }
+.ms-rail-bottom button { text-align: left; display: flex; gap: 20px; align-items: center; padding: 10px 0; }
+.ms-rail-bottom svg { width: 22px; height: 22px; flex-shrink: 0; }
+.ms-rail-bottom small { display: flex; align-items: center; gap: 7px; color: var(--quiet); font-size: 10px; margin-top: 5px; }
+.ms-rail-bottom i { width: 6px; height: 6px; border-radius: 50%; background: #a99e90; }
+.ms-rail-bottom i[data-connected="true"] { background: #65cda0; }
+.ms-rail-quote { color: #eee3d0; font: italic 15px/1.3 Georgia, serif; }
+.ms-rail-actions { display: none; }
+.ms-stage { padding: 40px 18px 24px; background: transparent; }
+.ms-atmosphere { background: rgba(39, 31, 23, .08); }
+.ms-ui { gap: 14px; }
+.ms-banner { font-size: 10px; padding: 5px 10px; position: absolute; z-index: 3; top: -29px; left: 0; max-width: 100%; background: rgba(22, 18, 15, .8); }
+.ms-mast { grid-template-columns: minmax(0, 1fr) 254px; gap: 24px; min-height: 44px; }
+.ms-askrow { grid-column: 1; grid-row: 1; gap: 14px; }
+.ms-ask { min-height: 44px; padding: 3px 6px 3px 18px; gap: 12px; background: rgba(205, 203, 193, .23); border-color: rgba(255, 255, 247, .55); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); backdrop-filter: blur(16px); }
+.ms-ask input { font-size: 12px; min-height: 34px; border-left: 1px solid rgba(247,241,230,.22); padding-left: 9px; }
+.ms-ask input::placeholder { color: #eee9df; opacity: .90; }
+.ms-ask button { width: 31px; min-width: 31px; height: 31px; min-height: 31px; background: rgba(176, 140, 91, .54); border: 1px solid rgba(255,255,255,.32); }
+.ms-mic { width: 44px; min-width: 44px; height: 44px; background: rgba(183, 171, 153, .40); border-color: rgba(255,255,255,.25); box-shadow: 0 3px 16px rgba(0,0,0,.12); }
+.ms-mic:disabled { opacity: .85; }
+.ms-greeting { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 12px; color: #251e16; }
+.ms-greeting > svg { color: #b4976e; width: 29px; height: 29px; flex-shrink: 0; }
+.ms-greeting strong { font-size: 14px; font-weight: 500; }
+.ms-greeting small { display: block; margin-top: 5px; font-size: 10px; color: #4c4337; }
+.ms-profile { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; background: rgba(174,145,112,.47); border: 1px solid rgba(255,255,255,.3); display: grid; place-items: center; }
+.ms-prompts { display: flex; align-items: center; gap: 12px; padding-left: 18px; flex-wrap: wrap; margin: -3px 0 5px; }
+.ms-prompts button { min-height: 25px; border-radius: 30px; border: 1px solid rgba(255,255,255,.3); background: rgba(42,38,31,.31); padding: 4px 13px; font-size: 10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.12); backdrop-filter: blur(14px); }
+.ms-columns, .ms-columns-solo { grid-template-columns: 15.5% minmax(0, 1fr) 26.5%; gap: 14px; align-items: start; flex: 0 0 auto; }
+.ms-center, .ms-side { display: grid; gap: 12px; min-width: 0; }
+.glass { padding: 15px; border-radius: 9px; background: var(--glass); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255,255,255,.20), 0 8px 22px rgba(23,20,16,.14); }
+.ms-card { padding: 13px 12px; }
+.ms-card-head { gap: 8px; white-space: nowrap; }
+.ms-side h2 { font-size: 12px; font-weight: 500; }
+.ms-list { gap: 5px; }
+.ms-side .ms-list button { padding: 5px 0; gap: 8px; font-size: 11px; }
+.ms-side .ms-list p { margin: 0 0 5px; font-size: 9px; }
+.ms-person strong { font-weight: 400; font-size: 11px; }
+.ms-role { font-size: 9px; margin-top: 3px; }
+.ms-avatar, .ms-pin { width: 27px; height: 27px; flex: 0 0 27px; font-size: 9px; }
+.ms-more { font-size: 10px; margin: 9px 0 0; }
+.ms-project { padding: 17px 18px 0; border-radius: 9px; min-height: 239px; overflow: hidden; }
+.ms-project h1 { font: 400 clamp(28px, 2.8vw, 44px)/1.13 Georgia, "Times New Roman", serif; letter-spacing: -.02em; }
+.ms-kicker { letter-spacing: .05em; font-size: 10px; font-weight: 400; }
+.ms-updated { font-size: 10px; gap: 4px; }
+.ms-updated span { font-size: 9px; }
+.ms-place { font-size: 14px; margin: 0 0 12px; }
+.ms-summary { font-size: 13px; line-height: 1.6; margin: 0 0 16px; overflow-wrap: anywhere; }
+.ms-fine { font-size: 11px; line-height: 1.5; }
+.ms-stats { display: flex; gap: 24px; border-top: 0; margin: 12px 0; padding: 0; }
+.ms-stats div { border-right: 1px solid rgba(255,255,255,.14); padding-right: 14px; }
+.ms-stats dt { font-size: 9px; color: var(--quiet); }
+.ms-stats dd { font-size: 16px; font-weight: 400; margin: 5px 0 0; }
+.ms-tabs { margin: 16px -18px 0; border-radius: 0; width: calc(100% + 36px); padding: 0 14px; border: 0; border-top: 1px solid rgba(255,255,255,.22); background: rgba(63,55,45,.20); display: flex; flex-wrap: wrap; gap: 3px; }
+.ms-tabs button { border-radius: 0; min-height: 37px; font-size: 10px; padding: 0 9px; position: relative; }
+.ms-tabs button[aria-selected="true"] { background: transparent; box-shadow: inset 0 -2px 0 #e1c59b; font-weight: 600; }
+.ms-actions { margin: 8px 0 12px; }
+.ms-actions button, .ms-primary { font-size: 11px; min-height: 32px; border-radius: 7px; }
+.ms-recent-notes { padding: 0 15px; }
+.ms-recent-notes > header, .ms-calendar > header, .ms-agenda > header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ms-recent-notes h2 { font-size: 13px; font-weight: 500; margin: 10px 0; }
+.ms-recent-notes > header button { display: flex; gap: 7px; align-items: center; font-size: 10px; min-height: 35px; padding: 0; }
+.ms-recent-notes ul { list-style: none; padding: 0; margin: 0; }
+.ms-recent-notes li { border-top: 1px solid rgba(255,255,255,.17); }
+.ms-recent-open { display: flex; width: 100%; align-items: center; gap: 12px; padding: 10px 0; text-align: left; }
+.ms-note-icon, .ms-quick-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: rgba(255,248,228,.13); flex-shrink: 0; }
+.ms-note-icon svg { width: 27px; height: 27px; }
+.ms-recent-copy { display: grid; gap: 7px; flex: 1; min-width: 0; }
+.ms-recent-copy strong { font-size: 11px; font-weight: 500; }
+.ms-recent-copy small { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 9px; color: var(--quiet); }
+.ms-recent-meta { display: grid; gap: 7px; justify-items: start; font-size: 10px; }
+.ms-pill { background: rgba(235,225,205,.16); padding: 3px 10px; border-radius: 20px; font-size: 9px; }
+.ms-calendar { padding: 16px 15px 0; }
+.ms-calendar h2 { font-size: 16px; font-weight: 500; margin: 0; }
+.ms-calendar > header > div { display: flex; gap: 2px; }
+.ms-calendar header button { width: 23px; min-height: 24px; padding: 0; }
+.ms-calendar header svg { width: 14px; }
+.ms-weekdays { display: grid; grid-template-columns: repeat(7,1fr); text-align: center; font-size: 10px; color: var(--quiet); margin: 16px 0 9px; }
+.ms-calendar-days { display: grid; grid-template-columns: repeat(7,1fr); text-align: center; }
+.ms-calendar-days button { font-size: 12px; padding: 3px 0 1px; position: relative; border-radius: 50%; border: 1px solid transparent; }
+.ms-calendar-days button[data-today="true"], .ms-calendar-days button[aria-pressed="true"] { background: #d9bd94; color: #251d14; }
+.ms-calendar-days button:hover:not(:disabled) { border-color: #e6d2b5; }
+.ms-calendar-days button:disabled { opacity: .4; }
+.ms-capture-dots { display: block; font-size: 10px; line-height: 4px; height: 4px; }
+.ms-agenda { margin: 19px -15px 0; padding: 16px 14px; border-top: 1px solid rgba(255,255,255,.3); }
+.ms-agenda h2 { font-size: 14px; }
+.ms-agenda small { font-size: 9px; color: var(--quiet); }
+.ms-agenda ul { list-style: none; padding: 0; margin: 15px 0; }
+.ms-agenda-list li { display: flex; gap: 10px; align-items: start; position: relative; }
+.ms-agenda-list li:not(:last-child)::after { content: ""; position: absolute; left: 4px; top: 15px; bottom: 0; border-left: 1px solid rgba(255,255,255,.22); }
+.ms-agenda-dot { background: #b8c7cd; width: 8px; height: 8px; border-radius: 50%; margin-top: 10px; flex-shrink: 0; }
+.ms-agenda-list button { text-align: left; padding: 7px 0 14px; }
+.ms-agenda-list strong { font-size: 11px; font-weight: 500; display: block; line-height: 1.4; }
+.ms-agenda-list small { display: block; margin-top: 5px; line-height: 1.3; }
+.ms-add-note { width: 100%; border: 1px solid rgba(255,255,255,.43) !important; border-radius: 8px; background: rgba(224,201,166,.22) !important; display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 37px !important; font-size: 12px !important; }
+.ms-empty { padding: 22px 7px; color: var(--quiet); text-align: center; }
+.ms-empty > svg { width: 28px; height: 28px; }
+.ms-empty p { font-size: 12px; margin: 10px 0 7px; }
+.ms-empty small { font-size: 10px; line-height: 1.5; display: block; }
+.ms-quick-cards { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin: auto 3.5% 10px 1.5%; }
+.ms-quick-card { display: flex; min-height: 81px !important; align-items: center; text-align: left; padding: 12px !important; }
+.ms-quick-icon { width: 38px; height: 38px; background: rgba(235,217,191,.2); }
+.ms-quick-icon svg { width: 26px; height: 26px; }
+.ms-quick-card > span:nth-child(2) { flex: 1; min-width: 0; }
+.ms-quick-label { font-size: 10px; display: block; white-space: nowrap; }
+.ms-quick-card strong { display: block; font: 400 23px/1.1 "Segoe UI",sans-serif; margin: 5px 0; }
+.ms-quick-card small { display: block; font-size: 9px; color: var(--quiet); line-height: 1.5; margin-top: 6px; }
+.ms-quick-arrow { width: 16px; align-self: start; flex-shrink: 0; }
+.ms-markdown { line-height: 1.6; overflow-wrap: anywhere; }
+.ms-markdown h1 { font-size: 25px; }.ms-markdown h2 { font-size: 17px; margin-top: 24px; }.ms-markdown h3 { font-size: 14px; }
+.ms-markdown p, .ms-markdown li { font-size: 13px; }.ms-markdown ul { padding-left: 22px; }.ms-markdown pre { white-space: pre-wrap; }.ms-note-link { text-decoration: underline; text-underline-offset: 3px; }
+.ms-vault-settings { position: absolute; z-index: 10; top: 100px; left: 12%; right: 12%; padding: 24px; background: rgba(31,29,26,.97); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 15px 80px #0008; }
+.ms-vault-settings header { display: flex; align-items: center; justify-content: space-between; }.ms-vault-settings button { border: 1px solid var(--line); border-radius: 7px; padding: 0 12px; margin-right: 8px; }
+.ms-evidence { align-items: start; }.ms-evidence .glass { max-height: none; }.ms-evidence h1 { font: 400 30px/1.2 Georgia,serif; }
+@media (min-width: 1500px) { .ms { font-size: 15px; }.ms-stage { padding: 50px 24px 30px; }.ms-columns { gap: 18px; }.ms-side h2 { font-size: 15px; }.ms-side .ms-list button { font-size: 14px; }.ms-role { font-size: 12px; }.ms-project { padding: 23px 24px 0; min-height: 310px; }.ms-summary { font-size: 16px; }.ms-place { font-size: 17px; }.ms-tabs { margin-inline: -24px; width: calc(100% + 48px); }.ms-tabs button { font-size: 13px; min-height: 46px; }.ms-recent-copy strong { font-size: 14px; }.ms-recent-copy small { font-size: 12px; }.ms-recent-open { padding-block: 14px; }.ms-calendar { padding: 20px 20px 0; }.ms-calendar h2 { font-size: 20px; }.ms-weekdays { font-size: 12px; }.ms-calendar-days button { min-height: 40px; font-size: 15px; }.ms-agenda { margin-inline: -20px; padding: 20px; }.ms-agenda-list strong { font-size: 14px; }.ms-quick-card { min-height: 105px !important; }.ms-quick-label { font-size: 12px; }.ms-quick-card small { font-size: 11px; } }
+@media (max-width: 1100px) { .ms { grid-template-columns: 76px minmax(0,1fr); }.ms-brand-logo { margin-inline: auto; }.ms-brand { margin-inline: 0; }.ms-brand > div, .ms-rail-quote, .ms-rail-bottom span { display: none; }.ms-rail-bottom button { justify-content: center; }.ms-stage { padding: 40px 16px 20px; }.ms-mast { grid-template-columns: minmax(0,1fr); }.ms-greeting { display: none; }.ms-columns { grid-template-columns: minmax(0,1fr) 240px; }.ms-side { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }.ms-center { grid-column: 1; }.ms-calendar { grid-column: 2; grid-row: 2; }.ms-quick-cards { margin-inline: 0; grid-template-columns: repeat(2,minmax(0,1fr)); }.ms-project h1 { font-size: 32px; }.ms-prompts { padding-left: 0; gap: 8px; } }
+@media (max-width: 720px) { .ms { grid-template-columns: 60px minmax(0,1fr); }.ms-rail { padding-inline: 5px; }.ms-columns { display: flex; flex-direction: column; }.ms-side, .ms-center, .ms-calendar { width: 100%; }.ms-recent-meta { display: none; }.ms-quick-cards { grid-template-columns: 1fr; }.ms-banner { position: relative; top: 0; }.ms-stage { padding-top: 16px; }.ms-ask input { font-size: 12px; }.ms-prompts button { font-size: 10px; }.ms-vault-settings { left: 3%; right: 3%; top: 60px; } }
+.ms-mast { padding-left: 18px; }
+.ms-nav { gap: 3px; }.ms-nav button { min-height: 35px; }.ms-rail-bottom { margin-top: 10px; }.ms-rail-quote { margin: 35px 16px 0; padding-top: 0; }
+.ms-project-head { min-height: 16px; }.ms-project-head .ms-updated { position: absolute; top: 17px; right: 18px; }.ms-project h1 { font-size: 28px; }
+.ms-project-properties { display: grid; margin: 21px 0 10px; }.ms-project-properties div { display: grid; gap: 5px; border-right: 1px solid rgba(255,255,255,.18); padding-right: 8px; }.ms-project-properties div:last-child { border: 0; }.ms-project-properties span { font-size: 9px; color: var(--quiet); }.ms-project-properties strong { font-size: 10px; font-weight: 400; white-space: nowrap; }
+.ms-avatar-reference { background-repeat: no-repeat; }.ms-agenda-list time { font-size: 10px; width: 43px; flex-shrink: 0; margin-top: 9px; }.ms-agenda-list li:has(time)::after { left: 57px; }.ms-recent-meta .ms-pill + .ms-pill { margin-left: 5px; }
+@media (min-width:1500px) { .ms-project h1 { font-size: 38px; }.ms-project-properties span { font-size: 12px; }.ms-project-properties strong { font-size: 13px; }.ms-nav button { min-height: 46px; }.ms-nav { gap: 4px; } }
+@media (max-width:1100px) { .ms-mast { padding-left: 0; } }
+.ms { --glass: rgba(87, 87, 81, .50); }.glass { backdrop-filter: blur(22px) saturate(.55); }
+.ms-project h1 { margin: 4px 0 9px; }.ms-place { margin-bottom: 9px; }.ms-project-properties { margin-top: 14px; }.ms-tabs { margin-top: 8px; }.ms-weekdays { margin-top: 10px; margin-bottom: 5px; }.ms-calendar-days { gap: 0; }.ms-calendar-days button { min-height: 29px; }.ms-agenda { margin-top: 11px; padding-top: 13px; }.ms-agenda-list li:nth-child(1) .ms-agenda-dot { background: #69b7e3; }.ms-agenda-list li:nth-child(2) .ms-agenda-dot { background: #72c99a; }.ms-agenda-list li:nth-child(3) .ms-agenda-dot { background: #ecb553; }.ms-agenda-list li:nth-child(4) .ms-agenda-dot { background: #d0cfcb; }
+.ms-quick-cards { flex-shrink: 0; }.ms-profile { min-height: 40px !important; color: #fff !important; }
+.ms-stage { padding-bottom: 52px; }.ms-agenda ul { margin-top: 8px; margin-bottom: 7px; }.ms-agenda-list button { padding-bottom: 4px; }
+@media (max-width:1100px) { .ms-stage { padding-bottom: 20px; } }
+.ms-project-properties { grid-template-columns: .9fr 1.35fr 1fr 1fr; gap: 9px; }.ms-project-properties div { grid-template-columns: 23px minmax(0,1fr); column-gap: 7px; }.ms-project-properties svg { grid-row: 1 / 3; width: 23px; height: 23px; align-self: center; }.ms-project-properties span, .ms-project-properties strong { grid-column: 2; }
+.ms-ask input { overflow: hidden; text-overflow: ellipsis; }.ms-greeting .ms-profile { color: #fff; }
+.ms-prompts { margin-bottom: 7px; }.ms-side .ms-card:nth-child(2) { min-height: 216px; margin-top: 4px; }.ms-rail-quote { margin-top: 24px; }
+.ms-recent-open { padding-block: 5.5px; }.ms-quick-cards { margin-right: 14%; margin-bottom: 5px; padding-top: 0; }.ms-quick-card strong { margin-block: 3px; }
+@media (max-width:1100px) { .ms-quick-cards { margin-right: 0; }.ms-side .ms-card:nth-child(2) { margin-top: 0; min-height: 0; } }
+.ms button.ms-quick-card { background: var(--glass); border: 1px solid var(--line); }.ms-quick-arrow { position: absolute; top: 12px; right: 12px; }.ms-quick-label { padding-right: 14px; }.ms-quick-card { gap: 12px; }.ms-quick-card small { white-space: nowrap; }
+.ms button.ms-profile { width: 40px; height: 40px; border-radius: 50%; background: rgba(174,145,112,.47); border: 1px solid rgba(255,255,255,.3); display: grid; place-items: center; padding: 0; }
+@media (max-width:1100px) { .ms-quick-card small { white-space: normal; } }
+.ms-modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(12,10,8,.45); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 16px; }.ms-modal-backdrop .ms-vault-settings { position: relative; top: auto; left: auto; right: auto; width: min(560px,100%); }
+.ms .ms-context-view { margin-left: auto; padding: 0; min-height: 20px; width: 16px; flex-shrink: 0; }.ms-context-view svg { width: 16px; height: 16px; }.ms-project-menu { position: absolute; right: 17px; top: 17px; width: 30px; min-height: 31px !important; border: 1px solid rgba(255,255,255,.25) !important; border-radius: 5px; padding: 0; }.ms-project-menu svg { width: 23px; height: 23px; }.ms-project:has(.ms-project-menu) .ms-updated { right: 60px; }
+@media (max-width:720px) { .ms-project-properties { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 12px; }.ms-project-properties strong { white-space: normal; line-height: 1.4; }.ms-project-properties div:nth-child(2) { border: 0; }.ms-card-head { white-space: normal; }.ms-context-view { margin-left: auto; } }
+/* Preserve the reference's proportions on a full-size business desktop. */
+@media (min-width:1500px) {
+  .ms-stage { padding-top: 52px; padding-bottom: 68px; }
+  .ms-rail { padding: 64px 12px 22px; }.ms-brand { margin-left: 8px; margin-bottom: 36px; gap: 22px; }.ms-brand-logo { width: 46px; height: 46px; flex-basis: 46px; background-size: 1510.333px auto; background-position: -19.166px -61.333px; }.ms-mark { font-size: 17px; }.ms-tagline { font-size: 11px; }
+  .ms-mast { padding-left: 26px; grid-template-columns: minmax(0,1fr) 326px; gap: 32px; min-height: 56px; }.ms-ask { min-height: 56px; }.ms-ask input { font-size: 15px; min-height: 40px; }.ms-ask button { width: 38px; height: 38px; min-width: 38px; }.ms-askrow { gap: 18px; }.ms-mic { width: 56px; height: 56px; min-width: 56px; }.ms-prompts { padding-left: 26px; margin-top: 2px; margin-bottom: 13px; gap: 15px; }.ms-prompts button { min-height: 32px; font-size: 12px; padding-inline: 17px; }
+  .ms-greeting strong { font-size: 17px; }.ms-greeting small { font-size: 12px; }.ms-greeting > svg { width: 36px; height: 36px; }.ms button.ms-profile { width: 50px; height: 50px; }
+  .ms-center, .ms-side { gap: 16px; }.ms-card { padding: 19px 16px; }.ms-side .ms-card:first-child { min-height: 260px; }.ms-side .ms-card:nth-child(2) { min-height: 280px; }.ms-side .ms-list { gap: 7px; }.ms-side .ms-list button { padding-block: 7px; }.ms-more { font-size: 12px; }.ms-avatar, .ms-pin { width: 36px; height: 36px; flex-basis: 36px; font-size: 12px; }
+  .ms-recent-notes { padding-inline: 18px; }.ms-recent-notes h2 { font-size: 16px; }.ms-recent-notes > header button { font-size: 12px; min-height: 44px; }.ms-recent-open { padding-block: 10px; }.ms-note-icon { width: 48px; height: 48px; }.ms-note-icon svg { width: 32px; height: 32px; }.ms-recent-meta { font-size: 12px; }.ms-pill { font-size: 11px; }
+  .ms-quick-card { gap: 16px; padding: 16px !important; }.ms-quick-icon { width: 48px; height: 48px; }.ms-quick-icon svg { width: 32px; height: 32px; }.ms-quick-card strong { font-size: 30px; }
+}
+.ms-avatar-reference { background-size: calc(1182px * var(--portrait-scale, 1)) auto; }
+@media (min-width:1500px) { .ms-avatar-reference { --portrait-scale: 1.333333; } }
+.ms-project h1, .ms-list button { overflow-wrap: anywhere; }
+@media (min-width:1500px) {
+  .ms-nav button { min-height: 44px; }.ms-nav { gap: 5px; }.ms-rail-bottom { gap: 16px; }
+  .ms-calendar-days button { min-height: 40px; }.ms-weekdays { margin-top: 10px; margin-bottom: 7px; }.ms-agenda { margin-top: 6px; padding: 20px; }.ms-agenda h2 { font-size: 18px; }.ms-agenda small { font-size: 12px; }.ms-agenda ul { margin-top: 18px; }.ms-agenda-list strong { font-size: 14px; }.ms-agenda-list small { font-size: 12px; }.ms-agenda-list button { padding: 8px 0 6px; }.ms-agenda-list time { font-size: 12px; width: 57px; margin-top: 12px; }.ms-agenda-list li:has(time)::after { left: 71px; }.ms-add-note { min-height: 48px !important; font-size: 14px !important; }
 }

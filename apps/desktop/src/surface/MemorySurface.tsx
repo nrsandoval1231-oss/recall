@@ -1,3 +1,9 @@
+import { canonicalFixture } from "./canonical-fixture";
+import { ArrowRightIcon, CalendarBlankIcon, CameraIcon, CaretRightIcon, ChartBarIcon, DotsThreeIcon, CrosshairIcon, CubeIcon, FileTextIcon, FolderSimpleIcon, GearSixIcon, HouseIcon, MapPinIcon, MagnifyingGlassIcon, WaveformIcon, SunIcon, TagIcon, UsersIcon, BuildingsIcon } from "@phosphor-icons/react";
+import workspaceBackground from "./assets/recall-workspace.webp";
+import canonicalReference from "../../../../docs/assets/recall-desktop-canonical-2026-10-11.png";
+import { NoteMarkdown, noteSummary } from "./NoteMarkdown";
+import { CaptureCalendar, QuickCards, RecentNotes, memoryTitle } from "./dashboard-parts";
 import { vaultContext, noteBody, noteWithBody, type SourceRow } from "./vault-context";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
@@ -6,22 +12,17 @@ import { KEYWORD_LABEL, keywordSearch, type KeywordAnswer } from "./keyword";
 import { hasPendingMeeting, processMeeting } from "./meeting-workflow";
 import { unavailableLibrarian, type Librarian, type Reading } from "./librarian";
 
-type Section = "home" | "ask" | "recent" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
-type Panel = "overview" | "timeline" | "people" | "places" | "equipment" | "related";
+type Section = "organizations" | "topics" | "settings" | "vault" | "home" | "ask" | "recent" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
+type Panel = "topics" | "overview" | "timeline" | "people" | "places" | "equipment" | "related";
 interface Selected { root: string; vault_id: string; vault_identity: string }
 interface PendingCapture { operationId: string; note: string; kind?: "photo" | "text" }
 interface Preview { text?: string; mime?: string; url: string; sha256: string; matches: boolean; name: string }
 
 const RAIL: { id: Section; label: string }[] = [
-  { id: "ask", label: "Ask Recall" },
-  { id: "home", label: "Home" },
-  { id: "recent", label: "Recent" },
-  { id: "people", label: "People" },
-  { id: "places", label: "Places" },
-  { id: "projects", label: "Projects" },
-  { id: "equipment", label: "Equipment" },
-  { id: "timeline", label: "Timeline" },
-  { id: "capture", label: "Capture" },
+  { id: "home", label: "Home" }, { id: "capture", label: "Capture" },
+  { id: "projects", label: "Projects" }, { id: "people", label: "People" },
+  { id: "organizations", label: "Organizations" }, { id: "topics", label: "Topics" },
+  { id: "places", label: "Locations" }, { id: "timeline", label: "Calendar" }, { id: "ask", label: "Search" },
 ];
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -130,6 +131,7 @@ function monthPhrase(label: string): string {
 }
 
 export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vault: LocalVault; librarian?: Librarian }) {
+  const [vaultSettings, setVaultSettings] = useState(false);
   const [status, setStatus] = useState<VaultStatus | null>(null);
   const [items, setItems] = useState<VaultMemory[]>([]);
   const [checking, setChecking] = useState(vault.available);
@@ -160,6 +162,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [projectFocusId, setProjectFocusId] = useState<string | null>(null);
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
   const askRef = useRef<HTMLInputElement>(null);
+  const settingsTrigger = useRef<HTMLElement | null>(null);
   const alive = useRef(true);
   const previewRef = useRef<Preview | null>(null);
   previewRef.current = preview;
@@ -178,9 +181,11 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   function inScope(vaultId: string) { return alive.current && scopeRef.current === vaultId; }
   const kept = items.filter(keptMemory);
   const active = kept.filter((memory) => memory.state === "active" && memory.revision > 0 && !memory.conflict);
-  const demo = !selected || kept.length === 0;
+  const demo = !vault.available;
+  const referencePreview = demo && new URLSearchParams(globalThis.location?.search ?? "").get("design") === "canonical";
+  const board = referencePreview ? canonicalFixture : brooks;
   const allContext = vaultContext(kept);
-  const projectFocus = section === "projects" && allContext.projects.some(row => row.memory.id === projectFocusId) ? active.find(memory => memory.id === projectFocusId) ?? null : null;
+  const projectFocus = (section === "projects" || section === "organizations") && allContext.projects.some(row => row.memory.id === projectFocusId) ? active.find(memory => memory.id === projectFocusId) ?? null : null;
   const featured = projectFocus ?? active[0] ?? kept[0] ?? null;
 
   useEffect(() => {
@@ -235,7 +240,27 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     return () => { cancel = true; };
   }, [librarian]);
 
+  function openSettings() { settingsTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; setVaultSettings(true); }
+  function closeSettings() { setVaultSettings(false); settingsTrigger.current?.focus(); }
+  useEffect(() => {
+    if (!vaultSettings) return;
+    const dialog = document.querySelector<HTMLElement>("[data-vault-dialog]");
+    dialog?.querySelector<HTMLButtonElement>("button")?.focus();
+    function dialogKeys(event: KeyboardEvent) {
+      if (event.key === "Escape") { setVaultSettings(false); settingsTrigger.current?.focus(); }
+      if (event.key === "Tab") {
+        const controls = dialog?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+        const first = controls?.[0], last = controls?.[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    }
+    document.addEventListener("keydown", dialogKeys);
+    return () => document.removeEventListener("keydown", dialogKeys);
+  }, [vaultSettings]);
+
   function go(next: Section) {
+    if (next === "vault" || next === "settings") { openSettings(); return; }
     if (next === "ask") {
       askRef.current?.focus();
       return;
@@ -248,7 +273,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setAnswer(null);
     setSourceAnswer(null);
     setVaultHits(null);
-    if (next === "home" || next === "projects") { setPanel("overview"); setDetail(null); }
+    if (next === "home" || next === "projects" || next === "organizations") { setPanel("overview"); setDetail(null); }
+    if (next === "topics") { setPanel("topics"); setDetail(null); }
     if (next === "people" || next === "places" || next === "equipment" || next === "timeline" || next === "recent") setPanel(panelFor(next));
   }
 
@@ -272,7 +298,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       const chosen = selectedFrom(next);
       setItems(chosen ? await vault.list(chosen.vault_id, "") : []);
       setNotice(kind === "default" ? "Opened the default vault folder." : "Opened the folder you chose.");
-      setSection("home");
+      setSection("home"); closeSettings();
       setFocusMonth(null); setProjectFocusId(null);
     } catch (chooseError) {
       if (alive.current) setError(message(chooseError));
@@ -550,19 +576,18 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   }
 
   const context = projectFocus ? vaultContext(kept, projectFocus.id) : allContext;
-  const demoMemories = brooks.memories;
+  const demoMemories = board.memories;
   const vaultMemories = projectFocus ? kept.filter(memory => memory.id === projectFocus.id) : kept;
   const evidenceMemory = kept.find((memory) => memory.id === evidenceId) ?? null;
   const demoEvidence = demo ? fixtureMemory(evidenceId ?? "") : undefined;
-  const ticks: TimelineTick[] = demo ? brooks.months.map((month) => ({ id: month, label: month })) : vaultTicks(vaultMemories);
-  const activeMonth = focusMonth && ticks.some((tick) => tick.id === focusMonth) ? focusMonth : (demo ? brooks.marker : ticks[ticks.length - 1]?.id ?? "");
+  const ticks: TimelineTick[] = demo ? board.months.map((month) => ({ id: month, label: month })) : vaultTicks(vaultMemories);
+  const activeMonth = focusMonth && ticks.some((tick) => tick.id === focusMonth) ? focusMonth : (demo ? board.marker : ticks[ticks.length - 1]?.id ?? "");
   const activeLabel = ticks.find((tick) => tick.id === activeMonth)?.label ?? activeMonth;
 
   return (
-    <div className="ms" data-mode={demo ? "demo" : "vault"}>
+    <div className="ms" data-mode={demo ? "demo" : "vault"} style={{ backgroundImage: `url(${workspaceBackground})` }}>
       <aside className="ms-rail" aria-label="Recall">
-        <p className="ms-mark">RECALL</p>
-        <p className="ms-tagline">Your life remembers itself.</p>
+        <div className="ms-brand"><span className="ms-brand-logo" style={{ backgroundImage: `url(${canonicalReference})` }} aria-hidden="true" /><div><p className="ms-mark">RECALL</p><p className="ms-tagline">Your knowledge. In context.</p></div></div>
         <nav className="ms-nav" aria-label="Memory">
           {RAIL.map((item) => (
             <button key={item.id} type="button" aria-current={section === item.id ? "page" : undefined} onClick={() => go(item.id)}>
@@ -571,32 +596,31 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
             </button>
           ))}
         </nav>
-        <div className="ms-rail-actions">
-          <button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("select")}>Choose a vault folder</button>
-          <button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("default")}>Use default vault</button>
-          {selected && <p className="ms-root">{selected.root}</p>}
-        </div>
+        <div className="ms-rail-bottom"><button type="button" aria-label={`Vault ${selected ? "Connected" : "Not connected"}`} onClick={() => go("vault")}><CubeIcon weight="light" /><span>Vault<small><i data-connected={Boolean(selected)} />{selected ? "Connected" : "Not connected"}</small></span></button><button type="button" aria-label="Settings" onClick={() => go("settings")}><GearSixIcon weight="light" /><span>Settings</span></button></div>
+        <blockquote className="ms-rail-quote">“Information<br />compounds when<br />it’s connected.”</blockquote>
+
       </aside>
-      <div className="ms-stage">
+      <main className="ms-stage">
         <div className="ms-atmosphere" aria-hidden="true" />
         <div className="ms-ui">
           {checking && <p className="ms-notice" role="status">Checking this device…</p>}
-          {demo && !checking && <p className="ms-banner" role="status">{FIXTURE_BANNER}{selected ? " This vault has no active memories yet." : ""}</p>}
+          {demo && !checking && <p className="ms-banner" role="status">{referencePreview ? "Design preview · synthetic reference content · not your memories" : FIXTURE_BANNER}{selected ? " This vault has no active memories yet." : ""}</p>}
           {error && <p className="ms-error" role="alert">{error}</p>}
           {notice && <p className="ms-notice" role="status">{notice}</p>}
           {processingState && <p className="ms-notice" role="status">{processingState}</p>}
           <header className="ms-mast">
-            {demo && <p className="ms-editorial">{brooks.editorial}</p>}
+            <div className="ms-greeting"><SunIcon weight="light" /><div><strong>{referencePreview ? "Good evening, Nick" : "Your day, in context."}</strong><small>Focus creates freedom.</small></div><button type="button" aria-label="Open settings" className="ms-profile" onClick={openSettings}>{referencePreview ? "NS" : <UsersIcon weight="light" />}</button></div>
             <div className="ms-askrow">
               <form className="ms-ask" role="search" onSubmit={(event) => void ask(event)}>
                 <SearchIcon />
                 <label className="ms-sr" htmlFor="recall-ask">Ask Recall</label>
-                <input id="recall-ask" ref={askRef} type="search" value={query} placeholder={demo ? "What do you know about Brooks Campus?" : "Ask your notes"} onChange={(event) => setQuery(event.target.value)} />
-                <button type="submit" disabled={busy} aria-label="Ask"><span aria-hidden="true">→</span></button>
+                <input id="recall-ask" ref={askRef} type="search" value={query} placeholder="Ask Recall anything about your notes, projects, people, or business…" onChange={(event) => setQuery(event.target.value)} />
+                <button type="submit" disabled={busy} aria-label="Ask"><ArrowRightIcon aria-hidden="true" /></button>
               </form>
               <button className="ms-mic" type="button" disabled aria-label="Voice ask is not available in this build"><WaveIcon /></button>
             </div>
           </header>
+          <div className="ms-prompts" aria-label="Ask suggestions">{["Find my meeting notes", "What needs a follow-up?", "Find project notes", "Show decisions from this month"].map(prompt => <button type="button" key={prompt} onClick={() => { setQuery(prompt); askRef.current?.focus(); }}>{prompt}</button>)}</div>
 
           {section === "evidence" ? (
             <Evidence
@@ -645,88 +669,90 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
             </section>
           ) : (
             <>
-              <div className={demo || context.people.length || context.places.length || context.related.length ? "ms-columns" : "ms-columns ms-columns-solo"}>
+              <div className="ms-columns">
                 {demo && (
                   <div className="ms-side">
-                    <ContextCard title="People" icon={<PeopleMark />}>
+                    <ContextCard title="Key People" icon={<PeopleMark />} onView={() => go("people")}>
                       <ul className="ms-list">
-                        {brooks.people.map((person) => (
-                          <li key={person.name}><button type="button" onClick={() => { setDetail({ title: person.name, text: `${person.role}. ${person.note}` }); setPanel("people"); setSection("people"); }}><i className={avatarTone(person.name)} aria-hidden="true">{initials(person.name)}</i><span className="ms-person"><strong>{person.name}</strong><small className="ms-role">{person.role}</small></span></button></li>
+                        {board.people.map((person, index) => (
+                          <li key={person.name}><button type="button" onClick={() => { setDetail({ title: person.name, text: `${person.role}. ${person.note}` }); setPanel("people"); setSection("people"); }}><i className={referencePreview ? "ms-avatar ms-avatar-reference" : avatarTone(person.name)} style={referencePreview ? { backgroundImage: `url(${canonicalReference})`, backgroundPosition: `calc(-216px * var(--portrait-scale, 1)) calc(-${187 + index * 39}px * var(--portrait-scale, 1))` } : undefined} aria-hidden="true">{referencePreview ? "" : initials(person.name)}</i><span className="ms-person"><strong>{person.name}</strong><small className="ms-role">{person.role}</small></span></button></li>
                         ))}
                       </ul>
-                      <p className="ms-more">+ {brooks.morePeople}</p>
+                      <p className="ms-more">+ {board.morePeople}</p>
                     </ContextCard>
-                    <ContextCard title="Locations" icon={<LocationMark />}>
+                    <ContextCard title="Key Locations" icon={<LocationMark />} onView={() => go("places")}>
                       <ul className="ms-list">
-                        {brooks.places.map((place) => (
+                        {board.places.map((place) => (
                           <li key={place.name}><button type="button" onClick={() => { setDetail({ title: place.name, text: `${place.locality}. ${place.note}` }); setPanel("places"); setSection("places"); }}><PinIcon /><span className="ms-person"><strong>{place.name}</strong><small className="ms-role">{place.locality}</small></span></button></li>
                         ))}
                       </ul>
-                      <p className="ms-more">+ {brooks.morePlaces}</p>
+                      <p className="ms-more">+ {board.morePlaces}</p>
                     </ContextCard>
                   </div>
                 )}
                 {!demo && (context.people.length > 0 || context.places.length > 0 || context.related.length > 0) && <div className="ms-side">
-                  {context.people.length > 0 && <ContextCard title="People" icon={<PeopleMark />}><SourceList rows={context.people} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
-                  {context.places.length > 0 && <ContextCard title="Locations" icon={<LocationMark />}><SourceList rows={context.places} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
+                  {context.people.length > 0 && <ContextCard title="Key People" icon={<PeopleMark />} onView={() => go("people")}><SourceList compact="people" rows={context.people} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
+                  {context.places.length > 0 && <ContextCard title="Key Locations" icon={<LocationMark />} onView={() => go("places")}><SourceList compact="places" rows={context.places} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
                 </div>}
+                {!demo && !context.people.length && !context.places.length && !context.related.length && <div className="ms-side"><ContextCard title="Key People" icon={<PeopleMark />} onView={() => go("people")}><p className="ms-fine">People mentioned in your organized notes will appear here.</p></ContextCard><ContextCard title="Key Locations" icon={<LocationMark />} onView={() => go("places")}><p className="ms-fine">Your notes bring the places into focus.</p></ContextCard></div>}
+                <div className="ms-center">
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
-                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{hit.note_basename}</h2><p className="ms-note">{noteBody({ id: hit.memory_id, note: hit.current_excerpt })}</p><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
+                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{items.find(row => row.id === hit.memory_id) ? memoryTitle(items.find(row => row.id === hit.memory_id)!) : hit.note_basename}</h2><NoteMarkdown>{noteBody({ id: hit.memory_id, note: hit.current_excerpt })}</NoteMarkdown><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
                     <>
                       <div className="ms-project-head">
-                        <p className="ms-kicker"><ProjectMark />{demo ? brooks.kicker : "MEMORY"}</p>
-                        <UpdatedLine value={demo ? `Last updated ${brooks.updated}` : featured ? `Last updated ${displayDate(featured.updated_at)}` : "Nothing saved yet"} />
+                        <p className="ms-kicker"><ProjectMark />{demo ? board.kicker : "MEMORY"}</p>
+                        {demo && <button className="ms-project-menu" type="button" aria-label="Browse design notes" onClick={() => setPanel("timeline")}><DotsThreeIcon /></button>}
+                        {featured && !demo && <button className="ms-project-menu" type="button" aria-label={`Open original: ${titleOf(featured)}`} onClick={() => void openVaultMemory(featured)}><DotsThreeIcon /></button>}
+                        <UpdatedLine value={demo ? `Last updated ${board.updated}` : featured ? `Last updated ${displayDate(featured.updated_at)}` : "Nothing saved yet"} />
                       </div>
-                      <h1>{detail?.title ?? (demo ? brooks.project : featured ? titleOf(featured) : "Your vault")}</h1>
-                      <p className="ms-place">{demo ? brooks.place : selected ? selected.root : "No vault open"}</p>
-                      {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : (featured ? noteBody(featured) : "") || "Import a photo to keep the original and a note in this vault."}</p>}
-                      {!demo && section === "projects" && panel === "overview" && !detail && !projectFocus && <SourceList rows={allContext.projects} empty="No unresolved project or organization mentions saved yet." onOpen={(memory) => { setProjectFocusId(memory.id); setPanel("overview"); }} />}
+                      <h1>{detail?.title ?? (demo ? board.project : featured ? titleOf(featured) : "Your memory starts here")}</h1>
+                      <p className="ms-place">{demo ? board.place : "Your memory. In context."}</p>
+                      {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? board.summary : (featured ? noteSummary(noteBody(featured)) : "") || "Import a photo to keep the original and a note in this vault."}</p>}
+                      {!demo && (section === "projects" || section === "organizations") && panel === "overview" && !detail && !projectFocus && <SourceList rows={section === "organizations" ? allContext.projects.filter(row => row.note.startsWith("organization")) : allContext.projects} empty={section === "organizations" ? "No unresolved organization mentions saved yet." : "No unresolved project or organization mentions saved yet."} onOpen={(memory) => { setProjectFocusId(memory.id); setPanel("overview"); }} />}
                       {!demo && projectFocus && <p className="ms-fine">Context from this source only; project and organization names remain unresolved. <button type="button" onClick={() => { setProjectFocusId(null); setPanel("overview"); }}>All project sources</button></p>}
-                      {demo && panel === "overview" && !detail && <p className="ms-fine">{brooks.caveat}</p>}
+                      {demo && !referencePreview && panel === "overview" && !detail && <p className="ms-fine">{board.caveat}</p>}
                       {panel === "timeline" && !demo && <><h2>Agenda</h2><SourceList rows={context.agenda} empty="No source follow-ups saved yet." onOpen={(memory) => void openVaultMemory(memory)} /><h2>Capture calendar</h2></>}
                       {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} month={activeMonth} monthLabel={activeLabel} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
                       {panel === "people" && !detail && !demo && <SourceList rows={context.people} empty="No unresolved people mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
-                      {panel === "people" && !detail && demo && <SimpleList demo={demo} rows={brooks.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
+                      {panel === "people" && !detail && demo && <SimpleList demo={demo} rows={board.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
                       {panel === "places" && !detail && !demo && <SourceList rows={context.places} empty="No unresolved location mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
-                      {panel === "places" && !detail && demo && <SimpleList demo={demo} rows={brooks.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
-                      {panel === "equipment" && <SimpleList demo={demo} rows={brooks.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
+                      {panel === "places" && !detail && demo && <SimpleList demo={demo} rows={board.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
+                      {panel === "equipment" && <SimpleList demo={demo} rows={board.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
+                      {panel === "topics" && !demo && <><h2>Saved note tags</h2><SourceList rows={context.topics} empty="No note tags saved yet. Tags you keep in Obsidian appear here." onOpen={memory => void openVaultMemory(memory)} /></>}
+                      {panel === "topics" && demo && <SimpleList demo rows={board.topics.map(topic => ({ label: topic.label, note: topic.note }))} empty="" />}
                       {panel === "related" && !demo && <SourceList rows={context.related} empty="No saved related memories." onOpen={(memory) => void openVaultMemory(memory)} />}
-                      {panel === "related" && demo && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
-                      <dl className="ms-stats">
-                        <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : projectFocus ? 1 : active.length}</dd></div>
+                      {panel === "related" && demo && <SimpleList demo={demo} rows={board.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
+                      {referencePreview ? <dl className="ms-project-properties"><div><CrosshairIcon weight="light" /><span>Market</span><strong>Oil &amp; Gas</strong></div><div><MapPinIcon weight="light" /><span>Region</span><strong>Permian Basin, TX</strong></div><div><ChartBarIcon weight="light" /><span>Stage</span><strong>Opportunity</strong></div><div><CalendarBlankIcon weight="light" /><span>Target Start</span><strong>Q4 2025</strong></div></dl> : <dl className="ms-stats">
+                        <div><dt>Memories</dt><dd>{demo ? board.stats.memories : projectFocus ? 1 : active.length}</dd></div>
                         {demo && (
                           <>
-                            <div><dt>People</dt><dd>{brooks.stats.people}</dd></div>
-                            <div><dt>Locations</dt><dd>{brooks.stats.locations}</dd></div>
-                            <div><dt>Key Topics</dt><dd>{brooks.stats.topics}</dd></div>
+                            <div><dt>People</dt><dd>{board.stats.people}</dd></div>
+                            <div><dt>Locations</dt><dd>{board.stats.locations}</dd></div>
+                            <div><dt>Key Topics</dt><dd>{board.stats.topics}</dd></div>
                           </>
                         )}
-                      </dl>
-                      {demo && <p className="ms-fine">{brooks.statsNote}</p>}
+                      </dl>}
+                      {demo && !referencePreview && <p className="ms-fine">{board.statsNote}</p>}
                       <div className="ms-tabs" role="tablist" aria-label="Project">
-                        {(["overview", "timeline", "people", "equipment", "related"] as const).map((tab) => (
-                          <button key={tab} type="button" role="tab" aria-selected={panel === tab} onClick={() => { setPanel(tab); setDetail(null); }}>{tab[0]?.toUpperCase()}{tab.slice(1)}</button>
+                        {(["overview", "timeline", "people", "places", "topics", "related"] as const).map((tab) => (
+                          <button key={tab} type="button" role="tab" aria-selected={panel === tab} onClick={() => { setPanel(tab); setDetail(null); }}>{tab === "overview" ? "Overview" : `${tab === "timeline" ? "Notes" : tab === "places" ? "Locations" : `${tab[0]?.toUpperCase()}${tab.slice(1)}`} (${referencePreview ? { timeline: 12, people: 6, places: 3, topics: 5, related: 8 }[tab] : tab === "timeline" ? vaultMemories.length : tab === "people" ? context.people.length : tab === "places" ? context.places.length : tab === "topics" ? context.topics.length : context.related.length})`}</button>
                         ))}
                       </div>
-                      {featured && !demo && <div className="ms-actions"><button type="button" onClick={() => void openVaultMemory(featured)}>Open original: {titleOf(featured)}</button></div>}
+
                     </>
                   )}
                 </article>
-                {demo && (
-                  <div className="ms-side">
-                    <CountCard title="Key Topics" icon={<TopicMark />} rows={brooks.topics} onOpen={(label, note) => { setDetail({ title: label, text: note }); setPanel("overview"); }} />
-                    <CountCard title="Related" icon={<RelatedMark />} rows={brooks.related} onOpen={(label, note) => { setDetail({ title: label, text: note }); setPanel("related"); setSection("projects"); }} />
-                    <blockquote className="glass ms-quote">{brooks.quote}</blockquote>
-                  </div>
-                )}
-                {!demo && (context.people.length > 0 || context.places.length > 0 || context.related.length > 0) && <div className="ms-side">{context.related.length > 0 && <ContextCard title="Related" icon={<RelatedMark />}><SourceList rows={context.related} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}</div>}
+                {section !== "ask" && <RecentNotes onReference={(title, text) => { setDetail({ title, text }); setPanel("overview"); }} referencePreview={referencePreview} memories={projectFocus ? active.filter(memory => memory.id === projectFocus.id) : active} onOpen={memory => void openVaultMemory(memory)} onAll={() => go("recent")} />}
+                </div>
+                <CaptureCalendar key={`${selected?.vault_identity ?? "preview"}:${projectFocus?.id ?? "all"}`} onReference={(title, text) => { setDetail({ title, text }); setPanel("overview"); }} referencePreview={referencePreview} memories={projectFocus ? active.filter(memory => memory.id === projectFocus.id) : active} initialMonth={referencePreview ? "2025-04" : projectFocus?.captured_at.slice(0, 7)} agenda={context.agenda} onOpen={memory => void openVaultMemory(memory)} onCapture={() => go("capture")} />
               </div>
-              {ticks.length > 0 && <TimelineStrip ticks={ticks} active={activeMonth} onSelect={selectMonth} />}
+              {(section === "timeline" || section === "recent") && ticks.length > 0 && <TimelineStrip ticks={ticks} active={activeMonth} onSelect={selectMonth} />}
             </>
           )}
-          <p className="ms-footer">CAPTURE · UNDERSTAND · CONNECT · REMEMBER · RECALL · ACT</p>
+          {section !== "evidence" && section !== "capture" && <QuickCards referencePreview={referencePreview} projects={new Set(allContext.projects.map(row => row.memory.id)).size} memories={active.length} openItems={allContext.agenda.length} onProjects={() => go("projects")} onWeek={() => go("recent")} onItems={() => go("timeline")} onCapture={() => go("capture")} />}
+          {vaultSettings && <div className="ms-modal-backdrop" onClick={closeSettings}><div data-vault-dialog className="ms-vault-settings" role="dialog" aria-modal="true" aria-label="Vault settings" onClick={event => event.stopPropagation()}><header><h2>Your Obsidian vault</h2><button type="button" onClick={closeSettings} aria-label="Close vault settings">Close</button></header><p>Memory stays in the folder you choose. Originals and history stay with it.</p><p className="ms-root">{selected?.root || "No vault selected"}</p><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("select")}>Choose a vault folder</button><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("default")}>Use default vault</button></div></div>}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -744,45 +770,19 @@ function detailFrom(id: string): { title: string; text: string } | null {
 }
 
 function RailIcon({ id }: { id: Section }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-      {id === "ask" && <path d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm7 2-3.5-3.5" />}
-      {id === "home" && <path d="M4 11.5 12 4l8 7.5V20H4v-8.5Z" />}
-      {id === "recent" && <path d="M12 7v6l4 2M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18Z" />}
-      {id === "people" && <path d="M8 14a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3ZM2 20a6 6 0 0 1 12 0M14 20a5 5 0 0 1 8 0" />}
-      {id === "places" && <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />}
-      {id === "projects" && <path d="M4 7h16v12H4V7Zm0 0 2-3h12l2 3" />}
-      {id === "equipment" && <path d="M14 7a2 2 0 1 0-4 0L5 9l1 3 3-1v6h6v-6l3 1 1-3-5-2Z" />}
-      {id === "timeline" && <path d="M4 12h16M7 12v.01M12 12v.01M17 12v.01" />}
-      {id === "capture" && <path d="M8 7h2l1-2h2l1 2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Zm4 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />}
-    </svg>
-  );
+  const Icon = { ask: MagnifyingGlassIcon, home: HouseIcon, recent: FileTextIcon, people: UsersIcon, places: MapPinIcon, projects: FolderSimpleIcon, equipment: CubeIcon, timeline: CalendarBlankIcon, capture: CameraIcon, evidence: FileTextIcon, organizations: BuildingsIcon, topics: TagIcon, settings: GearSixIcon, vault: CubeIcon }[id];
+  return <Icon size={22} weight={id === "home" ? "fill" : "light"} aria-hidden="true" />;
 }
 
-function ContextCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+function ContextCard({ title, icon, children, onView }: { title: string; icon: ReactNode; children: ReactNode; onView?: () => void }) {
   return (
     <section className="glass ms-card" aria-label={title}>
       <header className="ms-card-head">
         <span className="ms-card-icon" aria-hidden="true">{icon}</span>
         <h2>{title}</h2>
+        {onView && <button className="ms-context-view" type="button" aria-label={`View ${title.toLowerCase()}`} onClick={onView}><CaretRightIcon /></button>}
       </header>
       {children}
-    </section>
-  );
-}
-
-function CountCard({ title, icon, rows, onOpen }: { title: string; icon: ReactNode; rows: { label: string; count: number; note: string }[]; onOpen: (label: string, note: string) => void }) {
-  return (
-    <section className="glass ms-card" aria-label={title}>
-      <header className="ms-card-head">
-        <span className="ms-card-icon" aria-hidden="true">{icon}</span>
-        <h2>{title}</h2>
-      </header>
-      <ul className="ms-list">
-        {rows.map((row) => (
-          <li key={row.label}><button type="button" onClick={() => onOpen(row.label, row.note)}><span>{row.label}</span><span className="ms-count">{row.count}</span></button></li>
-        ))}
-      </ul>
     </section>
   );
 }
@@ -811,9 +811,9 @@ function TimelineStrip({ ticks, active, onSelect }: { ticks: TimelineTick[]; act
   );
 }
 
-function SourceList({ rows, empty, onOpen }: { rows: SourceRow[]; empty: string; onOpen: (memory: VaultMemory) => void }) {
+function SourceList({ rows, empty, onOpen, compact }: { rows: SourceRow[]; empty: string; onOpen: (memory: VaultMemory) => void; compact?: "people" | "places" }) {
   if (rows.length === 0) return <p className="ms-fine">{empty}</p>;
-  return <ul className="ms-list">{rows.map((row, index) => <li key={`${row.memory.id}-${index}`}><button type="button" onClick={() => onOpen(row.memory)}>{row.label}</button><p className="ms-fine">{row.note}</p></li>)}</ul>;
+  return <ul className="ms-list">{rows.map((row, index) => <li key={`${row.memory.id}-${index}`}><button type="button" onClick={() => onOpen(row.memory)}>{compact ? <>{compact === "people" ? <i className={avatarTone(row.label)} aria-hidden="true">{initials(row.label)}</i> : <PinIcon />}<span className="ms-person"><strong>{row.label}</strong><small className="ms-role">{compact === "people" ? "Identity unresolved" : "Unresolved place"}</small></span></> : row.label}</button>{!compact && <p className="ms-fine">{row.note}</p>}</li>)}</ul>;
 }
 
 function SimpleList({ demo, rows, empty }: { demo: boolean; rows: { label: string; note: string }[]; empty: string }) {
@@ -935,7 +935,7 @@ function Evidence(props: {
           <>
             <p className="ms-fine">{memory.state === "missing" ? "Markdown note missing. The original is still in the vault." : memory.note.startsWith("---\nrecall_id:") ? "Organized from source statements. Uncertain items require review; edits remain yours." : "Saved in your vault. The note below is human text, not a verified reading."}</p>
             {memory.conflict && <p role="alert">{memory.conflict}</p>}
-            <p className="ms-note">{noteBody(memory) || "No note added."}</p>
+            <NoteMarkdown>{noteBody(memory) || "No note added."}</NoteMarkdown>
             <form className="ms-form" onSubmit={(event) => { event.preventDefault(); props.onSave(); }}>
               <label htmlFor="correction">Your correction</label>
               <textarea id="correction" value={props.correction} onChange={(event) => props.onCorrection(event.target.value)} />
@@ -948,14 +948,14 @@ function Evidence(props: {
             </div>
             {props.history && (
               <ol className="ms-hits">
-                {props.history.map((revision) => <li key={revision.revision} className="ms-hit"><strong>Revision {revision.revision}</strong><p className="ms-note">{noteBody({ id: memory.id, note: revision.note }) || "No note added."}</p><small>{revision.kind} · {revision.origin} · {revision.recorded_at}</small></li>)}
+                {props.history.map((revision) => <li key={revision.revision} className="ms-hit"><strong>Revision {revision.revision}</strong><NoteMarkdown>{noteBody({ id: memory.id, note: revision.note }) || "No note added."}</NoteMarkdown><small>{revision.kind} · {revision.origin} · {revision.recorded_at}</small></li>)}
               </ol>
             )}
             <label className="ms-check"><input type="checkbox" checked={props.confirmRemove} onChange={(event) => props.onConfirmRemove(event.target.checked)} /> Remove from Recall. The photo and history stay in the vault.</label>
             <button type="button" disabled={props.busy || !props.confirmRemove} onClick={props.onRemove}>Remove from Recall</button>
             {props.canProcess && <section aria-label="Meeting processing"><h2>Organize in Obsidian</h2><label className="ms-check"><input type="checkbox" checked={props.processingConsent} onChange={(event) => props.onProcessingConsent(event.target.checked)} /> Send this source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type="button" disabled={props.busy || !props.processingConsent || memory.state !== "active" || Boolean(memory.conflict)} onClick={props.onOrganize}>Organize this memory</button></section>}
             {props.canReviewOrganization && <section aria-label="Reviewed organization retry"><h2>Review an organization retry</h2><p>The previous request may have incurred charges. Its record and reserved budget stay intact. Review authorizes one new Claude operation using the saved Jev result.</p><label className="ms-check"><input type="checkbox" disabled={props.busy} checked={props.reviewRetryAcknowledged} onChange={(event) => props.onReviewRetryAcknowledged(event.target.checked)} /> I reviewed the failed attempt and acknowledge that another request may incur additional charges.</label><button type="button" disabled={props.busy || !props.processingConsent || !props.reviewRetryAcknowledged} onClick={props.onReviewedRetry}>Review and retry organization</button></section>}
-            {memory.source_name && <ReadingBlock librarian={librarian} busy={props.busy} consent={props.consent} reading={props.reading} onConsent={props.onConsent} onRead={props.onRead} />}
+            {memory.source_name && preview && preview.text === undefined && <ReadingBlock librarian={librarian} busy={props.busy} consent={props.consent} reading={props.reading} onConsent={props.onConsent} onRead={props.onRead} />}
           </>
         )}
       </div>
@@ -995,88 +995,10 @@ function avatarTone(name: string): string {
   return `ms-avatar ms-avatar-${tones[index]}`;
 }
 
-function SearchIcon() {
-  return (
-    <svg className="ms-search" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
-      <circle cx="11" cy="11" r="7" />
-      <path d="M16 16l5 5" />
-    </svg>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg className="ms-pin" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
-      <circle cx="12" cy="10" r="2.2" />
-    </svg>
-  );
-}
-
-function WaveIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-      <rect x="3.5" y="9" width="2" height="6" rx="1" />
-      <rect x="7.5" y="5.5" width="2" height="13" rx="1" />
-      <rect x="11.5" y="3" width="2" height="18" rx="1" />
-      <rect x="15.5" y="5.5" width="2" height="13" rx="1" />
-      <rect x="19.5" y="9" width="2" height="6" rx="1" />
-    </svg>
-  );
-}
-
-function ProjectMark() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7">
-      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2h5.5A2.5 2.5 0 0 1 20 9.5v8A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-10Z" />
-    </svg>
-  );
-}
-
-function LocationMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
-      <circle cx="12" cy="10" r="2.2" />
-    </svg>
-  );
-}
-
-function PeopleMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M9 13a3.5 3.5 0 1 0-3.5-3.5A3.5 3.5 0 0 0 9 13Zm7.5 0a2.8 2.8 0 1 0-2.8-2.8A2.8 2.8 0 0 0 16.5 13ZM2.5 19.5a6.5 6.5 0 0 1 13 0M14 19.5a5 5 0 0 1 7.5 0" />
-    </svg>
-  );
-}
-
-function TopicMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.1" />
-      <path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1" />
-    </svg>
-  );
-}
-
-function RelatedMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="6" cy="12" r="2.2" />
-      <circle cx="17" cy="7" r="2.2" />
-      <circle cx="17" cy="17" r="2.2" />
-      <path d="M8.1 11.2 14.8 8.2M8.1 12.8l6.7 3" />
-    </svg>
-  );
-}
-
-function TimelineGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M3 12h18" />
-      <circle cx="8" cy="12" r="1.6" fill="currentColor" />
-      <circle cx="16" cy="12" r="1.6" />
-    </svg>
-  );
-}
-
+function SearchIcon() { return <MagnifyingGlassIcon className="ms-search" size={22} weight="light" aria-hidden="true" />; }
+function PinIcon() { return <MapPinIcon className="ms-pin" size={22} weight="fill" aria-hidden="true" />; }
+function WaveIcon() { return <WaveformIcon size={24} weight="light" aria-hidden="true" />; }
+function ProjectMark() { return <FolderSimpleIcon size={18} weight="light" aria-hidden="true" />; }
+function LocationMark() { return <MapPinIcon size={18} weight="light" aria-hidden="true" />; }
+function PeopleMark() { return <UsersIcon size={18} weight="light" aria-hidden="true" />; }
+function TimelineGlyph() { return <CalendarBlankIcon size={18} weight="light" aria-hidden="true" />; }

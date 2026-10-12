@@ -1,0 +1,84 @@
+{
+  "kind": "Browser UI test with synthetic native IPC fixture, not live providers or native persistence",
+  "results": [
+    {
+      "viewport": [
+        1182,
+        789
+      ],
+      "errors": []
+    },
+    {
+      "viewport": [
+        1536,
+        1024
+      ],
+      "errors": []
+    },
+    {
+      "viewport": [
+        900,
+        700
+      ],
+      "errors": []
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "errors": []
+    }
+  ],
+  "errors": [],
+  "calls": [
+    {
+      "cmd": "vault_status",
+      "args": {}
+    },
+    {
+      "cmd": "librarian_status",
+      "args": {}
+    },
+    {
+      "cmd": "vault_status",
+      "args": {}
+    },
+    {
+      "cmd": "librarian_status",
+      "args": {}
+    },
+    {
+      "cmd": "vault_list",
+      "args": {
+        "expectedVaultId": "test-session",
+        "query": ""
+      }
+    },
+    {
+      "cmd": "vault_source",
+      "args": {
+        "expectedVaultId": "test-session",
+        "memoryId": "11111111-1111-4111-8111-111111111111"
+      }
+    },
+    {
+      "cmd": "vault_correct",
+      "args": {
+        "expectedVaultId": "test-session",
+        "memoryId": "11111111-1111-4111-8111-111111111111",
+        "expectedRevision": 2,
+        "operationId": "f877b6b7-2ec6-4ebc-913c-26573be87b90",
+        "note": "---\nrecall_id: \"11111111-1111-4111-8111-111111111111\"\ntitle: \"Utility meeting\"\n---\n\n# Utility meeting\n\nHuman correction: deadline remains unknown."
+      }
+    },
+    {
+      "cmd": "memory_ask",
+      "args": {
+        "expectedVaultId": "test-session",
+        "question": "What was going on with that utility delay?"
+      }
+    }
+  ],
+  "violations": []
+}
