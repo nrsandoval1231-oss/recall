@@ -2,7 +2,7 @@
 import { webcrypto } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { LocalVault, VaultMemory, VaultStatus } from "../platform/local-vault";
@@ -17,6 +17,7 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 const emptyStatus: VaultStatus = { root: null, vault_id: null, vault_identity: null };
@@ -298,4 +299,58 @@ describe("Memory Surface", () => {
     await user.click(await screen.findByRole("button", { name: "Open original: north-lot" }));
     expect((await screen.findByTestId("integrity")).textContent).toMatch(/does not match/);
   });
+});
+
+it("saves messy text without provider consent and retrieves original source quotes through native Ask", async () => {
+  Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
+  const text = "Brad says maybe 5–10 MW? Utility late. Call Sarah. Crossed out: 8 MW confirmed.";
+  const bytes = new TextEncoder().encode(text);
+  const sha = Array.from(new Uint8Array(await webcrypto.subtle.digest("SHA-256", bytes)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const saved = memory({ note: text, source_name: "", source_sha256: "", note_path: "meeting.md" });
+  const captureNote = vi.fn(async () => saved);
+  const parse = vi.fn(); const organize = vi.fn(); const publish = vi.fn();
+  const ask = vi.fn(async () => ({ question: "utility delay", message: "Source-backed matches; retrieved quotes.", hits: [{ memory_id: saved.id, revision: 1, note_basename: "meeting.md", current_excerpt: text, original_excerpt: text, source_sha256: sha, mime_type: "text/plain" }] }));
+  render(<MemorySurface vault={vault({ captureNote, parse, organize, publish, ask, source: vi.fn(async () => ({ bytes: Array.from(bytes), sha256: sha, mime_type: "text/plain" })) })} />);
+  const user = userEvent.setup(); await user.click(await screen.findByRole("button", { name: "Capture" }));
+  await user.type(screen.getByLabelText("Optional note"), text); await user.click(screen.getByRole("button", { name: "Save note" }));
+  expect(await screen.findByText("Saved locally. Agree before sending this source to Jev and Claude.")).toBeTruthy();
+  expect(captureNote).toHaveBeenCalledWith("session-token", expect.any(String), text); expect(parse).not.toHaveBeenCalled();
+  expect(screen.getAllByText(text).length).toBeGreaterThan(0); expect(screen.getByTestId("integrity").textContent).toContain("Hash matches");
+  expect(screen.queryByRole("img")).toBeNull();
+  await user.type(screen.getByRole("searchbox"), "What happened with that utility delay?"); await user.click(screen.getByRole("button", { name: "Ask" }));
+  expect(await screen.findByRole("heading", { name: "Source-backed matches" })).toBeTruthy();
+  expect(ask).toHaveBeenCalledWith("session-token", "What happened with that utility delay?");
+  expect(screen.getByRole("button", { name: "Inspect original evidence" })).toBeTruthy(); expect(screen.getByText(`SHA-256: ${sha}`)).toBeTruthy();
+});
+
+it("finishing organization of A never replaces B's correction editor after navigation", async () => {
+  Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
+  const a = memory({ source_name: "A.png", note: "A source" });
+  const b = memory({ id: "22222222-2222-4222-8222-222222222222", source_name: "B.png", note: "B human draft" });
+  let finish!: (value: unknown) => void;
+  const organize = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+  const v = vault({ parse: vi.fn(async (_scope, id, revision, operation) => ({ memory_id: id, expected_revision: revision, operation_id: operation, source_sha256: a.source_sha256, state: "parsed", message: "Fixture" })), organize, publish: vi.fn(async () => ({ ...a, revision: 2, note: "Published A document" })) }, [a, b]);
+  const user = userEvent.setup(); render(<MemorySurface vault={v} />);
+  await user.click(await screen.findByRole("button", { name: "Open original: A" }));
+  await user.click(screen.getByLabelText(/Send this source to Jev and Claude/));
+  await user.click(screen.getByRole("button", { name: "Organize this memory" }));
+  await screen.findByText("Claude is organizing source-linked memory…");
+  await user.click(screen.getByRole("button", { name: "Timeline" }));
+  await user.click(await screen.findByRole("button", { name: /Aug 21, 2026 · B/ }));
+  expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("B human draft");
+  await act(async () => { finish({}); });
+  await screen.findByText("Organized in Obsidian. Uncertainty and original evidence preserved.");
+  expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("B human draft");
+});
+
+it("older Ask responses cannot replace a newer source-backed result", async () => {
+  let first!: (value: { question: string; message: string; hits: [] }) => void;
+  const ask = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { first = resolve; })).mockResolvedValueOnce({ question: "second", message: "Newest result", hits: [] });
+  render(<MemorySurface vault={vault({ ask }, [memory()])} />); const user = userEvent.setup();
+  const input = await screen.findByRole("searchbox"); await user.type(input, "first");
+  fireEvent.submit(screen.getByRole("search"));
+  await user.clear(input); await user.type(input, "second"); fireEvent.submit(screen.getByRole("search"));
+  await screen.findByText("Newest result");
+  await act(async () => { first({ question: "first", message: "Old result", hits: [] }); });
+  expect(screen.getByText("Newest result")).toBeTruthy(); expect(screen.queryByText("Old result")).toBeNull();
 });

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { LocalVault, VaultMemory, VaultRevision, VaultStatus } from "../platform/local-vault";
+import type { LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
 import { brooks, FIXTURE_BANNER, fixtureDocuments, fixtureMemory, type FixtureMemory } from "./brooks-fixture";
 import { KEYWORD_LABEL, keywordSearch, type KeywordAnswer } from "./keyword";
+import { processMeeting } from "./meeting-workflow";
 import { unavailableLibrarian, type Librarian, type Reading } from "./librarian";
 
 type Section = "home" | "ask" | "recent" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
 type Panel = "overview" | "timeline" | "people" | "places" | "equipment" | "related";
 interface Selected { root: string; vault_id: string; vault_identity: string }
-interface PendingCapture { operationId: string; note: string }
-interface Preview { url: string; sha256: string; matches: boolean; name: string }
+interface PendingCapture { operationId: string; note: string; kind?: "photo" | "text" }
+interface Preview { text?: string; mime?: string; url: string; sha256: string; matches: boolean; name: string }
 
 const RAIL: { id: Section; label: string }[] = [
   { id: "ask", label: "Ask Recall" },
@@ -58,7 +59,9 @@ function readPending(identity: string): PendingCapture | null {
   if (typeof operationIdValue !== "string" || !/^[0-9a-f-]{36}$/i.test(operationIdValue) || typeof note !== "string") {
     throw new Error("A pending import on this device could not be read. The vault was not changed.");
   }
-  return { operationId: operationIdValue, note };
+  const kind = "kind" in data ? data.kind : undefined;
+  if (kind !== undefined && kind !== "photo" && kind !== "text") throw new Error("Pending capture kind is invalid.");
+  return { operationId: operationIdValue, note, kind };
 }
 function displayDate(iso: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
@@ -136,6 +139,9 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [section, setSection] = useState<Section>("home");
   const [panel, setPanel] = useState<Panel>("overview");
   const [answer, setAnswer] = useState<KeywordAnswer | null>(null);
+  const [sourceAnswer, setSourceAnswer] = useState<SourceAnswer | null>(null);
+  const [processingConsent, setProcessingConsent] = useState(false);
+  const [processingState, setProcessingState] = useState("");
   const [vaultHits, setVaultHits] = useState<VaultMemory[] | null>(null);
   const [detail, setDetail] = useState<{ title: string; text: string } | null>(null);
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
@@ -156,6 +162,16 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   previewRef.current = preview;
 
   const selected = selectedFrom(status);
+  const scopeRef = useRef<string | null>(null);
+  scopeRef.current = selected?.vault_id ?? null;
+  const sourceRequest = useRef(0);
+  const askRequest = useRef(0);
+  const evidenceRef = useRef<string | null>(null);
+  function clearPreview() {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
+    previewRef.current = null; setPreview(null);
+  }
+  function inScope(vaultId: string) { return alive.current && scopeRef.current === vaultId; }
   const kept = items.filter(keptMemory);
   const active = kept.filter((memory) => memory.state === "active" && memory.revision > 0 && !memory.conflict);
   const demo = !selected || kept.length === 0;
@@ -219,9 +235,11 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       return;
     }
     setSection(next);
+    evidenceRef.current = null; sourceRequest.current += 1; askRequest.current += 1;
     setEvidenceId(null);
     setError("");
     setAnswer(null);
+    setSourceAnswer(null);
     setVaultHits(null);
     if (next === "home" || next === "projects") { setPanel("overview"); setDetail(null); }
     if (next === "people" || next === "places" || next === "equipment" || next === "timeline" || next === "recent") setPanel(panelFor(next));
@@ -240,6 +258,9 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       const next = kind === "select" ? await vault.select() : await vault.openDefault();
       if (!alive.current) return;
       if (!next) { setNotice("Folder choice cancelled. Nothing was written."); return; }
+      clearPreview(); evidenceRef.current = null; askRequest.current += 1;
+      setSourceAnswer(null); setProcessingState(""); setProcessingConsent(false);
+      sourceRequest.current += 1;
       setStatus(next);
       const chosen = selectedFrom(next);
       setItems(chosen ? await vault.list(chosen.vault_id, "") : []);
@@ -255,26 +276,69 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
 
   async function ask(event: { preventDefault(): void }) {
     event.preventDefault();
+    const request = ++askRequest.current;
+    evidenceRef.current = null; sourceRequest.current += 1;
     setError("");
     setDetail(null);
     setEvidenceId(null);
     setSection("ask");
-    if (demo || !selected) {
+    setSourceAnswer(null);
+    if (!selected) {
       setVaultHits(null);
       setAnswer(keywordSearch(query, fixtureDocuments()));
       return;
     }
     setBusy(true);
     try {
+      if (vault.ask) {
+        const response = await vault.ask(selected.vault_id, query);
+        if (!inScope(selected.vault_id) || request !== askRequest.current) return;
+        setSourceAnswer(response); setVaultHits(null); setAnswer(null); return;
+      }
       const hits = await vault.list(selected.vault_id, query);
-      if (!alive.current) return;
+      if (!inScope(selected.vault_id) || request !== askRequest.current) return;
       setVaultHits(hits);
       setAnswer(null);
     } catch (askError) {
-      if (alive.current) setError(message(askError));
+      if (inScope(selected.vault_id) && request === askRequest.current) setError(message(askError));
     } finally {
-      if (alive.current) setBusy(false);
+      if (inScope(selected.vault_id)) setBusy(false);
     }
+  }
+
+  async function organizeMemory(memory: VaultMemory) {
+    if (!selected) return;
+    const scope = selected;
+    setBusy(true); setError("");
+    try {
+      const published = await processMeeting(vault, scope, memory, processingConsent, (state) => { if (inScope(scope.vault_id)) setProcessingState(state); });
+      if (!inScope(scope.vault_id) || !published) return;
+      setItems((rows) => rows.map((row) => row.id === published.id ? published : row));
+      if (evidenceRef.current === published.id) { setCorrection(published.note); setHistory(null); setProcessingConsent(false); }
+    } catch (processingError) {
+      if (inScope(scope.vault_id)) setError(message(processingError));
+    } finally { if (inScope(scope.vault_id)) setBusy(false); }
+  }
+
+  async function saveNote() {
+    if (!selected || !vault.captureNote) { setError("Choose a vault in the native Recall app before saving text."); return; }
+    if (!draft.trim()) { setError("Write a note before saving."); return; }
+    const scope = selected;
+    if (pending && pending.kind !== "text") { setError("Finish the pending photo import before saving another capture."); return; }
+    const intent = pending ?? { operationId: operationId(), note: draft, kind: "text" as const };
+    sessionStorage.setItem(captureKey(scope.vault_identity), JSON.stringify(intent));
+    setPending(intent); setBusy(true); setError("");
+    try {
+      const saved = await vault.captureNote(scope.vault_id, intent.operationId, intent.note);
+      if (!inScope(scope.vault_id)) return;
+      sessionStorage.removeItem(captureKey(scope.vault_identity)); setPending(null); setDraft("");
+      setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
+      setSection("evidence"); evidenceRef.current = saved.id; setEvidenceId(saved.id); setCorrection(saved.note);
+      setNotice("Saved locally with original text evidence.");
+      await loadSource(scope.vault_id, saved);
+      await organizeMemory(saved);
+    } catch (captureError) { if (inScope(scope.vault_id)) setError(message(captureError)); }
+    finally { if (inScope(scope.vault_id)) setBusy(false); }
   }
 
   async function importPhoto() {
@@ -286,7 +350,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setError("Choose a vault folder, or use the default vault, before importing a photo.");
       return;
     }
-    const intent = pending ?? { operationId: operationId(), note: draft };
+    if (pending?.kind === "text") { setError("Retry the pending text save before importing a photo."); return; }
+    const intent = pending ?? { operationId: operationId(), note: draft, kind: "photo" as const };
     sessionStorage.setItem(captureKey(selected.vault_identity), JSON.stringify(intent));
     setPending(intent);
     setBusy(true); setError("");
@@ -305,6 +370,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
       setNotice("Saved in your vault. The original photo and a Markdown note are on this device.");
       setSection("evidence");
+      evidenceRef.current = saved.id;
       setEvidenceId(saved.id);
       setCorrection(saved.note);
       await loadSource(selected.vault_id, saved);
@@ -316,14 +382,18 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   }
 
   async function loadSource(vaultId: string, memory: VaultMemory) {
+    const request = ++sourceRequest.current;
     const source = await vault.source(vaultId, memory.id);
-    if (!alive.current) return;
+    if (!inScope(vaultId) || request !== sourceRequest.current) return;
     const sha = source.sha256.toLowerCase();
-    const matches = sha === memory.source_sha256.toLowerCase() && /^[0-9a-f]{64}$/.test(sha);
+    const text = source.mime_type === "text/plain" ? new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(source.bytes)) : undefined;
+    const textDigest = text === undefined ? null : Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(source.bytes))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    if (!inScope(vaultId) || request !== sourceRequest.current) return;
+    const matches = sha === (textDigest ?? memory.source_sha256.toLowerCase()) && /^[0-9a-f]{64}$/.test(sha);
     const url = URL.createObjectURL(new Blob([Uint8Array.from(source.bytes)], { type: source.mime_type }));
     setPreview((current) => {
       if (current) URL.revokeObjectURL(current.url);
-      return { url, sha256: sha, matches, name: memory.source_name };
+      return { url, sha256: sha, matches, name: memory.source_name || "Original text capture", text, mime: source.mime_type };
     });
   }
 
@@ -331,11 +401,15 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     if (!selected || !openable(memory)) return;
     setBusy(true); setError("");
     setHistory(null);
+    setProcessingState(""); setProcessingConsent(false);
+    clearPreview();
     setReading(null);
     setConsent(false);
     setReadOp(null);
     setConfirmRemove(false);
     setCorrection(memory.note);
+    evidenceRef.current = memory.id;
+    askRequest.current += 1;
     setEvidenceId(memory.id);
     setSection("evidence");
     try { await loadSource(selected.vault_id, memory); }
@@ -344,6 +418,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   }
 
   function openDemoMemory(memory: FixtureMemory) {
+    evidenceRef.current = null; sourceRequest.current += 1; askRequest.current += 1;
     setEvidenceId(memory.id);
     setSection("evidence");
     setPreview(null);
@@ -358,10 +433,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       const saved = await vault.correct(selected.vault_id, memory.id, intent.expectedRevision, intent.operationId, intent.note);
       if (!alive.current) return;
       setItems((rows) => rows.map((row) => row.id === saved.id ? saved : row));
-      setEvidenceId(saved.id);
-      setCorrection(saved.note);
-      setHistory(null);
-      setReading(null);
+      if (evidenceRef.current === memory.id) { setEvidenceId(saved.id); setCorrection(saved.note); setHistory(null); setReading(null); }
       setNotice("Correction saved in the vault. The original photo is unchanged. This is your note, not a verified fact.");
     } catch (correctError) {
       if (alive.current) setError(`${message(correctError)} The draft is still here. Reload the note before saving again.`);
@@ -379,8 +451,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setItems(rows.filter(keptMemory));
       const latest = rows.find((row) => row.id === memory.id);
       if (!latest) throw new Error("That memory is no longer in the vault.");
-      setCorrection(latest.note);
-      setEvidenceId(latest.id);
+      if (evidenceRef.current === memory.id) { setCorrection(latest.note); setEvidenceId(latest.id); }
     } catch (reloadError) {
       if (alive.current) setError(message(reloadError));
     } finally {
@@ -429,7 +500,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setBusy(true); setError("");
     try {
       const rows = await vault.history(selected.vault_id, memory.id);
-      if (alive.current) setHistory(rows);
+      if (inScope(selected.vault_id) && evidenceRef.current === memory.id) setHistory(rows);
     } catch (historyError) {
       if (alive.current) setError(message(historyError));
     } finally {
@@ -451,7 +522,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
         vaultId: selected.vault_id,
         memoryId: memory.id,
       });
-      if (!alive.current) return;
+      if (!inScope(selected.vault_id) || evidenceRef.current !== memory.id) return;
       setReading(result);
       setCorrection(result.transcription);
       setConsent(false);
@@ -497,6 +568,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
           {demo && !checking && <p className="ms-banner" role="status">{FIXTURE_BANNER}{selected ? " This vault has no active memories yet." : ""}</p>}
           {error && <p className="ms-error" role="alert">{error}</p>}
           {notice && <p className="ms-notice" role="status">{notice}</p>}
+          {processingState && <p className="ms-notice" role="status">{processingState}</p>}
           <header className="ms-mast">
             {demo && <p className="ms-editorial">{brooks.editorial}</p>}
             <div className="ms-askrow">
@@ -533,16 +605,22 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               onRestore={() => evidenceMemory && void restoreMemory(evidenceMemory)}
               onConsent={(value) => { setConsent(value); if (!value) setReadOp(null); }}
               onRead={() => evidenceMemory && void readPhoto(evidenceMemory)}
+              processingConsent={processingConsent}
+              onProcessingConsent={setProcessingConsent}
+              onOrganize={() => evidenceMemory && void organizeMemory(evidenceMemory)}
+              canProcess={Boolean(vault.parse)}
             />
           ) : section === "capture" ? (
             <section className="glass ms-project" aria-label="Capture">
               <p className="ms-kicker">CAPTURE</p>
-              <h1>Import a photo</h1>
-              <p>Recall writes the original bytes into the vault, then a Markdown note with a link to that file. The note is your words. It is not a reading of the page.</p>
+              <h1>Capture a note or photo</h1>
+              <p>Save messy notes or import a photo. Originals stay in your vault. Organization runs after your consent.</p>
               <form className="ms-form" onSubmit={(event) => { event.preventDefault(); void importPhoto(); }}>
                 <label htmlFor="capture-note">Optional note</label>
                 <textarea id="capture-note" value={draft} onChange={(event) => setDraft(event.target.value)} />
-                <button className="ms-primary" type="submit" disabled={busy}>{pending ? "Retry the same import" : "Import photo"}</button>
+                <label className="ms-check"><input type="checkbox" checked={processingConsent} onChange={(event) => setProcessingConsent(event.target.checked)} /> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label>
+                <button className="ms-primary" type="button" disabled={busy || !vault.captureNote} onClick={() => void saveNote()}>{pending?.kind === "text" ? "Retry the same note" : "Save note"}</button>
+                <button className="ms-primary" type="submit" disabled={busy || pending?.kind === "text"}>{pending ? "Retry the same import" : "Import photo"}</button>
               </form>
             </section>
           ) : (
@@ -569,7 +647,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                   </div>
                 )}
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
-                  {section === "ask" ? <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
+                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{hit.note_basename}</h2><p className="ms-note">{hit.current_excerpt}</p><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
                     <>
                       <div className="ms-project-head">
                         <p className="ms-kicker"><ProjectMark />{demo ? brooks.kicker : "MEMORY"}</p>
@@ -623,8 +701,10 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
 }
 
 function titleOf(memory: VaultMemory): string {
+  const title = /^title: (".*")$/m.exec(memory.note)?.[1];
+  if (memory.note.startsWith("---\nrecall_id:") && title) { try { const parsed: unknown = JSON.parse(title); if (typeof parsed === "string") return parsed; } catch { /* User-owned YAML can differ from the generated subset. */ } }
   const name = memory.source_name.replace(/\.[a-z0-9]+$/i, "");
-  return name || "Untitled page";
+  return name || "Meeting capture";
 }
 function detailFrom(id: string): { title: string; text: string } | null {
   const docs = fixtureDocuments();
@@ -781,6 +861,10 @@ function Evidence(props: {
   onRestore: () => void;
   onConsent: (value: boolean) => void;
   onRead: () => void;
+  canProcess: boolean;
+  processingConsent: boolean;
+  onProcessingConsent: (value: boolean) => void;
+  onOrganize: () => void;
 }) {
   const { demo, demoMemory, memory, preview, librarian } = props;
   return (
@@ -797,7 +881,7 @@ function Evidence(props: {
         )}
         {memory && preview && (
           <>
-            <img src={preview.url} alt={`Original photo ${preview.name}`} />
+            {preview.text === undefined ? <img src={preview.url} alt={`Original photo ${preview.name}`} /> : <pre className="ms-paper-view">{preview.text}</pre>}
             <p className="ms-fine" data-testid="integrity">{preview.matches ? "Hash matches the vault record. Original bytes are unchanged." : "Hash does not match the vault record. Do not treat this image as the original."}</p>
             <p className="ms-fine">{preview.sha256}</p>
             {memory.note_path && <p className="ms-fine">Recall/Memories/{memory.note_path}</p>}
@@ -809,7 +893,7 @@ function Evidence(props: {
         {demo && <p>Choose a vault to save a correction. This demo is not written to disk.</p>}
         {memory && (
           <>
-            <p className="ms-fine">{memory.state === "missing" ? "Markdown note missing. The original is still in the vault." : "Saved in your vault. The note below is human text, not a verified reading."}</p>
+            <p className="ms-fine">{memory.state === "missing" ? "Markdown note missing. The original is still in the vault." : memory.note.startsWith("---\nrecall_id:") ? "Organized from source statements. Uncertain items require review; edits remain yours." : "Saved in your vault. The note below is human text, not a verified reading."}</p>
             {memory.conflict && <p role="alert">{memory.conflict}</p>}
             <p className="ms-note">{memory.note || "No note added."}</p>
             <form className="ms-form" onSubmit={(event) => { event.preventDefault(); props.onSave(); }}>
@@ -829,7 +913,8 @@ function Evidence(props: {
             )}
             <label className="ms-check"><input type="checkbox" checked={props.confirmRemove} onChange={(event) => props.onConfirmRemove(event.target.checked)} /> Remove from Recall. The photo and history stay in the vault.</label>
             <button type="button" disabled={props.busy || !props.confirmRemove} onClick={props.onRemove}>Remove from Recall</button>
-            <ReadingBlock librarian={librarian} busy={props.busy} consent={props.consent} reading={props.reading} onConsent={props.onConsent} onRead={props.onRead} />
+            {props.canProcess && <section aria-label="Meeting processing"><h2>Organize in Obsidian</h2><label className="ms-check"><input type="checkbox" checked={props.processingConsent} onChange={(event) => props.onProcessingConsent(event.target.checked)} /> Send this source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type="button" disabled={props.busy || !props.processingConsent || memory.state !== "active" || Boolean(memory.conflict)} onClick={props.onOrganize}>Organize this memory</button></section>}
+            {memory.source_name && <ReadingBlock librarian={librarian} busy={props.busy} consent={props.consent} reading={props.reading} onConsent={props.onConsent} onRead={props.onRead} />}
           </>
         )}
       </div>

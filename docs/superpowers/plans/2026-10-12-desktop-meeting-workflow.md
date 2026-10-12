@@ -1,0 +1,5 @@
+# Desktop meeting workflow binding
+
+Preserve the existing warm-glass surface and hierarchy; missing canonical PNG remains an explicit design gate. Connect real typed capture, parser/librarian/publication states, original text evidence and native source-backed Ask. No synthetic data may appear as actual vault memories. Explicit consent authorizes only saved source plus bounded relevant vault context. Native credentials remain outside the webview. Persist native operation IDs by stable vault/memory identity across restart; retries use the same stage IDs. Async results must not cross vault scope. Keep corrections/review and photo import working. Photo pipeline requires the narrow existing Claude transcription adapter and stays explicit until connected.
+
+Verify typed capture/retry, no-consent/no-config, interrupted/replayed operation, processing state order, vague Ask source inspection, scope switching and native IPC authority. Run desktop typecheck/tests/build and full native tests/CI. No installed Windows or live provider proof without the required runtime/configuration.

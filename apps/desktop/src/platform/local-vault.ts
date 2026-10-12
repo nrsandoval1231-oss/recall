@@ -3,9 +3,16 @@ export interface VaultStatus { root: string | null; vault_id: string | null; vau
 export type VaultMemoryState = "active" | "missing" | "deleted" | "conflict";
 export interface VaultMemory { state: VaultMemoryState; note_path: string | null; id: string; revision: number; note: string; source_name: string; source_sha256: string; captured_at: string; updated_at: string; conflict: string | null }
 export interface VaultSource { bytes: number[]; mime_type: string; sha256: string }
-export interface VaultRevision { revision: number; note: string; recorded_at: string; origin: "human:recall" | "human:obsidian"; kind: "capture" | "correct" | "external" | "restore" | "remove" }
+export interface VaultRevision { revision: number; note: string; recorded_at: string; origin: "human:recall" | "human:obsidian" | "model:claude"; kind: "capture" | "correct" | "external" | "restore" | "remove" | "organize" }
+export interface ParserJob { operation_id: string; memory_id: string; expected_revision: number; source_sha256: string; state: string; message: string }
+export interface SourceAnswer { question: string; message: string; hits: { memory_id: string; revision: number; note_basename: string; current_excerpt: string; original_excerpt: string; source_sha256: string; mime_type: string }[] }
 export interface LocalVault {
   readonly available: boolean;
+  captureNote?(expectedVaultId: string, operationId: string, note: string): Promise<VaultMemory>;
+  parse?(expectedVaultId: string, memoryId: string, expectedRevision: number, operationId: string, consent: boolean): Promise<ParserJob>;
+  organize?(expectedVaultId: string, parserOperationId: string, operationId: string, consent: boolean): Promise<unknown>;
+  publish?(expectedVaultId: string, parserOperationId: string, organizationOperationId: string, operationId: string): Promise<VaultMemory>;
+  ask?(expectedVaultId: string, question: string): Promise<SourceAnswer>;
   status(): Promise<VaultStatus>;
   select(): Promise<VaultStatus | null>;
   openDefault(): Promise<VaultStatus>;
@@ -28,6 +35,11 @@ export class NativeLocalVault implements LocalVault {
   select() { return this.call<VaultStatus | null>("vault_select"); }
   openDefault() { return this.call<VaultStatus>("vault_open_default"); }
   capture(expectedVaultId: string, operationId: string, note: string) { return this.call<VaultMemory | null>("vault_capture", { expectedVaultId, operationId, note }); }
+  captureNote(expectedVaultId: string, operationId: string, note: string) { return this.call<VaultMemory>("vault_capture_note", { expectedVaultId, operationId, note }); }
+  parse(expectedVaultId: string, memoryId: string, expectedRevision: number, operationId: string, consent: boolean) { return this.call<ParserJob>("processing_parse", { expectedVaultId, memoryId, expectedRevision, operationId, consent }); }
+  organize(expectedVaultId: string, parserOperationId: string, operationId: string, consent: boolean) { return this.call<unknown>("meeting_organize", { expectedVaultId, parserOperationId, operationId, consent }); }
+  publish(expectedVaultId: string, parserOperationId: string, organizationOperationId: string, operationId: string) { return this.call<VaultMemory>("meeting_publish", { expectedVaultId, parserOperationId, organizationOperationId, operationId }); }
+  ask(expectedVaultId: string, question: string) { return this.call<SourceAnswer>("memory_ask", { expectedVaultId, question }); }
   list(expectedVaultId: string, query: string, includeDeleted?: boolean) { return this.call<VaultMemory[]>("vault_list", { expectedVaultId, query, ...(includeDeleted === undefined ? {} : { includeDeleted }) }); }
   rebuild(expectedVaultId: string, includeDeleted = false) { return this.call<VaultMemory[]>("vault_rebuild", { expectedVaultId, includeDeleted }); }
   restoreNote(expectedVaultId: string, memoryId: string, expectedRevision: number, operationId: string) { return this.call<VaultMemory>("vault_restore_note", { expectedVaultId, memoryId, expectedRevision, operationId }); }
