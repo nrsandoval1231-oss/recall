@@ -430,6 +430,37 @@ async fn meeting_organize(
 }
 
 #[tauri::command]
+async fn meeting_review_status(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    prior_operation_id: String,
+    reviewed_from: Option<String>,
+) -> Result<librarian::OrganizationReviewStatus, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        librarian::organization_review_status(&vault, &librarian::config_from_env(), &parser_operation_id, &prior_operation_id, reviewed_from.as_deref())
+    }).await.map_err(|_| "Organization review check stopped; no new request authorized".to_string())?
+}
+
+#[tauri::command]
+async fn meeting_organize_reviewed(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    prior_operation_id: String,
+    operation_id: String,
+    consent: bool,
+    acknowledge_uncertainty: bool,
+) -> Result<librarian::StoredOrganization, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        librarian::organize_selected_reviewed(&vault, &librarian::config_from_env(), &parser_operation_id,
+            &prior_operation_id, &operation_id, consent, acknowledge_uncertainty, &librarian::ClaudeTransport)
+    }).await.map_err(|_| "Claude worker stopped; reviewed attempt retained and resend blocked".to_string())?
+}
+
+#[tauri::command]
 fn meeting_publish(
     state: tauri::State<'_, local_vault::LocalVaultState>,
     expected_vault_id: String,
@@ -488,6 +519,8 @@ pub fn run() {
             processing_parse,
             processing_status,
             meeting_organize,
+            meeting_organize_reviewed,
+            meeting_review_status,
             meeting_publish,
             memory_ask,
             secrets::secret_get,

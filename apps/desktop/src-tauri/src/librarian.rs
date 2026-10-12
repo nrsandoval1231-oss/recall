@@ -168,7 +168,7 @@ struct Ledger {
     entries: Vec<LedgerEntry>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct LedgerEntry {
     operation_id: String,
@@ -775,7 +775,72 @@ pub struct StoredOrganization {
     pub payload_sha256:String,pub model:String,pub recorded_at:String,
     pub context:Vec<crate::meeting::Context>,pub layout:crate::meeting::Layout,
 }
+#[derive(Clone,PartialEq,Eq,Serialize,Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OrganizationRetryReview {
+    format:String,operation_id:String,parser_operation_id:String,prior_operation_id:String,
+    memory_id:String,expected_revision:u64,source_sha256:String,payload_sha256:String,
+    model:String,acknowledged_uncertainty:bool,prior_operations:Vec<LedgerEntry>,recorded_at:String,
+}
+fn organization_payload(operation:&str,parser_operation:&str,revision:u64,evidence:&serde_json::Value)->Result<String>{
+    Ok(hex::encode(Sha256::digest(serde_json::to_vec(&("recall-organization-input-v1",operation,parser_operation,revision,evidence)).map_err(|_|"Invalid organization identity")?)))
+}
 pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfig,parser_operation:&str,operation:&str,consent:bool,transport:&impl OrganizationTransport)->Result<StoredOrganization> {
+    organize_with_review(vault,config,parser_operation,operation,consent,None,transport)
+}
+pub fn organize_selected_reviewed(vault:&crate::local_vault::Vault,config:&LibrarianConfig,parser_operation:&str,prior_operation:&str,operation:&str,consent:bool,acknowledge_uncertainty:bool,transport:&impl OrganizationTransport)->Result<StoredOrganization>{
+    uuid(prior_operation)?;
+    if prior_operation==operation {return Err("Reviewed retry requires a separate operation identity".into());}
+    organize_with_review(vault,config,parser_operation,operation,consent,Some((prior_operation,acknowledge_uncertainty)),transport)
+}
+fn reviewed_prior_entries(ledger:&Ledger,prior:&str,parser:&str,memory:&str,revision:u64,sha:&str,evidence:&serde_json::Value)->Result<Vec<LedgerEntry>> {
+    let blocked:Vec<_>=ledger.entries.iter().filter(|e|e.source_sha256==sha && matches!(e.state.as_str(),"reserved"|"uncertain")).cloned().collect();
+    if blocked.is_empty() || blocked.len()>16 || !blocked.iter().any(|e|e.operation_id==prior) {return Err("No matching bounded uncertain organization attempts to review; no source was sent".into());}
+    for entry in &blocked {
+        if entry.memory_id!=memory || entry.payload_sha256!=organization_payload(&entry.operation_id,parser,revision,evidence)? {return Err("Prior organization source, parser, revision or context changed; review stopped".into());}
+    }
+    Ok(blocked)
+}
+/// Read-only preflight. It cannot grant consent, create an audit or reserve/send.
+#[derive(Debug,Serialize)]
+pub struct OrganizationReviewStatus {pub prior_operation_id:String,pub reuse_operation:bool}
+pub fn organization_review_status(vault:&crate::local_vault::Vault,config:&LibrarianConfig,parser_operation:&str,prior_operation:&str,reviewed_from:Option<&str>)->Result<OrganizationReviewStatus> {
+    uuid(parser_operation)?;uuid(prior_operation)?;
+    if let Some(previous)=reviewed_from {uuid(previous)?;if previous==prior_operation{return Err("Invalid pending review identity".into());}}
+    let job=crate::processing::status(vault,parser_operation)?;
+    let parsed=job.parsed.as_ref().ok_or("Validated Jev parsing is required before review")?;
+    let _lock=vault.lock()?;
+    let snapshot=vault.processing_snapshot_while_locked(&parsed.source_id,job.expected_revision)?;
+    if snapshot.human_corrected || snapshot.source.sha256!=job.source_sha256 {return Err("Organization source changed; review stopped".into());}
+    let prior_path=vault.root().join(format!("Recall/_meta/organizations/{prior_operation}.json"));crate::local_vault::safe(&prior_path)?;
+    match fs::symlink_metadata(&prior_path) {
+        Ok(_)=>return Err("A saved organization already exists. Resume its original operation instead of creating a new request".into()),
+        Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{},
+        Err(_)=>return Err("Prior organization inspection failed".into()),
+    }
+    let context=crate::meeting::context(&vault.list_while_locked("",false)?.into_iter().filter(|m|m.id!=parsed.source_id).collect::<Vec<_>>(),&parsed.transcription);
+    let evidence=crate::meeting::evidence_for_source(parsed,&context,&job.source_sha256,job.visual.as_ref());
+    if serde_json::to_vec(&evidence).map_err(|_|"Invalid review evidence")?.len()>50_000 {return Err("Review context exceeds bounded input".into());}
+    let ledger=load_ledger(vault.root())?;
+    let attempted=ledger.entries.iter().any(|e|e.operation_id==prior_operation);
+    let prior=if attempted{prior_operation}else{reviewed_from.ok_or("No matching uncertain organization operation to review")?};
+    reviewed_prior_entries(&ledger,prior,parser_operation,&parsed.source_id,job.expected_revision,&job.source_sha256,&evidence)?;
+    let mut reuse_operation=!attempted;
+    if reuse_operation {
+        let audit=vault.root().join(format!("Recall/_meta/organization-reviews/{prior_operation}.json"));crate::local_vault::safe(&audit)?;
+        match fs::symlink_metadata(&audit) {
+            Ok(_)=>{let review:OrganizationRetryReview=serde_json::from_slice(&crate::local_vault::read(&audit,16*1024)?).map_err(|_|"Invalid pending organization review")?;
+                // A model change requires a fresh explicitly acknowledged audit,
+                // while the unused older authorization remains preserved.
+                if config.model.as_deref()!=Some(review.model.as_str()){reuse_operation=false;}
+            },
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{},
+            Err(_)=>return Err("Pending review inspection failed".into()),
+        }
+    }
+    Ok(OrganizationReviewStatus{prior_operation_id:prior.into(),reuse_operation})
+}
+fn organize_with_review(vault:&crate::local_vault::Vault,config:&LibrarianConfig,parser_operation:&str,operation:&str,consent:bool,reviewed_prior:Option<(&str,bool)>,transport:&impl OrganizationTransport)->Result<StoredOrganization> {
     if !consent {return Err("Consent required for Claude organization; no source was sent".into());}
     uuid(operation)?;uuid(parser_operation)?;
     let parsed_job=crate::processing::status(vault,parser_operation)?;
@@ -788,7 +853,7 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
     let evidence=crate::meeting::evidence_for_source(&parsed,&context,&parsed_job.source_sha256,parsed_job.visual.as_ref());
     let bytes=serde_json::to_vec(&evidence).map_err(|_|"Invalid organization evidence")?;
     if bytes.len()>50_000 {return Err("Organization context exceeds bounded input".into());}
-    let payload=hex::encode(Sha256::digest(serde_json::to_vec(&("recall-organization-input-v1",operation,parser_operation,revision,&evidence)).map_err(|_|"Invalid organization identity")?));
+    let payload=organization_payload(operation,parser_operation,revision,&evidence)?;
     let dir=vault.root().join("Recall/_meta/organizations");crate::local_vault::safe(&dir)?;
     let _lock=vault.lock()?;
     let recheck = || -> Result<()> {
@@ -816,8 +881,14 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
     }
     if !config.ready {return Err(config.reason.clone());}
     let mut ledger=load_ledger(vault.root())?;
-    if ledger.entries.iter().any(|e|e.operation_id==operation || (e.source_sha256==parsed_job.source_sha256 && matches!(e.state.as_str(),"reserved"|"uncertain"))){
+    if ledger.entries.iter().any(|e|e.operation_id==operation){
         return Err("Previous Claude operation may have been delivered; automatic resend blocked".into());
+    }
+    let blocked:Vec<_>=ledger.entries.iter().filter(|e|e.source_sha256==parsed_job.source_sha256 && matches!(e.state.as_str(),"reserved"|"uncertain")).cloned().collect();
+    match reviewed_prior {
+        None if !blocked.is_empty()=>return Err("Previous Claude operation may have been delivered; automatic resend blocked".into()),
+        Some((prior,_))=>{reviewed_prior_entries(&ledger,prior,parser_operation,&parsed.source_id,revision,&parsed_job.source_sha256,&evidence)?;},
+        _=>{},
     }
     if ledger.entries.len()>=10_000 {return Err("Claude budget retention limit reached".into());}
     // Full reservation is retained: bounded 50KB evidence plus tool/system overhead.
@@ -826,6 +897,27 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
     let (day,month)=utc_day_month();
     if spent(&ledger,&day,true).checked_add(reserved).is_none_or(|n|n>config.daily_micros.unwrap_or(0))
         || spent(&ledger,&month,false).checked_add(reserved).is_none_or(|n|n>config.monthly_micros.unwrap_or(0)) {return Err("Claude organization budget exhausted".into());}
+    if let Some((prior,acknowledge_uncertainty))=reviewed_prior {
+        let review_dir=vault.root().join("Recall/_meta/organization-reviews");crate::local_vault::safe(&review_dir)?;
+        let review_path=review_dir.join(format!("{operation}.json"));
+        let mut review=OrganizationRetryReview{format:"recall-organization-review-v1".into(),operation_id:operation.into(),parser_operation_id:parser_operation.into(),prior_operation_id:prior.into(),memory_id:parsed.source_id.clone(),expected_revision:revision,source_sha256:parsed_job.source_sha256.clone(),payload_sha256:payload.clone(),model:config.model.clone().ok_or("Claude model missing")?,acknowledged_uncertainty:true,prior_operations:blocked,recorded_at:utc_timestamp()};
+        match fs::symlink_metadata(&review_path) {
+            Ok(_)=>{
+                let stored:OrganizationRetryReview=serde_json::from_slice(&crate::local_vault::read(&review_path,16*1024)?).map_err(|_|"Invalid organization retry review")?;
+                if stored.recorded_at.len()!=20 || stored.recorded_at.chars().any(char::is_control){return Err("Invalid organization review time".into());}
+                review.recorded_at=stored.recorded_at.clone();
+                if stored!=review {return Err("Organization retry review identity changed; no source was sent".into());}
+            },
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{
+                if !acknowledge_uncertainty {return Err("Explicit review acknowledgement required; no source was sent".into());}
+                if !review_dir.exists(){fs::create_dir(&review_dir).map_err(|_|"Organization review directory unavailable")?;}
+                let bytes=serde_json::to_vec(&review).map_err(|_|"Invalid organization review")?;
+                if bytes.len()>16*1024 {return Err("Organization review exceeds bounded audit record".into());}
+                crate::local_vault::create(&review_path,&bytes)?;
+            },
+            Err(_)=>return Err("Organization review inspection failed".into()),
+        }
+    }
     ledger.entries.push(LedgerEntry{operation_id:operation.into(),payload_sha256:payload.clone(),source_sha256:parsed_job.source_sha256.clone(),memory_id:parsed.source_id.clone(),day,month,reserved_micros:reserved,charged_micros:0,state:"reserved".into()});
     store_ledger(vault.root(),&ledger)?;
     let model=config.model.as_deref().ok_or("Claude model missing")?;
@@ -1272,5 +1364,113 @@ pub(crate) mod organization_tests {
         assert!(organize_selected(&reopened,&config(),&parser,&op,true,&provider).unwrap_err().contains("resend"));
         assert!(organize_selected(&reopened,&config(),&parser,&Uuid::new_v4().to_string(),true,&provider).unwrap_err().contains("resend"));
         assert_eq!(provider.calls.load(Ordering::SeqCst),1);
+    }
+    #[test] fn explicit_review_authorizes_one_new_operation_without_altering_prior_attempt(){
+        let (t,v,parser,_)=setup();let prior=Uuid::new_v4().to_string();
+        let failed=Claude{calls:AtomicUsize::new(0),invalid:false,fail:true};
+        assert!(organize_selected(&v,&config(),&parser,&prior,true,&failed).is_err());
+        let original=serde_json::to_value(load_ledger(v.root()).unwrap().entries[0].clone()).unwrap();
+        let next=Uuid::new_v4().to_string();let provider=claude();
+        assert!(organize_selected_reviewed(&v,&config(),&parser,&prior,&next,true,false,&provider).is_err());
+        assert!(organize_selected_reviewed(&v,&config(),&parser,&prior,&next,false,true,&provider).is_err());
+        assert_eq!(provider.calls.load(Ordering::SeqCst),0);
+        let stored=organize_selected_reviewed(&v,&config(),&parser,&prior,&next,true,true,&provider).unwrap();
+        let ledger=load_ledger(v.root()).unwrap();assert_eq!(ledger.entries.len(),2);
+        assert_eq!(serde_json::to_value(&ledger.entries[0]).unwrap(),original);
+        let audit:serde_json::Value=serde_json::from_slice(&fs::read(t.0.join(format!("Recall/_meta/organization-reviews/{next}.json"))).unwrap()).unwrap();
+        assert_eq!(audit["prior_operations"][0],original);
+        assert_eq!(audit["operation_id"],next);assert_eq!(audit["source_sha256"],stored.source_sha256);
+        let reopened=Vault::open(&t.0).unwrap();
+        let replay=organize_selected(&reopened,&config_from_pairs::<0>([]),&parser,&next,true,&provider).unwrap();
+        assert_eq!(replay.payload_sha256,stored.payload_sha256);assert_eq!(provider.calls.load(Ordering::SeqCst),1);
+        assert!(organize_selected(&reopened,&config(),&parser,&Uuid::new_v4().to_string(),true,&provider).is_err());
+    }
+    fn pending_review_case()->(Temp,Vault,String,String,String){
+        let (t,v,parser,memory)=setup();let prior=Uuid::new_v4().to_string();
+        assert!(organize_selected(&v,&config(),&parser,&prior,true,&Claude{calls:AtomicUsize::new(0),invalid:false,fail:true}).is_err());
+        (t,v,parser,memory,prior)
+    }
+    #[test] fn browser_identity_hint_cannot_create_native_review_or_reservation_without_acknowledgement(){
+        let (_t,v,parser,_,prior)=pending_review_case();let next=Uuid::new_v4().to_string();let provider=claude();
+        let before=fs::read(ledger_path(v.root()).unwrap()).unwrap();
+        organization_review_status(&v,&config(),&parser,&prior,None).unwrap();
+        assert!(organize_selected_reviewed(&v,&config(),&parser,&prior,&next,true,false,&provider).unwrap_err().contains("acknowledgement"));
+        assert_eq!(provider.calls.load(Ordering::SeqCst),0);assert_eq!(fs::read(ledger_path(v.root()).unwrap()).unwrap(),before);
+        assert!(!v.root().join(format!("Recall/_meta/organization-reviews/{next}.json")).exists());
+    }
+    #[test] fn read_only_review_refuses_saved_organization_without_new_reservation(){
+        let (_t,v,parser,_)=setup();let prior=Uuid::new_v4().to_string();let provider=claude();
+        organize_selected(&v,&config(),&parser,&prior,true,&provider).unwrap();
+        let before=fs::read(ledger_path(v.root()).unwrap()).unwrap();
+        assert!(organization_review_status(&v,&config(),&parser,&prior,None).unwrap_err().contains("saved organization"));
+        assert_eq!(fs::read(ledger_path(v.root()).unwrap()).unwrap(),before);assert_eq!(provider.calls.load(Ordering::SeqCst),1);
+    }
+    #[test] fn unattempted_review_reuses_pending_identity_after_configuration_or_budget_repair(){
+        for missing in ["config","budget"] {
+            let (_t,v,parser,_,prior)=pending_review_case();let next=Uuid::new_v4().to_string();let provider=claude();
+            let original=serde_json::to_value(load_ledger(v.root()).unwrap().entries[0].clone()).unwrap();
+            let mut denied=if missing=="config"{config_from_pairs::<0>([])}else{config()};
+            if missing=="budget" {denied.daily_micros=Some(load_ledger(v.root()).unwrap().entries[0].reserved_micros);}
+            assert!(organize_selected_reviewed(&v,&denied,&parser,&prior,&next,true,true,&provider).is_err());assert_eq!(provider.calls.load(Ordering::SeqCst),0);
+            let status=organization_review_status(&v,&config(),&parser,&next,Some(&prior)).unwrap();
+            assert!(status.reuse_operation);assert_eq!(status.prior_operation_id,prior);
+            organize_selected_reviewed(&v,&config(),&parser,&prior,&next,true,true,&provider).unwrap();
+            assert_eq!(provider.calls.load(Ordering::SeqCst),1);let ledger=load_ledger(v.root()).unwrap();assert_eq!(ledger.entries.len(),2);
+            assert_eq!(serde_json::to_value(&ledger.entries[0]).unwrap(),original);
+        }
+    }
+    #[test] fn review_rejects_wrong_same_or_nonorganization_prior_and_retains_full_budget(){
+        for case in ["wrong","same","reader","budget"] {
+            let (_t,v,parser,memory,prior)=pending_review_case();let provider=claude();let mut cfg=config();
+            let mut ledger=load_ledger(v.root()).unwrap();
+            if case=="reader" {ledger.entries[0].payload_sha256=payload_sha(&prior,&memory,1,&ledger.entries[0].source_sha256);store_ledger(v.root(),&ledger).unwrap();}
+            if case=="budget" {cfg.daily_micros=Some(ledger.entries[0].reserved_micros);}
+            let before=serde_json::to_vec(&load_ledger(v.root()).unwrap()).unwrap();
+            let previous=if case=="wrong"{Uuid::new_v4().to_string()}else{prior.clone()};
+            let next=if case=="same"{prior}else{Uuid::new_v4().to_string()};
+            assert!(organize_selected_reviewed(&v,&cfg,&parser,&previous,&next,true,true,&provider).is_err(),"{case}");
+            assert_eq!(provider.calls.load(Ordering::SeqCst),0);
+            assert_eq!(serde_json::to_vec(&load_ledger(v.root()).unwrap()).unwrap(),before);
+        }
+    }
+    #[test] fn review_refuses_changed_context_parser_memory_and_human_correction(){
+        for case in ["context","parser","memory","correction"] {
+            let (_t,v,mut parser,memory,prior)=pending_review_case();let provider=claude();
+            match case {
+                "context"=>{v.capture_note(&Uuid::new_v4().to_string(),"Utility late at another site.").unwrap();},
+                "parser"|"memory"=>{
+                    let id=if case=="memory"{v.capture_note(&Uuid::new_v4().to_string(),&meeting::tests::source().transcription).unwrap().id}else{memory.clone()};
+                    parser=Uuid::new_v4().to_string();processing::parse_note(&v,&processing::Config::synthetic_test_config(),&parser,&id,1,true,&Parser).unwrap();
+                },
+                "correction"=>{v.correct(&memory,1,&Uuid::new_v4().to_string(),"Human correction: utility on time.").unwrap();},
+                _=>unreachable!(),
+            }
+            assert!(organize_selected_reviewed(&v,&config(),&parser,&prior,&Uuid::new_v4().to_string(),true,true,&provider).is_err(),"{case}");
+            assert_eq!(provider.calls.load(Ordering::SeqCst),0);
+        }
+    }
+    #[test] fn reviewed_transport_interruption_keeps_both_attempts_and_blocks_resume_after_restart(){
+        struct Interrupt;
+        impl OrganizationTransport for Interrupt{
+            fn organize(&self,_:&str,_:&str,_:&serde_json::Value)->std::result::Result<meeting::Layout,CallError>{panic!("SYNTHETIC interruption after durable reservation");}
+        }
+        let (t,v,parser,_,prior)=pending_review_case();let next=Uuid::new_v4().to_string();
+        let before=serde_json::to_value(load_ledger(v.root()).unwrap().entries[0].clone()).unwrap();
+        let interrupted=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||organize_selected_reviewed(&v,&config(),&parser,&prior,&next,true,true,&Interrupt)));
+        assert!(interrupted.is_err());let reopened=Vault::open(&t.0).unwrap();let provider=claude();
+        let ledger=load_ledger(reopened.root()).unwrap();assert_eq!(ledger.entries.len(),2);assert_eq!(ledger.entries[1].state,"reserved");
+        assert_eq!(serde_json::to_value(&ledger.entries[0]).unwrap(),before);
+        assert!(organize_selected_reviewed(&reopened,&config(),&parser,&prior,&next,true,true,&provider).is_err());
+        assert!(organize_selected(&reopened,&config(),&parser,&Uuid::new_v4().to_string(),true,&provider).is_err());
+        assert_eq!(provider.calls.load(Ordering::SeqCst),0);
+    }
+    #[test] fn repeated_explicit_failed_reviews_preserve_all_costs_and_bound_review_history(){
+        let (_t,v,parser,_,mut prior)=pending_review_case();let provider=Claude{calls:AtomicUsize::new(0),invalid:false,fail:true};
+        let original=serde_json::to_value(load_ledger(v.root()).unwrap().entries[0].clone()).unwrap();
+        for _ in 0..16 {let next=Uuid::new_v4().to_string();assert!(organize_selected_reviewed(&v,&config(),&parser,&prior,&next,true,true,&provider).unwrap_err().contains("uncertain"));prior=next;}
+        let ledger=load_ledger(v.root()).unwrap();assert_eq!(ledger.entries.len(),17);assert_eq!(serde_json::to_value(&ledger.entries[0]).unwrap(),original);
+        assert!(ledger.entries.iter().all(|e|e.state=="uncertain" && e.charged_micros==e.reserved_micros));
+        assert!(organize_selected_reviewed(&v,&config(),&parser,&prior,&Uuid::new_v4().to_string(),true,true,&provider).unwrap_err().contains("bounded"));
+        assert_eq!(provider.calls.load(Ordering::SeqCst),16);
     }
 }

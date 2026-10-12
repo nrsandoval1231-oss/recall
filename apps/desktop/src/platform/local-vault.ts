@@ -5,12 +5,15 @@ export interface VaultMemory { state: VaultMemoryState; note_path: string | null
 export interface VaultSource { bytes: number[]; mime_type: string; sha256: string }
 export interface VaultRevision { revision: number; note: string; recorded_at: string; origin: "human:recall" | "human:obsidian" | "model:claude"; kind: "capture" | "correct" | "external" | "restore" | "remove" | "organize" }
 export interface ParserJob { operation_id: string; memory_id: string; expected_revision: number; source_sha256: string; state: string; message: string }
+export interface OrganizationReviewStatus { prior_operation_id: string; reuse_operation: boolean }
 export interface SourceAnswer { question: string; message: string; hits: { memory_id: string; revision: number; note_basename: string; current_excerpt: string; original_excerpt: string; source_sha256: string; mime_type: string }[] }
 export interface LocalVault {
   readonly available: boolean;
   captureNote?(expectedVaultId: string, operationId: string, note: string): Promise<VaultMemory>;
   parse?(expectedVaultId: string, memoryId: string, expectedRevision: number, operationId: string, consent: boolean): Promise<ParserJob>;
   organize?(expectedVaultId: string, parserOperationId: string, operationId: string, consent: boolean): Promise<unknown>;
+  reviewedOrganize?(expectedVaultId: string, parserOperationId: string, priorOperationId: string, operationId: string, consent: boolean, acknowledgeUncertainty: boolean): Promise<unknown>;
+  reviewOrganization?(expectedVaultId: string, parserOperationId: string, priorOperationId: string, reviewedFrom?: string): Promise<OrganizationReviewStatus>;
   publish?(expectedVaultId: string, parserOperationId: string, organizationOperationId: string, operationId: string): Promise<VaultMemory>;
   ask?(expectedVaultId: string, question: string): Promise<SourceAnswer>;
   status(): Promise<VaultStatus>;
@@ -38,6 +41,8 @@ export class NativeLocalVault implements LocalVault {
   captureNote(expectedVaultId: string, operationId: string, note: string) { return this.call<VaultMemory>("vault_capture_note", { expectedVaultId, operationId, note }); }
   parse(expectedVaultId: string, memoryId: string, expectedRevision: number, operationId: string, consent: boolean) { return this.call<ParserJob>("processing_parse", { expectedVaultId, memoryId, expectedRevision, operationId, consent }); }
   organize(expectedVaultId: string, parserOperationId: string, operationId: string, consent: boolean) { return this.call<unknown>("meeting_organize", { expectedVaultId, parserOperationId, operationId, consent }); }
+  reviewedOrganize(expectedVaultId: string, parserOperationId: string, priorOperationId: string, operationId: string, consent: boolean, acknowledgeUncertainty: boolean) { return this.call<unknown>("meeting_organize_reviewed", { expectedVaultId, parserOperationId, priorOperationId, operationId, consent, acknowledgeUncertainty }); }
+  reviewOrganization(expectedVaultId: string, parserOperationId: string, priorOperationId: string, reviewedFrom?: string) { return this.call<OrganizationReviewStatus>("meeting_review_status", { expectedVaultId, parserOperationId, priorOperationId, ...(reviewedFrom ? { reviewedFrom } : {}) }); }
   publish(expectedVaultId: string, parserOperationId: string, organizationOperationId: string, operationId: string) { return this.call<VaultMemory>("meeting_publish", { expectedVaultId, parserOperationId, organizationOperationId, operationId }); }
   ask(expectedVaultId: string, question: string) { return this.call<SourceAnswer>("memory_ask", { expectedVaultId, question }); }
   list(expectedVaultId: string, query: string, includeDeleted?: boolean) { return this.call<VaultMemory[]>("vault_list", { expectedVaultId, query, ...(includeDeleted === undefined ? {} : { includeDeleted }) }); }
