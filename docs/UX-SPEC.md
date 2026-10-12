@@ -13,7 +13,17 @@ This document defines the target Recall experience. It supersedes conventional d
 
 The desktop composition target is the owner-supplied reference below. Prose in this file remains authority for materials, trust, capture, and interaction grammar. Where the 2026-10-07 prose and the reference differ on desktop layout, the reference wins. Those differences are called out in the reference section.
 
-## Owner visual reference (2026-10-10)
+## Canonical desktop UI — latest owner selection (2026-10-11)
+
+**Single active visual direction:** the latest warm cinematic Recall Memory Surface mockup, with business-focused Permian Power Expansion content and the recent three-column board layout. This supersedes all earlier dark Forge/Aura palette experiments and alternative layouts. Older reference images and prose below are historical design context, not competing authorities.
+
+The selected composition uses a narrow dark navigation rail; broad top Ask field with voice control and contextual prompt chips; floating Key People and Key Locations panels to the left of a dominant central project board; a recent-notes list beneath it; a right-side monthly calendar and today's agenda; and a bottom row of compact Active Projects, This Week, Open Items and Capture actions. The UI uses warm ivory and charcoal, softly sunlit environmental depth, translucent smoked glass, restrained gold/taupe accents, thin borders, elegant serif display headings and clean readable body type. The backdrop is atmospheric and subordinate to content; never hardcode fictional photos or people as real vault evidence.
+
+**Asset handoff:** the latest generated mockup must be checked into `docs/assets/recall-desktop-canonical-2026-10-11.png` before visual implementation. The older `memory-surface-reference-2026-10-10.jpg` is historical once the new asset is committed. Do not claim the new PNG is present until verified. Use only one canonical desktop reference after the asset is installed; no parallel competing UI specifications.
+
+**Interaction:** Capture raw messy notes without filing or cleanup; show original saved → Jev parsing → Claude organizing → validated Obsidian write, with honest pending/error/uncertain states. Open the final Markdown/YAML note and preserved original in Obsidian. This is a target scenario, not yet a live-validated product capability.
+
+## Historical owner visual reference (2026-10-10)
 
 ![Owner-supplied Memory Surface reference, 2026-10-10](assets/memory-surface-reference-2026-10-10.jpg)
 
