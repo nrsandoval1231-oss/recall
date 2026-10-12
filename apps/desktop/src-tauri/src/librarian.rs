@@ -5,8 +5,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, OpenOptions},
-    io::Write,
+    fs,
+    io::Read,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 const FORMAT: &str = "recall-local-reading-v1";
 const LEDGER_FORMAT: &str = "recall-librarian-budget-v1";
+const MAX_RESPONSE: u64 = 128 * 1024;
 const MAX_PHOTO: usize = 25 * 1024 * 1024;
 const MAX_TRANSCRIPTION: usize = 16_000;
 const MAX_UNCERTAINTIES: usize = 20;
@@ -25,7 +26,7 @@ const PROMPT: &str = "Transcribe this one photographed page. Return only a JSON 
 
 type Result<T> = std::result::Result<T, String>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LibrarianConfig {
     api_key: Option<String>,
     pub model: Option<String>,
@@ -35,6 +36,13 @@ pub struct LibrarianConfig {
     monthly_micros: Option<i64>,
     pub reason: String,
     pub ready: bool,
+}
+
+impl std::fmt::Debug for LibrarianConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LibrarianConfig").field("model", &self.model)
+            .field("ready", &self.ready).finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -132,14 +140,16 @@ impl ReadingTransport for ClaudeTransport {
             .send_json(payload);
         match response {
             Ok(resp) => {
-                let text = resp.into_string().map_err(|error| CallError::Uncertain(error.to_string()))?;
+                let text = bounded_response(resp.into_reader()).map_err(CallError::Uncertain)?;
                 parse_provider_body(&text).map_err(|error| CallError::Uncertain(error))
             }
             Err(ureq::Error::Status(code, resp)) => {
-                let text = resp.into_string().unwrap_or_default();
-                Err(CallError::Uncertain(format!("HTTP {code}: {}", clip(&text, 180))))
+                let _ = resp;
+                Err(CallError::Uncertain(format!("Claude returned HTTP {code}.")))
             }
-            Err(ureq::Error::Transport(error)) => Err(CallError::NotSent(error.to_string())),
+            // A transport error may occur after request delivery. Never release
+            // a reservation or automatically repeat a possibly billed request.
+            Err(ureq::Error::Transport(_)) => Err(CallError::Uncertain("Claude transport outcome is unknown.".into())),
         }
     }
 }
@@ -264,6 +274,8 @@ pub fn read_selected(
         return Err("The photo hash does not match the vault record. Recall did not send this photo.".into());
     }
     let payload = payload_sha(&input.operation_id, &input.memory_id, input.expected_revision, &digest);
+    let vault = crate::local_vault::Vault::open(root)?;
+    let _reservation_lock = vault.lock()?;
     if let Some(existing) = load_reading(root, &input.memory_id, &input.operation_id)? {
         if existing.payload_sha256 != payload {
             return Err("That read attempt was already used for a different photo or revision. Recall did not send this photo.".into());
@@ -395,7 +407,16 @@ fn bounded_reading(transcription: &str, uncertainties: &[String]) -> Result<(Str
     Ok((transcription.to_string(), uncertainties.iter().map(|item| item.trim().to_string()).collect()))
 }
 
+fn bounded_response(reader: impl Read) -> Result<String> {
+    let mut bytes = Vec::new();
+    reader.take(MAX_RESPONSE + 1).read_to_end(&mut bytes)
+        .map_err(|_| "Claude response was interrupted".to_string())?;
+    if bytes.len() as u64 > MAX_RESPONSE { return Err("Claude response exceeds limit".into()); }
+    String::from_utf8(bytes).map_err(|_| "Claude response is not UTF-8".into())
+}
+
 fn parse_provider_body(body: &str) -> Result<ProviderOutput> {
+    if body.len() as u64 > MAX_RESPONSE { return Err("Claude response exceeds limit".into()); }
     let value: serde_json::Value = serde_json::from_str(body).map_err(|_| "Claude returned a response that was not JSON.".to_string())?;
     let model = value.get("model").and_then(|item| item.as_str()).unwrap_or("").to_string();
     let usage = value.get("usage");
@@ -508,18 +529,11 @@ fn dunce_canon(path: &Path) -> Result<PathBuf> {
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let tmp = path.with_extension(format!("stage-{}", Uuid::new_v4()));
-    {
-        let mut file = OpenOptions::new().write(true).create_new(true).open(&tmp).map_err(|error| error.to_string())?;
-        file.write_all(bytes).map_err(|error| error.to_string())?;
-        file.sync_all().map_err(|error| error.to_string())?;
-    }
-    match fs::rename(&tmp, path) {
-        Ok(()) => Ok(()),
-        Err(_) => {
-            let _ = fs::remove_file(path);
-            fs::rename(&tmp, path).map_err(|error| error.to_string())
-        }
-    }
+    // Reuse native safe-path checks, flushed staging and write-through atomic
+    // Windows replacement. Never delete the previous budget/reading on failure.
+    crate::local_vault::create(&tmp, bytes)?;
+    crate::local_vault::replace(&tmp, path)
+
 }
 
 fn uuid(value: &str) -> Result<()> {
@@ -850,4 +864,33 @@ mod tests {
         let memory = vault.capture(&Uuid::new_v4().to_string(), "synthetic.png", &photo(), "gate code 48?").unwrap();
         (Temp(root), vault, memory.id)
     }
+    #[test] fn config_debug_never_exposes_provider_key() {
+        assert!(!format!("{:?}", ready("5")).contains("synthetic-key-not-real"));
+    }
+    #[cfg(unix)]
+    #[test] fn atomic_provider_record_refuses_symlink_destination() {
+        let (root,_,_) = owned_fixture();
+        let original = root.0.join("original.json");
+        fs::write(&original,b"original").unwrap();
+        let link = root.0.join("record.json");
+        std::os::unix::fs::symlink(&original,&link).unwrap();
+        assert!(atomic_write(&link,b"replacement").is_err());
+        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert_eq!(fs::read(&original).unwrap(), b"original");
+    }
+    #[test] fn response_limit_rejects_oversized_valid_provider_json() {
+        let body = format!("{}{}", " ".repeat(128*1024), r#"{"model":"claude-test","content":[{"type":"text","text":"{\"transcription\":\"maybe 5 MW?\",\"uncertainties\":[]}"}]}"#);
+        assert!(parse_provider_body(&body).is_err());
+    }
+
+    #[test] fn busy_vault_cannot_race_provider_budget_reservation() {
+        let (root,_,memory_id) = owned_fixture();
+        let lock = fs::OpenOptions::new().read(true).write(true).open(root.0.join("Recall/_meta/writer.lock")).unwrap();
+        lock.try_lock().unwrap();
+        let script = Script { calls: AtomicUsize::new(0), mode:"ok", secret:"synthetic-key-not-real" };
+        let result = read_selected(&root.0,&ready("5"),&input(&memory_id,&Uuid::new_v4().to_string(),&photo()),&script);
+        assert!(result.is_err());
+        assert_eq!(script.calls.load(Ordering::SeqCst),0);
+    }
+
 }

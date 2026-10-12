@@ -295,7 +295,7 @@ fn sync_dir(path: &Path) -> Result<()> {
     // Windows publication uses write-through MoveFileEx; file data is flushed first.
     Ok(())
 }
-fn create(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn create(path: &Path, bytes: &[u8]) -> Result<()> {
     boundary!("create_before", path);
     safe(path)?;
     let mut f = OpenOptions::new()
@@ -360,7 +360,7 @@ fn rename(from: &Path, to: &Path) -> Result<()> {
     sync_dir(from.parent().ok_or("No parent")?)?;
     sync_dir(to.parent().ok_or("No parent")?)
 }
-fn replace(from: &Path, to: &Path) -> Result<()> {
+pub(crate) fn replace(from: &Path, to: &Path) -> Result<()> {
     safe(from)?;
     safe(to)?;
     #[cfg(windows)]
@@ -577,7 +577,7 @@ impl Vault {
         }
         Ok(())
     }
-    fn lock(&self) -> Result<File> {
+    pub(crate) fn lock(&self) -> Result<File> {
         self.validate()?;
         let p = self.path("_meta/writer.lock");
         safe(&p)?;

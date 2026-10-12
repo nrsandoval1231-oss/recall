@@ -1,5 +1,12 @@
 # Recall acceptance and evaluation
 
+## Claude reader recovery prerequisite — 2026-10-12
+
+Independent work while real Jev/Claude credentials are unavailable. This repairs the existing photo reader, not the unimplemented librarian organization stage. The actual Claude transport now treats delivery errors as uncertain, keeps their reservation and avoids automatic repeat. It bounds responses to 128 KiB, omits provider error bodies, and excludes the key from configuration Debug output. Provider budget/reading files reuse native checked-path, flushed staging and atomic Windows write-through replacement rather than deleting the prior record on rename failure. A vault writer lock serializes reservation/replay and provider calls so concurrent reads cannot overspend the same ledger. Capture may return busy during a reading (up to its 45-second timeout); original data remains intact.
+
+Four meaningful regressions reproduced failures before fixes: credential Debug leakage, symlink destination replacement, oversized valid response and concurrent budget reservation while the vault is locked. The byte-identical native-core harness passes 120 tests, including existing budget, uncertain-outcome retry, malformed response, idempotency, original preservation, external-edit, recovery and restart/reopen tests. Full local Tauri build remains blocked by missing GTK/WebKit development libraries; exact-head CI is required. Real provider/hardware/complete Meeting-to-Memory acceptance remains OPEN.
+
+
 ## RCL-INT-001A validator review — 2026-10-12
 
 PR #28 original head `2819d6208f35bbd4b4ae1780b1575055e57dbef9` was reviewed against main `3cea9ff9ddb36bdafbe5a323c5996ef71a585ddb`. PR #26 was neither fetched nor incorporated. PR #27 remains draft; its required canonical PNG is absent.
