@@ -8,10 +8,10 @@ function section(document: string, heading: string): string[] {
   return lines.slice(start + 1, end < 0 ? undefined : end);
 }
 function unescape(text: string): string { return text.replace(/\\([\\`*_[\]<>#!|])/g, "$1").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&"); }
-export function vaultContext(memories: VaultMemory[]) {
+export function vaultContext(memories: VaultMemory[], focusId?: string) {
   const people: SourceRow[] = [], places: SourceRow[] = [], projects: SourceRow[] = [], agenda: SourceRow[] = [], related: SourceRow[] = [];
   const active = memories.filter(memory => memory.state === "active" && !memory.conflict);
-  for (const memory of active) {
+  for (const memory of active.filter(memory => focusId === undefined || memory.id === focusId)) {
     // Read native document fields only as display hints. They never authorize a write or identity merge.
     if (!memory.note.startsWith(`---\nrecall_id: "${memory.id}"\n`)) continue;
     for (const line of section(memory.note, "Unresolved entity mentions")) {

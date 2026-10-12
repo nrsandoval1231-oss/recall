@@ -19,3 +19,12 @@ it("ignores arbitrary capture text, deleted/conflicted memories and missing rela
   expect(vaultContext([raw, source("deleted", "deleted"), conflict]).people).toEqual([]);
   expect(vaultContext([source("a")]).related).toEqual([]);
 });
+
+it("focuses one source without merging names and still resolves native related targets", () => {
+  const a = source("a"), b = source("b");
+  const focused = vaultContext([a, b], "a");
+  expect(focused.people.map(row => row.memory.id)).toEqual(["a"]);
+  expect(focused.agenda).toHaveLength(1);
+  expect(focused.related[0]?.memory).toBe(b);
+  expect(vaultContext([a, b], "missing").people).toEqual([]);
+});
