@@ -2,12 +2,12 @@
 
 ## Active next engineering slice
 
-Follow [Meeting to Memory](MEETING-TO-MEMORY.md): test one real Jev → Claude → deterministic vault-write pipeline with messy synthetic meeting notes, then bind the approved UI to real vault state. Record exact commit, live-provider tests and hardware limitations in ACCEPTANCE. No PostgreSQL dependency or speculative feature expansion.
+Follow [Meeting to Memory](MEETING-TO-MEMORY.md): the native text pipeline and vault-bound UI are implemented; owner-observed Windows real-provider publication, restart retrieval and Obsidian original access are recorded in ACCEPTANCE. Next validate real handwriting, physical phone/Tailscale and canonical visual fidelity. Record exact commit, live-provider tests and hardware limitations in ACCEPTANCE. No PostgreSQL dependency or speculative feature expansion.
 
 
 ## Current development path
 
-Use the desktop Memory Surface and local phone companion instructions for the active pilot. Cloud deployment and legacy clients are not launch requirements. Installed Windows and real iPhone acceptance remain unverified.
+Use the desktop Memory Surface and local phone companion instructions for the active pilot. Cloud deployment and legacy clients are not launch requirements. Bounded installed Windows text acceptance is owner-verified; real iPhone, handwriting and broader device acceptance remain open.
 
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 

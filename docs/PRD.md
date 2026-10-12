@@ -2,12 +2,12 @@
 
 ## Next product milestone — Meeting to Memory
 
-A user dumps disorganized meeting notes without naming, sorting or tagging them. Recall preserves originals, Jev parses evidence and uncertainty, Claude proposes useful Obsidian structure, and trusted code commits Markdown/YAML with wikilinks and history. Recall presents a grounded result with the original. This is the next mandatory product capability, not implemented acceptance. See [Meeting to Memory](MEETING-TO-MEMORY.md).
+A user dumps disorganized meeting notes without naming, sorting or tagging them. Recall preserves originals, Jev parses evidence and uncertainty, Claude proposes useful Obsidian structure, and trusted code commits Markdown/YAML with wikilinks and history. Recall presents a grounded result with the original. The bounded text loop is implemented and owner-verified on Windows with real providers, restart retrieval and Obsidian original access; handwriting, phone and visual fidelity acceptance remain open. See [Meeting to Memory](MEETING-TO-MEMORY.md).
 
 
 ## Current scope and authority (2026-10-11)
 
-The active product is an Obsidian-first desktop Memory Surface with a login-free Tailscale phone Capture/Ask companion. Claude is the intended opt-in librarian; live end-to-end interpretation and grounded vague recall are not accepted. Historical cloud/mobile architecture and authentication requirements later in this document describe retained optional components and must not be treated as active pilot requirements. The [Pilot Contract](PILOT-CONTRACT.md) and [Canonical Foundation](CANONICAL-FOUNDATION.md) override contradictory historical statements.
+The active product is an Obsidian-first desktop Memory Surface with a login-free Tailscale phone Capture/Ask companion. Claude is the consent-gated librarian; owner-observed live text publication and source-backed quote retrieval passed the bounded evaluation in ACCEPTANCE. Broader handwriting and generated-answer quality are not accepted. Historical cloud/mobile architecture and authentication requirements later in this document describe retained optional components and must not be treated as active pilot requirements. The [Pilot Contract](PILOT-CONTRACT.md) and [Canonical Foundation](CANONICAL-FOUNDATION.md) override contradictory historical statements.
 
 
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).

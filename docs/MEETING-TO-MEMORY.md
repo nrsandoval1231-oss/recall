@@ -27,12 +27,11 @@ This is intentionally uncertain, contradictory, incomplete and unorganized. Do n
 ```markdown
 ---
 type: meeting
-project: "[[Permian Power Expansion]]"
 status: needs-review
 tags: [meeting, temporary-power]
 source_id: synthetic-meeting-001
 ---
-# Permian Power Expansion — Site Meeting
+# Meeting notes
 
 ## Observations
 - Possible power requirement: **5–10 MW?** (unconfirmed)
