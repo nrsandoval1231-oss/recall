@@ -249,6 +249,20 @@ fn vault_capture(
     })
 }
 #[tauri::command]
+fn vault_capture_note(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    operation_id: String,
+    note: String,
+) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| {
+        let memory=vault.capture_note(&operation_id, &note)?;
+        vault.processing_snapshot(&memory.id, memory.revision)?;
+        Ok(memory)
+    })
+}
+
+#[tauri::command]
 fn vault_list(
     state: tauri::State<'_, local_vault::LocalVaultState>,
     expected_vault_id: String,
@@ -457,6 +471,7 @@ pub fn run() {
             vault_select,
             vault_open_default,
             vault_capture,
+            vault_capture_note,
             vault_list,
             vault_correct,
             vault_restore_note,
