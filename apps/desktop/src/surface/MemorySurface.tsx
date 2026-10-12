@@ -1,4 +1,4 @@
-import { vaultContext, type SourceRow } from "./vault-context";
+import { vaultContext, noteBody, noteWithBody, type SourceRow } from "./vault-context";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
 import { brooks, FIXTURE_BANNER, fixtureDocuments, fixtureMemory, type FixtureMemory } from "./brooks-fixture";
@@ -322,7 +322,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       if (!inScope(scope.vault_id) || !published) return;
       setItems((rows) => rows.map((row) => row.id === published.id ? published : row));
       if (evidenceRef.current === published.id) {
-        if (correctionVersion.current === draftVersion) setCorrection(published.note);
+        if (correctionVersion.current === draftVersion) setCorrection(noteBody(published));
         else setNotice("Organization saved. Your newer unsaved correction draft is preserved; review the saved note before applying it.");
         setHistory(null); setProcessingConsent(false);
       }
@@ -344,7 +344,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       if (!inScope(scope.vault_id)) return;
       sessionStorage.removeItem(captureKey(scope.vault_identity)); setPending(null); setDraft("");
       setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
-      setSection("evidence"); evidenceRef.current = saved.id; setEvidenceId(saved.id); setCorrection(saved.note);
+      setSection("evidence"); evidenceRef.current = saved.id; setEvidenceId(saved.id); setCorrection(noteBody(saved));
       setNotice("Saved locally with original text evidence.");
       await loadSource(scope.vault_id, saved);
       await organizeMemory(saved);
@@ -383,7 +383,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setSection("evidence");
       evidenceRef.current = saved.id;
       setEvidenceId(saved.id);
-      setCorrection(saved.note);
+      setCorrection(noteBody(saved));
       await loadSource(selected.vault_id, saved);
       await organizeMemory(saved);
     } catch (importError) {
@@ -419,7 +419,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setConsent(false);
     setReadOp(null);
     setConfirmRemove(false);
-    setCorrection(memory.note);
+    setCorrection(noteBody(memory));
     evidenceRef.current = memory.id;
     askRequest.current += 1;
     setEvidenceId(memory.id);
@@ -439,13 +439,13 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
 
   async function saveCorrection(memory: VaultMemory) {
     if (!selected) return;
-    const intent = { operationId: operationId(), note: correction, expectedRevision: memory.revision };
     setBusy(true); setError("");
     try {
+      const intent = { operationId: operationId(), note: noteWithBody(memory, correction), expectedRevision: memory.revision };
       const saved = await vault.correct(selected.vault_id, memory.id, intent.expectedRevision, intent.operationId, intent.note);
       if (!alive.current) return;
       setItems((rows) => rows.map((row) => row.id === saved.id ? saved : row));
-      if (evidenceRef.current === memory.id) { setEvidenceId(saved.id); setCorrection(saved.note); setHistory(null); setReading(null); }
+      if (evidenceRef.current === memory.id) { setEvidenceId(saved.id); setCorrection(noteBody(saved)); setHistory(null); setReading(null); }
       setNotice("Correction saved in the vault. The original photo is unchanged. This is your note, not a verified fact.");
     } catch (correctError) {
       if (alive.current) setError(`${message(correctError)} The draft is still here. Reload the note before saving again.`);
@@ -463,7 +463,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setItems(rows.filter(keptMemory));
       const latest = rows.find((row) => row.id === memory.id);
       if (!latest) throw new Error("That memory is no longer in the vault.");
-      if (evidenceRef.current === memory.id) { setCorrection(latest.note); setEvidenceId(latest.id); }
+      if (evidenceRef.current === memory.id) { setCorrection(noteBody(latest)); setEvidenceId(latest.id); }
     } catch (reloadError) {
       if (alive.current) setError(message(reloadError));
     } finally {
@@ -664,7 +664,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                   {context.places.length > 0 && <ContextCard title="Locations" icon={<LocationMark />}><SourceList rows={context.places} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
                 </div>}
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
-                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{hit.note_basename}</h2><p className="ms-note">{hit.current_excerpt}</p><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
+                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{hit.note_basename}</h2><p className="ms-note">{noteBody({ id: hit.memory_id, note: hit.current_excerpt })}</p><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
                     <>
                       <div className="ms-project-head">
                         <p className="ms-kicker"><ProjectMark />{demo ? brooks.kicker : "MEMORY"}</p>
@@ -672,7 +672,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       </div>
                       <h1>{detail?.title ?? (demo ? brooks.project : featured ? titleOf(featured) : "Your vault")}</h1>
                       <p className="ms-place">{demo ? brooks.place : selected ? selected.root : "No vault open"}</p>
-                      {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : featured?.note || "Import a photo to keep the original and a note in this vault."}</p>}
+                      {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : (featured ? noteBody(featured) : "") || "Import a photo to keep the original and a note in this vault."}</p>}
                       {!demo && section === "projects" && panel === "overview" && !detail && !projectFocus && <SourceList rows={allContext.projects} empty="No unresolved project or organization mentions saved yet." onOpen={(memory) => { setProjectFocusId(memory.id); setPanel("overview"); }} />}
                       {!demo && projectFocus && <p className="ms-fine">Context from this source only; project and organization names remain unresolved. <button type="button" onClick={() => { setProjectFocusId(null); setPanel("overview"); }}>All project sources</button></p>}
                       {demo && panel === "overview" && !detail && <p className="ms-fine">{brooks.caveat}</p>}
@@ -924,7 +924,7 @@ function Evidence(props: {
           <>
             <p className="ms-fine">{memory.state === "missing" ? "Markdown note missing. The original is still in the vault." : memory.note.startsWith("---\nrecall_id:") ? "Organized from source statements. Uncertain items require review; edits remain yours." : "Saved in your vault. The note below is human text, not a verified reading."}</p>
             {memory.conflict && <p role="alert">{memory.conflict}</p>}
-            <p className="ms-note">{memory.note || "No note added."}</p>
+            <p className="ms-note">{noteBody(memory) || "No note added."}</p>
             <form className="ms-form" onSubmit={(event) => { event.preventDefault(); props.onSave(); }}>
               <label htmlFor="correction">Your correction</label>
               <textarea id="correction" value={props.correction} onChange={(event) => props.onCorrection(event.target.value)} />
@@ -937,7 +937,7 @@ function Evidence(props: {
             </div>
             {props.history && (
               <ol className="ms-hits">
-                {props.history.map((revision) => <li key={revision.revision} className="ms-hit"><strong>Revision {revision.revision}</strong><p className="ms-note">{revision.note || "No note added."}</p><small>{revision.kind} · {revision.origin} · {revision.recorded_at}</small></li>)}
+                {props.history.map((revision) => <li key={revision.revision} className="ms-hit"><strong>Revision {revision.revision}</strong><p className="ms-note">{noteBody({ id: memory.id, note: revision.note }) || "No note added."}</p><small>{revision.kind} · {revision.origin} · {revision.recorded_at}</small></li>)}
               </ol>
             )}
             <label className="ms-check"><input type="checkbox" checked={props.confirmRemove} onChange={(event) => props.onConfirmRemove(event.target.checked)} /> Remove from Recall. The photo and history stay in the vault.</label>

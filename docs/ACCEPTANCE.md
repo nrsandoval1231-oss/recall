@@ -17,7 +17,7 @@ Implemented: selected-vault text/photo capture → native consent/configuration/
 | Phone Capture/Ask | 37 | ac7304e379c6ca8d3968af392d56b74fdf88d97d | 1d96e7be6e0dbf0e0c2911b4d239474b967d8cbb | 38263514173 | 191 native-core tests |
 | Persisted context surface | 38 | 2314d292ebc4761851ba7bc5ea2b04060d7eb476 | e8a9a8e6a6cd970def370005f6610a7620e1dffc | 38263516469 | 72 desktop tests/typecheck/build |
 
-PR39 source-focused project boards: independent 74 desktop tests/typecheck/build passed, with older-capture calendar regression; final-head CI required before merge. Narrative entries below record evidence at their original stage and do not override this snapshot.
+PR39 source-focused project boards accepted: exact head ae210ae95b989b03bd2224c86ff57c3f58b3e1b3 passed all five jobs in CI38267457055 and squash merged as240125bfc4c82b2bbd06c7b67065683477e42b97. Independent74 desktop tests/typecheck/build passed with the older-capture calendar regression. Narrative entries below record evidence at their original stage and do not override this snapshot.
 
 The mandatory meeting text was exercised through real native orchestration/storage with explicitly synthetic Jev/Claude transport fixtures. Persisted YAML has source hashes/wikilinks, exact quoted evidence, unresolved questions, source follow-ups and retracted8MW. Reopening the vault before “What was going on with that utility delay?” retrieves the note and exact original hash. This is NOT authenticated inference or handwriting performance proof. Core tests cover malformed proposals, unknown delivery, stale revisions, source/context mismatch, operation replay, external Obsidian edits, interrupted writes and pre-photo artifact recovery. Native source-linked originals/history remain preserved.
 
@@ -157,6 +157,12 @@ Paul's two-week pilot proves usefulness for one demanding user, not universal pr
 Universal readiness requires separate evidence that the memory model and retrieval behavior work across multiple domains without adding domain-specific core schema or prompt hacks.
 
 The goal is not high note count. The goal is trustworthy recovery from imperfect human recollection.
+
+### RCL-INT-001 organized-note body corrections
+
+Recall now edits the readable body of generated notes while preserving the exact native YAML identity, source references and owner properties in the unchanged native revision-checked writer payload. Board/evidence/current-quote/history views show body text; full documents remain in Obsidian and native history. Legacy raw notes remain unchanged, foreign identity headers are not treated as native properties, and malformed native headers require review rather than silent stripping.
+
+Verification: 79 combined desktop tests, lint, typecheck and production build passed after rebasing onto merged project boards. Independent review reproduced 77 editor-slice tests/typecheck including the final deferred-organization-to-save regression; it found a missed completion-path conversion, now fixed. The regression ensures no duplicated inner YAML and exact native correction payload. Final combined independent review and exact-head CI required before merge. Production TypeScript body conversion was also consumed by the real native correction writer: revision3 persisted, a new process reopened and replayed its receipt without another revision, original SHA unchanged and three history records. The initial vault uses synthetic provider fixtures; this proves correction/storage only. Native source/hash, optimistic revision, journal and receipt protections are unchanged; no provider or installed-device acceptance is implied.
 
 ## RCL-001 evidence (Trusted Capture)
 

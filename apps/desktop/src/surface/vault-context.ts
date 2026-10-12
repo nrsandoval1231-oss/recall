@@ -32,3 +32,20 @@ export function vaultContext(memories: VaultMemory[], focusId?: string) {
   }
   return { people, places, projects, agenda, related };
 }
+
+function noteParts(memory: Pick<VaultMemory, "id" | "note">): { prefix: string; body: string } | null {
+  const marker = `---\nrecall_id: "${memory.id}"\n`;
+  if (!memory.note.startsWith(marker)) return null;
+  const end = memory.note.indexOf("\n---\n", marker.length - 1);
+  if (end < 0) return null;
+  const boundary = end + 5 + (memory.note[end + 5] === "\n" ? 1 : 0);
+  return { prefix: memory.note.slice(0, boundary), body: memory.note.slice(boundary) };
+}
+export function noteBody(memory: Pick<VaultMemory, "id" | "note">): string {
+  return noteParts(memory)?.body ?? memory.note;
+}
+export function noteWithBody(memory: Pick<VaultMemory, "id" | "note">, body: string): string {
+  const parts = noteParts(memory);
+  if (!parts && memory.note.startsWith(`---\nrecall_id: "${memory.id}"\n`)) throw new Error("Note properties need review in Obsidian before saving a body correction.");
+  return parts ? parts.prefix + body : body;
+}

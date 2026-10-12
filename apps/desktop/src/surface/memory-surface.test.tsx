@@ -413,3 +413,45 @@ it("opens a source-focused project board and keeps unrelated people out", async 
   await user.click(screen.getByRole("button", { name: "All project sources" }));
   expect(screen.getByRole("button", { name: "Beta" })).toBeTruthy();
 });
+
+it("edits organized note words while preserving native properties in the save payload", async () => {
+  const user = userEvent.setup();
+  const header = `---\nrecall_id: "11111111-1111-4111-8111-111111111111"\ntitle: "Utility meeting"\nsource_sha256: "original-source-hash"\n---\n\n`;
+  const saved = memory({ revision: 2, note: header + "Utility late." });
+  const client = vault({ correct: vi.fn(async (_vault, _id, _rev, _op, note) => ({ ...saved, revision: 3, note })) }, [saved]);
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Open original: Utility meeting" }));
+  const editor = await screen.findByRole("textbox", { name: "Your correction" });
+  expect((editor as HTMLTextAreaElement).value).toBe("Utility late.");
+  await user.clear(editor); await user.type(editor, "Utility is now on time.");
+  await user.click(screen.getByRole("button", { name: "Save correction" }));
+  await screen.findByText(/Correction saved in the vault/);
+  expect(client.correct).toHaveBeenCalledWith("session-token", saved.id, 2, expect.any(String), header + "Utility is now on time.");
+  expect((editor as HTMLTextAreaElement).value).toBe("Utility is now on time.");
+});
+
+it("organization completion fills body-only editing without duplicating native properties on save", async () => {
+  Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
+  const initial = memory({ source_name: "Draft.png", note: "Original draft" });
+  const header = `---\nrecall_id: "${initial.id}"\ntitle: "Utility meeting"\n---\n\n`;
+  const published = { ...initial, revision: 2, note: header + "Utility late." };
+  let finish!: (value: unknown) => void;
+  const client = vault({
+    parse: vi.fn(async (_scope, id, revision, operation) => ({ memory_id: id, expected_revision: revision, operation_id: operation, source_sha256: initial.source_sha256, state: "parsed", message: "Synthetic fixture" })),
+    organize: vi.fn(() => new Promise(resolve => { finish = resolve; })),
+    publish: vi.fn(async () => published),
+    correct: vi.fn(async (_scope, _id, _rev, _op, note) => ({ ...published, revision: 3, note })),
+  }, [initial]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Open original: Draft" }));
+  await user.click(screen.getByLabelText(/Send this source to Jev and Claude/));
+  await user.click(screen.getByRole("button", { name: "Organize this memory" }));
+  await screen.findByText("Claude is organizing source-linked memory…");
+  await act(async () => { finish({}); });
+  await screen.findByText("Organized in Obsidian. Uncertainty and original evidence preserved.");
+  const editor = screen.getByRole("textbox", { name: "Your correction" }) as HTMLTextAreaElement;
+  expect(editor.value).toBe("Utility late.");
+  await user.click(screen.getByRole("button", { name: "Save correction" }));
+  await screen.findByText(/Correction saved in the vault/);
+  expect(client.correct).toHaveBeenCalledWith("session-token", initial.id, 2, expect.any(String), published.note);
+});
