@@ -161,7 +161,7 @@ pub fn validate_grounded(
     }
     for evidence in &p.evidence {
         let contexts: Vec<&str> = source_text
-            .split(['\n', '.', ';'])
+            .split(['.', ';'])
             .filter(|span| span.contains(&evidence.excerpt))
             .collect();
         if contexts.is_empty() {
@@ -338,6 +338,20 @@ mod tests {
             &"a".repeat(64),
             1,
             "Crossed out: 8 MW confirmed."
+        )
+        .is_err());
+    }
+    #[test]
+    fn preserves_multiline_retraction() {
+        let mut p = sample();
+        p.evidence[0].excerpt = "8 MW confirmed".into();
+        p.evidence[0].certainty = Certainty::Reported;
+        assert!(validate_grounded(
+            &p,
+            "capture-1",
+            &"a".repeat(64),
+            1,
+            "Crossed out:\n8 MW confirmed."
         )
         .is_err());
     }
