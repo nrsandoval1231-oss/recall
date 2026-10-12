@@ -1,5 +1,10 @@
 # Recall architecture
 
+## Implementation packet: local Meeting to Memory
+
+Follow [Meeting to Memory](MEETING-TO-MEMORY.md). Keep the native vault writer authoritative and put model proposals behind versioned validation and revision checks. Jev parses source candidates; Claude proposes Obsidian organization; deterministic code commits safe Markdown/YAML. SQLite may index or track jobs locally but must not become a second canonical memory. No PostgreSQL, cloud service or autonomous swarm is required for this pilot. Provider outages must leave durable pending captures, never fake organized states.
+
+
 ## Architecture authority and active path (2026-10-11)
 
 **Active:** Tauri desktop Memory Surface → native vault writer → user-selected Obsidian vault (`Recall/Sources`, `Recall/Memories`, history). Phone browser → Tailscale-restricted `recall-phone` process on desktop → same vault writer. The current implementation has a default-off, consent-gated Claude photo reader, but the required product pipeline is Jev parsing → Claude librarian organization proposals → deterministic, validated Markdown/YAML vault writes. Claude is not optional to the intended product. Provider configuration and consent gate external calls; capture remains durable and marked pending when intelligence is unavailable. Live end-to-end librarian quality remains unaccepted. The cloud topology, migrations, pgvector, Expo app, and legacy-cloud mode documented below are retained implementations, not active pilot dependencies or authority. Do not migrate the vault to PostgreSQL or add login UI based on the historical sections. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
