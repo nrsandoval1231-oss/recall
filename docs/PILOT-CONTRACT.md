@@ -22,6 +22,10 @@ You capture and ask. Recall organizes. **Obsidian holds your memory.**
 
 Desktop-first. The broader universal-memory application grows from making that experience work.
 
+### Intelligence pipeline amendment — 2026-10-11
+
+The core Recall experience requires Jev to parse captured information and Claude to organize that interpretation into the Obsidian vault. Claude proposes folders, note structure, YAML properties, wikilinks, entity relationships and safe updates. Trusted code validates and performs writes, preserving originals, uncertainty, revisions and user edits. Markdown with YAML frontmatter is the user-owned default; JSON supports internal metadata where necessary. External provider calls require consent and configuration, but Claude is not an optional product capability. If intelligence is unavailable, capture persists as pending, not falsely labeled organized. See `CANONICAL-FOUNDATION.md` for acceptance criteria.
+
 ### Product center
 
 - **The desktop Memory Surface is the primary shell.** The visual target is the owner-supplied reference [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg) (1536×1024 JPEG). Credit: owner-supplied reference, Nick Sandoval, dated 2026-10-10. Recall did not invent this composition. It is visual authority for the desktop surface alongside [UX-SPEC](UX-SPEC.md). Names, counts, and project facts drawn in the picture are the existing Brooks Campus design fixture, not verified customer memory.
