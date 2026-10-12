@@ -656,7 +656,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                     </ContextCard>
                   </div>
                 )}
-                {!demo && (context.people.length > 0 || context.places.length > 0) && <div className="ms-side">
+                {!demo && (context.people.length > 0 || context.places.length > 0 || context.related.length > 0) && <div className="ms-side">
                   {context.people.length > 0 && <ContextCard title="People" icon={<PeopleMark />}><SourceList rows={context.people} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
                   {context.places.length > 0 && <ContextCard title="Locations" icon={<LocationMark />}><SourceList rows={context.places} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
                 </div>}
@@ -708,7 +708,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                     <blockquote className="glass ms-quote">{brooks.quote}</blockquote>
                   </div>
                 )}
-                {!demo && context.related.length > 0 && <div className="ms-side"><ContextCard title="Related" icon={<RelatedMark />}><SourceList rows={context.related} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard></div>}
+                {!demo && (context.people.length > 0 || context.places.length > 0 || context.related.length > 0) && <div className="ms-side">{context.related.length > 0 && <ContextCard title="Related" icon={<RelatedMark />}><SourceList rows={context.related} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}</div>}
               </div>
               {ticks.length > 0 && <TimelineStrip ticks={ticks} active={activeMonth} onSelect={selectMonth} />}
             </>

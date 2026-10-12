@@ -383,3 +383,15 @@ it("shows saved unresolved people and source agenda in the existing panels", asy
   expect(screen.getByRole("button", { name: "Call Sarah" })).toBeTruthy();
   expect(screen.getByText(/Unscheduled source follow-up/)).toBeTruthy();
 });
+
+it("keeps the board in the center grid slot with related context alone", async () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const saved = memory({ note: `---\nrecall_id: "${id}"\n---\n## Related memories\n\n- [[Recall/Memories/target|Related source-backed memory]] (possible relationship; review)\n` });
+  const { container } = render(<MemorySurface vault={vault({}, [saved, memory({ id: "22222222-2222-4222-8222-222222222222", note_path: "target.md" })])} />);
+  await screen.findByRole("region", { name: "Related" });
+  const columns = container.querySelector(".ms-columns")!;
+  expect(columns.children).toHaveLength(3);
+  expect(columns.children[0]?.classList.contains("ms-side")).toBe(true);
+  expect(columns.children[1]?.classList.contains("ms-project")).toBe(true);
+  expect(columns.children[2]?.classList.contains("ms-side")).toBe(true);
+});
