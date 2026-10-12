@@ -106,14 +106,19 @@ pub trait ReadingTransport {
     fn complete(&self, request: &ProviderRequest<'_>) -> std::result::Result<ProviderOutput, CallError>;
 }
 
+/// Shared provider transport preserves native/system CA trust and approved proxy routing.
+pub(crate) fn provider_agent(seconds: u64) -> Result<ureq::Agent> {
+    let tls = ureq::native_tls::TlsConnector::new().map_err(|_| "Provider TLS setup failed")?;
+    Ok(ureq::AgentBuilder::new().tls_connector(std::sync::Arc::new(tls))
+        .try_proxy_from_env(true).timeout(std::time::Duration::from_secs(seconds))
+        .redirects(0).build())
+}
+
 pub struct ClaudeTransport;
 
 impl ReadingTransport for ClaudeTransport {
     fn complete(&self, request: &ProviderRequest<'_>) -> std::result::Result<ProviderOutput, CallError> {
-        let agent = ureq::AgentBuilder::new()
-            .timeout(std::time::Duration::from_secs(45))
-            .redirects(0)
-            .build();
+        let agent = provider_agent(45).map_err(CallError::NotSent)?;
         let payload = serde_json::json!({
             "model": request.model,
             "max_tokens": MAX_OUTPUT_TOKENS,
@@ -594,7 +599,7 @@ fn image_mime(bytes: &[u8]) -> Result<&'static str> {
     }
 }
 
-fn usd_to_micros(raw: &str) -> Result<i64> {
+pub(crate) fn usd_to_micros(raw: &str) -> Result<i64> {
     if !raw.bytes().all(|byte| byte.is_ascii_digit() || byte == b'.') || raw.starts_with('.') {
         return Err("not a USD amount".into());
     }
@@ -627,12 +632,12 @@ fn clip(value: &str, max: usize) -> String {
     value.chars().take(max).collect()
 }
 
-fn utc_timestamp() -> String {
+pub(crate) fn utc_timestamp() -> String {
     let (day, time) = utc_parts();
     format!("{day}T{time}Z")
 }
 
-fn utc_day_month() -> (String, String) {
+pub(crate) fn utc_day_month() -> (String, String) {
     let (day, _) = utc_parts();
     (day.clone(), day[..7].to_string())
 }

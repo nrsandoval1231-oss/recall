@@ -2033,3 +2033,51 @@ fn review_unique_rename_with_unrelated_old_bound_occupant_preserves_both_files()
     );
     assert!(!v.note_path(&m.id).exists());
 }
+
+#[test]
+fn processing_snapshot_preserves_text_original_before_model_and_after_restart() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let id = op();
+    let text = "Brad says maybe 5–10 MW? Crossed out: 8 MW confirmed.";
+    v.capture_note(&id,text).unwrap();
+    let snap = v.processing_snapshot(&id,1).unwrap();
+    assert_eq!(snap.source.bytes,text.as_bytes());
+    assert_eq!(snap.source.sha256,hash(text.as_bytes()));
+    assert_eq!(snap.source.mime_type,"text/plain");
+    assert!(!snap.human_corrected);
+    assert_eq!(fs::read(f.0.join(format!("Recall/Sources/{id}.txt"))).unwrap(),text.as_bytes());
+    assert_eq!(f.vault().processing_snapshot(&id,1).unwrap().source.bytes,text.as_bytes());
+}
+#[test]
+fn processing_snapshot_rejects_stale_revision_and_protects_human_correction() {
+    let f = Fixture::new(); let v=f.vault(); let id=op();
+    v.capture_note(&id,"Utility late.").unwrap();
+    v.correct(&id,1,&op(),"User correction: utility is on time.").unwrap();
+    assert!(v.processing_snapshot(&id,1).is_err());
+    let snap=v.processing_snapshot(&id,2).unwrap();
+    assert!(snap.human_corrected);
+    assert_eq!(snap.source.bytes,b"Utility late.");
+    assert!(snap.memory.note.contains("on time"));
+}
+#[test]
+fn processing_snapshot_rejects_tampered_text_and_photo_sources() {
+    let f=Fixture::new(); let v=f.vault(); let id=op();
+    v.capture_note(&id,"Utility late.").unwrap();
+    v.processing_snapshot(&id,1).unwrap();
+    fs::write(f.0.join(format!("Recall/Sources/{id}.txt")),b"8 MW confirmed").unwrap();
+    assert!(v.processing_snapshot(&id,1).is_err());
+    let p=v.capture(&op(),"synthetic.png",&photo(),"").unwrap();
+    fs::write(f.0.join(format!("Recall/Sources/{}.png",p.id)),b"different").unwrap();
+    assert!(v.processing_snapshot(&p.id,1).is_err());
+}
+#[test]
+fn processing_snapshot_reconciles_external_edits_before_provider_context() {
+    let f=Fixture::new(); let v=f.vault(); let id=op();
+    v.capture_note(&id,"Utility late.").unwrap();
+    let p=v.note_path(&id);
+    let body=fs::read_to_string(&p).unwrap().replace("Utility late.","Utility on time.");
+    fs::write(&p,body).unwrap();
+    assert!(v.processing_snapshot(&id,1).is_err());
+    assert!(v.processing_snapshot(&id,2).unwrap().human_corrected);
+}

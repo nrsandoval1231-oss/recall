@@ -316,3 +316,9 @@ Headless Chrome on this Linux sandbox opened `http://127.0.0.1:8787/`, uploaded 
 - **Desktop evidence for a text-only note.** Not redesigned. Opening that note on the desktop reports that there is no original photo. The Markdown note stays in the vault, and phone keyword search finds it.
 - **Claude from the phone.** Not implemented. The desktop consent path is unchanged.
 - **Windows firewall and an installed companion service.** Not run. The process is a console binary, not a Windows service.
+
+### RCL-INT-001 — durable text parser operations (in review)
+
+Native parser operations now preserve the immutable initial text capture as a SHA-256-linked `.txt` source before a provider attempt. Strict source/revision-bound input, reservation and result records survive reopening the vault. Missing native configuration or consent leaves capture pending. An attempted request without a validated result remains uncertain and is never automatically resent, including under a new operation ID for the same source. Successful requests retain their conservative budget reservation. Human corrections and external edits stop automatic reprocessing; photos explicitly await visual transcription.
+
+Validation: 153 source-identical native-core tests passed locally, including consent/budget gates, result tampering, uncertain delivery and replay after reopening, source mismatch, stale revisions, original preservation, and existing writer failure regressions. Synthetic transport fixtures prove orchestration only. Live Jev inference remains blocked by absent `TYPESAFE_API_KEY`; model/version and price/budget configuration must also be supplied. The native HTTPS metadata probe uses approved environment proxy and system trust with redirects disabled; it sends no key or capture. Full desktop exact-head Windows/Linux CI and independent review remain required before merging this slice. This operation does not yet invoke Claude organization or publish generated Markdown.

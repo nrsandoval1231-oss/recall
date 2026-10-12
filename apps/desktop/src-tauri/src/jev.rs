@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, io::Read, time::Duration};
+use std::{collections::BTreeMap, io::Read};
 const MAX_SOURCE: usize = 16_384;
 const MAX_SPANS: usize = 64;
 const MENTION_KINDS: &[&str] = &[
@@ -28,7 +28,7 @@ const KINDS: &[&str] = &[
     "other",
 ];
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SourceSpan {
     pub start: usize,
@@ -338,6 +338,46 @@ pub fn interpret(p: &Prepared, body: &str, source: &str) -> Result<ParsedSource,
         output_tokens: r.usage.output_tokens,
     })
 }
+/// Validate stored or transport-supplied candidates against the exact native input.
+pub fn validate_parsed(parsed: &ParsedSource, source_id: &str, text: &str, sha: &str, model: &str) -> Result<(), String> {
+    let p = prepare(source_id, text, sha, model)?;
+    if parsed.schema_version != 1 || parsed.source_id != source_id || parsed.source_sha256 != sha
+        || parsed.transcription != text || parsed.model != model || parsed.candidates.len() != p.spans.len()
+        || parsed.input_tokens > 100_000 || parsed.output_tokens > 100_000 || parsed.mentions.len() > 128
+        || parsed.legibility != "text_supplied_not_visually_verified" {
+        return Err("Parsed source identity or bounds mismatch".into());
+    }
+    for (candidate, expected) in parsed.candidates.iter().zip(&p.spans) {
+        let expected_status = if expected.retracted {"retracted"} else if expected.uncertain || candidate.confidence < 0.8 {"needs_review"} else {"candidate"};
+        if candidate.source_id != source_id || candidate.span != *expected || !KINDS.contains(&candidate.kind.as_str())
+            || !probability(candidate.confidence) || candidate.status != expected_status
+            || (expected.retracted && candidate.kind != "conflict")
+            || (expected.uncertain && matches!(candidate.kind.as_str(),"decision"|"possible_commitment"))
+            || candidate.probabilities.len() != KINDS.len()
+            || KINDS.iter().any(|k| !candidate.probabilities.get(*k).is_some_and(|v| probability(*v)))
+            || (candidate.probabilities.values().sum::<f64>() - 1.0).abs() > 0.001 {
+            return Err("Parsed claim lost source provenance or uncertainty".into());
+        }
+        let supported = candidate.probabilities.iter().any(|(kind, selected)| {
+            let mapped = if expected.retracted {"conflict"}
+                else if expected.uncertain && matches!(kind.as_str(), "decision" | "possible_commitment") {"question"}
+                else {kind.as_str()};
+            mapped == candidate.kind && !candidate.probabilities.values().any(|v| *v > *selected + 0.001)
+        });
+        if !supported {return Err("Parsed classification contradicts probability distribution".into());}
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for mention in &parsed.mentions {
+        if mention.source_id != source_id || !p.mentions.contains(&mention.span)
+            || !MENTION_KINDS.contains(&mention.kind.as_str()) || mention.kind == "other"
+            || !probability(mention.confidence) || !seen.insert((mention.span.start,mention.span.end))
+            || mention.status != if mention.span.retracted {"retracted"}else{"unresolved_candidate"} {
+            return Err("Parsed mention lost source provenance".into());
+        }
+    }
+    Ok(())
+}
+
 /// Executes the documented real HTTPS API. No automatic retries, redirects,
 /// remote URL configuration, credential output, or filesystem access.
 pub fn parse(
@@ -360,10 +400,7 @@ pub fn parse(
     {
         return Err("Jev request exceeds configured bound".into());
     }
-    let response = ureq::AgentBuilder::new()
-        .redirects(0)
-        .timeout(Duration::from_secs(30))
-        .build()
+    let response = crate::librarian::provider_agent(30)?
         .post(ENDPOINT)
         .set("Authorization", &format!("Bearer {}", config.api_key))
         .set("Content-Type", "application/json")

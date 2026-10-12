@@ -1,5 +1,6 @@
 #[allow(dead_code)]
 mod jev;
+mod processing;
 mod librarian;
 #[allow(dead_code)]
 mod organization_plan;
@@ -368,6 +369,31 @@ fn librarian_read(
     librarian::read_selected(&root, &librarian::config_from_env(), &input, &librarian::ClaudeTransport)
 }
 
+#[tauri::command]
+async fn processing_parse(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    memory_id: String,
+    operation_id: String,
+    expected_revision: u64,
+    consent: bool,
+) -> Result<processing::Job, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        processing::parse_note(&vault, &processing::Config::from_env(), &operation_id,
+            &memory_id, expected_revision, consent, &processing::NativeJev)
+    }).await.map_err(|_| "Parser worker stopped; inspect the saved operation before retrying".to_string())?
+}
+
+#[tauri::command]
+fn processing_status(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    operation_id: String,
+) -> Result<processing::Job, String> {
+    state.with(&expected_vault_id, |vault| processing::status(vault, &operation_id))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -402,6 +428,8 @@ pub fn run() {
             vault_history,
             librarian_status,
             librarian_read,
+            processing_parse,
+            processing_status,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,

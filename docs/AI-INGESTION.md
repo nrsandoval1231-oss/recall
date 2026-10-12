@@ -118,3 +118,11 @@ Evaluate on a private, consented multi-domain corpus. Paul's handwriting is an i
 Compare transcription/interpretation quality, uncertainty retention, numeric/name/time handling, retrieval grounding, latency, failure rate, cost, privacy terms, and structured-output support.
 
 No provider/model credential is committed to this public repository.
+
+## Durable native Jev operations
+
+`processing_parse` accepts only a selected-vault token, canonical operation/memory UUIDs, expected revision and explicit consent. Native configuration uses `TYPESAFE_API_KEY`, a supported pinned `RECALL_JEV_MODEL`, `RECALL_JEV_INPUT_USD_PER_MTOK`, `RECALL_JEV_DAILY_BUDGET_USD` and `RECALL_JEV_MONTHLY_BUDGET_USD`. Prices and budgets are positive USD decimals. Keys never travel through IPC or job status. Configure current provider prices yourself; Recall does not assume a price or model deployment.
+
+Before sending text, Recall saves its initial capture bytes under the assigned UUID in `Recall/Sources`, then flushes an immutable operation input and conservative 100,000-input-token reservation. Native process locking serializes reservations. Results are bounded, strictly parsed, source-linked and checked against the prepared spans before being stored. The status command reloads and validates persisted state. A reserved attempt without a valid result blocks resend after restart; no automatic retry can safely infer whether the provider billed an interrupted request. Reservations remain charged conservatively even on success. Review unresolved operations manually; deleting budget records is not a supported retry mechanism.
+
+Provider agents honor the approved environment proxy and native/system CA trust. Redirects are disabled. Photo captures return `needs_transcription`; human-corrected captures return `needs_review`. Parsed text returns `parsed`, explicitly awaiting the Claude librarian and deterministic publishing stages.
