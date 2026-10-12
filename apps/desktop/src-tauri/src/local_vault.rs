@@ -228,13 +228,18 @@ fn reparse(meta: &fs::Metadata) -> bool {
     }
 }
 /// Refuse links in every component, including the selected root's ancestors.
-fn safe(path: &Path) -> Result<()> {
+pub(crate) fn safe(path: &Path) -> Result<()> {
     let mut checked = PathBuf::new();
     for c in path.components() {
         if matches!(c, Component::ParentDir | Component::CurDir) {
             return Err("Unsafe path".into());
         }
         checked.push(c);
+        // A Windows prefix such as \\?\C: is not a filesystem node until
+        // RootDir is appended. Check the complete root and every real ancestor.
+        if matches!(c, Component::Prefix(_)) {
+            continue;
+        }
         match fs::symlink_metadata(&checked) {
             Ok(m) if reparse(&m) => return Err("Symlink or reparse point is not allowed".into()),
             Ok(_) => (),
@@ -244,7 +249,7 @@ fn safe(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn read(path: &Path, max: u64) -> Result<Vec<u8>> {
+pub(crate) fn read(path: &Path, max: u64) -> Result<Vec<u8>> {
     safe(path)?;
     let mut opts = OpenOptions::new();
     opts.read(true);
@@ -295,7 +300,7 @@ fn sync_dir(path: &Path) -> Result<()> {
     // Windows publication uses write-through MoveFileEx; file data is flushed first.
     Ok(())
 }
-fn create(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn create(path: &Path, bytes: &[u8]) -> Result<()> {
     boundary!("create_before", path);
     safe(path)?;
     let mut f = OpenOptions::new()
@@ -360,7 +365,7 @@ fn rename(from: &Path, to: &Path) -> Result<()> {
     sync_dir(from.parent().ok_or("No parent")?)?;
     sync_dir(to.parent().ok_or("No parent")?)
 }
-fn replace(from: &Path, to: &Path) -> Result<()> {
+pub(crate) fn replace(from: &Path, to: &Path) -> Result<()> {
     safe(from)?;
     safe(to)?;
     #[cfg(windows)]
@@ -577,7 +582,7 @@ impl Vault {
         }
         Ok(())
     }
-    fn lock(&self) -> Result<File> {
+    pub(crate) fn lock(&self) -> Result<File> {
         self.validate()?;
         let p = self.path("_meta/writer.lock");
         safe(&p)?;
