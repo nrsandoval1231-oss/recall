@@ -2158,3 +2158,48 @@ fn recovery_cannot_publish_after_related_context_edit(){
     assert_eq!(fs::read_dir(t.0.join(format!("Recall/History/{memory}"))).unwrap().count(),1);
     assert!(!fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap().starts_with("---"));
 }
+
+#[test]
+fn interrupted_photo_publication_recovers_both_evidence_references(){
+    for point in ["before_note","publish_before","publish_after","before_history","before_receipt"]{
+        let (t,v,parser,organization,memory)=crate::processing::tests::photo_fixture();let publication=op();
+        let fault=FaultGuard::set(move |at,_|if at==point{Err("INJECTED photo publication interruption".into())}else{Ok(())});
+        assert!(v.publish_meeting(&parser,&organization,&publication).is_err());drop(fault);
+        let reopened=Vault::open(&t.0).unwrap();let saved=reopened.publish_meeting(&parser,&organization,&publication).unwrap();assert_eq!(saved.revision,2);
+        assert_eq!(reopened.history(&memory).unwrap().len(),2);assert!(saved.note.contains("visual_status: unreviewed"));assert!(saved.note.contains("Original photo]]"));assert!(saved.note.contains("Unreviewed machine transcription]]"));
+        assert_eq!(reopened.source(&memory).unwrap().sha256,reopened.captured_source_while_locked(&memory).unwrap().sha256);
+    }
+}
+#[test]
+fn photo_recovery_refuses_tampered_transcription_before_publication(){
+    let (t,v,parser,organization,memory)=crate::processing::tests::photo_fixture();let publication=op();
+    let fault=FaultGuard::set(|point,_|if point=="before_note"{Err("INJECTED photo pending".into())}else{Ok(())});assert!(v.publish_meeting(&parser,&organization,&publication).is_err());drop(fault);
+    fs::write(t.0.join(format!("Recall/Sources/{memory}-{parser}.txt")),"Forged machine transcription").unwrap();
+    let reopened=Vault::open(&t.0).unwrap();assert!(reopened.list("").unwrap()[0].conflict.is_some());assert_eq!(fs::read_dir(t.0.join(format!("Recall/History/{memory}"))).unwrap().count(),1);
+    assert!(!fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap().starts_with("---"));
+}
+
+#[test]
+fn previous_native_typed_publication_artifacts_replay_and_recover_unchanged(){
+    // Exported by compiling source-identical native modules from pre-photo commit
+    //887e1c4, using explicitly synthetic provider fixtures. This is storage
+    // compatibility evidence, not model/provider execution evidence.
+    let fixture:serde_json::Value=serde_json::from_str(include_str!("fixtures/legacy-v3-organization.json")).unwrap();
+    assert_eq!(fixture["generated_from"],"887e1c4df3eab2fab64f795c633b7ef6130edf6d");
+    for case in fixture["cases"].as_array().unwrap(){
+        let f=Fixture::new();
+        for directory in case["directories"].as_array().unwrap(){let relative=Path::new(directory.as_str().unwrap());assert!(relative.components().all(|c|matches!(c,Component::Normal(_))));fs::create_dir_all(f.0.join(relative)).unwrap();}
+        for file in case["files"].as_array().unwrap(){
+            let relative=Path::new(file["path"].as_str().unwrap());assert!(relative.components().all(|c|matches!(c,Component::Normal(_))));
+            let path=f.0.join(relative);fs::create_dir_all(path.parent().unwrap()).unwrap();fs::write(path,file["contents"].as_str().unwrap()).unwrap();
+        }
+        let memory=case["memory_id"].as_str().unwrap();
+        let original=case["files"].as_array().unwrap().iter().find(|file|file["path"]==format!("Recall/_meta/journal/{}.json",case["publication_operation_id"].as_str().unwrap())).unwrap();
+        let event:serde_json::Value=serde_json::from_str(original["contents"].as_str().unwrap()).unwrap();let previous_document=event["markdown"].as_str().unwrap();
+        let v=Vault::open(&f.0).unwrap();
+        let saved=v.publish_meeting(case["parser_operation_id"].as_str().unwrap(),case["organization_operation_id"].as_str().unwrap(),case["publication_operation_id"].as_str().unwrap()).unwrap();
+        assert_eq!(saved.revision,2);assert_eq!(saved.note,previous_document);
+        assert_eq!(fs::read_to_string(f.0.join(format!("Recall/Memories/{memory}.md"))).unwrap(),previous_document);
+        assert_eq!(v.history(memory).unwrap().len(),2);
+    }
+}

@@ -77,7 +77,7 @@ pub fn validate(
         &parsed.source_sha256,
         &parsed.model,
     )?;
-    if layout.schema_version != 1
+    if ![1, 2].contains(&layout.schema_version)
         || !["meeting", "project", "operations"].contains(&layout.category.as_str())
         || layout
             .title_span
@@ -169,7 +169,7 @@ pub fn render(
             3
         } else if candidate.status == "needs_review" {
             2
-        } else if layout.follow_ups.contains(n)
+        } else if (layout.schema_version >= 2 || layout.follow_ups.contains(n))
             && candidate
                 .span
                 .text
@@ -239,14 +239,77 @@ pub fn render(
     out.push_str(&format!("\n## Original evidence\n\n[[Recall/Sources/{}.txt|Original meeting capture]]\n\nSHA-256: `{}`\n\nOrganization is derived from source statements. Estimates, identities and dates require review.\n",parsed.source_id,parsed.source_sha256));
     Ok(out)
 }
-pub(crate) fn evidence(parsed:&jev::ParsedSource,context:&[Context])->serde_json::Value {
+pub(crate) fn render_for_evidence(
+    layout: &Layout,
+    parsed: &jev::ParsedSource,
+    context: &[Context],
+    original_sha: &str,
+    visual: Option<&crate::processing::VisualEvidence>,
+) -> Result<String, String> {
+    let mut document = render(layout, parsed, context)?;
+    if let Some(visual) = visual {
+        let extension = match visual.mime_type.as_str() {
+            "image/png" => "png",
+            "image/jpeg" => "jpg",
+            "image/webp" => "webp",
+            _ => return Err("Unsupported original visual MIME".into()),
+        };
+        let suffix = visual
+            .transcript_basename
+            .strip_prefix(&format!("{}-", parsed.source_id))
+            .and_then(|v| v.strip_suffix(".txt"))
+            .ok_or("Invalid native transcript basename")?;
+        if uuid::Uuid::parse_str(suffix).map_or(true, |id| id.to_string() != suffix)
+            || original_sha.len() != 64
+            || !original_sha.bytes().all(|b| b.is_ascii_hexdigit())
+            || visual.transcription_sha256 != parsed.source_sha256
+        {
+            return Err("Invalid native visual evidence identity".into());
+        }
+        document=document.replacen(&format!("source_sha256: {}\n",yaml(&parsed.source_sha256)),&format!("source_sha256: {}\ntranscription_sha256: {}\nvisual_status: unreviewed\ntranscription_model: {}\n",yaml(original_sha),yaml(&visual.transcription_sha256),yaml(&visual.reader_model)),1);
+        document=document.replace(&format!("[[Recall/Sources/{}.txt|Original meeting capture]]",parsed.source_id),&format!("[[Recall/Sources/{}.{extension}|Original photo]]\n\n[[Recall/Sources/{}|Unreviewed machine transcription]]",parsed.source_id,visual.transcript_basename));
+        document = document.replace(
+            &format!("SHA-256: `{}`", parsed.source_sha256),
+            &format!(
+                "Original photo SHA-256: `{original_sha}`\n\nTranscription SHA-256: `{}`",
+                visual.transcription_sha256
+            ),
+        );
+        let mut review="## Visual transcription review\n\nAll quoted text below is an unreviewed machine reading of the original photo. No visual accuracy is claimed. Inspect the original before treating any item as established.\n\n".to_string();
+        for uncertainty in &visual.uncertainties {
+            review.push_str(&format!("- {}\n", escaped(uncertainty)));
+        }
+        review.push_str("\n## Observations (source statements)");
+        document = document.replacen("## Observations (source statements)", &review, 1);
+    } else if original_sha != parsed.source_sha256 {
+        return Err("Text original identity mismatch".into());
+    }
+    Ok(document)
+}
+pub(crate) fn evidence_for_source(
+    parsed: &jev::ParsedSource,
+    context: &[Context],
+    original_sha: &str,
+    visual: Option<&crate::processing::VisualEvidence>,
+) -> serde_json::Value {
+    let mut value = evidence(parsed, context);
+    if original_sha != parsed.source_sha256 {
+        value["original_source_sha256"] = original_sha.into();
+        value["visual_status"] = "unreviewed_transcription".into();
+    }
+    if let Some(visual) = visual {
+        value["visual_evidence"] = serde_json::json!({"status":"unreviewed","human_review_required":true,"reader_model":visual.reader_model,"uncertainties":visual.uncertainties,"mime_type":visual.mime_type,"transcription_sha256":visual.transcription_sha256});
+    }
+    value
+}
+pub(crate) fn evidence(parsed: &jev::ParsedSource, context: &[Context]) -> serde_json::Value {
     serde_json::json!({"source_id":parsed.source_id,"source_sha256":parsed.source_sha256,
         "spans":parsed.candidates.iter().enumerate().map(|(id,c)|serde_json::json!({"id":id,"text":c.span.text,"kind":c.kind,"status":c.status})).collect::<Vec<_>>(),
         "unresolved_mentions":parsed.mentions,"existing_memories":context})
 }
 pub fn tool_schema() -> serde_json::Value {
     serde_json::json!({"type":"object","additionalProperties":false,"required":["schema_version","title_span","category","observations","follow_ups","questions","related_memory_ids"],"properties":{
-        "schema_version":{"type":"integer","enum":[1]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["meeting","project","operations"]},
+        "schema_version":{"type":"integer","enum":[2]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["meeting","project","operations"]},
         "observations":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"follow_ups":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"questions":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"related_memory_ids":{"type":"array","maxItems":4,"items":{"type":"string"}}}})
 }
 #[cfg(test)]
@@ -343,7 +406,31 @@ pub(crate) mod tests {
             .unwrap()
             .contains("8 MW confirmed"));
         assert!(out.contains("Original meeting capture"));
+        assert!(out.contains("- [ ] “Call Sarah."));
+        assert!(out.contains("- [ ] “Ask operator about gas."));
         assert!(out.contains(&p.source_sha256));
+    }
+    #[test]
+    fn provider_schema_uses_current_renderer_contract() {
+        assert_eq!(
+            tool_schema()["properties"]["schema_version"]["enum"],
+            serde_json::json!([2])
+        );
+    }
+    #[test]
+    fn explicit_source_actions_survive_model_section_misclassification() {
+        let p = source();
+        let mut l = layout(&p);
+        l.schema_version = 2;
+        l.observations = std::mem::take(&mut l.follow_ups);
+        let out = render(&l, &p, &[]).unwrap();
+        assert!(out.contains("- [ ] “Call Sarah."));
+        assert!(out.contains("- [ ] “Ask operator about gas."));
+        assert!(!out
+            .split("## Open questions")
+            .next()
+            .unwrap()
+            .contains("Need generators by Dec?"));
     }
     #[test]
     fn omissions_duplicates_paths_and_unsupported_links_are_rejected() {
