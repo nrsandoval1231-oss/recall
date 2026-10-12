@@ -119,6 +119,14 @@ Compare transcription/interpretation quality, uncertainty retention, numeric/nam
 
 No provider/model credential is committed to this public repository.
 
+## Phone native processing and local retrieval
+
+The tailnet companion preserves original text and photo captures in the selected vault. Each capture may explicitly authorize native Jev and Claude processing with at most four relevant vault excerpts; no consent means no provider work. Keys, models, prices and budgets are read only by the desktop native process. Deterministic stage IDs and durable source-bound consent records protect duplicate attempts. Native receipt verification alone establishes publication; a cached published flag becomes needs-review if its original or receipt cannot be verified.
+
+Background workers are in-memory threads. Restart preserves evidence, consent and completed stages, but does not automatically resume pending provider work. Retry the same capture operation to resume safely; uncertain delivery requires desktop inspection and does not automatically resend. Ask returns bounded local source-backed quotes with original hashes and inspection links; it is explicitly not a Claude-generated answer. Cross-origin requests and repeated/invalid consent values are refused. Capture acknowledgement remains truthful if later processing metadata fails.
+
+Live inference and iPhone/Tailscale execution require credentials, consent/configuration and devices. Fixture tests prove native orchestration/storage only.
+
 ## Durable native Jev operations
 
 `processing_parse` accepts only a selected-vault token, canonical operation/memory UUIDs, expected revision and explicit consent. Native configuration uses `TYPESAFE_API_KEY`, a supported pinned `RECALL_JEV_MODEL`, `RECALL_JEV_INPUT_USD_PER_MTOK`, `RECALL_JEV_DAILY_BUDGET_USD` and `RECALL_JEV_MONTHLY_BUDGET_USD`. Prices and budgets are positive USD decimals. Keys never travel through IPC or job status. Configure current provider prices yourself; Recall does not assume a price or model deployment.
@@ -142,11 +150,3 @@ After a durable Jev operation is `parsed`, `meeting_organize` takes its native o
 The processing command uses Claude only as the visual transcription adapter when the original source is a photo. It uses the existing reader, native budgets and explicit source-specific consent. Jev receives the bounded machine transcript as text, never the image. Original photo identity and transcript identity are separate, and native reading metadata/uncertainties remain linked to both. Unknown delivery stops automatic resend. Missing Jev native key/model/price/budgets stops before paid visual reading.
 
 Generated Obsidian notes link the original photo and the immutable unreviewed transcription attachment. They retain explicit visual-review status and all reader uncertainties. Librarian context includes those uncertainties and provenance, not only plain transcribed words. Source-backed Ask returns current notes and the original-photo inspection reference without pretending photo bytes are verified text. Handwriting accuracy requires actual provider evaluation with approved samples; synthetic image signatures in tests prove orchestration only. Current bounds are16KiB parser text,64 source spans,128 mention candidates and one photo up to25MiB; oversized/malformed input is retained locally and fails processing safely.
-
-## Phone native processing and local retrieval
-
-The tailnet companion preserves original text and photo captures in the selected vault. Each capture may explicitly authorize native Jev and Claude processing with at most four relevant vault excerpts; no consent means no provider work. Keys, models, prices and budgets are read only by the desktop native process. Deterministic stage IDs and durable source-bound consent records protect duplicate attempts. Native receipt verification alone establishes publication; a cached published flag becomes needs-review if its original or receipt cannot be verified.
-
-Background workers are in-memory threads. Restart preserves evidence, consent and completed stages, but does not automatically resume pending provider work. Retry the same capture operation to resume safely; uncertain delivery requires desktop inspection and does not automatically resend. Ask returns bounded local source-backed quotes with original hashes and inspection links; it is explicitly not a Claude-generated answer. Cross-origin requests and repeated/invalid consent values are refused. Capture acknowledgement remains truthful if later processing metadata fails.
-
-Live inference and iPhone/Tailscale execution require credentials, consent/configuration and devices. Fixture tests prove native orchestration/storage only.
