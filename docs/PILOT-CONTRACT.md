@@ -1,5 +1,10 @@
 # Recall pilot product contract
 
+## Owner-approved next build — Meeting to Memory
+
+Follow [Meeting to Memory](MEETING-TO-MEMORY.md) for the required real Jev parsing, Claude organization, validated Obsidian Markdown/YAML writing and evidence-backed recall. The latest warm-glass business board in UX-SPEC is the only active desktop visual direction. The concept video is illustrative, not verified runtime behavior. PR #26 remains isolated.
+
+
 ## Amendment — 2026-10-10 (current)
 
 Status: **CURRENT OWNER DECISION — normative for the product center.** This amendment supersedes conflicting parts of the 2026-10-09 PWA-only pilot contract preserved below, and conflicting pilot-center sentences in older requirements, designs, implementation notes, acceptance ledgers, and builder handoffs. The 2026-10-09 text stays in this file, labeled historical. PR #16 stays in the repository.
