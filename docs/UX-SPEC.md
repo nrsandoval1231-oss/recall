@@ -3,6 +3,10 @@
 > **CURRENT PRODUCT CENTER — 2026-10-10.** The [pilot amendment](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The desktop Memory Surface is the primary shell. The phone is the capture/ask companion. No login or email-auth UX. PR #16 remains an optional web companion and enrollment transport. The 2026-10-09 PWA-only pilot note is historical.
 
 
+## Intelligence behavior — 2026-10-11
+
+The visual surface presents the required Jev parsing and Claude librarian pipeline without exposing model internals as a workflow the user must manage. Capture is durable first; interpretation can be pending, uncertain, needs-review or organized. Claude proposes vault organization, native YAML properties and meaningful wikilinks, while validated native code writes Markdown and preserves originals and corrections. Keyword search must be labeled as such, never presented as a completed Claude answer. This is the approved product requirement, not evidence that the live pipeline is implemented. The monthly timeline remains part of the approved desktop composition.
+
 Version: 1.1 | Date: 2026-10-10 | Status: **approved canonical product direction, with the owner visual reference as desktop authority**
 
 This document defines the target Recall experience. It supersedes conventional dashboard/page-navigation interpretations of the earlier UX baseline while preserving Recall's trust, provenance, accessibility, and universal-memory requirements.
