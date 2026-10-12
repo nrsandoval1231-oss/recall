@@ -222,7 +222,7 @@ The steps to run on the host and on devices are the unchecked list in [Real-devi
 
 ## Desktop Obsidian Memory Surface (2026-10-10)
 
-This section is the desktop vault slice. The PR #16 sentence above still describes that packet: native installers were not its acceptance path. This slice is the product center. It is synthetic and automated. It is not an installed Windows app, a phone companion, or a live Claude reading.
+This section records the October 10 desktop-vault candidate snapshot, not the latest integrated behavior. The PR #16 sentence above still describes that packet: native installers were not its acceptance path. This slice became the product center. Its evidence is synthetic and automated; it is not installed Windows, real iPhone, or a live Claude reading. Later opt-in reader and phone changes are tracked separately below.
 
 Candidate: branch `cursor/desktop-vault-memory-surface-bab1` (exact SHA in the PR). Environment: Linux sandbox, Node 22.14.0, rustc 1.99.0. Synthetic Brooks Campus fixture and generated photo bytes only. No private notes. No paid model call.
 
@@ -230,7 +230,7 @@ Candidate: branch `cursor/desktop-vault-memory-surface-bab1` (exact SHA in the P
 
 The Tauri app opens the Memory Surface with no email, password, or sign-in link. `?mode=legacy-cloud` still reaches the older cloud desktop, including its email sign-in. That is not the happy path. `apps/web` enrollment is unchanged.
 
-A chosen folder, or `Documents/Recall` from **Use default vault**, holds `Recall/Sources`, `Recall/Memories`, `Recall/History`, and `Recall/_meta`. The webview cannot pass a path. `RECALL_VAULT_DIR` is a native-process override and must be absolute. Import writes the original bytes before the Markdown note. A correction appends history and publishes only when the expected revision still matches. A note edited outside Recall is kept. Ask is keyword search over those notes, or over the labeled synthetic fixture when no vault memory exists, and can open the original. The result is labeled keyword search. Claude reading is unwired. A test can inject a synthetic reader; it does not make a network call, and its text is saved only after an explicit checkbox and a save.
+A chosen folder, or `Documents/Recall` from **Use default vault**, holds `Recall/Sources`, `Recall/Memories`, `Recall/History`, and `Recall/_meta`. The webview cannot pass a path. `RECALL_VAULT_DIR` is a native-process override and must be absolute. Import writes the original bytes before the Markdown note. A correction appends history and publishes only when the expected revision still matches. A note edited outside Recall is kept. Ask is keyword search over those notes, or over the labeled synthetic fixture when no vault memory exists, and can open the original. The result is labeled keyword search. At this dated candidate commit, Claude reading was unwired. A test could inject a synthetic reader; it did not make a network call, and its text was saved only after an explicit checkbox and a save. Later opt-in transport is described in subsequent evidence and does not retroactively change this candidate's test results.
 
 When no vault is open, or the vault has no memories, the board is the synthetic Brooks Campus fixture and says so. People, places, topics, and related counts on that board are the illustration. They are not inferred from a real vault.
 
