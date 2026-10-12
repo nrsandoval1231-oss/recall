@@ -1,5 +1,18 @@
 # AI ingestion and grounded retrieval
 
+## Jev capability discovery — 2026-10-12
+
+Primary sources: [API](https://docs.typesafe.ai/api), [state](https://docs.typesafe.ai/concepts/state), [models](https://docs.typesafe.ai/models), [Python SDK](https://docs.typesafe.ai/sdk/python), [JavaScript SDK](https://docs.typesafe.ai/sdk/javascript), [known limitations](https://docs.typesafe.ai/model-jaggedness/jev-1.13), and [legal terms](https://docs.typesafe.ai/legal). These were inspected directly; independent similarly named sites are not authority.
+
+Jev accepts text, not images/audio/video, and produces bounded Choice, Score or Noul decisions, not generated transcriptions. The supported endpoint is `POST https://api.typesafe.ai/v1/systemone` with Bearer authentication, `model`, `state`, and a named question map. The documented concrete model is `jev-1.13.0`; moving aliases exist, but the native adapter requires a concrete version and response-model equality. Python `typesafe-sdk` and Node 20+ `@typesafe-ai/sdk` exist; Recall reuses its existing Rust HTTPS dependency instead of adding a runtime or SDK. Hosted account/customer terms govern model use; no open-weight/local Jev distribution was established by these sources. SDK licensing is separate from model rights.
+
+The native `jev.rs` boundary builds exact UTF-8 evidence spans and token candidates, asks typed classifications, and returns unresolved entity/date/quantity/unit mentions and observation/question/follow-up/decision/possible-commitment/conflict candidates. It preserves raw text, source hash, source ID, offsets, model and token usage. It does not perform arithmetic, infer a year, normalize identities, or turn model confidence into verification. Retraction scope is conservatively retained through the rest of the source after a crossed-out marker. Uncertainty remains lexical and model-based, not a semantic proof. Token-level entity candidates can miss multiword identities; do not merge them without separate evidence.
+
+Limits: 16 KiB text, 64 spans, 128 mention candidates, configured maximum request bytes capped at 128 KiB, 128 KiB response and 30-second transport timeout. No redirects, URL overrides or automatic retries. Consent, credentials, source digest, version and response distributions are checked. Provider errors are generic and never include credentials or response bodies.
+
+This is an executable provider adapter, not a completed workflow. It is deliberately not exposed through the UI until durable jobs/reservations, original-photo transcription provenance, and revision-safe downstream organization exist. A byte bound is not a financial budget. External calls still require explicit consent and configured spend reservations. Real Jev execution and handwriting evaluation are blocked by missing credentials; Jev itself cannot perform handwriting OCR. Evaluate the existing consented Claude photo reader as the narrow transcription adapter, preserving crossed-out text and legibility, before librarian organization. No synthetic response establishes provider quality.
+
+
 ## Active Claude librarian status (2026-10-11)
 
 The active desktop-vault product intends consented Claude interpretation of handwritten notes, source-grounded organization, cross-note relationships, and vague retrieval. Current keyword matching is not generative recall. Existing provider-independent contracts and cloud embeddings below are reusable safety guidance, not evidence that live Claude or pgvector are integrated into the active vault path. Validate real handwriting, ambiguity, source citations, correction precedence, and abstention before claiming the librarian works. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
