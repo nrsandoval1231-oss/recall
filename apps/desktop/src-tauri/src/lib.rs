@@ -1,4 +1,12 @@
+#[allow(dead_code)]
+mod jev;
+mod processing;
+mod meeting;
+mod memory_query;
+mod companion_processing;
 mod librarian;
+#[allow(dead_code)]
+mod organization_plan;
 pub(crate) mod local_vault;
 mod managed_export;
 mod persistence;
@@ -242,6 +250,20 @@ fn vault_capture(
     })
 }
 #[tauri::command]
+fn vault_capture_note(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    operation_id: String,
+    note: String,
+) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| {
+        let memory=vault.capture_note(&operation_id, &note)?;
+        vault.processing_snapshot(&memory.id, memory.revision)?;
+        Ok(memory)
+    })
+}
+
+#[tauri::command]
 fn vault_list(
     state: tauri::State<'_, local_vault::LocalVaultState>,
     expected_vault_id: String,
@@ -364,6 +386,101 @@ fn librarian_read(
     librarian::read_selected(&root, &librarian::config_from_env(), &input, &librarian::ClaudeTransport)
 }
 
+#[tauri::command]
+async fn processing_parse(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    memory_id: String,
+    operation_id: String,
+    expected_revision: u64,
+    consent: bool,
+) -> Result<processing::Job, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let parser_config=processing::Config::from_env();
+        let reader_config=librarian::config_from_env();
+        processing::parse_with_visual(&vault, &parser_config, &operation_id,
+            &memory_id, expected_revision, consent, &processing::NativeJev,
+            Some((&reader_config, &librarian::ClaudeTransport)))
+    }).await.map_err(|_| "Parser worker stopped; inspect the saved operation before retrying".to_string())?
+}
+
+#[tauri::command]
+fn processing_status(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    operation_id: String,
+) -> Result<processing::Job, String> {
+    state.with(&expected_vault_id, |vault| processing::status(vault, &operation_id))
+}
+
+#[tauri::command]
+async fn meeting_organize(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    operation_id: String,
+    consent: bool,
+) -> Result<librarian::StoredOrganization, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        librarian::organize_selected(&vault, &librarian::config_from_env(), &parser_operation_id,
+            &operation_id, consent, &librarian::ClaudeTransport)
+    }).await.map_err(|_| "Claude worker stopped; review the operation before retrying".to_string())?
+}
+
+#[tauri::command]
+async fn meeting_review_status(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    prior_operation_id: String,
+    reviewed_from: Option<String>,
+) -> Result<librarian::OrganizationReviewStatus, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        librarian::organization_review_status(&vault, &librarian::config_from_env(), &parser_operation_id, &prior_operation_id, reviewed_from.as_deref())
+    }).await.map_err(|_| "Organization review check stopped; no new request authorized".to_string())?
+}
+
+#[tauri::command]
+async fn meeting_organize_reviewed(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    prior_operation_id: String,
+    operation_id: String,
+    consent: bool,
+    acknowledge_uncertainty: bool,
+) -> Result<librarian::StoredOrganization, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        librarian::organize_selected_reviewed(&vault, &librarian::config_from_env(), &parser_operation_id,
+            &prior_operation_id, &operation_id, consent, acknowledge_uncertainty, &librarian::ClaudeTransport)
+    }).await.map_err(|_| "Claude worker stopped; reviewed attempt retained and resend blocked".to_string())?
+}
+
+#[tauri::command]
+fn meeting_publish(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    organization_operation_id: String,
+    operation_id: String,
+) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| vault.publish_meeting(
+        &parser_operation_id, &organization_operation_id, &operation_id))
+}
+
+#[tauri::command]
+fn memory_ask(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    question: String,
+) -> Result<memory_query::Answer, String> {
+    state.with(&expected_vault_id, |vault| memory_query::ask(vault, &question))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -389,6 +506,7 @@ pub fn run() {
             vault_select,
             vault_open_default,
             vault_capture,
+            vault_capture_note,
             vault_list,
             vault_correct,
             vault_restore_note,
@@ -398,6 +516,13 @@ pub fn run() {
             vault_history,
             librarian_status,
             librarian_read,
+            processing_parse,
+            processing_status,
+            meeting_organize,
+            meeting_organize_reviewed,
+            meeting_review_status,
+            meeting_publish,
+            memory_ask,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,

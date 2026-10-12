@@ -1,6 +1,6 @@
 # Recall — Meeting to Memory (RCL-INT-001)
 
-Status: **canonical next implementation packet; NOT implemented or accepted.** Owner decision: 2026-10-11. This packet extends the merged local-first foundation and the latest warm-glass desktop design. PR #26 is deliberately isolated and must not be merged, rebased, copied, or used as authority for this packet.
+Status: **canonical implementation packet; native text pipeline implemented and owner-observed live Windows text acceptance recorded. Photo, phone and visual fidelity gates remain OPEN.** Owner decision: 2026-10-11. This packet extends the merged local-first foundation and the latest warm-glass desktop design. PR #26 is deliberately isolated and must not be merged, rebased, copied, or used as authority for this packet.
 
 ## Outcome
 
@@ -68,5 +68,7 @@ source_id: synthetic-meeting-001
 No PostgreSQL requirement, hosted backend, autonomous agent swarm, graph database, speculative sync, or UI rewrite. SQLite is permitted only for rebuildable indexes and local operational state. Preserve the current native vault writer. UI implementation must follow the one canonical visual direction in UX-SPEC; do not fabricate fixture people, events, or statuses as real memories.
 
 ## Sequencing
+
+Current evidence: PRs28–43 implement and verify the bounded text loop; [live Windows evidence](audits/2026-10-12-live-windows-meeting.md) records real Jev/Sonnet execution, restart retrieval and Obsidian original access. The canonical image is now committed in this packet. The sequence below records the original dependency order, not a claim that remaining photo/phone gates passed.
 
 First commit and verify the approved UI image asset; then implement the smallest real end-to-end note transformation; then bind the Memory Surface to actual vault data; then complete installed Windows and iPhone pilot gates. Maintain a per-commit acceptance ledger. Do not expand to broad document/voice integrations until this slice is trustworthy.

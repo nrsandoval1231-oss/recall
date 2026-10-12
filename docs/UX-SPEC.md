@@ -19,9 +19,11 @@ The desktop composition target is the owner-supplied reference below. Prose in t
 
 The selected composition uses a narrow dark navigation rail; broad top Ask field with voice control and contextual prompt chips; floating Key People and Key Locations panels to the left of a dominant central project board; a recent-notes list beneath it; a right-side monthly calendar and today's agenda; and a bottom row of compact Active Projects, This Week, Open Items and Capture actions. The UI uses warm ivory and charcoal, softly sunlit environmental depth, translucent smoked glass, restrained gold/taupe accents, thin borders, elegant serif display headings and clean readable body type. The backdrop is atmospheric and subordinate to content; never hardcode fictional photos or people as real vault evidence.
 
-**Asset handoff:** the latest generated mockup must be checked into `docs/assets/recall-desktop-canonical-2026-10-11.png` before visual implementation. The older `memory-surface-reference-2026-10-10.jpg` is historical once the new asset is committed. Do not claim the new PNG is present until verified. Use only one canonical desktop reference after the asset is installed; no parallel competing UI specifications.
+**Verified asset handoff (2026-10-12):** the owner uploaded `Screenshot 2026-10-12 163754.png`; its original bytes are preserved at [recall-desktop-canonical-2026-10-11.png](assets/recall-desktop-canonical-2026-10-11.png). PNG: 1182 × 789, RGBA. SHA-256: `66a0b09c499604ef5fc5811c55a9868ccd5d7dcc3966e594f74782b66dec275a`. This is the single canonical desktop reference. Mockup people, dates, counts and business records are illustrative, not actual vault data. Asset verification does not establish implemented UI fidelity.
 
-**Interaction:** Capture raw messy notes without filing or cleanup; show original saved → Jev parsing → Claude organizing → validated Obsidian write, with honest pending/error/uncertain states. Open the final Markdown/YAML note and preserved original in Obsidian. This is a target scenario, not yet a live-validated product capability.
+![Canonical owner-selected Recall desktop mockup](assets/recall-desktop-canonical-2026-10-11.png)
+
+**Interaction:** Capture raw messy notes without filing or cleanup; show original saved → Jev parsing → Claude organizing → validated Obsidian write, with honest pending/error/uncertain states. Open the final Markdown/YAML note and preserved original in Obsidian. The installed Windows text loop is owner-verified in the acceptance ledger; photo/phone and visual fidelity acceptance remain open.
 
 ## Historical owner visual reference (2026-10-10)
 

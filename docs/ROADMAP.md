@@ -2,7 +2,7 @@
 
 ## Immediate build sequence — RCL-INT-001
 
-1. Verify and commit the selected canonical UI image to the repo (PR #27 visual asset is pending).
+1. Canonical UI asset handoff verified: see the committed owner image and SHA-256 in UX-SPEC.
 2. Build and test the real Jev → Claude → deterministic vault writer path for one messy meeting note, with corrections, source provenance and honest processing states.
 3. Bind the approved warm-glass Memory Surface to actual vault data and open-in-Obsidian evidence.
 4. Complete installed Windows and real iPhone/Tailscale acceptance. No feature expansion until the loop works.

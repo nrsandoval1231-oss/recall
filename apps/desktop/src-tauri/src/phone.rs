@@ -1,8 +1,9 @@
 //! Phone capture and ask for the desktop Obsidian vault.
 //!
 //! This process is the Tailscale companion. It serves one mobile page and writes
-//! through the same vault the desktop app uses. It does not call Claude, does not
-//! read an API key, and does not talk to Cloud Postgres. Bind is a Tailscale
+//! through the same vault the desktop app uses. Provider processing requires
+//! explicit per-capture consent and native configuration; credentials stay on
+//! the desktop. No Cloud Postgres is used. Bind is a Tailscale
 //! address or loopback unless every interface is explicitly allowed.
 
 use crate::local_vault::{Vault, VaultMemory};
@@ -21,52 +22,6 @@ const CAPTURES_PER_MINUTE: u32 = 30;
 const ASKS_PER_MINUTE: u32 = 60;
 const KEYWORD_LABEL: &str = "Keyword search. Not a Claude answer.";
 const ICON_PNG: &[u8] = include_bytes!("../icons/32x32.png");
-
-const QUESTION_WORDS: &[&str] = &[
-    "what",
-    "whats",
-    "who",
-    "whom",
-    "whose",
-    "where",
-    "when",
-    "why",
-    "how",
-    "do",
-    "does",
-    "did",
-    "is",
-    "are",
-    "was",
-    "were",
-    "be",
-    "been",
-    "you",
-    "your",
-    "yours",
-    "me",
-    "my",
-    "we",
-    "our",
-    "the",
-    "a",
-    "an",
-    "of",
-    "to",
-    "for",
-    "in",
-    "on",
-    "at",
-    "and",
-    "or",
-    "about",
-    "know",
-    "tell",
-    "anything",
-    "something",
-    "please",
-    "recall",
-];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BindMode {
@@ -389,7 +344,43 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
         None => vault.capture_note(&form.operation_id, &form.note),
     };
     match saved {
-        Ok(memory) => redirect(&format!("/saved/{}", memory.id)),
+        Ok(memory) => {
+            if let Err(error) = vault.processing_snapshot(&memory.id, memory.revision) {
+                return saved_processing_error(&memory.id, &error);
+            }
+            if form.process_consent {
+                match crate::companion_processing::consent(&vault, &memory, true) {
+                    Ok(Some(intent)) => {
+                        let requested = crate::companion_processing::Outcome {
+                            state: "pending".into(),
+                            message:
+                                "Processing requested. Refresh this saved page for native status."
+                                    .into(),
+                            memory_id: memory.id.clone(),
+                            revision: memory.revision,
+                        };
+                        if let Err(error) = crate::companion_processing::record(&vault, &requested)
+                        {
+                            return saved_processing_error(&memory.id, &error);
+                        }
+                        let worker = vault.clone();
+                        std::thread::spawn(move || {
+                            let outcome = crate::companion_processing::run(&worker, &intent)
+                                .unwrap_or_else(|error| crate::companion_processing::Outcome {
+                                    state: "error".into(),
+                                    message: error,
+                                    memory_id: requested.memory_id,
+                                    revision: requested.revision,
+                                });
+                            let _ = crate::companion_processing::record(&worker, &outcome);
+                        });
+                    }
+                    Ok(None) => {}
+                    Err(error) => return saved_processing_error(&memory.id, &error),
+                }
+            }
+            redirect(&format!("/saved/{}", memory.id))
+        }
         Err(err) => not_saved(
             vault_status(&err),
             &err,
@@ -398,6 +389,10 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             form.photo.is_some(),
         ),
     }
+}
+
+fn saved_processing_error(memory_id: &str, error: &str) -> PhoneResponse {
+    html(200, page("Capture saved; processing stopped", &format!("<h1>Capture saved; processing stopped</h1><p>{}</p><p><a href=\"/saved/{}\">Inspect the saved capture</a></p>", esc(error), esc(memory_id))))
 }
 
 fn not_saved(
@@ -435,8 +430,10 @@ struct CaptureForm {
     filename: String,
     photo: Option<Vec<u8>>,
     note: String,
+    process_consent: bool,
 }
 
+#[derive(Debug)]
 struct FormError {
     status: u16,
     message: String,
@@ -480,6 +477,7 @@ fn read_capture(request: &PhoneRequest<'_>) -> Result<CaptureForm, FormError> {
             filename: String::new(),
             photo: None,
             note,
+            process_consent: header_consent(request.headers)?,
         });
     }
     Ok(CaptureForm {
@@ -487,6 +485,7 @@ fn read_capture(request: &PhoneRequest<'_>) -> Result<CaptureForm, FormError> {
         filename: "photo".into(),
         photo: Some(request.body.to_vec()),
         note,
+        process_consent: header_consent(request.headers)?,
     })
 }
 
@@ -519,6 +518,7 @@ fn read_urlencoded_capture(request: &PhoneRequest<'_>) -> Result<CaptureForm, Fo
         filename: String::new(),
         photo: None,
         note,
+        process_consent: form_consent(text)?,
     })
 }
 
@@ -530,6 +530,7 @@ fn read_multipart_capture(content_type: &str, body: &[u8]) -> Result<CaptureForm
     let mut photo: Option<(String, Vec<u8>)> = None;
     let mut note = String::new();
     let mut operation = None;
+    let mut process_consent = None;
     for part in split_multipart(body, &boundary).map_err(|message| FormError {
         status: 400,
         message,
@@ -549,6 +550,15 @@ fn read_multipart_capture(content_type: &str, body: &[u8]) -> Result<CaptureForm
             }
             "note" => note = utf8_field(part.body)?,
             "operation_id" => operation = Some(utf8_field(part.body)?),
+            "process_consent" => {
+                if process_consent.is_some() {
+                    return Err(FormError {
+                        status: 400,
+                        message: "Repeated processing consent".into(),
+                    });
+                }
+                process_consent = Some(consent_value(&utf8_field(part.body)?)?);
+            }
             _ => {}
         }
     }
@@ -569,7 +579,60 @@ fn read_multipart_capture(content_type: &str, body: &[u8]) -> Result<CaptureForm
         filename,
         photo,
         note,
+        process_consent: process_consent.unwrap_or(false),
     })
+}
+
+fn form_consent(body: &str) -> Result<bool, FormError> {
+    let mut value = None;
+    for pair in body.split('&') {
+        let (key, raw) = pair.split_once('=').unwrap_or((pair, ""));
+        if url_decode(key).map_err(|message| FormError {
+            status: 400,
+            message,
+        })? == "process_consent"
+        {
+            if value.is_some() {
+                return Err(FormError {
+                    status: 400,
+                    message: "Repeated processing consent".into(),
+                });
+            }
+            value = Some(consent_value(&url_decode(raw).map_err(|message| {
+                FormError {
+                    status: 400,
+                    message,
+                }
+            })?)?);
+        }
+    }
+    Ok(value.unwrap_or(false))
+}
+fn header_consent(headers: &[(&str, &str)]) -> Result<bool, FormError> {
+    let mut values = headers
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("x-recall-process-consent"));
+    let value = values.next();
+    if values.next().is_some() {
+        return Err(FormError {
+            status: 400,
+            message: "Repeated processing consent".into(),
+        });
+    }
+    match value {
+        Some((_, value)) => consent_value(value),
+        None => Ok(false),
+    }
+}
+fn consent_value(value: &str) -> Result<bool, FormError> {
+    match value {
+        "" | "false" => Ok(false),
+        "true" => Ok(true),
+        _ => Err(FormError {
+            status: 400,
+            message: "Processing consent must be explicit true or false".into(),
+        }),
+    }
 }
 
 fn ask(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
@@ -589,7 +652,7 @@ fn ask(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
         Ok(vault) => vault,
         Err(err) => return vault_page(err),
     };
-    let answer = match keyword_answer(&vault, &question) {
+    let answer = match source_answer(&vault, &question) {
         Ok(answer) => answer,
         Err(err) => return vault_page(err),
     };
@@ -635,99 +698,31 @@ fn read_question(request: &PhoneRequest<'_>) -> Result<String, FormError> {
     Ok(question)
 }
 
-fn keyword_answer(vault: &Vault, question: &str) -> Result<String, String> {
-    if question.len() > MAX_QUESTION {
-        return Ok(abstain("That question is too long to search."));
-    }
+fn source_answer(vault: &Vault, question: &str) -> Result<String, String> {
     if question.trim().is_empty() {
         return Ok(abstain("Type a question to search the notes."));
     }
-    let terms = keyword_terms(question);
-    if terms.is_empty() {
+    let answer = crate::memory_query::ask(vault, question)?;
+    if answer.hits.is_empty() {
         return Ok(abstain(
-            "Type a question that includes a word from the notes.",
-        ));
-    }
-    let memories = vault.list_with_deleted(&terms.join(" "), false)?;
-    let eligible: Vec<&VaultMemory> = memories
-        .iter()
-        .filter(|memory| memory.state == "active" && memory.conflict.is_none())
-        .collect();
-    if eligible.is_empty() {
-        return Ok(abstain(
-            "Nothing in the notes matches that. This is keyword search of the desktop vault, not a Claude answer.",
+            "Nothing in the notes matches that. This is local retrieval, not a Claude answer.",
         ));
     }
     let mut cards = String::new();
-    for memory in eligible {
-        let note_path = note_rel(memory);
-        let body = esc(&excerpt(
-            &memory.note,
-            terms.first().map(String::as_str).unwrap_or(""),
-        ));
-        let evidence = if let Some(source_path) = source_rel(memory) {
-            format!(
-                "<img src=\"/sources/{}\" alt=\"Original page\"><p class=\"path\">{}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p>",
-                esc(&memory.id),
-                esc(&note_path),
-                esc(&source_path),
-                esc(&memory.id),
-            )
-        } else {
-            format!(
-                "<p>No original photo.</p><p class=\"path\">{}</p>",
-                esc(&note_path)
-            )
+    for hit in answer.hits {
+        let extension = match hit.mime_type.as_str() {
+            "image/png" => "png",
+            "image/jpeg" => "jpg",
+            "image/webp" => "webp",
+            _ => "txt",
         };
-        cards.push_str(&format!(
-            "<article data-memory=\"{}\"><h2>{}</h2><p>{body}</p>{evidence}</article>",
-            esc(&memory.id),
-            esc(&title_for(memory)),
-        ));
+        let paths = format!(
+            "Recall/Memories/{} · Recall/Sources/{}.{extension}",
+            hit.note_basename, hit.memory_id
+        );
+        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><h3>Original evidence</h3><p>{}</p><p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id)));
     }
-    Ok(format!(
-        "<h1>Notes that contain those words</h1><p class=\"fine\">{KEYWORD_LABEL} Searched the Markdown notes in the desktop vault. Nothing was sent to Claude.</p>{cards}"
-    ))
-}
-
-fn keyword_terms(question: &str) -> Vec<String> {
-    question
-        .to_lowercase()
-        .split_whitespace()
-        .map(strip_edges)
-        .filter(|term| term.chars().count() > 1 && !QUESTION_WORDS.contains(&term.as_str()))
-        .collect()
-}
-
-fn strip_edges(term: &str) -> String {
-    let chars: Vec<char> = term.chars().collect();
-    let mut start = 0;
-    let mut end = chars.len();
-    while start < end && !chars[start].is_alphanumeric() {
-        start += 1;
-    }
-    while end > start && !chars[end - 1].is_alphanumeric() {
-        end -= 1;
-    }
-    chars[start..end].iter().collect()
-}
-
-fn excerpt(text: &str, term: &str) -> String {
-    let at = text.to_lowercase().find(&term.to_lowercase());
-    let mut start = at.map(|index| index.saturating_sub(48)).unwrap_or(0);
-    while !text.is_char_boundary(start) && start > 0 {
-        start -= 1;
-    }
-    let mut end = text.len().min(start + 220);
-    while !text.is_char_boundary(end) && end < text.len() {
-        end += 1;
-    }
-    let slice = text[start..end].trim();
-    if start > 0 {
-        format!("…{slice}")
-    } else {
-        slice.to_string()
-    }
+    Ok(format!("<h1>Source-backed matches</h1><p>{}</p><p class=\"fine\">{KEYWORD_LABEL} Retrieved local quotes and evidence; nothing was sent to Claude.</p>{cards}",esc(&answer.message)))
 }
 
 fn saved(root: &Path, id: &str) -> PhoneResponse {
@@ -770,9 +765,11 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         );
     }
     let note_path = note_rel(&memory);
+    let processing=match crate::companion_processing::status(&vault,&memory.id){Ok(Some(status))=>format!("<section><h2>Processing: {}</h2><p>{}</p><a href=\"/saved/{}\">Refresh processing status</a></section>",esc(&status.state),esc(&status.message),esc(&memory.id)),Ok(None)=>"<p>No source-specific processing consent is recorded for this phone capture.</p>".into(),Err(_)=>format!("<p>Native processing is busy or needs review. <a href=\"/saved/{}\">Refresh status</a></p>",esc(&memory.id))};
+    let source_card=match vault.source(&memory.id){Ok(source)=>format!("<p class=\"path\">Original SHA-256: {}</p><a href=\"/sources/{}\">Open original evidence</a>",esc(&source.sha256),esc(&memory.id)),Err(_)=>"<p>Original evidence unavailable; resolve on desktop.</p>".into()};
     let body = if let Some(source_path) = source_rel(&memory) {
         format!(
-            "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. It was not uploaded to a cloud, and Claude was not called. Open the photo in the desktop app later if you want Claude to read it.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>",
+            "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. Provider processing status is shown below; nothing is sent without source-specific consent.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>",
             esc(&source_path),
             esc(&note_path),
             esc(&memory.id),
@@ -782,7 +779,7 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         )
     } else {
         format!(
-            "<h1>Saved in the desktop vault</h1><p>The note is in {note}. There is no original photo, and nothing was added under Recall/Sources. It was not uploaded to a cloud, and Claude was not called.</p><p>{}</p><p class=\"path\">{note}</p>",
+            "<h1>Saved in the desktop vault</h1><p>The note is in {note}. The original text is preserved separately. Provider processing status is shown below; nothing is sent without source-specific consent.</p><p>{}</p><p class=\"path\">{note}</p>",
             esc(&memory.note),
             note = esc(&note_path),
         )
@@ -792,7 +789,7 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         page(
             "Saved in the desktop vault",
             &format!(
-                "{body}{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
+                "{body}{source_card}{processing}{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
                 capture_form(&Uuid::new_v4().to_string(), ""),
                 ask_form("")
             ),
@@ -822,6 +819,7 @@ fn source(root: &Path, id: &str) -> PhoneResponse {
             let filename = match source.mime_type.as_str() {
                 "image/jpeg" => "original.jpg",
                 "image/webp" => "original.webp",
+                "text/plain" => "original.txt",
                 _ => "original.png",
             };
             let mut response = bytes(200, &source.mime_type, source.bytes);
@@ -875,7 +873,7 @@ fn home_page() -> String {
     page(
         "Recall",
         &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. The desktop app can read a saved photo with Claude later; this page does not.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
             capture_form(&Uuid::new_v4().to_string(), ""),
             ask_form("")
         ),
@@ -884,7 +882,7 @@ fn home_page() -> String {
 
 fn capture_form(operation_id: &str, note: &str) -> String {
     format!(
-        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><button type=\"submit\">Save to the vault</button></form><p class=\"fine\">A photo is optional. A note by itself is saved under Recall/Memories and does not add a file under Recall/Sources. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save to the vault</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
         esc(operation_id),
         esc(note)
     )
@@ -1514,6 +1512,14 @@ mod tests {
     }
 
     #[test]
+    fn processing_failure_does_not_deny_saved_capture() {
+        let response = saved_processing_error("saved-id", "Metadata unavailable <unsafe>");
+        let body = String::from_utf8(response.body).unwrap();
+        assert!(body.contains("Capture saved; processing stopped"));
+        assert!(body.contains("&lt;unsafe&gt;"));
+        assert!(!body.contains("Nothing new was written"));
+    }
+    #[test]
     fn bind_defaults_to_loopback_and_refuses_every_interface() {
         let choice = decide_bind(None, false, 8787, None).unwrap();
         assert_eq!(choice.addr, "127.0.0.1:8787".parse().unwrap());
@@ -1691,13 +1697,73 @@ mod tests {
     }
 
     #[test]
-    fn text_only_note_is_saved_without_a_source_and_ask_finds_it() {
+    fn processing_consent_is_explicit_and_duplicate_fields_are_rejected() {
+        assert!(!header_consent(&[]).unwrap());
+        assert!(header_consent(&[("X-Recall-Process-Consent", "true")]).unwrap());
+        assert!(header_consent(&[
+            ("x-recall-process-consent", "true"),
+            ("X-Recall-Process-Consent", "false")
+        ])
+        .is_err());
+        assert!(header_consent(&[("x-recall-process-consent", "yes")]).is_err());
+        assert!(!form_consent("note=hello").unwrap());
+        assert!(form_consent("process_consent=true").unwrap());
+        assert!(form_consent("process_consent=true&process_consent=false").is_err());
+        assert!(form_consent("process_consent=yes").is_err());
+        let dir = TempDir::new();
+        let id = Uuid::new_v4().to_string();
+        let response = call(
+            &dir.0,
+            "POST",
+            "/capture",
+            &[
+                ("content-type", "application/x-www-form-urlencoded"),
+                ("origin", "http://evil.example"),
+                ("host", "127.0.0.1:8787"),
+            ],
+            format!("operation_id={id}&note=hello&process_consent=true").as_bytes(),
+        );
+        assert_eq!(response.status, 403);
+        assert!(!dir.0.join("Recall").exists());
+    }
+    #[test]
+    fn vague_phone_ask_returns_current_memory_and_original_hash() {
+        let dir = TempDir::new();
+        let v = Vault::open(&dir.0).unwrap();
+        let m = v
+            .capture_note(
+                &Uuid::new_v4().to_string(),
+                "Utility late. Call Sarah. Crossed out: 8 MW confirmed.",
+            )
+            .unwrap();
+        let response = call(
+            &dir.0,
+            "POST",
+            "/ask",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            b"q=What+was+going+on+with+that+utility+delay%3F",
+        );
+        assert_eq!(response.status, 200);
+        let page = text(&response);
+        assert!(page.contains("Source-backed matches"));
+        assert!(page.contains("Utility late."));
+        assert!(page.contains(&v.source(&m.id).unwrap().sha256));
+        assert!(page.contains(&format!("/sources/{}", m.id)));
+        let original = call(&dir.0, "GET", &format!("/sources/{}", m.id), &[], b"");
+        assert_eq!(original.status, 200);
+        assert_eq!(original.content_type, "text/plain");
+        assert!(text(&original).contains("Crossed out: 8 MW confirmed."));
+    }
+    #[test]
+    fn text_only_note_preserves_original_source_and_ask_finds_it() {
         let dir = TempDir::new();
         Vault::open(&dir.0).unwrap();
         let home = text(&call(&dir.0, "GET", "/", &[], b""));
         assert!(home.contains("A photo is optional."));
         assert!(home.contains("Photo or file, optional"));
-        assert!(!home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" required"));
+        assert!(
+            !home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" required")
+        );
         assert!(home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\""));
 
         let id = Uuid::new_v4().to_string();
@@ -1731,16 +1797,16 @@ mod tests {
         assert!(!markdown.contains("../Sources/"));
         assert_eq!(
             fs::read_dir(dir.0.join("Recall/Sources")).unwrap().count(),
-            0
+            1
         );
         let saved = text(&call(&dir.0, "GET", &format!("/saved/{id}"), &[], b""));
-        assert!(saved.contains("There is no original photo"));
+        assert!(saved.contains("original text is preserved"));
         assert!(saved.contains("Meet Pat at the pump house, uncertain?"));
-        assert!(!saved.contains(&format!("Recall/Sources/{id}")));
+        assert!(saved.contains("Original SHA-256"));
         assert!(!saved.contains("<img"));
         assert_eq!(
             call(&dir.0, "GET", &format!("/sources/{id}"), &[], b"").status,
-            404
+            200
         );
 
         let again = call(
@@ -1757,7 +1823,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_dir(dir.0.join("Recall/Sources")).unwrap().count(),
-            0
+            1
         );
 
         let ask = call(
@@ -1771,17 +1837,19 @@ mod tests {
         assert_eq!(ask.status, 200, "{page}");
         assert!(page.contains(KEYWORD_LABEL));
         assert!(page.contains("Meet Pat at the pump house, uncertain?"));
-        assert!(page.contains("No original photo."));
+        assert!(page.contains("Original evidence"));
         assert!(page.contains(&format!("Recall/Memories/{id}.md")));
-        assert!(!page.contains("Recall/Sources"));
+        assert!(page.contains(&format!("Recall/Sources/{id}.txt")));
         assert!(!page.contains("<img"));
-        assert!(!page.contains(&format!("/sources/{id}")));
+        assert!(page.contains(&format!("/sources/{id}")));
 
         let mut changed = Vec::new();
         changed.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"operation_id\"\r\n\r\n{id}\r\n").into_bytes());
         changed.extend(
-            format!("--{boundary}\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nchanged\r\n")
-                .into_bytes(),
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nchanged\r\n"
+            )
+            .into_bytes(),
         );
         changed.extend(format!("--{boundary}--\r\n").into_bytes());
         let rejected = call(
@@ -1811,7 +1879,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_dir(dir.0.join("Recall/Sources")).unwrap().count(),
-            0
+            1
         );
 
         let edited = fs::read_to_string(&note_path)
@@ -1826,7 +1894,7 @@ mod tests {
             b"q=Obsidian",
         ));
         assert!(edited_ask.contains("Obsidian kept this?"));
-        assert!(!edited_ask.contains("Recall/Sources"));
+        assert!(edited_ask.contains(&format!("Recall/Sources/{id}.txt")));
         assert_eq!(fs::read_to_string(&note_path).unwrap(), edited);
     }
 
@@ -2056,7 +2124,7 @@ mod tests {
             .into_string()
             .unwrap();
         assert!(page.contains("Saved in the desktop vault"));
-        assert!(page.contains("Claude was not called"));
+        assert!(page.contains("No source-specific processing consent"));
         let response = ureq::get(&format!("http://{}/sources/{id}", running.addr))
             .call()
             .unwrap();
