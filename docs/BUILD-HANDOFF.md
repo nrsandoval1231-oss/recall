@@ -1,5 +1,10 @@
 # First builder handoff — RCL-001
 
+## Current builder packet supersedes historical RCL-001
+
+For new work use [Meeting to Memory](MEETING-TO-MEMORY.md) and [UX-SPEC](UX-SPEC.md). Do not execute historical cloud-first instructions below as current tasks. Preserve the existing vault writer, validate real Jev/Claude integrations, write native Obsidian Markdown/YAML safely, and record evidence. Keep PR #26 separate.
+
+
 ## Active builder directive (2026-10-11)
 
 **This is a historical RCL-001 cloud-first handoff, not a current task packet.** Do not execute its Expo sign-in, cloud API, Supabase or PostgreSQL provisioning steps for the active pilot. The active work is a verified desktop Memory Surface + Obsidian vault + Tailscale phone Capture/Ask + consented Claude librarian, governed by [Canonical Foundation](CANONICAL-FOUNDATION.md), [Pilot Contract](PILOT-CONTRACT.md), and [Acceptance](ACCEPTANCE.md). Preserve this document as historical implementation evidence.

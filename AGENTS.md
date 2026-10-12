@@ -1,5 +1,10 @@
 # Recall builder instructions
 
+## Active next packet — Meeting to Memory
+
+Read `docs/MEETING-TO-MEMORY.md` before any new intelligence or desktop UI work. It defines the smallest Jev → Claude → deterministic Obsidian writer implementation, acceptance gates, and scope boundaries. Keep PR #26 isolated; do not import its divergent vault-only/no-Claude vision. The single active UI direction is the latest warm-glass business board in `docs/UX-SPEC.md`; do not revive older visual alternatives.
+
+
 ## Start here
 
 Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository contains implemented desktop, phone, and legacy cloud components. Verify current code and acceptance evidence before claiming a feature works.

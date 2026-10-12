@@ -2,7 +2,7 @@
 
 ## RCL-INT-001 current native status — 2026-10-12
 
-Implemented: selected-vault text/photo capture → native consent/configuration/budgets → text-only Jev classification (Claude visual adapter for photos) → closed Claude librarian → deterministic source-linked YAML/Markdown publication → desktop/phone source-backed local retrieval. Source-focused project boards and an explicitly unscheduled agenda use persisted notes. No active PostgreSQL/login dependency. PR26 remains isolated. PR27 is draft at a4be1ca94e1b629a57e967bbb7e9eba44d87f40b; its proposed canonical PNG remains absent, so no PNG fidelity acceptance is claimed.
+Implemented: selected-vault text/photo capture → native consent/configuration/budgets → text-only Jev classification (Claude visual adapter for photos) → closed Claude librarian → deterministic source-linked YAML/Markdown publication → desktop/phone source-backed local retrieval. Source-focused project boards and an explicitly unscheduled agenda use persisted notes. No active PostgreSQL/login dependency. PR26 remains isolated. The owner-uploaded canonical PNG is now available in UX-SPEC. Asset handoff is verified; implemented UI fidelity is not accepted.
 
 | Slice | PR | Validated head | Squash merge | Exact-head CI (all five passed) | Independent verification |
 |---|---|---|---|---|---|
@@ -433,3 +433,7 @@ Regression coverage includes forged browser review metadata, false flags, wrong/
 The installed PR42 build completed the mandatory synthetic meeting source using real Jev 1.13.0 and Claude Sonnet 5.5 after explicit reviewed retry. This updates earlier OPEN text-runtime entries; it does not accept photo or phone behavior. Owner screenshots and pasted persisted Markdown show native YAML/model/operation provenance, matching original hash, uncertainty, unchecked follow-ups and the retracted 8 MW statement. The note and vague utility-delay retrieval survived application restart. The owner opened the note in Obsidian and followed its original-evidence link, returning the exact capture. See [bounded live evidence](audits/2026-10-12-live-windows-meeting.md).
 
 PR42 head d84014613b479ba2b87e4e7aea39acfd21c2579b passed all five jobs in run38282476137 before squash merge f7c7129cd189df0c241c0579a46c757a334b797d. Independent review reproduced205 native and85 desktop tests. Incorrect unresolved entity classifications, raw Markdown presentation, real handwriting evaluation, physical phone/Tailscale checks and PR27's absent canonical PNG remain open. Owner evidence is distinguished from direct engineering-workspace provider execution and automated fixture tests.
+
+## Canonical image handoff — 2026-10-12
+
+Owner upload renamed without modifying bytes to `docs/assets/recall-desktop-canonical-2026-10-11.png`: PNG1182×789 RGBA, SHA-256 `66a0b09c499604ef5fc5811c55a9868ccd5d7dcc3966e594f74782b66dec275a`. Visually inspected against the owner-selected three-column business mockup. Missing-asset gate is closed; visual implementation fidelity remains OPEN. Main was merged into PR27 while preserving all native code and the current acceptance ledger. No PR26 content was incorporated.
