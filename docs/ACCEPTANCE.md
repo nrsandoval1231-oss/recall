@@ -1,5 +1,29 @@
 # Recall acceptance and evaluation
 
+## RCL-INT-001 current native status — 2026-10-12
+
+Implemented: selected-vault text/photo capture → native consent/configuration/budgets → text-only Jev classification (Claude visual adapter for photos) → closed Claude librarian → deterministic source-linked YAML/Markdown publication → desktop/phone source-backed local retrieval. Source-focused project boards and an explicitly unscheduled agenda use persisted notes. No active PostgreSQL/login dependency. PR26 remains isolated. PR27 is draft at a4be1ca94e1b629a57e967bbb7e9eba44d87f40b; its proposed canonical PNG remains absent, so no PNG fidelity acceptance is claimed.
+
+| Slice | PR | Validated head | Squash merge | Exact-head CI (all five passed) | Independent verification |
+|---|---|---|---|---|---|
+| Validator | 28 | 0b5f018fb5d2759b03f03d737152a68ef25cfdd3 | f28d07f02f88b811dc01c43883f9dd6845f3cf28 | 38197994123 | 17 focused tests |
+| Existing reader recovery | 31 | 4d952b89828de9caa0ac3c75339d3d8a6f36ff35 | e0d7386fed0a89b3475d99ac1db387397c7ef408 | 38200077693 | 123 native-core tests |
+| Jev adapter | 30 | 9dda50e34b7e4da45fb1863aa8b0e2b0fc2b4daa | 99b1d711413ef2b744c09dbc3c8972e709dbf729 | 38246208761 | 15 adapter tests |
+| Durable parser | 32 | f95c0f2b50f3e6cfa77fc46388a0b6ad74b50565 | b6073fb0dd19df598b0d7b99e547210cff622544 | 38249613484 | 153 native-core tests |
+| Claude librarian | 33 | 54ebf30abf35457921d90d0d67e2939a2c2b7192 | 53d3267d5dfbb35506c4c89041a85fef25fa5c5c | 38252323122 | 164 native-core tests |
+| YAML writer/retrieval | 34 | 49a0074c7a86601172ec6e86dd5e31e5dc395953 | 2f078251cd1a37a7259ee754bae95322241a15d8 | 38255483857 | 173 native-core tests |
+| Desktop typed workflow | 35 | dd53900e989d01b2445d4cb0ea3fba60dfcde79c | 0da44c6474ef7fca412b091e1fce381190ccf55f | 38259230636 | 68 desktop tests/typecheck/build |
+| Photo bridge | 36 | 954a7fceec12e68a52c48f8eac9b5024e154049e | 90532bff5b14aacce9f1b2ffcc4b57b200b2d0e7 | 38261409179 | 183 native-core tests |
+| Phone Capture/Ask | 37 | ac7304e379c6ca8d3968af392d56b74fdf88d97d | 1d96e7be6e0dbf0e0c2911b4d239474b967d8cbb | 38263514173 | 191 native-core tests |
+| Persisted context surface | 38 | 2314d292ebc4761851ba7bc5ea2b04060d7eb476 | e8a9a8e6a6cd970def370005f6610a7620e1dffc | 38263516469 | 72 desktop tests/typecheck/build |
+
+PR39 source-focused project boards: independent 74 desktop tests/typecheck/build passed, with older-capture calendar regression; final-head CI required before merge. Narrative entries below record evidence at their original stage and do not override this snapshot.
+
+The mandatory meeting text was exercised through real native orchestration/storage with explicitly synthetic Jev/Claude transport fixtures. Persisted YAML has source hashes/wikilinks, exact quoted evidence, unresolved questions, source follow-ups and retracted8MW. Reopening the vault before “What was going on with that utility delay?” retrieves the note and exact original hash. This is NOT authenticated inference or handwriting performance proof. Core tests cover malformed proposals, unknown delivery, stale revisions, source/context mismatch, operation replay, external Obsidian edits, interrupted writes and pre-photo artifact recovery. Native source-linked originals/history remain preserved.
+
+Live acceptance remains OPEN: all native provider keys/model pins/current prices/budgets are absent. Actual unauthenticated HTTPS Jev metadata request returned403 via configured proxy/system trust, with no key or capture sent. Windows CI builds an unsigned installer; installed Windows/Obsidian runtime and real iPhone/Tailscale/denied-peer tests need devices. Real handwriting evaluation requires configured providers and approved sample images. Pending phone workers require manual retry after restart; uncertain delivery never automatically resends. Ask is bounded local quote retrieval, not a Claude-generated synthesis. Mentions/relationships remain unresolved display hints from user-editable Markdown; no semantic identity/project merges or confirmed calendar commitments are claimed.
+
+
 ### RCL-INT-001 source-focused project boards
 
 Projects now opens a board from each saved unresolved project/organization mention. Context, agenda and capture months stay scoped to that source ID; existing native related targets remain eligible possible relationships. Same names never merge. Returning to all project sources resets Overview; deleted/conflicted/retracted or changed mentions no longer supply a stale focus. Vault changes clear focus.
@@ -329,13 +353,13 @@ Headless Chrome on this Linux sandbox opened `http://127.0.0.1:8787/`, uploaded 
 - **Claude from the phone.** Not implemented. The desktop consent path is unchanged.
 - **Windows firewall and an installed companion service.** Not run. The process is a console binary, not a Windows service.
 
-### RCL-INT-001 — durable text parser operations (in review)
+### RCL-INT-001 — durable text parser operations (implemented; live acceptance open)
 
 Native parser operations now preserve the immutable initial text capture as a SHA-256-linked `.txt` source before a provider attempt. Strict source/revision-bound input, reservation and result records survive reopening the vault. Missing native configuration or consent leaves capture pending. An attempted request without a validated result remains uncertain and is never automatically resent, including under a new operation ID for the same source. Successful requests retain their conservative budget reservation. Human corrections and external edits stop automatic reprocessing; photos explicitly await visual transcription.
 
 Validation: 153 source-identical native-core tests passed locally, including consent/budget gates, result tampering, uncertain delivery and replay after reopening, source mismatch, stale revisions, original preservation, and existing writer failure regressions. Synthetic transport fixtures prove orchestration only. Live Jev inference remains blocked by absent `TYPESAFE_API_KEY`; model/version and price/budget configuration must also be supplied. The native HTTPS metadata probe uses approved environment proxy and system trust with redirects disabled; it sends no key or capture. Full desktop exact-head Windows/Linux CI and independent review remain required before merging this slice. This operation does not yet invoke Claude organization or publish generated Markdown.
 
-### RCL-INT-001C — closed Claude organization (in review)
+### RCL-INT-001C — closed Claude organization (implemented; live acceptance open)
 
 The existing ClaudeTransport now supports a forced `organize_memory` tool with a strict layout schema. Claude receives validated source spans and at most four relevant active, nonconflicting memory excerpts (600 characters each). Its response can select source-span sections/title/category and authorized memory IDs; it cannot supply arbitrary paths, Markdown, YAML, entity identities, dates or new claims. Native rendering quotes source statements, preserves every span, routes uncertain/retracted statements into dedicated sections, leaves entity candidates unresolved, and supplies YAML properties and native source/memory wikilinks. Only explicit source imperatives become follow-up checkboxes.
 
@@ -345,7 +369,7 @@ Independent organization review found renamed-note link resolution and a pre-loc
 
 Durable parser operations accepted: PR32 exact candidate f95c0f2b50f3e6cfa77fc46388a0b6ad74b50565 passed all five jobs in CI run38249613484, including Windows native checks and unsigned installer. Independent review reproduced153 native-core tests. Squash merged as b6073fb0dd19df598b0d7b99e547210cff622544. Authenticated Jev inference remains blocked and is not implied by adapter acceptance.
 
-### RCL-INT-001D — native YAML publication and source-backed retrieval (in review)
+### RCL-INT-001D — native YAML publication and source-backed retrieval (implemented; live acceptance open)
 
 Closed persisted parser/librarian proposals now publish through the existing native journal, receipt, preserved-backup and revision machinery. A v3 manifest fence prevents older writers from opening YAML-bearing vaults; legacy v1/v2 serialized history remains unchanged. Native YAML begins at byte zero. Organization revisions retain model/operation provenance, original text SHA-256 and native source/memory links. Whole-document user corrections, external edits, note renames, explicit restore and removal remain portable and revisioned. Duplicate publication returns the current memory without overwriting later human edits.
 
@@ -365,7 +389,7 @@ Local verification: 72 desktop tests, TypeScript checks and production build pas
 
 Independent floating-card review identified a related-only grid placement bug; both existing side slots are now retained whenever context is present, with a three-slot regression. Exact-head CI remains required.
 
-### RCL-INT-001E — desktop text workflow binding (in review)
+### RCL-INT-001E — desktop text workflow binding (implemented; live acceptance open)
 
 The existing warm-glass surface now saves messy text through selected-vault native authority and preserves original text evidence before returning capture. Explicit consent runs durable Jev parsing, closed Claude organization and validated Obsidian publication sequentially, with actual pending/processing/review/error messages. Stage operation IDs persist by stable vault/memory identity; renderer interruptions replay exact native receipts and never invent a new provider retry. Native secrets and filesystem destinations stay outside the webview.
 
@@ -376,7 +400,7 @@ Local verification: desktop typecheck and68 tests passed, including no-consent s
 Desktop organization completion preserves newer unsaved human drafts using an editor version guard. Deferred same-memory typing regression passes; older Ask completion cannot clear the newest request busy state.
 
 Validated native YAML publication accepted: PR34 candidate49a0074c7a86601172ec6e86dd5e31e5dc395953 passed all five jobs in CI run38255483857 after rebasing onto the merged librarian. Independent review reproduced173 native-core tests, including recovery and capture-history provenance. Squash merged as2f078251cd1a37a7259ee754bae95322241a15d8. This is native storage acceptance; installed Windows/live provider acceptance remains OPEN.
-### RCL-INT-001B/C/D/E — narrow photo bridge (in review)
+### RCL-INT-001B/C/D/E — narrow photo bridge (implemented; live acceptance open)
 
 The native processing command now reuses the existing consented Claude photo reader as a narrowly scoped visual adapter before text-only Jev parsing. Original photo bytes/hash remain authoritative; the machine transcript receives a separate SHA-256, immutable attachment and strict native-reading linkage. Both hashes and native capture history are checked by parser status, organization, publication and interrupted-journal recovery. Claude organization receives the bounded visual uncertainties, reader/model provenance and an explicit unreviewed flag. Generated notes link both evidence forms and state that visual accuracy is unverified. Crossed-out content remains retracted; native explicit source imperatives become possible follow-ups even if a model misfiles them.
 
