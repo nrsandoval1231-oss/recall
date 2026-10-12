@@ -36,7 +36,7 @@ The core Recall experience requires Jev to parse captured information and Claude
 
 ### What this amendment does not change by itself
 
-- Nothing is deployed, and draft PRs #11–#14 are not merged by this document. Those drafts are the Tauri/Obsidian vault stack to revive and rebase. See [the realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md).
+- This amendment did not itself deploy anything. PRs #11–#14 are now closed; their historical Tauri/Obsidian vault work informed the implemented desktop path. Do not revive or rebase them as active tasks. See [the realignment audit](audits/2026-10-10-obsidian-desktop-realignment.md) for the dated original plan.
 - The desktop slice writes the local vault and does not consult Cloud Postgres on that path. The web companion and `?mode=legacy-cloud` still use Cloud Postgres, private object storage, and Markdown export. ARCHITECTURE, PRD, ROADMAP, AGENTS.md, and SYNC-AND-EXPORT record both. This amendment does not add a second architecture document. Device install and live Claude are not claimed done. The phone companion is a local process on the desktop machine for that same vault; a real iPhone over Tailscale is not claimed done.
 - A question mark, hypothesis, illegible number, or unresolved first name stays uncertain.
 - A locally edited Obsidian file is never silently replaced.
@@ -46,7 +46,7 @@ The core Recall experience requires Jev to parse captured information and Claude
 
 ### What to build next
 
-The next engineering slice is the desktop Memory Surface, matching the reference, writing organized notes into a local Obsidian vault, with photo capture, Claude reading, and natural-language ask. Revive and rebase draft PRs #11–#14 onto current `main`. Do not close them. Do not merge them unchanged over this amendment.
+The desktop Memory Surface and local Obsidian vault path now have implementation and synthetic-test evidence. Next, complete and verify the required Jev parsing → Claude librarian organization → deterministic Markdown/YAML vault writing and grounded natural-language recall loop, plus real Windows and iPhone/Tailscale acceptance. PRs #11–#14 are closed historical work and must not be revived or rebased. Preserve PR #26 as an isolated follow-up.
 
 ### Still in force from 2026-10-09
 
