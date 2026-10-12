@@ -17,6 +17,8 @@ Six meaningful regressions reproduced failures before fixes: credential Debug le
 
 ## RCL-INT-001A validator review — 2026-10-12
 
+PR #28 merged as `f28d07f02f88b811dc01c43883f9dd6845f3cf28` after all five CI jobs passed on candidate `0b5f018fb5d2759b03f03d737152a68ef25cfdd3` (run `38197994123`), including Windows tests/check/unsigned installer. Independent review reproduced 17 validator tests. This is not installed Windows acceptance.
+
 PR #28 original head `2819d6208f35bbd4b4ae1780b1575055e57dbef9` was reviewed against main `3cea9ff9ddb36bdafbe5a323c5996ef71a585ddb`. PR #26 was neither fetched nor incorporated. PR #27 remains draft; its required canonical PNG is absent.
 
 The follow-up validator rejects Windows device names/trailing periods, case-insensitive duplicate targets, undeclared body wikilinks, arbitrary Markdown destinations/HTML/embeds, fabricated evidence excerpts, and explicit uncertainty downgrades. Retracted evidence must retain its context. `validate_grounded` requires caller-supplied, hash-verified transcription; it cannot verify a photo transcription against pixels. No publishing adapter is connected yet, and free-form body entailment, identity resolution, YAML serialization, and authorized existing-target checks remain OPEN. Passing this boundary must never be described as safe automatic organization.
