@@ -583,7 +583,7 @@ fn dunce_canon(path: &Path) -> Result<PathBuf> {
     fs::canonicalize(path).map_err(|error| error.to_string())
 }
 
-fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let tmp = path.with_extension(format!("stage-{}", Uuid::new_v4()));
     // Reuse native safe-path checks, flushed staging and write-through atomic
     // Windows replacement. Never delete the previous budget/reading on failure.
