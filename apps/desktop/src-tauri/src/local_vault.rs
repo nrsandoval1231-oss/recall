@@ -1475,6 +1475,10 @@ impl Vault {
         include_deleted: bool,
     ) -> Result<Vec<VaultMemory>> {
         let _lock = self.lock()?;
+        self.list_while_locked(query, include_deleted)
+    }
+    /// Caller must hold the native writer lock.
+    pub(crate) fn list_while_locked(&self, query: &str, include_deleted: bool) -> Result<Vec<VaultMemory>> {
         let pending = self.recover()?;
         if query.len() > 4096 {
             return Err("Query too long".into());
@@ -1722,6 +1726,10 @@ impl Vault {
     /// immutable human text is copied to a native-assigned attachment before AI.
     pub(crate) fn processing_snapshot(&self, memory_id: &str, revision: u64) -> Result<ProcessingSnapshot> {
         let _lock = self.lock()?;
+        self.processing_snapshot_while_locked(memory_id, revision)
+    }
+    /// Caller must hold the native writer lock; rechecks disk/source state.
+    pub(crate) fn processing_snapshot_while_locked(&self, memory_id: &str, revision: u64) -> Result<ProcessingSnapshot> {
         id(memory_id)?;
         let pending = self.recover()?;
         let memory = self.current(memory_id, &pending)?;

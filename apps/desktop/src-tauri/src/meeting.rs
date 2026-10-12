@@ -20,6 +20,14 @@ pub struct Context {
     pub id: String,
     pub revision: u64,
     pub excerpt: String,
+    pub note_basename: String,
+}
+fn safe_target(value: &str) -> bool {
+    value.ends_with(".md")
+        && value.len() <= 255
+        && value.len() > 3
+        && !value.contains(['/', '\\', '[', ']', '#', '|'])
+        && !value.chars().any(char::is_control)
 }
 pub fn context(memories: &[VaultMemory], source: &str) -> Vec<Context> {
     let words: BTreeSet<_> = source
@@ -29,7 +37,11 @@ pub fn context(memories: &[VaultMemory], source: &str) -> Vec<Context> {
         .collect();
     let mut ranked: Vec<_> = memories
         .iter()
-        .filter(|m| m.state == "active" && m.conflict.is_none())
+        .filter(|m| {
+            m.state == "active"
+                && m.conflict.is_none()
+                && m.note_path.as_deref().is_some_and(safe_target)
+        })
         .map(|m| {
             (
                 words
@@ -48,6 +60,7 @@ pub fn context(memories: &[VaultMemory], source: &str) -> Vec<Context> {
         .map(|(_, m)| Context {
             id: m.id.clone(),
             revision: m.revision,
+            note_basename: m.note_path.clone().expect("filtered native note path"),
             excerpt: m.note.chars().take(600).collect(),
         })
         .collect()
@@ -74,6 +87,7 @@ pub fn validate(
             uuid::Uuid::parse_str(&c.id).map_or(true, |id| id.to_string() != c.id)
                 || c.excerpt.len() > 2400
                 || c.revision == 0
+                || !safe_target(&c.note_basename)
         })
     {
         return Err("Invalid organization identity, title or category".into());
@@ -215,7 +229,12 @@ pub fn render(
     }
     out.push_str("## Related memories\n\n");
     for id in &layout.related_memory_ids {
-        out.push_str(&format!("- [[Recall/Memories/{id}|Related source-backed memory]] (possible relationship; review)\n"));
+        let target = &context
+            .iter()
+            .find(|c| &c.id == id)
+            .expect("validated native context")
+            .note_basename;
+        out.push_str(&format!("- [[Recall/Memories/{}|Related source-backed memory]] (possible relationship; review)\n",target.strip_suffix(".md").expect("validated native basename")));
     }
     out.push_str(&format!("\n## Original evidence\n\n[[Recall/Sources/{}.txt|Original meeting capture]]\n\nSHA-256: `{}`\n\nOrganization is derived from source statements. Estimates, identities and dates require review.\n",parsed.source_id,parsed.source_sha256));
     Ok(out)

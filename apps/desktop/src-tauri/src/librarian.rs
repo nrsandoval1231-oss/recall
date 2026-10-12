@@ -755,6 +755,14 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
     let payload=hex::encode(Sha256::digest(serde_json::to_vec(&("recall-organization-input-v1",operation,parser_operation,revision,&evidence)).map_err(|_|"Invalid organization identity")?));
     let dir=vault.root().join("Recall/_meta/organizations");crate::local_vault::safe(&dir)?;
     let _lock=vault.lock()?;
+    let recheck = || -> Result<()> {
+        let latest=vault.processing_snapshot_while_locked(&parsed.source_id,revision)?;
+        if latest.human_corrected || latest.source.sha256!=parsed.source_sha256 {return Err("Organization source changed; proposal withheld".into());}
+        let current=crate::meeting::context(&vault.list_while_locked("",false)?.into_iter().filter(|m|m.id!=parsed.source_id).collect::<Vec<_>>(),&parsed.transcription);
+        if serde_json::to_vec(&current).ok()!=serde_json::to_vec(&context).ok(){return Err("Organization context changed; proposal withheld".into());}
+        Ok(())
+    };
+    recheck()?;
     if !dir.exists(){fs::create_dir(&dir).map_err(|_|"Organization directory unavailable")?;}
     let path=dir.join(format!("{operation}.json"));
     match fs::symlink_metadata(&path) {
@@ -762,7 +770,8 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
             let stored:StoredOrganization=serde_json::from_slice(&crate::local_vault::read(&path,128*1024)?).map_err(|_|"Invalid stored organization")?;
             if stored.format!="recall-organization-v1" || stored.operation_id!=operation || stored.parser_operation_id!=parser_operation
                 || stored.memory_id!=parsed.source_id || stored.expected_revision!=revision || stored.source_sha256!=parsed.source_sha256
-                || stored.payload_sha256!=payload || serde_json::to_vec(&stored.context).ok()!=serde_json::to_vec(&context).ok(){return Err("Organization operation identity or context changed".into());}
+                || stored.model.is_empty() || stored.model.len()>200 || stored.model.chars().any(char::is_control)
+                || stored.recorded_at.len()!=20 || stored.payload_sha256!=payload || serde_json::to_vec(&stored.context).ok()!=serde_json::to_vec(&context).ok(){return Err("Organization operation identity or context changed".into());}
             crate::meeting::validate(&stored.layout,&parsed,&context)?;
             return Ok(stored);
         },
@@ -793,6 +802,7 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
     if crate::meeting::validate(&layout,&parsed,&context).is_err(){
         mark(&mut ledger,operation,"uncertain",reserved);store_ledger(vault.root(),&ledger)?;return Err("Invalid Claude organization withheld; resend blocked".into());
     }
+    recheck()?;
     let stored=StoredOrganization{format:"recall-organization-v1".into(),operation_id:operation.into(),parser_operation_id:parser_operation.into(),memory_id:parsed.source_id.clone(),expected_revision:revision,source_sha256:parsed.source_sha256.clone(),payload_sha256:payload,model:model.into(),recorded_at:utc_timestamp(),context,layout};
     crate::local_vault::create(&path,&serde_json::to_vec(&stored).map_err(|_|"Invalid organization record")?)?;
     mark(&mut ledger,operation,"charged",reserved);store_ledger(vault.root(),&ledger)?;
@@ -1128,6 +1138,33 @@ mod organization_tests {
         let entry=LedgerEntry{operation_id:Uuid::new_v4().to_string(),payload_sha256:"a".repeat(64),source_sha256:"b".repeat(64),memory_id:memory,day,month,reserved_micros:cfg.daily_micros.unwrap(),charged_micros:0,state:"reserved".into()};
         store_ledger(v.root(),&Ledger{format:LEDGER_FORMAT.into(),entries:vec![entry]}).unwrap();
         assert!(organize_selected(&v,&cfg,&parser,&op,true,&c).unwrap_err().contains("budget"));assert_eq!(c.calls.load(Ordering::SeqCst),0);
+    }
+    #[test] fn external_edit_during_provider_call_withholds_proposal_and_blocks_resend(){
+        struct Editor{path:std::path::PathBuf,inner:Claude}
+        impl OrganizationTransport for Editor{
+            fn organize(&self,model:&str,key:&str,evidence:&serde_json::Value)->std::result::Result<meeting::Layout,CallError>{
+                let old=fs::read_to_string(&self.path).unwrap();fs::write(&self.path,format!("{old}\nHuman edit: utility now on time.")).unwrap();
+                self.inner.organize(model,key,evidence)
+            }
+        }
+        let (t,v,parser,memory)=setup();let c=Editor{path:t.0.join(format!("Recall/Memories/{memory}.md")),inner:claude()};
+        assert!(organize_selected(&v,&config(),&parser,&Uuid::new_v4().to_string(),true,&c).is_err());
+        assert_eq!(c.inner.calls.load(Ordering::SeqCst),1);
+        assert!(fs::read_dir(t.0.join("Recall/_meta/organizations")).unwrap().next().is_none());
+    }
+    #[test] fn related_links_resolve_native_renamed_notes(){
+        let (t,v,parser,_)=setup();let related=v.capture_note(&Uuid::new_v4().to_string(),"Utility background").unwrap();
+        fs::rename(t.0.join(format!("Recall/Memories/{}.md",related.id)),t.0.join("Recall/Memories/Utility background.md")).unwrap();
+        let p=processing::status(&v,&parser).unwrap().parsed.unwrap();
+        let context=meeting::context(&v.list_with_deleted("",false).unwrap().into_iter().filter(|m|m.id!=p.source_id).collect::<Vec<_>>(),&p.transcription);
+        assert_eq!(context[0].note_basename,"Utility background.md");
+        let mut layout=claude().organize("fixture","fixture",&serde_json::json!({"spans":p.candidates})).unwrap();layout.related_memory_ids.push(related.id);
+        assert!(meeting::render(&layout,&p,&context).unwrap().contains("[[Recall/Memories/Utility background|"));
+    }
+    #[test] fn corrupted_proposal_audit_metadata_is_not_replayed(){
+        let (t,v,parser,_)=setup();let op=Uuid::new_v4().to_string();let c=claude();organize_selected(&v,&config(),&parser,&op,true,&c).unwrap();
+        let path=t.0.join(format!("Recall/_meta/organizations/{op}.json"));let mut value:serde_json::Value=serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();value["model"]="".into();fs::write(path,serde_json::to_vec(&value).unwrap()).unwrap();
+        assert!(organize_selected(&v,&config(),&parser,&op,true,&c).is_err());assert_eq!(c.calls.load(Ordering::SeqCst),1);
     }
     #[test] fn tool_output_must_be_complete_and_closed(){
         for body in ["{}",r#"{"stop_reason":"max_tokens","content":[]}"#,r#"{"stop_reason":"tool_use","content":[{"type":"tool_use","name":"wrong","input":{}}]}"#]{assert!(parse_organization_body(body).is_err());}
