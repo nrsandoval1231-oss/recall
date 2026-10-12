@@ -228,7 +228,7 @@ fn reparse(meta: &fs::Metadata) -> bool {
     }
 }
 /// Refuse links in every component, including the selected root's ancestors.
-fn safe(path: &Path) -> Result<()> {
+pub(crate) fn safe(path: &Path) -> Result<()> {
     let mut checked = PathBuf::new();
     for c in path.components() {
         if matches!(c, Component::ParentDir | Component::CurDir) {
@@ -244,7 +244,7 @@ fn safe(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn read(path: &Path, max: u64) -> Result<Vec<u8>> {
+pub(crate) fn read(path: &Path, max: u64) -> Result<Vec<u8>> {
     safe(path)?;
     let mut opts = OpenOptions::new();
     opts.read(true);

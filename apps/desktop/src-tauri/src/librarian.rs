@@ -155,12 +155,14 @@ impl ReadingTransport for ClaudeTransport {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Ledger {
     format: String,
     entries: Vec<LedgerEntry>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct LedgerEntry {
     operation_id: String,
     payload_sha256: String,
@@ -469,16 +471,36 @@ fn mark(ledger: &mut Ledger, operation_id: &str, state: &str, charged: i64) {
     }
 }
 
+fn digest_valid(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 fn load_ledger(root: &Path) -> Result<Ledger> {
     let path = ledger_path(root)?;
     if !path.exists() {
         return Ok(Ledger { format: LEDGER_FORMAT.into(), entries: Vec::new() });
     }
-    let bytes = fs::read(&path).map_err(|error| error.to_string())?;
+    let bytes = crate::local_vault::read(&path, 2 * 1024 * 1024)?;
     if bytes.len() > 2 * 1024 * 1024 {
         return Err("The Claude budget ledger is too large. Recall did not send this photo.".into());
     }
-    serde_json::from_slice(&bytes).map_err(|_| "The Claude budget ledger could not be read. Recall did not send this photo.".into())
+    let ledger: Ledger = serde_json::from_slice(&bytes).map_err(|_| "The Claude budget ledger could not be read.")?;
+    if ledger.format != LEDGER_FORMAT || ledger.entries.len() > 10_000 {
+        return Err("Invalid Claude budget ledger".into());
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    for entry in &ledger.entries {
+        uuid(&entry.operation_id)?;
+        uuid(&entry.memory_id)?;
+        if !ids.insert(&entry.operation_id) || !digest_valid(&entry.payload_sha256)
+            || !digest_valid(&entry.source_sha256) || entry.reserved_micros <= 0
+            || entry.charged_micros < 0 || entry.day.len() != 10 || entry.month.len() != 7
+            || !entry.day.starts_with(&entry.month)
+            || !matches!(entry.state.as_str(), "reserved" | "released" | "charged" | "uncertain") {
+            return Err("Invalid Claude budget entry; processing stopped".into());
+        }
+    }
+    Ok(ledger)
 }
 
 fn store_ledger(root: &Path, ledger: &Ledger) -> Result<()> {
@@ -490,8 +512,19 @@ fn load_reading(root: &Path, memory_id: &str, operation_id: &str) -> Result<Opti
     if !path.exists() {
         return Ok(None);
     }
-    let bytes = fs::read(&path).map_err(|error| error.to_string())?;
-    serde_json::from_slice(&bytes).map(Some).map_err(|_| "A stored reading could not be read. Your note was not changed.".into())
+    let bytes = crate::local_vault::read(&path, 2 * 1024 * 1024)?;
+    let reading: StoredReading = serde_json::from_slice(&bytes).map_err(|_| "A stored reading could not be read.")?;
+    if reading.format != FORMAT || reading.status != "unreviewed"
+        || reading.memory_id != memory_id || reading.operation_id != operation_id
+        || reading.expected_revision == 0 || reading.expected_revision > 10_000
+        || !digest_valid(&reading.source_sha256) || !digest_valid(&reading.payload_sha256)
+        || reading.payload_sha256 != payload_sha(operation_id, memory_id, reading.expected_revision, &reading.source_sha256)
+        || reading.provider != "anthropic" || reading.model.is_empty() || reading.model.len() > 80
+        || reading.recorded_at.len() != 20 {
+        return Err("Invalid stored reading metadata".into());
+    }
+    bounded_reading(&reading.transcription, &reading.uncertainties)?;
+    Ok(Some(reading))
 }
 
 fn store_reading(root: &Path, reading: &StoredReading) -> Result<()> {
@@ -504,6 +537,7 @@ fn reading_path(root: &Path, memory_id: &str, operation_id: &str) -> Result<Path
     uuid(operation_id)?;
     let root = dunce_canon(root)?;
     let dir = root.join("Recall").join("_meta").join("readings").join(memory_id);
+    crate::local_vault::safe(&dir)?;
     fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     let dir = dunce_canon(&dir)?;
     if !dir.starts_with(&root) {
@@ -515,6 +549,7 @@ fn reading_path(root: &Path, memory_id: &str, operation_id: &str) -> Result<Path
 fn ledger_path(root: &Path) -> Result<PathBuf> {
     let root = dunce_canon(root)?;
     let dir = root.join("Recall").join("_meta");
+    crate::local_vault::safe(&dir)?;
     fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     let dir = dunce_canon(&dir)?;
     if !dir.starts_with(&root) {
@@ -891,6 +926,30 @@ mod tests {
         let result = read_selected(&root.0,&ready("5"),&input(&memory_id,&Uuid::new_v4().to_string(),&photo()),&script);
         assert!(result.is_err());
         assert_eq!(script.calls.load(Ordering::SeqCst),0);
+    }
+
+    #[test] fn malformed_budget_state_cannot_release_provider_spend() {
+        let (root,_,memory_id) = owned_fixture();
+        let request = input(&memory_id,&Uuid::new_v4().to_string(),&photo());
+        let script = Script { calls:AtomicUsize::new(0),mode:"ok",secret:"synthetic-key-not-real" };
+        read_selected(&root.0,&ready("5"),&request,&script).unwrap();
+        let path = ledger_path(&root.0).unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        value["entries"][0]["state"] = serde_json::json!("ignore_spend");
+        fs::write(&path,serde_json::to_vec(&value).unwrap()).unwrap();
+        assert!(load_ledger(&root.0).is_err());
+    }
+    #[cfg(unix)]
+    #[test] fn reading_load_refuses_symlink_even_when_json_is_valid() {
+        let (root,_,memory_id) = owned_fixture();
+        let request = input(&memory_id,&Uuid::new_v4().to_string(),&photo());
+        let script = Script { calls:AtomicUsize::new(0),mode:"ok",secret:"synthetic-key-not-real" };
+        read_selected(&root.0,&ready("5"),&request,&script).unwrap();
+        let path = reading_path(&root.0,&memory_id,&request.operation_id).unwrap();
+        let outside = root.0.join("outside.json");
+        fs::rename(&path,&outside).unwrap();
+        std::os::unix::fs::symlink(&outside,&path).unwrap();
+        assert!(load_reading(&root.0,&memory_id,&request.operation_id).is_err());
     }
 
 }
