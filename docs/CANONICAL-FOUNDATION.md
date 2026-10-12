@@ -1,5 +1,10 @@
 # Recall — Canonical Foundation (2026-10-11)
 
+## Next implementation milestone
+
+[Meeting to Memory](MEETING-TO-MEMORY.md) is the executable next vertical slice: chaotic meeting note → durable original → Jev structured parsing → Claude Obsidian organization → validated native Markdown/YAML writer → grounded recall. The latest warm-glass business board in UX-SPEC is the sole active visual direction. Neither the concept video nor design mockups prove runtime functionality. Keep PR #26 separate.
+
+
 ## Authority
 
 `PILOT-CONTRACT.md` (2026-10-10 amendment) governs product intent. `UX-SPEC.md` plus its 2026-10-11 owner cuts governs visual behavior. This document disambiguates active implementation from historical architecture. Acceptance evidence, not prose or PR descriptions, governs claims of readiness.
