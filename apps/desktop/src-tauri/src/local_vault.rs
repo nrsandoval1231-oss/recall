@@ -49,6 +49,12 @@ pub struct VaultSource {
     pub mime_type: String,
     pub sha256: String,
 }
+pub(crate) struct ProcessingSnapshot {
+    pub memory: VaultMemory,
+    pub source: VaultSource,
+    pub human_corrected: bool,
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct VaultRevision {
     pub revision: u64,
@@ -1710,6 +1716,32 @@ impl Vault {
         };
         self.commit(&e)
     }
+    /// Resolve original evidence from native history under the writer lock.
+    /// Legacy text captures keep their persisted metadata shape; their initial
+    /// immutable human text is copied to a native-assigned attachment before AI.
+    pub(crate) fn processing_snapshot(&self, memory_id: &str, revision: u64) -> Result<ProcessingSnapshot> {
+        let _lock = self.lock()?;
+        id(memory_id)?;
+        let pending = self.recover()?;
+        let memory = self.current(memory_id, &pending)?;
+        if memory.state != "active" || memory.conflict.is_some() || memory.revision != revision {
+            return Err("Processing source revision changed; refresh before retrying".into());
+        }
+        let records = self.records(memory_id)?;
+        let human_corrected = records.iter().any(|event| matches!(event.kind.as_str(), "correct" | "external"));
+        let source = if absent_original(&memory) {
+            let original = records.first().ok_or("Missing original capture")?.memory.note.as_bytes();
+            let path = self.path(&format!("Sources/{memory_id}.txt"));
+            immutable(&path, original)?;
+            let bytes = read(&path, MAX_NOTE as u64)?;
+            if bytes != original { return Err("Original text hash mismatch".into()); }
+            VaultSource { sha256: hash(&bytes), bytes, mime_type: "text/plain".into() }
+        } else {
+            self.verify_source(&memory)?
+        };
+        Ok(ProcessingSnapshot { memory, source, human_corrected })
+    }
+
     pub fn source(&self, memory_id: &str) -> Result<VaultSource> {
         let _lock = self.lock()?;
         if let Some(error) = self.recover()?.get(memory_id) {
