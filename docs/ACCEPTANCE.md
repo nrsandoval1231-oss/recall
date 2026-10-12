@@ -1,5 +1,10 @@
 # Recall acceptance and evaluation
 
+## Upcoming acceptance: RCL-INT-001 Meeting to Memory
+
+[Meeting to Memory](MEETING-TO-MEMORY.md) defines the active next evaluation. It is OPEN: no real end-to-end Jev → Claude → validated Obsidian write has been independently accepted. Require source fidelity, uncertain claims preserved, valid YAML/wikilinks, correction-safe reprocessing, original access, grounded vague recall and real Windows/iPhone pilot evidence. Historical synthetic tests below do not close this gate. PR #26 is isolated.
+
+
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 
