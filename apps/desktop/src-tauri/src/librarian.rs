@@ -952,4 +952,14 @@ mod tests {
         assert!(load_reading(&root.0,&memory_id,&request.operation_id).is_err());
     }
 
+    #[test] fn canonical_root_supports_checked_provider_record_replacement() {
+        let (root,vault,_) = owned_fixture();
+        let canonical = fs::canonicalize(&root.0).unwrap();
+        assert_eq!(Vault::open(&canonical).unwrap().id,vault.id);
+        let record = canonical.join("Recall/_meta/canonical-record-test.json");
+        atomic_write(&record,b"first").unwrap();
+        atomic_write(&record,b"second").unwrap();
+        assert_eq!(crate::local_vault::read(&record,100).unwrap(), b"second");
+    }
+
 }

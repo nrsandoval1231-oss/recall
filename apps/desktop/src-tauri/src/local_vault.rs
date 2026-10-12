@@ -235,6 +235,11 @@ pub(crate) fn safe(path: &Path) -> Result<()> {
             return Err("Unsafe path".into());
         }
         checked.push(c);
+        // A Windows prefix such as \\?\C: is not a filesystem node until
+        // RootDir is appended. Check the complete root and every real ancestor.
+        if matches!(c, Component::Prefix(_)) {
+            continue;
+        }
         match fs::symlink_metadata(&checked) {
             Ok(m) if reparse(&m) => return Err("Symlink or reparse point is not allowed".into()),
             Ok(_) => (),
