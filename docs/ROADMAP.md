@@ -1,5 +1,15 @@
 # Recall build roadmap
 
+## Immediate build sequence — RCL-INT-001
+
+1. Verify and commit the selected canonical UI image to the repo (PR #27 visual asset is pending).
+2. Build and test the real Jev → Claude → deterministic vault writer path for one messy meeting note, with corrections, source provenance and honest processing states.
+3. Bind the approved warm-glass Memory Surface to actual vault data and open-in-Obsidian evidence.
+4. Complete installed Windows and real iPhone/Tailscale acceptance. No feature expansion until the loop works.
+
+See [Meeting to Memory](MEETING-TO-MEMORY.md). Keep PR #26 isolated.
+
+
 ## Active execution order (2026-10-11)
 
 The RCL-001 through RCL-005 cloud-first milestones below are historical implementation/evidence tracks, not the current pilot's dependency order. Current gates: (1) installed Windows desktop vault save/reopen/correction; (2) real iPhone over restricted Tailscale photo and text capture, retrieval, and denied-peer checks; (3) consented Claude reading and grounded organization on representative handwriting; (4) vague question → cited answer → original evidence, with abstention and correction survival; (5) only then expand features. No new platform, cloud sync, or login UI before these gates. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
