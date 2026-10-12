@@ -239,6 +239,11 @@ pub fn render(
     out.push_str(&format!("\n## Original evidence\n\n[[Recall/Sources/{}.txt|Original meeting capture]]\n\nSHA-256: `{}`\n\nOrganization is derived from source statements. Estimates, identities and dates require review.\n",parsed.source_id,parsed.source_sha256));
     Ok(out)
 }
+pub(crate) fn evidence(parsed:&jev::ParsedSource,context:&[Context])->serde_json::Value {
+    serde_json::json!({"source_id":parsed.source_id,"source_sha256":parsed.source_sha256,
+        "spans":parsed.candidates.iter().enumerate().map(|(id,c)|serde_json::json!({"id":id,"text":c.span.text,"kind":c.kind,"status":c.status})).collect::<Vec<_>>(),
+        "unresolved_mentions":parsed.mentions,"existing_memories":context})
+}
 pub fn tool_schema() -> serde_json::Value {
     serde_json::json!({"type":"object","additionalProperties":false,"required":["schema_version","title_span","category","observations","follow_ups","questions","related_memory_ids"],"properties":{
         "schema_version":{"type":"integer","enum":[1]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["meeting","project","operations"]},

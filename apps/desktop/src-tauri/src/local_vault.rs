@@ -16,6 +16,7 @@ use uuid::Uuid;
 type Result<T> = std::result::Result<T, String>;
 const FORMAT: &str = "recall-local-vault-v1";
 const FORMAT_V2: &str = "recall-local-vault-v2";
+const FORMAT_V3: &str = "recall-local-vault-v3";
 const MAX_PHOTO: u64 = 25 * 1024 * 1024;
 const MAX_NOTE: usize = 256 * 1024;
 const MAX_JSON: u64 = 2 * 1024 * 1024;
@@ -69,6 +70,9 @@ struct Manifest {
     format: String,
     vault_id: String,
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OrganizationBinding {parser_operation_id:String,organization_operation_id:String}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Event {
@@ -94,6 +98,8 @@ struct Event {
         skip_serializing_if = "Option::is_none"
     )]
     expected_state: Option<String>,
+    #[serde(default,deserialize_with="present_organization",skip_serializing_if="Option::is_none")]
+    organization: Option<OrganizationBinding>,
     previous_markdown: Option<String>,
     markdown: String,
 }
@@ -177,6 +183,7 @@ macro_rules! boundary {
         tests::boundary($point, $path)?;
     }};
 }
+fn present_organization<'de,D:serde::Deserializer<'de>>(d:D)->std::result::Result<Option<OrganizationBinding>,D::Error>{OrganizationBinding::deserialize(d).map(Some)}
 fn present_string<'de, D: serde::Deserializer<'de>>(
     d: D,
 ) -> std::result::Result<Option<String>, D::Error> {
@@ -471,6 +478,10 @@ fn markdown(m: &VaultMemory) -> String {
         m.id, m.note
     )
 }
+fn event_markdown(format:&str,m:&VaultMemory)->String {
+    if format==FORMAT_V3 {m.note.clone()}else{markdown(m)}
+}
+fn modern_identity(memory_id:&str)->String {format!("---\nrecall_id: \"{memory_id}\"\n")}
 fn payload(
     kind: &str,
     memory: &str,
@@ -527,7 +538,7 @@ impl Vault {
             rename(&staging, &recall)?;
         }
         let manifest: Manifest = decode(&recall.join("_meta/manifest.json"))?;
-        if ![FORMAT, FORMAT_V2].contains(&manifest.format.as_str()) {
+        if ![FORMAT, FORMAT_V2, FORMAT_V3].contains(&manifest.format.as_str()) {
             return Err("Unsupported or legacy Recall subtree".into());
         }
         id(&manifest.vault_id)?;
@@ -569,7 +580,7 @@ impl Vault {
     fn validate(&self) -> Result<()> {
         safe(&self.root)?;
         let m: Manifest = decode(&self.path("_meta/manifest.json"))?;
-        if ![FORMAT, FORMAT_V2].contains(&m.format.as_str()) || m.vault_id != self.id {
+        if ![FORMAT, FORMAT_V2, FORMAT_V3].contains(&m.format.as_str()) || m.vault_id != self.id {
             return Err("Selected vault identity changed".into());
         }
         for d in [
@@ -609,7 +620,7 @@ impl Vault {
         let path = self.path("_meta/manifest.json");
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
-        if manifest.format == FORMAT_V2 {
+        if [FORMAT_V2,FORMAT_V3].contains(&manifest.format.as_str()) {
             return Ok(());
         }
         immutable(&self.path("_meta/manifest-v1.json"), &bytes)?;
@@ -625,6 +636,16 @@ impl Vault {
         replace(&stage, &path)?;
         boundary!("fence_after", &path);
         Ok(())
+    }
+    fn fence_v3(&self)->Result<()> {
+        self.fence_v2()?;
+        let path=self.path("_meta/manifest.json");let bytes=read(&path,MAX_JSON)?;
+        let manifest:Manifest=serde_json::from_slice(&bytes).map_err(fail)?;
+        if manifest.format==FORMAT_V3 {return Ok(());}
+        immutable(&self.path("_meta/manifest-before-v3.json"),&bytes)?;
+        let stage=path.with_extension(format!("stage-{}",Uuid::new_v4()));
+        create(&stage,&json(&Manifest{format:FORMAT_V3.into(),vault_id:self.id.clone()})?)?;
+        boundary!("fence_before",&path);replace(&stage,&path)?;boundary!("fence_after",&path);Ok(())
     }
     fn event_note_path(&self, e: &Event) -> Result<PathBuf> {
         match &e.note_path {
@@ -649,6 +670,7 @@ impl Vault {
             })
             .transpose()?;
         let marker = format!("<!-- Recall memory {memory_id} | ");
+        let modern_marker=format!("---\nrecall_id: \"{memory_id}\"\n");
         let mut candidates = Vec::new();
         let mut nested = false;
         for p in entries(&self.path("Memories"))? {
@@ -662,6 +684,7 @@ impl Vault {
             safe(&p)?;
             if p == canonical
                 || identity_prefix(&p, marker.len()).is_ok_and(|b| b == marker.as_bytes())
+                || identity_prefix(&p, modern_marker.len()).is_ok_and(|b| b==modern_marker.as_bytes())
             {
                 basename(
                     p.file_name()
@@ -700,7 +723,7 @@ impl Vault {
         id(&e.memory.id)?;
         id(&e.operation_id)?;
         note_valid(&e.memory.note)?;
-        if ![FORMAT, FORMAT_V2].contains(&e.format.as_str())
+        if ![FORMAT, FORMAT_V2, FORMAT_V3].contains(&e.format.as_str())
             || (e.format == FORMAT
                 && (e.note_path.is_some()
                     || e.expected_state.is_some()
@@ -710,26 +733,32 @@ impl Vault {
             || e.memory.revision > MAX_RECORDS as u64
             || e.expected_revision.checked_add(1) != Some(e.memory.revision)
             || e.memory.conflict.is_some()
-            || !["capture", "correct", "external", "restore", "remove"].contains(&e.kind.as_str())
+            || !["capture", "correct", "external", "restore", "remove", "organize"].contains(&e.kind.as_str())
             || e.origin
                 != if e.kind == "external" {
                     "human:obsidian"
+                } else if e.kind=="organize" {
+                    "model:claude"
                 } else {
                     "human:recall"
                 }
+            || (e.kind=="organize" && e.format!=FORMAT_V3)
+            || (e.kind=="organize")!=e.organization.is_some()
+            || (e.format==FORMAT_V3 && e.kind=="capture")
             || !source_identity_ok(&e.memory)
             || e.memory.captured_at.len() != 20
             || e.memory.updated_at.len() != 20
-            || e.markdown != markdown(&e.memory)
+            || e.markdown != event_markdown(&e.format,&e.memory)
             || (e.memory.revision == 1) != (e.parent_sha256.is_none())
             || (e.kind == "capture") != (e.memory.revision == 1)
         {
             return Err("Malformed revision metadata".into());
         }
+        if e.format==FORMAT_V3 && !e.memory.note.starts_with(&modern_identity(&e.memory.id)) {return Err("Modern Markdown identity changed".into());}
         if let Some(name) = &e.note_path {
             basename(name)?;
         }
-        if e.format == FORMAT_V2 && e.note_path.is_none() {
+        if e.format != FORMAT && e.note_path.is_none() {
             return Err("Missing bound note basename".into());
         }
         if (e.kind == "remove") != e.expected_state.is_some()
@@ -737,7 +766,7 @@ impl Vault {
                 .as_deref()
                 .is_some_and(|state| !["active", "missing"].contains(&state))
             || (["capture", "restore"].contains(&e.kind.as_str()) && e.previous_markdown.is_some())
-            || (["correct", "external"].contains(&e.kind.as_str()) && e.previous_markdown.is_none())
+            || (["correct", "external", "organize"].contains(&e.kind.as_str()) && e.previous_markdown.is_none())
             || (e.kind == "capture" && e.operation_id != e.memory.id)
             || (e.kind == "remove"
                 && (e.expected_state.as_deref() == Some("active")) != e.previous_markdown.is_some())
@@ -844,7 +873,7 @@ impl Vault {
                     || e.memory.source_name != prev.memory.source_name
                     || e.memory.captured_at != prev.memory.captured_at
                     || prev.kind == "remove"
-                    || (prev.format == FORMAT_V2 && e.format == FORMAT)
+                    || (prev.format != FORMAT && e.format == FORMAT) || (prev.format==FORMAT_V3 && e.format!=FORMAT_V3)
                     || (["restore", "remove"].contains(&e.kind.as_str())
                         && e.memory.note != prev.memory.note)
                     || (e.previous_markdown.is_some()
@@ -1048,12 +1077,37 @@ impl Vault {
             return Err("Competing committed revision".into());
         }
         self.records_inner(&e.memory.id, false)?;
-        if e.format == FORMAT_V2 {
-            self.fence_v2()?;
-        }
+        if e.format == FORMAT_V3 {self.fence_v3()?;}
+        else if e.format == FORMAT_V2 {self.fence_v2()?;}
         boundary!("before_receipt", &self.done_path(&e.operation_id));
         immutable(&self.done_path(&e.operation_id), hash(bytes).as_bytes())?;
         boundary!("after_receipt", &self.done_path(&e.operation_id));
+        Ok(())
+    }
+    fn organization_precondition(&self,e:&Event)->Result<()> {
+        let Some(binding)=&e.organization else {return Ok(());};
+        id(&binding.parser_operation_id)?;id(&binding.organization_operation_id)?;
+        let archive=crate::processing::archived_result(self,&binding.parser_operation_id)?;
+        let parsed=archive.parsed.ok_or("Missing archived parsing")?;
+        let stored:crate::librarian::StoredOrganization=serde_json::from_slice(&read(&self.path(&format!("_meta/organizations/{}.json",binding.organization_operation_id)),128*1024)?).map_err(|_|"Invalid organization recovery record")?;
+        let evidence=crate::meeting::evidence(&parsed,&stored.context);
+        let identity=hash(&json(&("recall-organization-input-v1",&binding.organization_operation_id,&binding.parser_operation_id,archive.expected_revision,&evidence))?);
+        if stored.format!="recall-organization-v1" || stored.operation_id!=binding.organization_operation_id
+            || stored.parser_operation_id!=binding.parser_operation_id || stored.memory_id!=e.memory.id
+            || parsed.source_id!=e.memory.id || stored.source_sha256!=parsed.source_sha256
+            || stored.expected_revision!=e.expected_revision || archive.expected_revision!=e.expected_revision
+            || stored.payload_sha256!=identity || stored.model.is_empty() || stored.model.len()>200
+            || stored.model.chars().any(char::is_control) || stored.recorded_at.len()!=20 {return Err("Organization recovery identity mismatch".into());}
+        let document=crate::meeting::render(&stored.layout,&parsed,&stored.context)?;
+        let marker=modern_identity(&parsed.source_id);
+        let metadata=format!("{}librarian_model: {}\nparser_operation_id: {}\norganization_operation_id: {}\n",marker,serde_json::to_string(&stored.model).map_err(fail)?,serde_json::to_string(&binding.parser_operation_id).map_err(fail)?,serde_json::to_string(&binding.organization_operation_id).map_err(fail)?);
+        if document.replacen(&marker,&metadata,1)!=e.markdown {return Err("Organization recovery document mismatch".into());}
+        for context in &stored.context {
+            let memory=self.reconciled(&context.id)?;
+            if memory.state!="active" || memory.conflict.is_some() || memory.revision!=context.revision
+                || memory.note_path.as_deref()!=Some(&context.note_basename)
+                || memory.note.chars().take(600).collect::<String>()!=context.excerpt {return Err("Organization recovery related context changed".into());}
+        }
         Ok(())
     }
     fn finish(&self, e: &Event) -> Result<()> {
@@ -1069,6 +1123,7 @@ impl Vault {
             // Never replay its Markdown over a later head (especially a tombstone).
             return self.repair_receipt(e, &bytes);
         }
+        self.organization_precondition(e)?;
         self.confirm_source(&e.memory)?;
         if e.expected_revision > 0 {
             let records = self.records(&e.memory.id)?;
@@ -1079,7 +1134,7 @@ impl Vault {
                 || last.memory.source_sha256 != e.memory.source_sha256
                 || last.memory.source_name != e.memory.source_name
                 || last.memory.captured_at != e.memory.captured_at
-                || (last.format == FORMAT_V2 && e.format == FORMAT)
+                || (last.format != FORMAT && e.format == FORMAT) || (last.format==FORMAT_V3 && e.format!=FORMAT_V3)
                 || (["remove", "restore"].contains(&e.kind.as_str())
                     && last.memory.note != e.memory.note)
                 || (e.previous_markdown.is_some()
@@ -1092,9 +1147,8 @@ impl Vault {
         {
             return Err("Capture history already exists".into());
         }
-        if e.format == FORMAT_V2 {
-            self.fence_v2()?;
-        }
+        if e.format == FORMAT_V3 {self.fence_v3()?;}
+        else if e.format == FORMAT_V2 {self.fence_v2()?;}
         let dir = hp.parent().ok_or("Missing parent")?;
         safe(dir)?;
         if !dir.exists() {
@@ -1112,6 +1166,7 @@ impl Vault {
         }
         let np = self.event_note_path(e)?;
         boundary!("before_note", &np);
+        self.organization_precondition(e)?;
         if self
             .inventory(&e.memory.id, e.note_path.as_deref())?
             .is_some_and(|p| p != np)
@@ -1174,6 +1229,7 @@ impl Vault {
         if self.inventory(&e.memory.id, e.note_path.as_deref())? != Some(np.clone()) {
             return Err("Memory moved or duplicated during publication".into());
         }
+        self.organization_precondition(e)?;
         // Check again immediately before committing. A concurrent edit remains intact.
         if read(&np, MAX_JSON)? != e.markdown.as_bytes() {
             return Err("Concurrent Markdown edit; retry refresh".into());
@@ -1193,9 +1249,8 @@ impl Vault {
     }
     fn commit(&self, e: &Event) -> Result<VaultMemory> {
         self.preflight_capacity(e)?;
-        if e.format == FORMAT_V2 {
-            self.fence_v2()?;
-        }
+        if e.format == FORMAT_V3 {self.fence_v3()?;}
+        else if e.format == FORMAT_V2 {self.fence_v2()?;}
         immutable(&self.journal_path(&e.operation_id), &json(e)?)?;
         self.finish(e)?;
         let mut m = e.memory.clone();
@@ -1330,6 +1385,7 @@ impl Vault {
             kind: "capture".into(),
             note_path: Some(format!("{operation_id}.md")),
             expected_state: None,
+            organization: None,
             expected_revision: 0,
             payload_sha256,
             parent_sha256: None,
@@ -1384,6 +1440,7 @@ impl Vault {
             kind: "capture".into(),
             note_path: Some(format!("{operation_id}.md")),
             expected_state: None,
+            organization: None,
             expected_revision: 0,
             payload_sha256,
             parent_sha256: None,
@@ -1428,7 +1485,8 @@ impl Vault {
             note: String::new(),
             ..m.clone()
         });
-        let Some(note) = disk.strip_prefix(&prefix) else {
+        let note = if last.format==FORMAT_V3 {disk.strip_prefix(&modern_identity(&m.id)).map(|_|disk.as_str())} else {disk.strip_prefix(&prefix)};
+        let Some(note) = note else {
             m.state = "conflict".into();
             m.conflict = Some(
                 "Markdown identity or evidence link changed; restore the header to reconcile"
@@ -1442,12 +1500,13 @@ impl Vault {
         m.updated_at = timestamp();
         let operation_id = Uuid::new_v4().to_string();
         let e = Event {
-            format: FORMAT_V2.into(),
+            format: if last.format==FORMAT_V3 {FORMAT_V3}else{FORMAT_V2}.into(),
             vault_id: self.id.clone(),
             operation_id,
             kind: "external".into(),
             note_path: m.note_path.clone(),
             expected_state: None,
+            organization: None,
             expected_revision: last.memory.revision,
             payload_sha256: payload(
                 "external",
@@ -1582,12 +1641,13 @@ impl Vault {
         memory.note = note.into();
         memory.updated_at = timestamp();
         let e = Event {
-            format: FORMAT_V2.into(),
+            format: if last.format==FORMAT_V3 {FORMAT_V3}else{FORMAT_V2}.into(),
             vault_id: self.id.clone(),
             operation_id: operation_id.into(),
             kind: "correct".into(),
             note_path: memory.note_path.clone(),
             expected_state: None,
+            organization: None,
             expected_revision,
             payload_sha256: payload(
                 "correct",
@@ -1600,10 +1660,55 @@ impl Vault {
             parent_sha256: Some(self.parent_hash(&last.memory.id, last.memory.revision)?),
             origin: "human:recall".into(),
             previous_markdown: Some(last.markdown.clone()),
-            markdown: markdown(&memory),
+            markdown: event_markdown(&last.format,&memory),
             memory,
         };
         self.commit(&e)
+    }
+    /// Publish only native-validated archived parsing and closed organization.
+    pub(crate) fn publish_meeting(&self,parser_operation:&str,organization_operation:&str,operation:&str)->Result<VaultMemory> {
+        id(parser_operation)?;id(organization_operation)?;id(operation)?;
+        let _lock=self.lock()?;
+        let pending=self.recover()?;
+        let archive=crate::processing::archived_result(self,parser_operation)?;
+        let parsed=archive.parsed.ok_or("Missing parsed evidence")?;
+        let path=self.path(&format!("_meta/organizations/{organization_operation}.json"));
+        let stored:crate::librarian::StoredOrganization=serde_json::from_slice(&read(&path,128*1024)?).map_err(|_|"Invalid organization record")?;
+        let evidence=crate::meeting::evidence(&parsed,&stored.context);
+        let identity=hash(&json(&("recall-organization-input-v1",organization_operation,parser_operation,archive.expected_revision,&evidence))?);
+        if stored.format!="recall-organization-v1" || stored.operation_id!=organization_operation
+            || stored.parser_operation_id!=parser_operation || stored.memory_id!=parsed.source_id
+            || stored.expected_revision!=archive.expected_revision || stored.source_sha256!=parsed.source_sha256
+            || stored.payload_sha256!=identity || stored.model.is_empty() || stored.model.len()>200
+            || stored.model.chars().any(char::is_control) || stored.recorded_at.len()!=20 {
+            return Err("Organization source, revision or identity mismatch".into());
+        }
+        let mut document=crate::meeting::render(&stored.layout,&parsed,&stored.context)?;
+        let marker=modern_identity(&parsed.source_id);
+        let metadata=format!("{}librarian_model: {}\nparser_operation_id: {}\norganization_operation_id: {}\n",marker,serde_json::to_string(&stored.model).map_err(fail)?,serde_json::to_string(parser_operation).map_err(fail)?,serde_json::to_string(organization_operation).map_err(fail)?);
+        document=document.replacen(&marker,&metadata,1);
+        note_valid(&document)?;
+        if let Some(event)=self.receipt(operation)? {
+            if event.kind!="organize" || event.memory.id!=parsed.source_id || event.expected_revision!=archive.expected_revision || event.memory.note!=document {
+                return Err("Publication operation reused with different proposal".into());
+            }
+            return self.current(&event.memory.id,&pending);
+        }
+        let snapshot=self.processing_snapshot_while_locked(&parsed.source_id,archive.expected_revision)?;
+        if snapshot.human_corrected || snapshot.source.sha256!=parsed.source_sha256 {return Err("Source correction or mismatch; publication withheld".into());}
+        let current=self.list_while_locked("",false)?;
+        for context in &stored.context {
+            let m=current.iter().find(|m|m.id==context.id && m.state=="active" && m.conflict.is_none()).ok_or("Related memory no longer eligible")?;
+            if m.revision!=context.revision || m.note_path.as_deref()!=Some(&context.note_basename)
+                || m.note.chars().take(600).collect::<String>()!=context.excerpt {return Err("Related memory revision or target changed; publication withheld".into());}
+        }
+        let last=self.records(&parsed.source_id)?.pop().ok_or("Missing capture history")?;
+        let mut memory=snapshot.memory;memory.revision+=1;memory.note=document;memory.updated_at=timestamp();
+        let event=Event{format:FORMAT_V3.into(),vault_id:self.id.clone(),operation_id:operation.into(),kind:"organize".into(),expected_revision:archive.expected_revision,
+            payload_sha256:payload("organize",&memory.id,archive.expected_revision,&memory.note,&memory.source_sha256,&memory.source_name)?,
+            parent_sha256:Some(self.parent_hash(&memory.id,archive.expected_revision)?),origin:"model:claude".into(),
+            note_path:memory.note_path.clone(),expected_state:None,organization:Some(OrganizationBinding{parser_operation_id:parser_operation.into(),organization_operation_id:organization_operation.into()}),previous_markdown:Some(last.markdown),markdown:memory.note.clone(),memory};
+        self.commit(&event)
     }
     fn removal_precondition(&self, e: &Event) -> Result<()> {
         let candidate = self.inventory(&e.memory.id, e.note_path.as_deref())?;
@@ -1694,7 +1799,7 @@ impl Vault {
             payload_sha256 = hash(&json(&(payload_sha256, &expected_state))?);
         }
         let e = Event {
-            format: FORMAT_V2.into(),
+            format: if last.format==FORMAT_V3 {FORMAT_V3}else{FORMAT_V2}.into(),
             vault_id: self.id.clone(),
             operation_id: operation_id.into(),
             kind: kind.into(),
@@ -1708,12 +1813,13 @@ impl Vault {
                 .or(last.note_path)
                 .or_else(|| Some(format!("{memory_id}.md"))),
             expected_state,
+            organization: None,
             previous_markdown: if m.state == "active" {
                 Some(last.markdown)
             } else {
                 None
             },
-            markdown: markdown(&m),
+            markdown: event_markdown(&last.format,&m),
             memory: VaultMemory {
                 state: "active".into(),
                 ..m
@@ -1729,6 +1835,13 @@ impl Vault {
         self.processing_snapshot_while_locked(memory_id, revision)
     }
     /// Caller must hold the native writer lock; rechecks disk/source state.
+    pub(crate) fn captured_text_while_locked(&self,memory_id:&str)->Result<Vec<u8>> {
+        id(memory_id)?;
+        let records=self.records(memory_id)?;
+        let capture=records.first().ok_or("Missing native capture history")?;
+        if capture.kind!="capture" || !absent_original(&capture.memory){return Err("Native original is not a text capture".into());}
+        Ok(capture.memory.note.as_bytes().to_vec())
+    }
     pub(crate) fn processing_snapshot_while_locked(&self, memory_id: &str, revision: u64) -> Result<ProcessingSnapshot> {
         id(memory_id)?;
         let pending = self.recover()?;
@@ -1761,7 +1874,12 @@ impl Vault {
             return Err("Resolve this memory's conflict before using its evidence".into());
         }
         if absent_original(&m) {
-            return Err("This note has no original photo.".into());
+            let path=self.path(&format!("Sources/{memory_id}.txt"));
+            if !path.exists(){return Err("This note has no original photo.".into());}
+            let original=self.records(memory_id)?.first().ok_or("Missing original capture")?.memory.note.clone();
+            let bytes=read(&path,MAX_NOTE as u64)?;
+            if bytes!=original.as_bytes(){return Err("Original text hash mismatch".into());}
+            return Ok(VaultSource{sha256:hash(&bytes),bytes,mime_type:"text/plain".into()});
         }
         self.verify_source(&m)
     }
