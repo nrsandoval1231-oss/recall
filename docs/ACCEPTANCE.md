@@ -351,6 +351,14 @@ Publication recovery also compares archived TXT bytes against the first immutabl
 
 Closed Claude organization accepted: PR33 exact candidate54ebf30abf35457921d90d0d67e2939a2c2b7192 passed all five jobs in CI run38252323122 after rebasing onto merged parser operations. Independent review reproduced164 native-core tests and approved the bounded nonpublishing capability. Squash merged as53d3267d5dfbb35506c4c89041a85fef25fa5c5c. Provider inference and visual accuracy remain unverified.
 
+### RCL-INT-001 persisted context surface
+
+Existing warm-glass panels/cards now show source-specific unresolved people/location/project/organization mentions and related notes from persisted native Markdown. A source follow-up agenda lives in the existing Timeline panel and explicitly remains unscheduled; capture-month dates are actual native timestamps. No entity merges or December deadlines are inferred. React text rendering and exact section parsing exclude retracted mentions, deleted/conflicted notes, arbitrary raw captures and missing related targets. User edits can change these display hints; they are not independent provider or identity verification.
+
+Local verification: 72 desktop tests, TypeScript checks and production build passed. Independent review reproduced all 72 tests/typecheck/build after fixing the floating-card layout. Exact-head CI required before merge. Full semantic project grouping, confirmed calendar commitments, live provider and device acceptance remain open. PR27's proposed canonical PNG is still absent; no image fidelity acceptance is claimed.
+
+Independent floating-card review identified a related-only grid placement bug; both existing side slots are now retained whenever context is present, with a three-slot regression. Exact-head CI remains required.
+
 ### RCL-INT-001E — desktop text workflow binding (in review)
 
 The existing warm-glass surface now saves messy text through selected-vault native authority and preserves original text evidence before returning capture. Explicit consent runs durable Jev parsing, closed Claude organization and validated Obsidian publication sequentially, with actual pending/processing/review/error messages. Stage operation IDs persist by stable vault/memory identity; renderer interruptions replay exact native receipts and never invent a new provider retry. Native secrets and filesystem destinations stay outside the webview.

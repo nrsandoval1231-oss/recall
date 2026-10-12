@@ -1,3 +1,4 @@
+import { vaultContext, type SourceRow } from "./vault-context";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
 import { brooks, FIXTURE_BANNER, fixtureDocuments, fixtureMemory, type FixtureMemory } from "./brooks-fixture";
@@ -542,6 +543,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     }
   }
 
+  const context = vaultContext(kept);
   const demoMemories = brooks.memories;
   const vaultMemories = kept;
   const evidenceMemory = kept.find((memory) => memory.id === evidenceId) ?? null;
@@ -633,7 +635,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
             </section>
           ) : (
             <>
-              <div className={demo ? "ms-columns" : "ms-columns ms-columns-solo"}>
+              <div className={demo || context.people.length || context.places.length || context.related.length ? "ms-columns" : "ms-columns ms-columns-solo"}>
                 {demo && (
                   <div className="ms-side">
                     <ContextCard title="People" icon={<PeopleMark />}>
@@ -654,6 +656,10 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                     </ContextCard>
                   </div>
                 )}
+                {!demo && (context.people.length > 0 || context.places.length > 0 || context.related.length > 0) && <div className="ms-side">
+                  {context.people.length > 0 && <ContextCard title="People" icon={<PeopleMark />}><SourceList rows={context.people} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
+                  {context.places.length > 0 && <ContextCard title="Locations" icon={<LocationMark />}><SourceList rows={context.places} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}
+                </div>}
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
                   {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{hit.note_basename}</h2><p className="ms-note">{hit.current_excerpt}</p><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
                     <>
@@ -664,12 +670,17 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       <h1>{detail?.title ?? (demo ? brooks.project : featured ? titleOf(featured) : "Your vault")}</h1>
                       <p className="ms-place">{demo ? brooks.place : selected ? selected.root : "No vault open"}</p>
                       {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : featured?.note || "Import a photo to keep the original and a note in this vault."}</p>}
+                      {!demo && section === "projects" && panel === "overview" && !detail && <SourceList rows={context.projects} empty="No unresolved project or organization mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
                       {demo && panel === "overview" && !detail && <p className="ms-fine">{brooks.caveat}</p>}
+                      {panel === "timeline" && !demo && <><h2>Agenda</h2><SourceList rows={context.agenda} empty="No source follow-ups saved yet." onOpen={(memory) => void openVaultMemory(memory)} /><h2>Capture calendar</h2></>}
                       {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} month={activeMonth} monthLabel={activeLabel} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
-                      {panel === "people" && !detail && <SimpleList demo={demo} rows={brooks.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
-                      {panel === "places" && !detail && <SimpleList demo={demo} rows={brooks.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
+                      {panel === "people" && !detail && !demo && <SourceList rows={context.people} empty="No unresolved people mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
+                      {panel === "people" && !detail && demo && <SimpleList demo={demo} rows={brooks.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
+                      {panel === "places" && !detail && !demo && <SourceList rows={context.places} empty="No unresolved location mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
+                      {panel === "places" && !detail && demo && <SimpleList demo={demo} rows={brooks.places.map((place) => ({ label: place.name, note: place.note }))} empty="Places are not inferred from your notes." />}
                       {panel === "equipment" && <SimpleList demo={demo} rows={brooks.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
-                      {panel === "related" && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
+                      {panel === "related" && !demo && <SourceList rows={context.related} empty="No saved related memories." onOpen={(memory) => void openVaultMemory(memory)} />}
+                      {panel === "related" && demo && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
                       <dl className="ms-stats">
                         <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : active.length}</dd></div>
                         {demo && (
@@ -697,6 +708,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                     <blockquote className="glass ms-quote">{brooks.quote}</blockquote>
                   </div>
                 )}
+                {!demo && (context.people.length > 0 || context.places.length > 0 || context.related.length > 0) && <div className="ms-side">{context.related.length > 0 && <ContextCard title="Related" icon={<RelatedMark />}><SourceList rows={context.related} empty="" onOpen={(memory) => void openVaultMemory(memory)} /></ContextCard>}</div>}
               </div>
               {ticks.length > 0 && <TimelineStrip ticks={ticks} active={activeMonth} onSelect={selectMonth} />}
             </>
@@ -786,6 +798,11 @@ function TimelineStrip({ ticks, active, onSelect }: { ticks: TimelineTick[]; act
       </ol>
     </section>
   );
+}
+
+function SourceList({ rows, empty, onOpen }: { rows: SourceRow[]; empty: string; onOpen: (memory: VaultMemory) => void }) {
+  if (rows.length === 0) return <p className="ms-fine">{empty}</p>;
+  return <ul className="ms-list">{rows.map((row, index) => <li key={`${row.memory.id}-${index}`}><button type="button" onClick={() => onOpen(row.memory)}>{row.label}</button><p className="ms-fine">{row.note}</p></li>)}</ul>;
 }
 
 function SimpleList({ demo, rows, empty }: { demo: boolean; rows: { label: string; note: string }[]; empty: string }) {

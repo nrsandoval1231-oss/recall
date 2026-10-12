@@ -368,3 +368,30 @@ it("preserves a newer unsaved draft when organization finishes on the same memor
   await act(async () => { finish({}); }); await screen.findByText(/Your newer unsaved correction draft is preserved/);
   expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("Newer unsaved human draft");
 });
+
+it("shows saved unresolved people and source agenda in the existing panels", async () => {
+  const user = userEvent.setup();
+  const id = "11111111-1111-4111-8111-111111111111";
+  const saved = memory({ note: `---\nrecall_id: "${id}"\n---\n## Unresolved entity mentions\n\n- “Sarah” — person candidate; identity unresolved\n## Follow-ups (not confirmed commitments)\n\n- [ ] “Call Sarah” — source bytes 20–30\n## Open questions and uncertainty\n\n-  “Need generators by Dec?” — source bytes 31–55\n` });
+  render(<MemorySurface vault={vault({}, [saved])} />);
+  await screen.findByText(/Last updated/);
+  await user.click(screen.getByRole("button", { name: "People" }));
+  expect(screen.getAllByRole("button", { name: "Sarah" })[0]).toBeTruthy();
+  expect(screen.getAllByText(/person candidate; identity unresolved/)[0]).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Timeline" }));
+  expect(screen.getByRole("heading", { name: "Agenda" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Call Sarah" })).toBeTruthy();
+  expect(screen.getByText(/Unscheduled source follow-up/)).toBeTruthy();
+});
+
+it("keeps the board in the center grid slot with related context alone", async () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const saved = memory({ note: `---\nrecall_id: "${id}"\n---\n## Related memories\n\n- [[Recall/Memories/target|Related source-backed memory]] (possible relationship; review)\n` });
+  const { container } = render(<MemorySurface vault={vault({}, [saved, memory({ id: "22222222-2222-4222-8222-222222222222", note_path: "target.md" })])} />);
+  await screen.findByRole("region", { name: "Related" });
+  const columns = container.querySelector(".ms-columns")!;
+  expect(columns.children).toHaveLength(3);
+  expect(columns.children[0]?.classList.contains("ms-side")).toBe(true);
+  expect(columns.children[1]?.classList.contains("ms-project")).toBe(true);
+  expect(columns.children[2]?.classList.contains("ms-side")).toBe(true);
+});
