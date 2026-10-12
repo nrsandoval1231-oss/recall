@@ -167,6 +167,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const sourceRequest = useRef(0);
   const askRequest = useRef(0);
   const evidenceRef = useRef<string | null>(null);
+  const correctionVersion = useRef(0);
   function clearPreview() {
     if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
     previewRef.current = null; setPreview(null);
@@ -234,6 +235,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       askRef.current?.focus();
       return;
     }
+    if (section === "ask") setBusy(false);
     setSection(next);
     evidenceRef.current = null; sourceRequest.current += 1; askRequest.current += 1;
     setEvidenceId(null);
@@ -302,19 +304,24 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     } catch (askError) {
       if (inScope(selected.vault_id) && request === askRequest.current) setError(message(askError));
     } finally {
-      if (inScope(selected.vault_id)) setBusy(false);
+      if (inScope(selected.vault_id) && request === askRequest.current) setBusy(false);
     }
   }
 
   async function organizeMemory(memory: VaultMemory) {
     if (!selected) return;
     const scope = selected;
+    const draftVersion = correctionVersion.current;
     setBusy(true); setError("");
     try {
       const published = await processMeeting(vault, scope, memory, processingConsent, (state) => { if (inScope(scope.vault_id)) setProcessingState(state); });
       if (!inScope(scope.vault_id) || !published) return;
       setItems((rows) => rows.map((row) => row.id === published.id ? published : row));
-      if (evidenceRef.current === published.id) { setCorrection(published.note); setHistory(null); setProcessingConsent(false); }
+      if (evidenceRef.current === published.id) {
+        if (correctionVersion.current === draftVersion) setCorrection(published.note);
+        else setNotice("Organization saved. Your newer unsaved correction draft is preserved; review the saved note before applying it.");
+        setHistory(null); setProcessingConsent(false);
+      }
     } catch (processingError) {
       if (inScope(scope.vault_id)) setError(message(processingError));
     } finally { if (inScope(scope.vault_id)) setBusy(false); }
@@ -596,7 +603,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               reading={reading}
               librarian={reader}
               onBack={() => go("home")}
-              onCorrection={setCorrection}
+              onCorrection={(value) => { correctionVersion.current += 1; setCorrection(value); }}
               onSave={() => evidenceMemory && void saveCorrection(evidenceMemory)}
               onReload={() => evidenceMemory && void reload(evidenceMemory)}
               onHistory={() => evidenceMemory && void showHistory(evidenceMemory)}
@@ -617,7 +624,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               <p>Save messy notes or import a photo. Originals stay in your vault. Organization runs after your consent.</p>
               <form className="ms-form" onSubmit={(event) => { event.preventDefault(); void importPhoto(); }}>
                 <label htmlFor="capture-note">Optional note</label>
-                <textarea id="capture-note" value={draft} onChange={(event) => setDraft(event.target.value)} />
+                <textarea id="capture-note" disabled={busy} value={draft} onChange={(event) => setDraft(event.target.value)} />
                 <label className="ms-check"><input type="checkbox" checked={processingConsent} onChange={(event) => setProcessingConsent(event.target.checked)} /> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label>
                 <button className="ms-primary" type="button" disabled={busy || !vault.captureNote} onClick={() => void saveNote()}>{pending?.kind === "text" ? "Retry the same note" : "Save note"}</button>
                 <button className="ms-primary" type="submit" disabled={busy || pending?.kind === "text"}>{pending ? "Retry the same import" : "Import photo"}</button>

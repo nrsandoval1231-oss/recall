@@ -354,3 +354,17 @@ it("older Ask responses cannot replace a newer source-backed result", async () =
   await act(async () => { first({ question: "first", message: "Old result", hits: [] }); });
   expect(screen.getByText("Newest result")).toBeTruthy(); expect(screen.queryByText("Old result")).toBeNull();
 });
+
+it("preserves a newer unsaved draft when organization finishes on the same memory", async () => {
+  Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
+  const a = memory({ source_name: "Draft.png", note: "Original draft" });
+  let finish!: (value: unknown) => void;
+  const organize = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+  render(<MemorySurface vault={vault({ parse: vi.fn(async (_scope, id, revision, operation) => ({ memory_id: id, expected_revision: revision, operation_id: operation, source_sha256: a.source_sha256, state: "parsed", message: "Fixture" })), organize, publish: vi.fn(async () => ({ ...a, revision: 2, note: "Published machine document" })) }, [a])} />);
+  const user = userEvent.setup(); await user.click(await screen.findByRole("button", { name: "Open original: Draft" }));
+  await user.click(screen.getByLabelText(/Send this source to Jev and Claude/)); await user.click(screen.getByRole("button", { name: "Organize this memory" }));
+  await screen.findByText("Claude is organizing source-linked memory…");
+  await user.clear(screen.getByLabelText("Your correction")); await user.type(screen.getByLabelText("Your correction"), "Newer unsaved human draft");
+  await act(async () => { finish({}); }); await screen.findByText(/Your newer unsaved correction draft is preserved/);
+  expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("Newer unsaved human draft");
+});
