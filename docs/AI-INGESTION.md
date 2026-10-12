@@ -130,3 +130,9 @@ Provider agents honor the approved environment proxy and native/system CA trust.
 ## Claude meeting organization
 
 After a durable Jev operation is `parsed`, `meeting_organize` takes its native operation ID, a new UUID, the selected-vault token and explicit consent. It uses the existing `RECALL_CLAUDE_*` configuration and the same budget ledger as photo reading. A forced Messages API tool returns a closed layout, validated locally; unsupported provider/model tool behavior fails closed. Evidence and context are bounded before reserving budget. The native renderer supplies quoted source text, valid JSON-quoted YAML scalars, stable native destinations and authorized wikilinks. Proposals remain under assigned `Recall/_meta/organizations/<UUID>.json` records until the dependent native writer publishes them. An unvalidated organization plan from the earlier free-form proposal API is never automatically published.
+
+## Validated Obsidian publication
+
+`meeting_publish` resolves native parser/organization UUID records, renders the closed proposal and commits through the native vault writer. Model data never controls the destination. The current managed basename remains stable across user renames. Original text evidence and SHA-256 are revalidated before publication and interrupted-journal recovery; related memory revisions, excerpts and destinations must remain authorized. A v3 manifest fence is written before modern Markdown publication. Older Recall binaries refuse that vault rather than flatten frontmatter. Obsidian remains readable/editable, and native correction/history/recovery remains authoritative.
+
+`memory_ask` is a bounded local quote retriever. It uses active nonconflicting current notes, recognizes delay/late wording, and returns current excerpts plus verified original source excerpts/hashes. Results survive restart and link to native originals. It does not claim that these retrieved quotes are a generated or comprehensive answer.

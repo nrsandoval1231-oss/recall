@@ -747,9 +747,7 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
     if snapshot.human_corrected {return Err("Human correction requires review before organization".into());}
     let memories=vault.list_with_deleted("",false)?;
     let context=crate::meeting::context(&memories.into_iter().filter(|m|m.id!=parsed.source_id).collect::<Vec<_>>(),&parsed.transcription);
-    let evidence=serde_json::json!({"source_id":parsed.source_id,"source_sha256":parsed.source_sha256,
-        "spans":parsed.candidates.iter().enumerate().map(|(id,c)|serde_json::json!({"id":id,"text":c.span.text,"kind":c.kind,"status":c.status})).collect::<Vec<_>>(),
-        "unresolved_mentions":parsed.mentions,"existing_memories":context});
+    let evidence=crate::meeting::evidence(&parsed,&context);
     let bytes=serde_json::to_vec(&evidence).map_err(|_|"Invalid organization evidence")?;
     if bytes.len()>50_000 {return Err("Organization context exceeds bounded input".into());}
     let payload=hex::encode(Sha256::digest(serde_json::to_vec(&("recall-organization-input-v1",operation,parser_operation,revision,&evidence)).map_err(|_|"Invalid organization identity")?));
@@ -1083,11 +1081,11 @@ mod tests {
 }
 
 #[cfg(test)]
-mod organization_tests {
+pub(crate) mod organization_tests {
     use super::*;
     use crate::{jev,local_vault::Vault,processing,meeting};
     use std::sync::atomic::{AtomicUsize,Ordering};
-    struct Temp(std::path::PathBuf);
+    pub(crate) struct Temp(pub(crate) std::path::PathBuf);
     impl Temp {fn new()->Self{let p=std::env::temp_dir().join(format!("recall-synthetic-organization-{}",Uuid::new_v4()));fs::create_dir(&p).unwrap();Self(p)}}
     impl Drop for Temp {fn drop(&mut self){let _=fs::remove_dir_all(&self.0);}}
     struct Parser;
@@ -1096,7 +1094,7 @@ mod organization_tests {
             let mut parsed=meeting::tests::source();assert_eq!(parsed.transcription,text);parsed.source_id=id.into();parsed.source_sha256=sha.into();for c in &mut parsed.candidates{c.source_id=id.into();}Ok(parsed)
         }
     }
-    struct Claude {calls:AtomicUsize,invalid:bool,fail:bool}
+    pub(crate) struct Claude {calls:AtomicUsize,invalid:bool,fail:bool}
     impl OrganizationTransport for Claude {
         fn organize(&self,_:&str,_:&str,evidence:&serde_json::Value)->std::result::Result<meeting::Layout,CallError>{
             self.calls.fetch_add(1,Ordering::SeqCst);
@@ -1104,12 +1102,12 @@ mod organization_tests {
             Ok(meeting::Layout{schema_version:1,title_span:Some(1),category:"meeting".into(),observations:if self.invalid{vec![]}else{(0..evidence["spans"].as_array().unwrap().len()).collect()},follow_ups:vec![],questions:vec![],related_memory_ids:vec![]})
         }
     }
-    fn claude()->Claude {Claude{calls:AtomicUsize::new(0),invalid:false,fail:false}}
-    fn config()->LibrarianConfig {config_from_pairs([
+    pub(crate) fn claude()->Claude {Claude{calls:AtomicUsize::new(0),invalid:false,fail:false}}
+    pub(crate) fn config()->LibrarianConfig {config_from_pairs([
         ("RECALL_CLAUDE_API_KEY",Some("synthetic-key".into())),("RECALL_CLAUDE_MODEL",Some("synthetic-test-model".into())),
         ("RECALL_CLAUDE_INPUT_USD_PER_MTOK",Some("3".into())),("RECALL_CLAUDE_OUTPUT_USD_PER_MTOK",Some("15".into())),
         ("RECALL_CLAUDE_DAILY_BUDGET_USD",Some("10".into())),("RECALL_CLAUDE_MONTHLY_BUDGET_USD",Some("10".into()))])}
-    fn setup()->(Temp,Vault,String,String){
+    pub(crate) fn setup()->(Temp,Vault,String,String){
         let t=Temp::new();let v=Vault::open(&t.0).unwrap();let p=meeting::tests::source();let id=Uuid::new_v4().to_string();
         let m=v.capture_note(&id,&p.transcription).unwrap();let op=Uuid::new_v4().to_string();
         // Native config is injected for synthetic unit execution, never environment credentials.

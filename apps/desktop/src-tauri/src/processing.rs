@@ -421,6 +421,22 @@ fn read_job(vault: &Vault, dir: &Path, input: &Input) -> Result<Job> {
         None,
     ))
 }
+/// Read immutable parser evidence without acquiring the processing lock.
+/// Caller publication holds the writer lock; never infer current revision from this archive.
+pub(crate) fn archived_result(vault:&Vault,operation:&str)->Result<Job> {
+    let dir=root(vault)?;
+    let input:Input=read_optional(&path(&dir,"inputs",operation)?)?.ok_or("Parser input missing")?;
+    valid_input(vault,&input,operation)?;
+    if input.human_corrected || input.mime_type!="text/plain" {return Err("Parser source is not authorized for automatic publication".into());}
+    let attempt:Attempt=read_optional(&path(&dir,"attempts",operation)?)?.ok_or("Parser attempt missing")?;
+    valid_attempt(&input,&attempt)?;
+    let completed:Completed=read_optional(&path(&dir,"results",operation)?)?.ok_or("Validated parser result missing")?;
+    valid_completed(&input,&attempt,&completed)?;
+    let original=local_vault::read(&vault.root().join(format!("Recall/Sources/{}.txt",input.memory_id)),16*1024)?;
+    if digest(&original)!=input.source_sha256 || original!=completed.parsed.transcription.as_bytes(){return Err("Archived parser original mismatch".into());}
+    Ok(job(&input,"parsed","Archived validated parser evidence",Some(&attempt),Some(completed.parsed)))
+}
+
 pub fn status(vault: &Vault, operation: &str) -> Result<Job> {
     let dir = root(vault)?;
     let _lock = lock(&dir)?;

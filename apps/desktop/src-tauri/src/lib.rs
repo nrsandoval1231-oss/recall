@@ -2,6 +2,7 @@
 mod jev;
 mod processing;
 mod meeting;
+mod memory_query;
 mod librarian;
 #[allow(dead_code)]
 mod organization_plan;
@@ -410,6 +411,27 @@ async fn meeting_organize(
     }).await.map_err(|_| "Claude worker stopped; review the operation before retrying".to_string())?
 }
 
+#[tauri::command]
+fn meeting_publish(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    organization_operation_id: String,
+    operation_id: String,
+) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| vault.publish_meeting(
+        &parser_operation_id, &organization_operation_id, &operation_id))
+}
+
+#[tauri::command]
+fn memory_ask(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    question: String,
+) -> Result<memory_query::Answer, String> {
+    state.with(&expected_vault_id, |vault| memory_query::ask(vault, &question))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -447,6 +469,8 @@ pub fn run() {
             processing_parse,
             processing_status,
             meeting_organize,
+            meeting_publish,
+            memory_ask,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,

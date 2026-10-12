@@ -2081,3 +2081,80 @@ fn processing_snapshot_reconciles_external_edits_before_provider_context() {
     assert!(v.processing_snapshot(&id,1).is_err());
     assert!(v.processing_snapshot(&id,2).unwrap().human_corrected);
 }
+
+fn organized_fixture()->(crate::librarian::organization_tests::Temp,Vault,String,String,String){
+    use crate::librarian::organization_tests as provider_fixture;
+    let (t,v,parser,memory)=provider_fixture::setup();let organization=op();
+    crate::librarian::organize_selected(&v,&provider_fixture::config(),&parser,&organization,true,&provider_fixture::claude()).unwrap();
+    (t,v,parser,organization,memory)
+}
+#[test]
+fn meeting_publication_has_native_yaml_original_and_durable_idempotent_history(){
+    let (t,v,parser,organization,memory)=organized_fixture();let publication=op();
+    let saved=v.publish_meeting(&parser,&organization,&publication).unwrap();assert_eq!(saved.revision,2);
+    let document=fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap();
+    assert!(document.starts_with(&modern_identity(&memory)));assert!(document.contains("librarian_model:"));
+    assert!(document.contains("source_sha256:"));assert!(document.contains("Open questions and uncertainty"));
+    assert!(!document.split("## Retracted").next().unwrap().contains("8 MW confirmed"));
+    let reopened=Vault::open(&t.0).unwrap();assert_eq!(reopened.publish_meeting(&parser,&organization,&publication).unwrap().revision,2);
+    assert_eq!(reopened.history(&memory).unwrap()[1].origin,"model:claude");
+    assert!(String::from_utf8(reopened.source(&memory).unwrap().bytes).unwrap().contains("Crossed out: 8 MW confirmed"));
+    assert_eq!(serde_json::from_slice::<Manifest>(&fs::read(t.0.join("Recall/_meta/manifest.json")).unwrap()).unwrap().format,FORMAT_V3);
+    reopened.capture_note(&op(),"Another user capture").unwrap();assert_eq!(Vault::open(&t.0).unwrap().list("").unwrap().len(),2);
+}
+#[test]
+fn modern_notes_preserve_external_edits_rename_correction_restore_and_removal(){
+    let (t,v,parser,organization,memory)=organized_fixture();let publication=op();v.publish_meeting(&parser,&organization,&publication).unwrap();
+    let old=t.0.join(format!("Recall/Memories/{memory}.md"));let renamed=t.0.join("Recall/Memories/Utility planning.md");fs::rename(old,&renamed).unwrap();
+    let edited=format!("{}\nHuman correction: utility now on time.\n",fs::read_to_string(&renamed).unwrap());fs::write(&renamed,&edited).unwrap();
+    let reopened=Vault::open(&t.0).unwrap();let latest=reopened.list("").unwrap().pop().unwrap();assert_eq!(latest.revision,3);assert_eq!(latest.note,edited);
+    assert_eq!(reopened.publish_meeting(&parser,&organization,&publication).unwrap().note,edited);
+    assert!(reopened.publish_meeting(&parser,&organization,&op()).is_err());
+    let corrected=reopened.correct(&memory,3,&op(),&format!("{edited}\nReviewed by user.")).unwrap();assert_eq!(corrected.revision,4);
+    fs::remove_file(&renamed).unwrap();let restored=reopened.restore_note(&memory,4,&op()).unwrap();assert_eq!(restored.revision,5);
+    assert!(fs::read_to_string(&renamed).unwrap().starts_with("---\nrecall_id:"));
+    let removed=reopened.remove(&memory,5,&op(),"active").unwrap();assert_eq!(removed.state,"deleted");
+}
+#[test]
+fn publication_refuses_source_and_user_edits_before_commit(){
+    let (t,v,parser,organization,memory)=organized_fixture();
+    let path=t.0.join(format!("Recall/Memories/{memory}.md"));let edited=format!("{}\nUser changed it.",fs::read_to_string(&path).unwrap());fs::write(&path,&edited).unwrap();
+    assert!(v.publish_meeting(&parser,&organization,&op()).is_err());assert_eq!(fs::read_to_string(path).unwrap(),edited);
+    let (t,v,parser,organization,memory)=organized_fixture();fs::write(t.0.join(format!("Recall/Sources/{memory}.txt")),"forged original").unwrap();
+    assert!(v.publish_meeting(&parser,&organization,&op()).is_err());assert_eq!(v.history(&memory).unwrap().len(),1);
+}
+#[test]
+fn interrupted_meeting_publication_recovers_without_duplicate_revisions(){
+    for point in ["fence_before","before_note","publish_before","publish_after","before_history","before_receipt"] {
+        let (t,v,parser,organization,memory)=organized_fixture();let publication=op();
+        let fault=FaultGuard::set(move |at,_|if at==point {Err("INJECTED publication interruption".into())}else{Ok(())});
+        assert!(v.publish_meeting(&parser,&organization,&publication).is_err());drop(fault);
+        let reopened=Vault::open(&t.0).unwrap();let saved=reopened.publish_meeting(&parser,&organization,&publication).unwrap();assert_eq!(saved.revision,2);
+        assert_eq!(reopened.history(&memory).unwrap().len(),2);
+        assert!(fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap().starts_with("---\nrecall_id:"));
+    }
+}
+
+#[test]
+fn recovery_cannot_publish_after_original_tampering(){
+    let (t,v,parser,organization,memory)=organized_fixture();let publication=op();
+    let fault=FaultGuard::set(|point,_|if point=="before_note"{Err("INJECTED pending organization".into())}else{Ok(())});
+    assert!(v.publish_meeting(&parser,&organization,&publication).is_err());drop(fault);
+    fs::write(t.0.join(format!("Recall/Sources/{memory}.txt")),"tampered after interruption").unwrap();
+    let reopened=Vault::open(&t.0).unwrap();let listed=reopened.list("").unwrap();assert!(listed[0].conflict.is_some());
+    assert_eq!(fs::read_dir(t.0.join(format!("Recall/History/{memory}"))).unwrap().count(),1);
+    assert!(!fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap().starts_with("---"));
+    assert!(reopened.publish_meeting(&parser,&organization,&publication).is_err());
+}
+#[test]
+fn recovery_cannot_publish_after_related_context_edit(){
+    use crate::librarian::organization_tests as fixture;
+    let (t,v,parser,memory)=fixture::setup();let related=v.capture_note(&op(),"Utility planning context").unwrap();let organization=op();
+    crate::librarian::organize_selected(&v,&fixture::config(),&parser,&organization,true,&fixture::claude()).unwrap();
+    let publication=op();let fault=FaultGuard::set(|point,_|if point=="before_note"{Err("INJECTED pending organization".into())}else{Ok(())});
+    assert!(v.publish_meeting(&parser,&organization,&publication).is_err());drop(fault);
+    let path=t.0.join(format!("Recall/Memories/{}.md",related.id));let edited=format!("{}\nExternal correction.",fs::read_to_string(&path).unwrap());fs::write(path,&edited).unwrap();
+    let reopened=Vault::open(&t.0).unwrap();let listed=reopened.list("").unwrap();assert!(listed.iter().find(|m|m.id==memory).unwrap().conflict.is_some());
+    assert_eq!(fs::read_dir(t.0.join(format!("Recall/History/{memory}"))).unwrap().count(),1);
+    assert!(!fs::read_to_string(t.0.join(format!("Recall/Memories/{memory}.md"))).unwrap().starts_with("---"));
+}
