@@ -158,6 +158,12 @@ Universal readiness requires separate evidence that the memory model and retriev
 
 The goal is not high note count. The goal is trustworthy recovery from imperfect human recollection.
 
+### RCL-INT-001 organized-note body corrections
+
+Recall now edits the readable body of generated notes while preserving the exact native YAML identity, source references and owner properties in the unchanged native revision-checked writer payload. Board/evidence/current-quote/history views show body text; full documents remain in Obsidian and native history. Legacy raw notes remain unchanged, foreign identity headers are not treated as native properties, and malformed native headers require review rather than silent stripping.
+
+Verification: 77 desktop tests, lint, typecheck and production build passed. Independent review reproduced 76 tests/typecheck before the final deferred-organization-to-save regression; it found a missed completion-path conversion, now fixed. The regression ensures no duplicated inner YAML and exact native correction payload. Final independent review and exact-head CI required before merge. Native source/hash, optimistic revision, journal and receipt protections are unchanged; no provider or installed-device acceptance is implied.
+
 ## RCL-001 evidence (Trusted Capture)
 
 Candidate: branch `rcl-001-trusted-capture` (exact SHA in the PR description). Environment: Linux x86_64 sandbox, Python 3.13, Node 22, PostgreSQL 16 (throwaway local cluster per test run), Rust stable. **Everything below marked PASS is synthetic/automated evidence on that environment; none of it is installed-client, signed-build, live-provider, or private-user acceptance.**
