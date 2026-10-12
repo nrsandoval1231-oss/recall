@@ -395,3 +395,21 @@ it("keeps the board in the center grid slot with related context alone", async (
   expect(columns.children[1]?.classList.contains("ms-project")).toBe(true);
   expect(columns.children[2]?.classList.contains("ms-side")).toBe(true);
 });
+
+it("opens a source-focused project board and keeps unrelated people out", async () => {
+  const user = userEvent.setup();
+  const first = memory({ captured_at: "2026-05-12T15:00:00Z", note: `---\nrecall_id: "11111111-1111-4111-8111-111111111111"\ntitle: "First meeting"\n---\n## Unresolved entity mentions\n\n- “Alpha” — project candidate; identity unresolved\n- “Sarah” — person candidate; identity unresolved\n` });
+  const second = memory({ id: "22222222-2222-4222-8222-222222222222", note: `---\nrecall_id: "22222222-2222-4222-8222-222222222222"\n---\n## Unresolved entity mentions\n\n- “Beta” — project candidate; identity unresolved\n- “Brad” — person candidate; identity unresolved\n` });
+  render(<MemorySurface vault={vault({}, [first, second])} />);
+  await screen.findByText(/Last updated/);
+  await user.click(screen.getByRole("button", { name: "Projects" }));
+  await user.click(screen.getByRole("button", { name: "Alpha" }));
+  expect(screen.getByText(/Context from this source only/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Brad" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Sarah" })).toBeTruthy();
+  await user.click(screen.getByRole("tab", { name: "Timeline" }));
+  expect(screen.queryByText(/No notes fall/)).toBeNull();
+  expect(screen.getAllByRole("button", { name: /First meeting/ })).toHaveLength(2);
+  await user.click(screen.getByRole("button", { name: "All project sources" }));
+  expect(screen.getByRole("button", { name: "Beta" })).toBeTruthy();
+});

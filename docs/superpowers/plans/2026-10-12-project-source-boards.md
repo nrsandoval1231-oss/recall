@@ -1,0 +1,3 @@
+# Source-focused project boards
+
+Reuse Projects and existing board/cards/tabs. Each saved unresolved project/organization mention opens that source's board; its context and agenda stay source-scoped. Related targets resolve against the selected vault but remain possible relationships. Similar names never merge. Preserve a clear return to all project sources and source inspection. Ignore stale/deleted/conflicted focus and reset on vault changes. Test context isolation, missing focus, related target resolution and React project navigation. No semantic identity claims, redesigned modules or fabricated project data.

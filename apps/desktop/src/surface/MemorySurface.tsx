@@ -156,6 +156,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [reading, setReading] = useState<Reading | null>(null);
   const [reader, setReader] = useState(librarian);
   const [readOp, setReadOp] = useState<string | null>(null);
+  const [projectFocusId, setProjectFocusId] = useState<string | null>(null);
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
   const askRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
@@ -177,7 +178,9 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const kept = items.filter(keptMemory);
   const active = kept.filter((memory) => memory.state === "active" && memory.revision > 0 && !memory.conflict);
   const demo = !selected || kept.length === 0;
-  const featured = active[0] ?? kept[0] ?? null;
+  const allContext = vaultContext(kept);
+  const projectFocus = section === "projects" && allContext.projects.some(row => row.memory.id === projectFocusId) ? active.find(memory => memory.id === projectFocusId) ?? null : null;
+  const featured = projectFocus ?? active[0] ?? kept[0] ?? null;
 
   useEffect(() => {
     alive.current = true;
@@ -269,7 +272,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setItems(chosen ? await vault.list(chosen.vault_id, "") : []);
       setNotice(kind === "default" ? "Opened the default vault folder." : "Opened the folder you chose.");
       setSection("home");
-      setFocusMonth(null);
+      setFocusMonth(null); setProjectFocusId(null);
     } catch (chooseError) {
       if (alive.current) setError(message(chooseError));
     } finally {
@@ -543,12 +546,12 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     }
   }
 
-  const context = vaultContext(kept);
+  const context = projectFocus ? vaultContext(kept, projectFocus.id) : allContext;
   const demoMemories = brooks.memories;
-  const vaultMemories = kept;
+  const vaultMemories = projectFocus ? kept.filter(memory => memory.id === projectFocus.id) : kept;
   const evidenceMemory = kept.find((memory) => memory.id === evidenceId) ?? null;
   const demoEvidence = demo ? fixtureMemory(evidenceId ?? "") : undefined;
-  const ticks: TimelineTick[] = demo ? brooks.months.map((month) => ({ id: month, label: month })) : vaultTicks(kept);
+  const ticks: TimelineTick[] = demo ? brooks.months.map((month) => ({ id: month, label: month })) : vaultTicks(vaultMemories);
   const activeMonth = focusMonth && ticks.some((tick) => tick.id === focusMonth) ? focusMonth : (demo ? brooks.marker : ticks[ticks.length - 1]?.id ?? "");
   const activeLabel = ticks.find((tick) => tick.id === activeMonth)?.label ?? activeMonth;
 
@@ -670,7 +673,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       <h1>{detail?.title ?? (demo ? brooks.project : featured ? titleOf(featured) : "Your vault")}</h1>
                       <p className="ms-place">{demo ? brooks.place : selected ? selected.root : "No vault open"}</p>
                       {detail ? <p className="ms-summary">{detail.text}</p> : panel === "overview" && <p className="ms-summary">{demo ? brooks.summary : featured?.note || "Import a photo to keep the original and a note in this vault."}</p>}
-                      {!demo && section === "projects" && panel === "overview" && !detail && <SourceList rows={context.projects} empty="No unresolved project or organization mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
+                      {!demo && section === "projects" && panel === "overview" && !detail && !projectFocus && <SourceList rows={allContext.projects} empty="No unresolved project or organization mentions saved yet." onOpen={(memory) => { setProjectFocusId(memory.id); setPanel("overview"); }} />}
+                      {!demo && projectFocus && <p className="ms-fine">Context from this source only; project and organization names remain unresolved. <button type="button" onClick={() => { setProjectFocusId(null); setPanel("overview"); }}>All project sources</button></p>}
                       {demo && panel === "overview" && !detail && <p className="ms-fine">{brooks.caveat}</p>}
                       {panel === "timeline" && !demo && <><h2>Agenda</h2><SourceList rows={context.agenda} empty="No source follow-ups saved yet." onOpen={(memory) => void openVaultMemory(memory)} /><h2>Capture calendar</h2></>}
                       {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} month={activeMonth} monthLabel={activeLabel} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
@@ -682,7 +686,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       {panel === "related" && !demo && <SourceList rows={context.related} empty="No saved related memories." onOpen={(memory) => void openVaultMemory(memory)} />}
                       {panel === "related" && demo && <SimpleList demo={demo} rows={brooks.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
                       <dl className="ms-stats">
-                        <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : active.length}</dd></div>
+                        <div><dt>Memories</dt><dd>{demo ? brooks.stats.memories : projectFocus ? 1 : active.length}</dd></div>
                         {demo && (
                           <>
                             <div><dt>People</dt><dd>{brooks.stats.people}</dd></div>

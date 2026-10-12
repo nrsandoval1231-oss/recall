@@ -1,5 +1,11 @@
 # Recall acceptance and evaluation
 
+### RCL-INT-001 source-focused project boards
+
+Projects now opens a board from each saved unresolved project/organization mention. Context, agenda and capture months stay scoped to that source ID; existing native related targets remain eligible possible relationships. Same names never merge. Returning to all project sources resets Overview; deleted/conflicted/retracted or changed mentions no longer supply a stale focus. Vault changes clear focus.
+
+Verification: 74 desktop tests, lint, typecheck and production build passed. Independent review reproduced 74 tests/typecheck/build; its older-capture calendar finding is fixed with a May/August source regression. Exact-head CI required before merge. This is source-board navigation, not verified semantic project/entity resolution. Live inference and installed-device acceptance remain open.
+
 ## RCL-INT-001B first Jev boundary — 2026-10-12
 
 OPEN: bounded native text parser and real documented HTTPS transport implemented; durable provider jobs/budgets, photo transcription provenance, multiword entity extraction, live execution, complete pipeline/restart and UI wiring remain open. No model request sent. This is the next small reviewable slice, not stage completion.
