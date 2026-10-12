@@ -1,5 +1,18 @@
 # Recall acceptance and evaluation
 
+## RCL-INT-001A validator review — 2026-10-12
+
+PR #28 original head `2819d6208f35bbd4b4ae1780b1575055e57dbef9` was reviewed against main `3cea9ff9ddb36bdafbe5a323c5996ef71a585ddb`. PR #26 was neither fetched nor incorporated. PR #27 remains draft; its required canonical PNG is absent.
+
+The follow-up validator rejects Windows device names/trailing periods, case-insensitive duplicate targets, undeclared body wikilinks, arbitrary Markdown destinations/HTML/embeds, fabricated evidence excerpts, and explicit uncertainty downgrades. Retracted evidence must retain its context. `validate_grounded` requires caller-supplied, hash-verified transcription; it cannot verify a photo transcription against pixels. No publishing adapter is connected yet, and free-form body entailment, identity resolution, YAML serialization, and authorized existing-target checks remain OPEN. Passing this boundary must never be described as safe automatic organization.
+
+Focused verification: the unchanged native module compiled in an external minimal Rust harness with serde/serde_json; 17 tests passed. Three added security regressions first failed on the original implementation. Full `cargo test --lib` was attempted but failed during dependency build: system `glib-2.0.pc` unavailable; WebKit development libraries also absent and no sudo installed. Remote exact-head CI is required before merge. Follow-up review found a multiline retraction bypass; a regression reproduced it and removing newline as a context delimiter fixed that case. This conservative delimiter-based helper is not a full natural-language uncertainty detector.
+
+Independent adversarial review found and confirmed the issues above; also noted the existing writer's concurrent ancestor replacement race, which is not addressed by this proposal-only slice. Reusable writer behavior includes append-only revision chains, original hashes, optimistic concurrency, journal recovery and external-edit protection. It does not currently produce organization YAML.
+
+Provider/runtime gates: environment readiness reports no configured secrets, runtime variables or outbound identities. No private source or model request was sent. Windows installation, real iPhone/Tailscale/denied peers, Obsidian application launch, real Jev/Claude outputs, restart of the complete intelligent pipeline, and the mandatory meeting-to-vague-Ask demonstration remain OPEN.
+
+
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 

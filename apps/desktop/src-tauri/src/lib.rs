@@ -1,4 +1,6 @@
 mod librarian;
+#[allow(dead_code)]
+mod organization_plan;
 pub(crate) mod local_vault;
 mod managed_export;
 mod persistence;
