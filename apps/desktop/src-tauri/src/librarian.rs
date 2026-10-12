@@ -813,7 +813,7 @@ pub fn organize_selected(vault:&crate::local_vault::Vault,config:&LibrarianConfi
         Ok(layout)=>layout,
         Err(_)=>{mark(&mut ledger,operation,"uncertain",reserved);store_ledger(vault.root(),&ledger)?;return Err("Claude organization outcome uncertain; original retained and resend blocked".into());},
     };
-    if crate::meeting::validate(&layout,&parsed,&context).is_err(){
+    if layout.schema_version!=2 || crate::meeting::validate(&layout,&parsed,&context).is_err(){
         mark(&mut ledger,operation,"uncertain",reserved);store_ledger(vault.root(),&ledger)?;return Err("Invalid Claude organization withheld; resend blocked".into());
     }
     recheck()?;
@@ -1115,7 +1115,7 @@ pub(crate) mod organization_tests {
         fn organize(&self,_:&str,_:&str,evidence:&serde_json::Value)->std::result::Result<meeting::Layout,CallError>{
             self.calls.fetch_add(1,Ordering::SeqCst);
             if self.fail{return Err(CallError::Uncertain("synthetic failure".into()));}
-            Ok(meeting::Layout{schema_version:1,title_span:Some(1),category:"meeting".into(),observations:if self.invalid{vec![]}else{(0..evidence["spans"].as_array().unwrap().len()).collect()},follow_ups:vec![],questions:vec![],related_memory_ids:vec![]})
+            Ok(meeting::Layout{schema_version:2,title_span:Some(1),category:"meeting".into(),observations:if self.invalid{vec![]}else{(0..evidence["spans"].as_array().unwrap().len()).collect()},follow_ups:vec![],questions:vec![],related_memory_ids:vec![]})
         }
     }
     pub(crate) fn claude()->Claude {Claude{calls:AtomicUsize::new(0),invalid:false,fail:false}}

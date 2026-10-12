@@ -77,7 +77,7 @@ pub fn validate(
         &parsed.source_sha256,
         &parsed.model,
     )?;
-    if layout.schema_version != 1
+    if ![1, 2].contains(&layout.schema_version)
         || !["meeting", "project", "operations"].contains(&layout.category.as_str())
         || layout
             .title_span
@@ -169,17 +169,18 @@ pub fn render(
             3
         } else if candidate.status == "needs_review" {
             2
-        } else if candidate
-            .span
-            .text
-            .split_whitespace()
-            .next()
-            .is_some_and(|word| {
-                [
-                    "call", "ask", "contact", "check", "confirm", "schedule", "follow",
-                ]
-                .contains(&word.to_lowercase().as_str())
-            })
+        } else if (layout.schema_version >= 2 || layout.follow_ups.contains(n))
+            && candidate
+                .span
+                .text
+                .split_whitespace()
+                .next()
+                .is_some_and(|word| {
+                    [
+                        "call", "ask", "contact", "check", "confirm", "schedule", "follow",
+                    ]
+                    .contains(&word.to_lowercase().as_str())
+                })
         {
             1
         } else if layout.questions.contains(n) {
@@ -308,7 +309,7 @@ pub(crate) fn evidence(parsed: &jev::ParsedSource, context: &[Context]) -> serde
 }
 pub fn tool_schema() -> serde_json::Value {
     serde_json::json!({"type":"object","additionalProperties":false,"required":["schema_version","title_span","category","observations","follow_ups","questions","related_memory_ids"],"properties":{
-        "schema_version":{"type":"integer","enum":[1]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["meeting","project","operations"]},
+        "schema_version":{"type":"integer","enum":[2]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["meeting","project","operations"]},
         "observations":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"follow_ups":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"questions":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"related_memory_ids":{"type":"array","maxItems":4,"items":{"type":"string"}}}})
 }
 #[cfg(test)]
@@ -410,9 +411,17 @@ pub(crate) mod tests {
         assert!(out.contains(&p.source_sha256));
     }
     #[test]
+    fn provider_schema_uses_current_renderer_contract() {
+        assert_eq!(
+            tool_schema()["properties"]["schema_version"]["enum"],
+            serde_json::json!([2])
+        );
+    }
+    #[test]
     fn explicit_source_actions_survive_model_section_misclassification() {
         let p = source();
         let mut l = layout(&p);
+        l.schema_version = 2;
         l.observations = std::mem::take(&mut l.follow_ups);
         let out = render(&l, &p, &[]).unwrap();
         assert!(out.contains("- [ ] “Call Sarah."));

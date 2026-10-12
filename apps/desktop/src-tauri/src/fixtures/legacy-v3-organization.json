@@ -1,0 +1,196 @@
+{
+  "cases": [
+    {
+      "directories": [
+        "Recall",
+        "Recall/History",
+        "Recall/History/90030b8a-262e-4d29-942d-9d52a3ba8cb7",
+        "Recall/Memories",
+        "Recall/Sources",
+        "Recall/_meta",
+        "Recall/_meta/commits",
+        "Recall/_meta/journal",
+        "Recall/_meta/organizations",
+        "Recall/_meta/preserved",
+        "Recall/_meta/processing",
+        "Recall/_meta/processing/attempts",
+        "Recall/_meta/processing/inputs",
+        "Recall/_meta/processing/results"
+      ],
+      "files": [
+        {
+          "contents": "{\"format\":\"recall-local-vault-v2\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\",\"operation_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"kind\":\"capture\",\"expected_revision\":0,\"payload_sha256\":\"e9b55dfdf2c9014e02cf0b731004c1ddc79c6076e126558705181d879412464c\",\"parent_sha256\":null,\"origin\":\"human:recall\",\"memory\":{\"id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"revision\":1,\"note\":\"Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"source_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"source_name\":\"\",\"captured_at\":\"2026-10-12T13:35:33Z\",\"updated_at\":\"2026-10-12T13:35:33Z\",\"conflict\":null},\"note_path\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7.md\",\"previous_markdown\":null,\"markdown\":\"<!-- Recall memory 90030b8a-262e-4d29-942d-9d52a3ba8cb7 | human annotation, not OCR -->\\nNo original photo.\\n\\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\"}",
+          "path": "Recall/History/90030b8a-262e-4d29-942d-9d52a3ba8cb7/00000000000000000001.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v3\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\",\"operation_id\":\"36aae438-32bc-4523-bd17-32c080075cdf\",\"kind\":\"organize\",\"expected_revision\":1,\"payload_sha256\":\"c3b7db37a40f88227a3c4c2395cfb316d2ad4f7bee88482639b849a2af607a77\",\"parent_sha256\":\"aabd225caa20f4449b1169ca56e0edafc99660afac7ffa3e4c79dea33645e1ce\",\"origin\":\"model:claude\",\"memory\":{\"id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"revision\":2,\"note\":\"---\\nrecall_id: \\\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\\\"\\nlibrarian_model: \\\"synthetic-test-model\\\"\\nparser_operation_id: \\\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\\\"\\norganization_operation_id: \\\"961013de-e054-4c11-b01c-3c9c341af55a\\\"\\ntitle: \\\"Meeting — Utility late.\\\"\\ntype: \\\"meeting\\\"\\nsource_sha256: \\\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\\\"\\nparser_model: \\\"jev-1.13.0\\\"\\nstatus: needs-review\\ntags: [recall/meeting, recall/needs-review]\\n---\\n\\n# Meeting — Utility late.\\n\\n## Observations (source statements)\\n\\n-  “Utility late.” — source bytes 27–40\\n-  “Call Sarah.” — source bytes 41–52\\n-  “Ask operator about gas.” — source bytes 120–143\\n\\n## Follow-ups (not confirmed commitments)\\n\\nNo source items.\\n\\n\\n## Open questions and uncertainty\\n\\n-  “Brad says maybe 5–10 MW?” — source bytes 0–26\\n-  “Need generators by Dec?” — source bytes 53–76\\n-  “Prism doing electrical?” — source bytes 77–100\\n-  “Site access north?” — source bytes 101–119\\n\\n## Retracted source statements (not facts)\\n\\n-  “Crossed out: 8 MW confirmed.” — source bytes 144–172\\n\\n## Related memories\\n\\n\\n## Original evidence\\n\\n[[Recall/Sources/90030b8a-262e-4d29-942d-9d52a3ba8cb7.txt|Original meeting capture]]\\n\\nSHA-256: `54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1`\\n\\nOrganization is derived from source statements. Estimates, identities and dates require review.\\n\",\"source_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"source_name\":\"\",\"captured_at\":\"2026-10-12T13:35:33Z\",\"updated_at\":\"2026-10-12T13:35:33Z\",\"conflict\":null},\"note_path\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7.md\",\"organization\":{\"parser_operation_id\":\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\",\"organization_operation_id\":\"961013de-e054-4c11-b01c-3c9c341af55a\"},\"previous_markdown\":\"<!-- Recall memory 90030b8a-262e-4d29-942d-9d52a3ba8cb7 | human annotation, not OCR -->\\nNo original photo.\\n\\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"markdown\":\"---\\nrecall_id: \\\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\\\"\\nlibrarian_model: \\\"synthetic-test-model\\\"\\nparser_operation_id: \\\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\\\"\\norganization_operation_id: \\\"961013de-e054-4c11-b01c-3c9c341af55a\\\"\\ntitle: \\\"Meeting — Utility late.\\\"\\ntype: \\\"meeting\\\"\\nsource_sha256: \\\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\\\"\\nparser_model: \\\"jev-1.13.0\\\"\\nstatus: needs-review\\ntags: [recall/meeting, recall/needs-review]\\n---\\n\\n# Meeting — Utility late.\\n\\n## Observations (source statements)\\n\\n-  “Utility late.” — source bytes 27–40\\n-  “Call Sarah.” — source bytes 41–52\\n-  “Ask operator about gas.” — source bytes 120–143\\n\\n## Follow-ups (not confirmed commitments)\\n\\nNo source items.\\n\\n\\n## Open questions and uncertainty\\n\\n-  “Brad says maybe 5–10 MW?” — source bytes 0–26\\n-  “Need generators by Dec?” — source bytes 53–76\\n-  “Prism doing electrical?” — source bytes 77–100\\n-  “Site access north?” — source bytes 101–119\\n\\n## Retracted source statements (not facts)\\n\\n-  “Crossed out: 8 MW confirmed.” — source bytes 144–172\\n\\n## Related memories\\n\\n\\n## Original evidence\\n\\n[[Recall/Sources/90030b8a-262e-4d29-942d-9d52a3ba8cb7.txt|Original meeting capture]]\\n\\nSHA-256: `54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1`\\n\\nOrganization is derived from source statements. Estimates, identities and dates require review.\\n\"}",
+          "path": "Recall/History/90030b8a-262e-4d29-942d-9d52a3ba8cb7/00000000000000000002.json"
+        },
+        {
+          "contents": "---\nrecall_id: \"90030b8a-262e-4d29-942d-9d52a3ba8cb7\"\nlibrarian_model: \"synthetic-test-model\"\nparser_operation_id: \"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\"\norganization_operation_id: \"961013de-e054-4c11-b01c-3c9c341af55a\"\ntitle: \"Meeting — Utility late.\"\ntype: \"meeting\"\nsource_sha256: \"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\"\nparser_model: \"jev-1.13.0\"\nstatus: needs-review\ntags: [recall/meeting, recall/needs-review]\n---\n\n# Meeting — Utility late.\n\n## Observations (source statements)\n\n-  “Utility late.” — source bytes 27–40\n-  “Call Sarah.” — source bytes 41–52\n-  “Ask operator about gas.” — source bytes 120–143\n\n## Follow-ups (not confirmed commitments)\n\nNo source items.\n\n\n## Open questions and uncertainty\n\n-  “Brad says maybe 5–10 MW?” — source bytes 0–26\n-  “Need generators by Dec?” — source bytes 53–76\n-  “Prism doing electrical?” — source bytes 77–100\n-  “Site access north?” — source bytes 101–119\n\n## Retracted source statements (not facts)\n\n-  “Crossed out: 8 MW confirmed.” — source bytes 144–172\n\n## Related memories\n\n\n## Original evidence\n\n[[Recall/Sources/90030b8a-262e-4d29-942d-9d52a3ba8cb7.txt|Original meeting capture]]\n\nSHA-256: `54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1`\n\nOrganization is derived from source statements. Estimates, identities and dates require review.\n",
+          "path": "Recall/Memories/90030b8a-262e-4d29-942d-9d52a3ba8cb7.md"
+        },
+        {
+          "contents": "Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.",
+          "path": "Recall/Sources/90030b8a-262e-4d29-942d-9d52a3ba8cb7.txt"
+        },
+        {
+          "contents": "351cc098eada07aecf5b1e18fdfd2d3ada8be1ff20bcd49446a7c53ffce523ee",
+          "path": "Recall/_meta/commits/36aae438-32bc-4523-bd17-32c080075cdf.json"
+        },
+        {
+          "contents": "aabd225caa20f4449b1169ca56e0edafc99660afac7ffa3e4c79dea33645e1ce",
+          "path": "Recall/_meta/commits/90030b8a-262e-4d29-942d-9d52a3ba8cb7.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v3\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\",\"operation_id\":\"36aae438-32bc-4523-bd17-32c080075cdf\",\"kind\":\"organize\",\"expected_revision\":1,\"payload_sha256\":\"c3b7db37a40f88227a3c4c2395cfb316d2ad4f7bee88482639b849a2af607a77\",\"parent_sha256\":\"aabd225caa20f4449b1169ca56e0edafc99660afac7ffa3e4c79dea33645e1ce\",\"origin\":\"model:claude\",\"memory\":{\"id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"revision\":2,\"note\":\"---\\nrecall_id: \\\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\\\"\\nlibrarian_model: \\\"synthetic-test-model\\\"\\nparser_operation_id: \\\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\\\"\\norganization_operation_id: \\\"961013de-e054-4c11-b01c-3c9c341af55a\\\"\\ntitle: \\\"Meeting — Utility late.\\\"\\ntype: \\\"meeting\\\"\\nsource_sha256: \\\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\\\"\\nparser_model: \\\"jev-1.13.0\\\"\\nstatus: needs-review\\ntags: [recall/meeting, recall/needs-review]\\n---\\n\\n# Meeting — Utility late.\\n\\n## Observations (source statements)\\n\\n-  “Utility late.” — source bytes 27–40\\n-  “Call Sarah.” — source bytes 41–52\\n-  “Ask operator about gas.” — source bytes 120–143\\n\\n## Follow-ups (not confirmed commitments)\\n\\nNo source items.\\n\\n\\n## Open questions and uncertainty\\n\\n-  “Brad says maybe 5–10 MW?” — source bytes 0–26\\n-  “Need generators by Dec?” — source bytes 53–76\\n-  “Prism doing electrical?” — source bytes 77–100\\n-  “Site access north?” — source bytes 101–119\\n\\n## Retracted source statements (not facts)\\n\\n-  “Crossed out: 8 MW confirmed.” — source bytes 144–172\\n\\n## Related memories\\n\\n\\n## Original evidence\\n\\n[[Recall/Sources/90030b8a-262e-4d29-942d-9d52a3ba8cb7.txt|Original meeting capture]]\\n\\nSHA-256: `54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1`\\n\\nOrganization is derived from source statements. Estimates, identities and dates require review.\\n\",\"source_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"source_name\":\"\",\"captured_at\":\"2026-10-12T13:35:33Z\",\"updated_at\":\"2026-10-12T13:35:33Z\",\"conflict\":null},\"note_path\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7.md\",\"organization\":{\"parser_operation_id\":\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\",\"organization_operation_id\":\"961013de-e054-4c11-b01c-3c9c341af55a\"},\"previous_markdown\":\"<!-- Recall memory 90030b8a-262e-4d29-942d-9d52a3ba8cb7 | human annotation, not OCR -->\\nNo original photo.\\n\\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"markdown\":\"---\\nrecall_id: \\\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\\\"\\nlibrarian_model: \\\"synthetic-test-model\\\"\\nparser_operation_id: \\\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\\\"\\norganization_operation_id: \\\"961013de-e054-4c11-b01c-3c9c341af55a\\\"\\ntitle: \\\"Meeting — Utility late.\\\"\\ntype: \\\"meeting\\\"\\nsource_sha256: \\\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\\\"\\nparser_model: \\\"jev-1.13.0\\\"\\nstatus: needs-review\\ntags: [recall/meeting, recall/needs-review]\\n---\\n\\n# Meeting — Utility late.\\n\\n## Observations (source statements)\\n\\n-  “Utility late.” — source bytes 27–40\\n-  “Call Sarah.” — source bytes 41–52\\n-  “Ask operator about gas.” — source bytes 120–143\\n\\n## Follow-ups (not confirmed commitments)\\n\\nNo source items.\\n\\n\\n## Open questions and uncertainty\\n\\n-  “Brad says maybe 5–10 MW?” — source bytes 0–26\\n-  “Need generators by Dec?” — source bytes 53–76\\n-  “Prism doing electrical?” — source bytes 77–100\\n-  “Site access north?” — source bytes 101–119\\n\\n## Retracted source statements (not facts)\\n\\n-  “Crossed out: 8 MW confirmed.” — source bytes 144–172\\n\\n## Related memories\\n\\n\\n## Original evidence\\n\\n[[Recall/Sources/90030b8a-262e-4d29-942d-9d52a3ba8cb7.txt|Original meeting capture]]\\n\\nSHA-256: `54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1`\\n\\nOrganization is derived from source statements. Estimates, identities and dates require review.\\n\"}",
+          "path": "Recall/_meta/journal/36aae438-32bc-4523-bd17-32c080075cdf.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v2\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\",\"operation_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"kind\":\"capture\",\"expected_revision\":0,\"payload_sha256\":\"e9b55dfdf2c9014e02cf0b731004c1ddc79c6076e126558705181d879412464c\",\"parent_sha256\":null,\"origin\":\"human:recall\",\"memory\":{\"id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"revision\":1,\"note\":\"Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"source_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"source_name\":\"\",\"captured_at\":\"2026-10-12T13:35:33Z\",\"updated_at\":\"2026-10-12T13:35:33Z\",\"conflict\":null},\"note_path\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7.md\",\"previous_markdown\":null,\"markdown\":\"<!-- Recall memory 90030b8a-262e-4d29-942d-9d52a3ba8cb7 | human annotation, not OCR -->\\nNo original photo.\\n\\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\"}",
+          "path": "Recall/_meta/journal/90030b8a-262e-4d29-942d-9d52a3ba8cb7.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-librarian-budget-v1\",\"entries\":[{\"operation_id\":\"961013de-e054-4c11-b01c-3c9c341af55a\",\"payload_sha256\":\"6e34baf42e9c5cdfbd0d5ae80309c3099c3c6656eeaa082d18d5c45f6799b0b9\",\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"memory_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"day\":\"2026-10-12\",\"month\":\"2026-10\",\"reserved_micros\":222720,\"charged_micros\":222720,\"state\":\"charged\"}]}",
+          "path": "Recall/_meta/librarian-budget.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v2\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\"}",
+          "path": "Recall/_meta/manifest-before-v3.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v1\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\"}",
+          "path": "Recall/_meta/manifest-v1.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v3\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\"}",
+          "path": "Recall/_meta/manifest.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-organization-v1\",\"operation_id\":\"961013de-e054-4c11-b01c-3c9c341af55a\",\"parser_operation_id\":\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\",\"memory_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"expected_revision\":1,\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"payload_sha256\":\"6e34baf42e9c5cdfbd0d5ae80309c3099c3c6656eeaa082d18d5c45f6799b0b9\",\"model\":\"synthetic-test-model\",\"recorded_at\":\"2026-10-12T13:35:33Z\",\"context\":[],\"layout\":{\"schema_version\":1,\"title_span\":1,\"category\":\"meeting\",\"observations\":[0,1,2,3,4,5,6,7],\"follow_ups\":[],\"questions\":[],\"related_memory_ids\":[]}}",
+          "path": "Recall/_meta/organizations/961013de-e054-4c11-b01c-3c9c341af55a.json"
+        },
+        {
+          "contents": "<!-- Recall memory 90030b8a-262e-4d29-942d-9d52a3ba8cb7 | human annotation, not OCR -->\nNo original photo.\n\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.",
+          "path": "Recall/_meta/preserved/36aae438-32bc-4523-bd17-32c080075cdf.md"
+        },
+        {
+          "contents": "{\"format\":\"recall-parser-operation-v1\",\"input_sha256\":\"402f7e6cfa652c70c529c4406b1a320cbacfe2970ec770f35bd0de982d34525c\",\"model\":\"jev-1.13.0\",\"price_micros\":42000,\"reserved_micros\":4200,\"day\":\"2026-10-12\",\"month\":\"2026-10\"}",
+          "path": "Recall/_meta/processing/attempts/10d3c329-fcf7-439d-a4ff-3a993ce1cc2a.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-parser-operation-v1\",\"vault_id\":\"3e45e44c-e93b-4291-8d3a-835c42016c05\",\"operation_id\":\"10d3c329-fcf7-439d-a4ff-3a993ce1cc2a\",\"memory_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"revision\":1,\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"mime_type\":\"text/plain\",\"human_corrected\":false}",
+          "path": "Recall/_meta/processing/inputs/10d3c329-fcf7-439d-a4ff-3a993ce1cc2a.json"
+        },
+        {
+          "contents": "",
+          "path": "Recall/_meta/processing/processing.lock"
+        },
+        {
+          "contents": "{\"format\":\"recall-parser-operation-v1\",\"input_sha256\":\"402f7e6cfa652c70c529c4406b1a320cbacfe2970ec770f35bd0de982d34525c\",\"attempt_sha256\":\"a65be3ed159b73bdb98c2d76cb3d6975e0c3bce0b49ebfe74961dc883142aad5\",\"parsed\":{\"schema_version\":1,\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"transcription\":\"Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"legibility\":\"text_supplied_not_visually_verified\",\"model\":\"jev-1.13.0\",\"candidates\":[{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":0,\"end\":26,\"text\":\"Brad says maybe 5–10 MW?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":27,\"end\":40,\"text\":\"Utility late.\",\"uncertain\":false,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"candidate\"},{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":41,\"end\":52,\"text\":\"Call Sarah.\",\"uncertain\":false,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"candidate\"},{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":53,\"end\":76,\"text\":\"Need generators by Dec?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":77,\"end\":100,\"text\":\"Prism doing electrical?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":101,\"end\":119,\"text\":\"Site access north?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":120,\"end\":143,\"text\":\"Ask operator about gas.\",\"uncertain\":false,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"candidate\"},{\"source_id\":\"90030b8a-262e-4d29-942d-9d52a3ba8cb7\",\"span\":{\"start\":144,\"end\":172,\"text\":\"Crossed out: 8 MW confirmed.\",\"uncertain\":true,\"retracted\":true},\"kind\":\"conflict\",\"confidence\":0.9,\"probabilities\":{\"conflict\":1.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":0.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"retracted\"}],\"mentions\":[],\"input_tokens\":100,\"output_tokens\":100}}",
+          "path": "Recall/_meta/processing/results/10d3c329-fcf7-439d-a4ff-3a993ce1cc2a.json"
+        },
+        {
+          "contents": "",
+          "path": "Recall/_meta/writer.lock"
+        }
+      ],
+      "memory_id": "90030b8a-262e-4d29-942d-9d52a3ba8cb7",
+      "organization_operation_id": "961013de-e054-4c11-b01c-3c9c341af55a",
+      "parser_operation_id": "10d3c329-fcf7-439d-a4ff-3a993ce1cc2a",
+      "pending": false,
+      "publication_operation_id": "36aae438-32bc-4523-bd17-32c080075cdf"
+    },
+    {
+      "directories": [
+        "Recall",
+        "Recall/History",
+        "Recall/History/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0",
+        "Recall/Memories",
+        "Recall/Sources",
+        "Recall/_meta",
+        "Recall/_meta/commits",
+        "Recall/_meta/journal",
+        "Recall/_meta/organizations",
+        "Recall/_meta/preserved",
+        "Recall/_meta/processing",
+        "Recall/_meta/processing/attempts",
+        "Recall/_meta/processing/inputs",
+        "Recall/_meta/processing/results"
+      ],
+      "files": [
+        {
+          "contents": "{\"format\":\"recall-local-vault-v2\",\"vault_id\":\"8db2499d-402c-43ea-9492-63de768c9fd0\",\"operation_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"kind\":\"capture\",\"expected_revision\":0,\"payload_sha256\":\"ac1086813cf15494bdd440e0ae51c199594d2f425696e9483fdf6ae706920f7f\",\"parent_sha256\":null,\"origin\":\"human:recall\",\"memory\":{\"id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"revision\":1,\"note\":\"Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"source_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"source_name\":\"\",\"captured_at\":\"2026-10-12T13:35:33Z\",\"updated_at\":\"2026-10-12T13:35:33Z\",\"conflict\":null},\"note_path\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.md\",\"previous_markdown\":null,\"markdown\":\"<!-- Recall memory 6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0 | human annotation, not OCR -->\\nNo original photo.\\n\\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\"}",
+          "path": "Recall/History/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0/00000000000000000001.json"
+        },
+        {
+          "contents": "<!-- Recall memory 6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0 | human annotation, not OCR -->\nNo original photo.\n\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.",
+          "path": "Recall/Memories/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.md"
+        },
+        {
+          "contents": "Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.",
+          "path": "Recall/Sources/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.txt"
+        },
+        {
+          "contents": "f93c74b2e46338fb96fd79e105d383c83a84ea9b32bed07d983653c8e898f4a7",
+          "path": "Recall/_meta/commits/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v3\",\"vault_id\":\"8db2499d-402c-43ea-9492-63de768c9fd0\",\"operation_id\":\"194d6666-5229-45ff-a9e2-f9e471682882\",\"kind\":\"organize\",\"expected_revision\":1,\"payload_sha256\":\"4d39af891cc6415ca8b7f1909edb735bc55b79868a43bba9707df0a49e12d0d7\",\"parent_sha256\":\"f93c74b2e46338fb96fd79e105d383c83a84ea9b32bed07d983653c8e898f4a7\",\"origin\":\"model:claude\",\"memory\":{\"id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"revision\":2,\"note\":\"---\\nrecall_id: \\\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\\\"\\nlibrarian_model: \\\"synthetic-test-model\\\"\\nparser_operation_id: \\\"5de4a8a4-59d6-4235-b95b-15aa04c0c239\\\"\\norganization_operation_id: \\\"9f2dccb9-0e8d-4dcb-9e91-e570810b4c1a\\\"\\ntitle: \\\"Meeting — Utility late.\\\"\\ntype: \\\"meeting\\\"\\nsource_sha256: \\\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\\\"\\nparser_model: \\\"jev-1.13.0\\\"\\nstatus: needs-review\\ntags: [recall/meeting, recall/needs-review]\\n---\\n\\n# Meeting — Utility late.\\n\\n## Observations (source statements)\\n\\n-  “Utility late.” — source bytes 27–40\\n-  “Call Sarah.” — source bytes 41–52\\n-  “Ask operator about gas.” — source bytes 120–143\\n\\n## Follow-ups (not confirmed commitments)\\n\\nNo source items.\\n\\n\\n## Open questions and uncertainty\\n\\n-  “Brad says maybe 5–10 MW?” — source bytes 0–26\\n-  “Need generators by Dec?” — source bytes 53–76\\n-  “Prism doing electrical?” — source bytes 77–100\\n-  “Site access north?” — source bytes 101–119\\n\\n## Retracted source statements (not facts)\\n\\n-  “Crossed out: 8 MW confirmed.” — source bytes 144–172\\n\\n## Related memories\\n\\n\\n## Original evidence\\n\\n[[Recall/Sources/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.txt|Original meeting capture]]\\n\\nSHA-256: `54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1`\\n\\nOrganization is derived from source statements. Estimates, identities and dates require review.\\n\",\"source_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"source_name\":\"\",\"captured_at\":\"2026-10-12T13:35:33Z\",\"updated_at\":\"2026-10-12T13:35:33Z\",\"conflict\":null},\"note_path\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.md\",\"organization\":{\"parser_operation_id\":\"5de4a8a4-59d6-4235-b95b-15aa04c0c239\",\"organization_operation_id\":\"9f2dccb9-0e8d-4dcb-9e91-e570810b4c1a\"},\"previous_markdown\":\"<!-- Recall memory 6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0 | human annotation, not OCR -->\\nNo original photo.\\n\\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"markdown\":\"---\\nrecall_id: \\\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\\\"\\nlibrarian_model: \\\"synthetic-test-model\\\"\\nparser_operation_id: \\\"5de4a8a4-59d6-4235-b95b-15aa04c0c239\\\"\\norganization_operation_id: \\\"9f2dccb9-0e8d-4dcb-9e91-e570810b4c1a\\\"\\ntitle: \\\"Meeting — Utility late.\\\"\\ntype: \\\"meeting\\\"\\nsource_sha256: \\\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\\\"\\nparser_model: \\\"jev-1.13.0\\\"\\nstatus: needs-review\\ntags: [recall/meeting, recall/needs-review]\\n---\\n\\n# Meeting — Utility late.\\n\\n## Observations (source statements)\\n\\n-  “Utility late.” — source bytes 27–40\\n-  “Call Sarah.” — source bytes 41–52\\n-  “Ask operator about gas.” — source bytes 120–143\\n\\n## Follow-ups (not confirmed commitments)\\n\\nNo source items.\\n\\n\\n## Open questions and uncertainty\\n\\n-  “Brad says maybe 5–10 MW?” — source bytes 0–26\\n-  “Need generators by Dec?” — source bytes 53–76\\n-  “Prism doing electrical?” — source bytes 77–100\\n-  “Site access north?” — source bytes 101–119\\n\\n## Retracted source statements (not facts)\\n\\n-  “Crossed out: 8 MW confirmed.” — source bytes 144–172\\n\\n## Related memories\\n\\n\\n## Original evidence\\n\\n[[Recall/Sources/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.txt|Original meeting capture]]\\n\\nSHA-256: `54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1`\\n\\nOrganization is derived from source statements. Estimates, identities and dates require review.\\n\"}",
+          "path": "Recall/_meta/journal/194d6666-5229-45ff-a9e2-f9e471682882.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v2\",\"vault_id\":\"8db2499d-402c-43ea-9492-63de768c9fd0\",\"operation_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"kind\":\"capture\",\"expected_revision\":0,\"payload_sha256\":\"ac1086813cf15494bdd440e0ae51c199594d2f425696e9483fdf6ae706920f7f\",\"parent_sha256\":null,\"origin\":\"human:recall\",\"memory\":{\"id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"revision\":1,\"note\":\"Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"source_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"source_name\":\"\",\"captured_at\":\"2026-10-12T13:35:33Z\",\"updated_at\":\"2026-10-12T13:35:33Z\",\"conflict\":null},\"note_path\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.md\",\"previous_markdown\":null,\"markdown\":\"<!-- Recall memory 6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0 | human annotation, not OCR -->\\nNo original photo.\\n\\nBrad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\"}",
+          "path": "Recall/_meta/journal/6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-librarian-budget-v1\",\"entries\":[{\"operation_id\":\"9f2dccb9-0e8d-4dcb-9e91-e570810b4c1a\",\"payload_sha256\":\"1af2a881f489e37e67649785852832bd9823125cecb0bd1328934b559b93a5a8\",\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"memory_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"day\":\"2026-10-12\",\"month\":\"2026-10\",\"reserved_micros\":222720,\"charged_micros\":222720,\"state\":\"charged\"}]}",
+          "path": "Recall/_meta/librarian-budget.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v2\",\"vault_id\":\"8db2499d-402c-43ea-9492-63de768c9fd0\"}",
+          "path": "Recall/_meta/manifest-before-v3.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v1\",\"vault_id\":\"8db2499d-402c-43ea-9492-63de768c9fd0\"}",
+          "path": "Recall/_meta/manifest-v1.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-local-vault-v3\",\"vault_id\":\"8db2499d-402c-43ea-9492-63de768c9fd0\"}",
+          "path": "Recall/_meta/manifest.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-organization-v1\",\"operation_id\":\"9f2dccb9-0e8d-4dcb-9e91-e570810b4c1a\",\"parser_operation_id\":\"5de4a8a4-59d6-4235-b95b-15aa04c0c239\",\"memory_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"expected_revision\":1,\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"payload_sha256\":\"1af2a881f489e37e67649785852832bd9823125cecb0bd1328934b559b93a5a8\",\"model\":\"synthetic-test-model\",\"recorded_at\":\"2026-10-12T13:35:33Z\",\"context\":[],\"layout\":{\"schema_version\":1,\"title_span\":1,\"category\":\"meeting\",\"observations\":[0,1,2,3,4,5,6,7],\"follow_ups\":[],\"questions\":[],\"related_memory_ids\":[]}}",
+          "path": "Recall/_meta/organizations/9f2dccb9-0e8d-4dcb-9e91-e570810b4c1a.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-parser-operation-v1\",\"input_sha256\":\"17f7cd7cd9109149e4f8b255bcfd1794724c47eae9b634c37da72a94f3165713\",\"model\":\"jev-1.13.0\",\"price_micros\":42000,\"reserved_micros\":4200,\"day\":\"2026-10-12\",\"month\":\"2026-10\"}",
+          "path": "Recall/_meta/processing/attempts/5de4a8a4-59d6-4235-b95b-15aa04c0c239.json"
+        },
+        {
+          "contents": "{\"format\":\"recall-parser-operation-v1\",\"vault_id\":\"8db2499d-402c-43ea-9492-63de768c9fd0\",\"operation_id\":\"5de4a8a4-59d6-4235-b95b-15aa04c0c239\",\"memory_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"revision\":1,\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"mime_type\":\"text/plain\",\"human_corrected\":false}",
+          "path": "Recall/_meta/processing/inputs/5de4a8a4-59d6-4235-b95b-15aa04c0c239.json"
+        },
+        {
+          "contents": "",
+          "path": "Recall/_meta/processing/processing.lock"
+        },
+        {
+          "contents": "{\"format\":\"recall-parser-operation-v1\",\"input_sha256\":\"17f7cd7cd9109149e4f8b255bcfd1794724c47eae9b634c37da72a94f3165713\",\"attempt_sha256\":\"72f9b40822ed67db88d5ec548b65e5990769666ecae5f57971bc9a71ebb13ef5\",\"parsed\":{\"schema_version\":1,\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"source_sha256\":\"54b5ce453ea0a0c75e315b403811f72f3d014a34b0cda1ba835010924e5247f1\",\"transcription\":\"Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.\",\"legibility\":\"text_supplied_not_visually_verified\",\"model\":\"jev-1.13.0\",\"candidates\":[{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":0,\"end\":26,\"text\":\"Brad says maybe 5–10 MW?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":27,\"end\":40,\"text\":\"Utility late.\",\"uncertain\":false,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"candidate\"},{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":41,\"end\":52,\"text\":\"Call Sarah.\",\"uncertain\":false,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"candidate\"},{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":53,\"end\":76,\"text\":\"Need generators by Dec?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":77,\"end\":100,\"text\":\"Prism doing electrical?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":101,\"end\":119,\"text\":\"Site access north?\",\"uncertain\":true,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"needs_review\"},{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":120,\"end\":143,\"text\":\"Ask operator about gas.\",\"uncertain\":false,\"retracted\":false},\"kind\":\"observation\",\"confidence\":0.9,\"probabilities\":{\"conflict\":0.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":1.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"candidate\"},{\"source_id\":\"6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0\",\"span\":{\"start\":144,\"end\":172,\"text\":\"Crossed out: 8 MW confirmed.\",\"uncertain\":true,\"retracted\":true},\"kind\":\"conflict\",\"confidence\":0.9,\"probabilities\":{\"conflict\":1.0,\"date\":0.0,\"decision\":0.0,\"follow_up\":0.0,\"observation\":0.0,\"other\":0.0,\"possible_commitment\":0.0,\"quantity\":0.0,\"question\":0.0},\"status\":\"retracted\"}],\"mentions\":[],\"input_tokens\":100,\"output_tokens\":100}}",
+          "path": "Recall/_meta/processing/results/5de4a8a4-59d6-4235-b95b-15aa04c0c239.json"
+        },
+        {
+          "contents": "",
+          "path": "Recall/_meta/writer.lock"
+        }
+      ],
+      "memory_id": "6d4ca4a8-bf8e-47c1-8ef6-4c28088658b0",
+      "organization_operation_id": "9f2dccb9-0e8d-4dcb-9e91-e570810b4c1a",
+      "parser_operation_id": "5de4a8a4-59d6-4235-b95b-15aa04c0c239",
+      "pending": true,
+      "publication_operation_id": "194d6666-5229-45ff-a9e2-f9e471682882"
+    }
+  ],
+  "generated_from": "887e1c4df3eab2fab64f795c633b7ef6130edf6d",
+  "provider_execution": "synthetic fixtures only"
+}
