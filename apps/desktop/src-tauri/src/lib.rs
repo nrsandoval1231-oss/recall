@@ -3,6 +3,7 @@ mod jev;
 mod processing;
 mod meeting;
 mod memory_query;
+mod companion_processing;
 mod librarian;
 #[allow(dead_code)]
 mod organization_plan;
