@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 mod jev;
 mod processing;
+mod meeting;
 mod librarian;
 #[allow(dead_code)]
 mod organization_plan;
@@ -394,6 +395,21 @@ fn processing_status(
     state.with(&expected_vault_id, |vault| processing::status(vault, &operation_id))
 }
 
+#[tauri::command]
+async fn meeting_organize(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    parser_operation_id: String,
+    operation_id: String,
+    consent: bool,
+) -> Result<librarian::StoredOrganization, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        librarian::organize_selected(&vault, &librarian::config_from_env(), &parser_operation_id,
+            &operation_id, consent, &librarian::ClaudeTransport)
+    }).await.map_err(|_| "Claude worker stopped; review the operation before retrying".to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -430,6 +446,7 @@ pub fn run() {
             librarian_read,
             processing_parse,
             processing_status,
+            meeting_organize,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,

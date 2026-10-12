@@ -26,6 +26,10 @@ pub struct Config {
     monthly_micros: Option<i64>,
 }
 impl Config {
+    #[cfg(test)]
+    pub(crate) fn synthetic_test_config()->Self {
+        Self {api_key:Some("synthetic-key".into()),model:Some("jev-1.13.0".into()),price_micros:Some(42_000),daily_micros:Some(1_000_000),monthly_micros:Some(10_000_000)}
+    }
     pub fn from_env() -> Self {
         let value = |name: &str| {
             std::env::var(name)
