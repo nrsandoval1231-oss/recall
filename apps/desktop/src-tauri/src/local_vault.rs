@@ -1835,6 +1835,13 @@ impl Vault {
         self.processing_snapshot_while_locked(memory_id, revision)
     }
     /// Caller must hold the native writer lock; rechecks disk/source state.
+    pub(crate) fn captured_text_while_locked(&self,memory_id:&str)->Result<Vec<u8>> {
+        id(memory_id)?;
+        let records=self.records(memory_id)?;
+        let capture=records.first().ok_or("Missing native capture history")?;
+        if capture.kind!="capture" || !absent_original(&capture.memory){return Err("Native original is not a text capture".into());}
+        Ok(capture.memory.note.as_bytes().to_vec())
+    }
     pub(crate) fn processing_snapshot_while_locked(&self, memory_id: &str, revision: u64) -> Result<ProcessingSnapshot> {
         id(memory_id)?;
         let pending = self.recover()?;

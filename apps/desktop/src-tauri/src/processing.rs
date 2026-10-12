@@ -433,7 +433,7 @@ pub(crate) fn archived_result(vault:&Vault,operation:&str)->Result<Job> {
     let completed:Completed=read_optional(&path(&dir,"results",operation)?)?.ok_or("Validated parser result missing")?;
     valid_completed(&input,&attempt,&completed)?;
     let original=local_vault::read(&vault.root().join(format!("Recall/Sources/{}.txt",input.memory_id)),16*1024)?;
-    if digest(&original)!=input.source_sha256 || original!=completed.parsed.transcription.as_bytes(){return Err("Archived parser original mismatch".into());}
+    if original!=vault.captured_text_while_locked(&input.memory_id)? || digest(&original)!=input.source_sha256 || original!=completed.parsed.transcription.as_bytes(){return Err("Archived parser original mismatch".into());}
     Ok(job(&input,"parsed","Archived validated parser evidence",Some(&attempt),Some(completed.parsed)))
 }
 
@@ -774,6 +774,18 @@ mod tests {
             "needs_review"
         );
         assert_eq!(p.calls.load(Ordering::SeqCst), 0);
+    }
+    #[test]
+    fn consistent_parser_archive_tampering_cannot_replace_native_original(){
+        let t=Temp::new();let v=t.vault();let m=v.capture_note(&id(),NOTE).unwrap();let op=id();parse_note(&v,&configured(),&op,&m.id,1,true,&parser()).unwrap();
+        let dir=root(&v).unwrap();let altered=NOTE.replace("Utility late.","Utility next.");let sha=digest(altered.as_bytes());
+        let mut input:Input=read_optional(&path(&dir,"inputs",&op).unwrap()).unwrap().unwrap();input.source_sha256=sha.clone();
+        let mut attempt:Attempt=read_optional(&path(&dir,"attempts",&op).unwrap()).unwrap().unwrap();attempt.input_sha256=digest(&json(&input).unwrap());
+        let mut completed:Completed=read_optional(&path(&dir,"results",&op).unwrap()).unwrap().unwrap();completed.input_sha256=attempt.input_sha256.clone();completed.attempt_sha256=digest(&json(&attempt).unwrap());completed.parsed.source_sha256=sha;completed.parsed.transcription=altered.clone();
+        for (candidate,span) in completed.parsed.candidates.iter_mut().zip(jev::candidates(&altered).unwrap()){candidate.span=span;}
+        fs::write(path(&dir,"inputs",&op).unwrap(),json(&input).unwrap()).unwrap();fs::write(path(&dir,"attempts",&op).unwrap(),json(&attempt).unwrap()).unwrap();fs::write(path(&dir,"results",&op).unwrap(),json(&completed).unwrap()).unwrap();
+        fs::write(t.0.join(format!("Recall/Sources/{}.txt",m.id)),altered).unwrap();
+        let _lock=v.lock().unwrap();assert!(archived_result(&v,&op).unwrap_err().contains("original mismatch"));
     }
     #[test]
     fn tampered_classification_cannot_be_replayed_as_a_decision() {
