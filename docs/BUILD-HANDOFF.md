@@ -1,5 +1,10 @@
 # First builder handoff — RCL-001
 
+## Active builder directive (2026-10-11)
+
+**This is a historical RCL-001 cloud-first handoff, not a current task packet.** Do not execute its Expo sign-in, cloud API, Supabase or PostgreSQL provisioning steps for the active pilot. The active work is a verified desktop Memory Surface + Obsidian vault + Tailscale phone Capture/Ask + consented Claude librarian, governed by [Canonical Foundation](CANONICAL-FOUNDATION.md), [Pilot Contract](PILOT-CONTRACT.md), and [Acceptance](ACCEPTANCE.md). Preserve this document as historical implementation evidence.
+
+
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 

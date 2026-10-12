@@ -1,5 +1,10 @@
 # Recall architecture
 
+## Architecture authority and active path (2026-10-11)
+
+**Active:** Tauri desktop Memory Surface → native vault writer → user-selected Obsidian vault (`Recall/Sources`, `Recall/Memories`, history). Phone browser → Tailscale-restricted `recall-phone` process on desktop → same vault writer. The current implementation has a default-off, consent-gated Claude photo reader, but the required product pipeline is Jev parsing → Claude librarian organization proposals → deterministic, validated Markdown/YAML vault writes. Claude is not optional to the intended product. Provider configuration and consent gate external calls; capture remains durable and marked pending when intelligence is unavailable. Live end-to-end librarian quality remains unaccepted. The cloud topology, migrations, pgvector, Expo app, and legacy-cloud mode documented below are retained implementations, not active pilot dependencies or authority. Do not migrate the vault to PostgreSQL or add login UI based on the historical sections. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
+
+
 > **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
 
 

@@ -1,5 +1,10 @@
 # Recall
 
+## Canonical pilot implementation (2026-10-11)
+
+The active product is the Tauri desktop Memory Surface with a user-selected Obsidian vault as durable memory, and a local Tailscale phone Capture/Ask companion. Claude interpretation is opt-in and has not passed live end-to-end acceptance. The Expo/FastAPI/PostgreSQL/Cloudflare PWA stack described below is retained as legacy or optional infrastructure, **not** a prerequisite or source of truth for this pilot. Read [Canonical Foundation](docs/CANONICAL-FOUNDATION.md) and [Pilot Contract](docs/PILOT-CONTRACT.md) before implementing features.
+
+
 > **CURRENT PRODUCT CENTER — 2026-10-10.** The [pilot amendment](docs/PILOT-CONTRACT.md) is normative. You capture and ask. Recall organizes. **Obsidian holds your memory.** The primary shell is the desktop Memory Surface in the [owner-supplied reference](docs/assets/memory-surface-reference-2026-10-10.jpg) (Nick Sandoval, 2026-10-10; Recall did not invent it). The phone is the capture/ask companion. PR #16, the installable web app, remains an optional companion and enrollment transport. No login or email-auth UX. The 2026-10-09 “web PWA is the pilot” notes are historical.
 
 
@@ -21,11 +26,11 @@ Example: “What was the name of that guy Sarah introduced me to last summer who
 
 ## Current status
 
-**The product center is the desktop Memory Surface writing into an Obsidian vault.** The Tauri app opens that surface with no login, saves a photo as an original plus a Markdown note, and answers from keyword search over the vault. Claude reading is opt-in on that desktop process and off unless a key, model, prices, and budgets are set; no live reading was accepted. The phone companion and an installed Windows run are not done. Automated evidence is in [ACCEPTANCE](docs/ACCEPTANCE.md) under "Desktop Obsidian Memory Surface". Draft PRs #11–#14 stay open; this slice ports their vault behavior instead of merging them. Do not deploy PR #16 as the way to start using Recall.
+**The product center is the desktop Memory Surface writing into an Obsidian vault.** The Tauri app opens that surface with no login, saves a photo as an original plus a Markdown note, and answers from keyword search over the vault. Claude reading is opt-in on that desktop process and off unless a key, model, prices, and budgets are set; no live reading was accepted. The phone companion is implemented with synthetic and loopback evidence, but a real iPhone over Tailscale and an installed Windows run remain unaccepted. Automated evidence is in [ACCEPTANCE](docs/ACCEPTANCE.md) under "Desktop Obsidian Memory Surface". PRs #11–#14 are closed; their historical vault-slice work is retained in the implementation and evidence history. Do not deploy PR #16 as the way to start using Recall.
 
 PR #16 is merged and real: `apps/web` is an installable PWA with no login screen and operator device enrollment, covered by synthetic tests. iPhone Home Screen, a Windows browser, and a deployed enrollment were not accepted. That web app stays as an optional companion and enrollment transport. The October 9 decision that made it the pilot is historical.
 
-RCL-001 (Trusted Capture) and RCL-002 (First Useful Recall) are implemented as code and verified by automated tests. No real iPhone → Windows acceptance has been run, and no live AI provider has been called from this amendment. RCL-002 adds opt-in AI reading of captures, keyword retrieval, and cited answers that abstain without evidence. The V1 build adds canonical entities and temporal claims, user corrections, hybrid retrieval, SQLite/offline sync, portable exports, managed Markdown, deletion, and backup/restore. See [V1 implementation status](docs/V1-STATUS.md) for that evidence and its limits. The code on `main` still stores canonical state in Cloud Postgres and exports Markdown; the 2026-10-10 amendment makes the Obsidian vault the memory the user keeps, and the vault slice has to change the code and the invariant together.
+RCL-001 (Trusted Capture) and RCL-002 (First Useful Recall) are implemented as code and verified by automated tests. No real iPhone → Windows acceptance has been run, and no live AI provider has been called from this amendment. RCL-002 adds opt-in AI reading of captures, keyword retrieval, and cited answers that abstain without evidence. The V1 build adds canonical entities and temporal claims, user corrections, hybrid retrieval, SQLite/offline sync, portable exports, managed Markdown, deletion, and backup/restore. See [V1 implementation status](docs/V1-STATUS.md) for that evidence and its limits. The legacy cloud subsystem retains PostgreSQL canonical state and Markdown export. The active desktop-vault path already writes to the user-selected Obsidian vault, which is its authority; live device and librarian acceptance remain open.
 
 What exists: Expo iPhone app, Tauri/React Windows app, FastAPI backend, Postgres schema with RLS, private-storage adapters, shared sync/API/token packages, and the web companion from PR #16. See [DEVELOPMENT](docs/DEVELOPMENT.md) to run it and [ACCEPTANCE](docs/ACCEPTANCE.md) ("RCL-001 evidence") for exactly what was and was not verified.
 
@@ -39,7 +44,7 @@ This repository is public. Every checked-in example must remain synthetic. Never
 | Obsidian vault | Memory for the desktop product: original photos, Markdown notes, and append-only history in a folder the user chooses. |
 | Cloud PostgreSQL + pgvector | Store for the optional web companion and the legacy cloud desktop. Not the authority for the desktop vault path. |
 | Desktop SQLite | Rebuildable cache and outbox for that legacy cloud desktop. |
-| AI | Interpretation is off on the desktop vault path. Keyword search is not a Claude answer. Model output stays untrusted when a reader exists. |
+| AI | The current desktop reader is default-off and consent-gated. The required Jev parsing and Claude librarian organization pipeline is not yet accepted end to end. Keyword search is not a Claude answer; model output remains untrusted. |
 | Organized notes | The desktop app writes them into the vault. The legacy cloud path can still export Markdown and will not overwrite a local-vault tree. |
 | Web companion (PR #16) | Optional browser companion and enrollment transport. Not the primary shell. |
 
@@ -65,7 +70,7 @@ V1 proves trusted photo capture and grounded recall. Typed text joins voice, scr
 - Mobile: Expo / React Native / TypeScript, iPhone first.
 - Desktop: Tauri 2 / React / TypeScript, Windows first.
 - Backend: FastAPI + durable worker.
-- Canonical state: managed PostgreSQL + pgvector.
+- Active desktop state: owner-selected Obsidian vault; SQLite may hold rebuildable indexes and local operational state. Legacy cloud state: managed PostgreSQL + pgvector.
 - Original evidence: private object storage.
 - Desktop offline state: SQLite.
 - AI: one evaluated multimodal configuration plus embeddings; no model router or autonomous agent framework in V1.

@@ -2,9 +2,13 @@
 
 ## Start here
 
-Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository starts as documentation and a scaffold, not an existing working app.
+Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository contains implemented desktop, phone, and legacy cloud components. Verify current code and acceptance evidence before claiming a feature works.
 
 Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. The primary shell is the desktop Memory Surface. The phone is a capture and ask companion. Organized notes live in Obsidian, and originals stay preserved. The installable web app (PR #16) is an optional companion and enrollment transport, not the product people start using. Do not rebuild a general productivity suite. The 2026-10-10 amendment in `docs/PILOT-CONTRACT.md` is the product-center authority.
+
+## Required intelligence pipeline (owner decision 2026-10-11)
+
+Jev parses incoming sources into evidence-linked structured candidates. Claude is the core librarian that proposes Obsidian note organization, YAML frontmatter, wikilinks, relationships and safe updates. A deterministic vault writer validates and commits these proposals; neither model has unrestricted filesystem access. Markdown with YAML properties is the primary Obsidian representation; JSON is for internal structured state. Capture remains durable when models are unavailable, but keyword search is not a substitute for the intended Jev + Claude loop. See `docs/CANONICAL-FOUNDATION.md`. Keep PR #26 separate.
 
 ## Non-negotiable invariants
 

@@ -1,5 +1,10 @@
 # Sync, offline behavior, and Obsidian export
 
+## Active pilot authority (2026-10-11)
+
+For the **active desktop pilot**, the owner-selected Obsidian vault is authoritative. Local originals, Markdown notes, and append-only history are the persistent memory. Preserve user edits and refuse unsafe overwrites. The PostgreSQL-as-authority statement in section 1 and subsequent cloud sync, SQLite projection, and managed Markdown export rules describe the **legacy cloud path only**. Do not implement cloud sync as a requirement for the current phone/desktop pilot. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
+
+
 > **TWO STORES.** The desktop vault path keeps memory in the user's Obsidian folder: originals in `Recall/Sources`, notes in `Recall/Memories`, append-only history, and no silent replacement of a local edit. Cloud Postgres is not that path's authority. The rest of this file describes the legacy cloud cache and the managed Markdown export. That export refuses to write into a folder that already has a local-vault `_meta` tree. The [2026-10-10 amendment](PILOT-CONTRACT.md) is the product center. PR #16 does not change this file into the launch path.
 
 ## V1 implementation details
@@ -13,9 +18,9 @@ The optional native adapter writes only UUID memory files beneath a selected `Re
 
 Version: 0.1 | No bidirectional vault synchronization in V1
 
-## 1. Source of truth
+## 1. Source of truth — legacy cloud subsystem only
 
-Cloud PostgreSQL is authoritative for committed application state. SQLite stores a local projection and durable pending commands. Local records are never copied wholesale over server records. Obsidian is an optional one-way export, not a second master.
+For the legacy cloud subsystem, Cloud PostgreSQL is authoritative for committed application state. For the active desktop product, the Obsidian vault is authoritative; this cloud rule does not apply. SQLite stores a local projection and durable pending commands. Local records are never copied wholesale over server records. Obsidian is an optional one-way export, not a second master.
 
 Offline work is acknowledged as saved on this device until the server accepts it. The UI shows last successful sync and any failed/conflicting operations. Do not say "synced" just because a request was sent.
 
