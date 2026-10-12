@@ -7,6 +7,8 @@ it("keeps same-name mentions source-scoped, excludes retractions and does not cr
   expect(data.people.map(row => row.memory.id)).toEqual(["a", "b"]);
   expect(data.places[0]?.label).toBe("North [gate]");
   expect(data.projects[0]?.label).toBe("Prism");
+  const encoded = source("encoded"); encoded.note = encoded.note.replace("Sarah", "&lt;yard&gt; &amp;lt;");
+  expect(vaultContext([encoded]).people[0]?.label).toBe("<yard> &lt;");
   expect(data.agenda.map(row => row.label)).toEqual(["Call Sarah", "Call Sarah"]);
   expect(data.agenda[0]?.note).toContain("Unscheduled");
   expect(data.related[0]?.memory).toBe(b);

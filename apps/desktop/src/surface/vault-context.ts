@@ -7,7 +7,7 @@ function section(document: string, heading: string): string[] {
   const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));
   return lines.slice(start + 1, end < 0 ? undefined : end);
 }
-function unescape(text: string): string { return text.replace(/\\([\\`*_\[\]<>#!|])/g, "$1"); }
+function unescape(text: string): string { return text.replace(/\\([\\`*_[\]<>#!|])/g, "$1").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&"); }
 export function vaultContext(memories: VaultMemory[]) {
   const people: SourceRow[] = [], places: SourceRow[] = [], projects: SourceRow[] = [], agenda: SourceRow[] = [], related: SourceRow[] = [];
   const active = memories.filter(memory => memory.state === "active" && !memory.conflict);
