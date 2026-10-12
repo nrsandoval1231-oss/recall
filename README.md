@@ -1,5 +1,10 @@
 # Recall
 
+## Next build — Meeting to Memory
+
+The approved next vertical slice is [Meeting to Memory](docs/MEETING-TO-MEMORY.md): messy source capture → Jev parsing → Claude librarian proposals → validated Markdown/YAML Obsidian write → evidence-backed Recall retrieval. This is a product requirement, **not** a completed live workflow. The sole active desktop UI direction is in [UX-SPEC](docs/UX-SPEC.md). PR #26 remains isolated.
+
+
 ## Canonical pilot implementation (2026-10-11)
 
 The active product is the Tauri desktop Memory Surface with a user-selected Obsidian vault as durable memory, and a local Tailscale phone Capture/Ask companion. Claude interpretation is opt-in and has not passed live end-to-end acceptance. The Expo/FastAPI/PostgreSQL/Cloudflare PWA stack described below is retained as legacy or optional infrastructure, **not** a prerequisite or source of truth for this pilot. Read [Canonical Foundation](docs/CANONICAL-FOUNDATION.md) and [Pilot Contract](docs/PILOT-CONTRACT.md) before implementing features.
