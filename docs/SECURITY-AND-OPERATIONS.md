@@ -1,5 +1,10 @@
 # Security, privacy, and operations
 
+## Meeting to Memory security gate
+
+The active [Meeting to Memory](MEETING-TO-MEMORY.md) pipeline must preserve original bytes before provider calls, require explicit consent/configuration for external Jev/Claude processing, bound model context, validate all proposed paths and YAML, and prevent silent overwrites of edited Obsidian notes. Local-first is not a license for unrestricted model filesystem access. PR #26 remains isolated.
+
+
 ## Active pilot security boundary (2026-10-11)
 
 The desktop vault is local and has no Recall login UI. The phone companion has no app-level login and serves over HTTP; network reachability through Tailscale ACLs and host firewall rules is therefore a security-critical gate, not proof of authorization merely because Tailscale is installed. Verify denied-peer access before real notes. Cloud account/RLS/auth operations below are for the optional legacy path, not required for the active local-vault pilot. See [Canonical Foundation](CANONICAL-FOUNDATION.md).
