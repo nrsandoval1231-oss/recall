@@ -1,3 +1,5 @@
+> **CURRENT PRODUCT AUTHORITY — 2026-10-13:** [Native Memory Product Contract](NATIVE-MEMORY-PRODUCT-CONTRACT.md) supersedes Obsidian-as-required-application, Obsidian-only editing/opening, and previous dashboard/UI directions. Obsidian references below describe **historical pilot implementation or optional Markdown compatibility**, not the intended required user workflow. The user-owned local-first Markdown/source library stays; **no storage migration or PR #26 merge is authorized**. The approved photo-free ivory graph-field Camera/Speak/Write UI remains canonical. Preserve evidence and implementation status; do not assume new product behavior is already built.
+
 # Recall — Meeting to Memory (RCL-INT-001)
 
 Status: **canonical implementation packet; native text pipeline implemented and owner-observed live Windows text acceptance recorded. Photo, phone and visual fidelity gates remain OPEN.** Owner decision: 2026-10-11. This packet extends the merged local-first foundation and the latest warm-glass desktop design. PR #26 is deliberately isolated and must not be merged, rebased, copied, or used as authority for this packet.

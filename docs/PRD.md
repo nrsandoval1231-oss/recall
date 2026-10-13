@@ -1,3 +1,5 @@
+> **CURRENT PRODUCT AUTHORITY — 2026-10-13:** [Native Memory Product Contract](NATIVE-MEMORY-PRODUCT-CONTRACT.md) supersedes Obsidian-as-required-application, Obsidian-only editing/opening, and previous dashboard/UI directions. Obsidian references below describe **historical pilot implementation or optional Markdown compatibility**, not the intended required user workflow. The user-owned local-first Markdown/source library stays; **no storage migration or PR #26 merge is authorized**. The approved photo-free ivory graph-field Camera/Speak/Write UI remains canonical. Preserve evidence and implementation status; do not assume new product behavior is already built.
+
 # Recall — Product Requirements Document
 
 Desktop UI authority: [Adaptive Memory Surface](ADAPTIVE-MEMORY-SURFACE-PRD.md) from PR #51, with the exact approved four-panel PNG. Earlier dashboard compositions are historical.
