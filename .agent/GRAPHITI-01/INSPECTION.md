@@ -1,0 +1,12 @@
+# Graphiti inspection evidence
+
+Current origin/main inspected at 8f90e5a5ead9dd05b58beaecb6811b2b197088e2. Dedicated clean worktree branch integrate/graphiti. Original dirty implement/owner-device-pairing checkout preserved without modifying/stashing.
+PR #26 OPEN at 0d36d891fa6ae3f6c757ad18fdf49ed26c334064, not merged. Its diff from main spans 95 files, 1352 insertions and 8880 deletions, including newer processing/UI. Reconcile desired no-Obsidian-required semantics, not wholesale branch replacement. Reference plan read directly from its branch.
+
+Read main canonical PRD, Architecture, Roadmap, Meeting-to-Memory, Canonical Foundation, UX Spec, Security/Operations, V1 Status, Acceptance and provider evidence. Newer native vault has immutable originals, versioned Markdown, correction/conflict checks and source-backed keyword Ask. Existing SQLite NativeStore serves legacy cloud; it must not be repurposed as authoritative vault storage. Existing desktop MemorySurface, original inspection, note editor, project source boards and source query are reused.
+
+Upstream https://github.com/getzep/graphiti inspected main 2f0fb35b749f1ff17377892e099882176e453393 (source version 0.31.0). Released PyPI used for implementation: 0.30.2, Apache-2.0. Neo4j, FalkorDB, Neptune supported; Kuzu deprecated. Choose embedded FalkorDB in a WSL/Linux local service; native Windows falkordblite fails (redislite unsupported on win32). Docker daemon unavailable. WSL Ubuntu26.04 Python3.14.4 real Graphiti build_indices_and_constraints succeeded with no-op provider adapters. This is storage initialization proof only, NOT extraction/retrieval/provider acceptance. Shutdown warning remains to investigate.
+
+Graphiti episode UUID is not sufficient exactly-once proof. Recall owns source/revision/hash/generation ledger and worker recovery. Graphiti remove_episode cannot reconstruct shared facts: changed/deleted/revoked inputs require retrieval fencing and scoped rebuild. Native checks all support revisions/hash/quotes. Graphiti temporal dates are inferences, not verified historical snapshots. Metadata telemetry default is disabled explicitly. Provider disclosure and bounded configured model calls are separate from local storage; no development private data or paid calls authorized.
+
+Model roles: Luna native+Python builders, Sol contract review, Terra runtime feasibility. Tokens UNKNOWN; no speedup claim. Full production and device finish gates remain open.

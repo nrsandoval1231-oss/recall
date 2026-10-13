@@ -1,5 +1,9 @@
 # Recall builder instructions
 
+## Graphiti mission amendment (2026-10-12)
+
+The owner's Graphiti integration mission supersedes earlier Obsidian-required and no-graph restrictions below. Recall owns its portable Markdown notes, original attachments and correction history; Obsidian is optional. Graphiti is an optional, derived, rebuildable relationship index. Saving, reading, editing and local keyword retrieval must work without it or any model provider. Preserve the canonical desktop UI and existing Jev/Claude processing; do not import PR #26 wholesale. Graph processing requires its own explicit purpose consent and configured providers. Implementation and acceptance are tracked in `.agent/GRAPHITI-01/`; no production readiness, provider compatibility or device claim follows from this amendment.
+
 ## Active next packet — Meeting to Memory
 
 Read `docs/MEETING-TO-MEMORY.md` before any new intelligence or desktop UI work. It defines the smallest Jev → Claude → deterministic Obsidian writer implementation, acceptance gates, and scope boundaries. Keep PR #26 isolated; do not import its divergent vault-only/no-Claude vision. The single active UI direction is the latest warm-glass business board in `docs/UX-SPEC.md`; do not revive older visual alternatives.

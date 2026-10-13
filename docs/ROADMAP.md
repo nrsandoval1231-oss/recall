@@ -1,5 +1,9 @@
 # Recall build roadmap
 
+## Graphiti mission amendment (2026-10-12)
+
+The owner's Graphiti integration mission supersedes earlier Obsidian-required and no-graph restrictions below. Recall owns its portable Markdown notes, original attachments and correction history; Obsidian is optional. Graphiti is an optional, derived, rebuildable relationship index. Saving, reading, editing and local keyword retrieval must work without it or any model provider. Preserve the canonical desktop UI and existing Jev/Claude processing; do not import PR #26 wholesale. Graph processing requires its own explicit purpose consent and configured providers. Implementation and acceptance are tracked in `.agent/GRAPHITI-01/`; no production readiness, provider compatibility or device claim follows from this amendment.
+
 ## Immediate build sequence — RCL-INT-001
 
 1. Canonical UI asset handoff verified: see the committed owner image and SHA-256 in UX-SPEC.
