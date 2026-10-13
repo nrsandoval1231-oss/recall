@@ -3,10 +3,14 @@ Date: 2026-10-13
 
 You are the senior builder for `nrsandoval1231-oss/recall`. The owner has approved a radically simpler canonical desktop experience: **ivory full-canvas memory graph as the environment; near-empty Home centered on three capture bubbles Camera, Speak, Write; interface adapts to real user intent and persisted memory**.
 
+## Verified owner-approved visual reference
+
+The owner committed the final four-panel, photo-free adaptive Recall UI reference to `main` at [docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png](https://github.com/nrsandoval1231-oss/recall/blob/main/docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png). Its Git blob SHA is `6abf5192ab4ee96708984174ed15e3648c668bf0`. This is the **canonical visual authority** for Capture, Processing, Memory Inspection, and Graph View. Use the exact existing PNG; do not rename, move, redraw, substitute generated images, or commit a duplicate. Illustrative text and nodes in the mockup are not user data. The separate, earlier three-bubble and post-capture concept images are historical supporting references only.
+
 ## Sources of truth
 Read `docs/ADAPTIVE-MEMORY-SURFACE-PRD.md`, `docs/ADAPTIVE-MEMORY-SURFACE-SCREENS.md`, current native desktop code, `docs/PILOT-CONTRACT.md` and `docs/MEETING-TO-MEMORY.md`. This UI amendment supersedes the older warm dashboard design; PRs #48/#49 are historical and must NOT be implemented as the new visual direction. PR #26 remains isolated. Graphiti PR #50 may be inspected for compatible derived knowledge, but neither merge it nor make graph rendering depend on it.
 
-The two owner-approved visual references are the minimal ivory graph with Camera/Speak/Write bubbles (Home) and the post-camera capture state with right glass progress panel. They exist as ChatGPT conversation-generated images; if their originals are not present in the repository, obtain/commit the original image bytes for pixel comparison. Do not manufacture a lookalike and report it as the approved image.
+The owner-approved four-screen reference is already committed on `main` at `docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png`. Use this actual PNG for screenshot fidelity. Do not request another upload or substitute an older design.
 
 ## Build, don't just plan
 1. Inspect actual Tauri desktop architecture, navigation, native bridge, existing vault reading/index and current tests. Identify working actions and unavailable modes.
