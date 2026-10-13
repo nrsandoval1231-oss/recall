@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   {
     ignores: [
-      "**/node_modules/**", "**/dist/**", "**/.expo/**", "**/target/**", "**/coverage/**", "**/.wrangler/**",
+      "**/node_modules/**", "**/dist/**", "**/.expo/**", "**/target/**", "**/coverage/**", "**/.wrangler/**", "test-results/**", "playwright-report/**",
       "services/**", "apps/desktop/src-tauri/**", "apps/mobile/ios/**", "apps/mobile/android/**",
     ],
   },
