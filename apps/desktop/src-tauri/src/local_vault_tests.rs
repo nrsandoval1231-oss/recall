@@ -60,7 +60,7 @@ fn photo() -> Vec<u8> {
     b"\x89PNG\r\n\x1a\nSYNTHETIC-TEST-ONLY".to_vec()
 }
 #[test]
-fn text_note_writes_markdown_without_a_source_file() {
+fn text_note_preserves_a_readable_original_without_ai_or_an_external_editor() {
     let f = Fixture::new();
     let v = f.vault();
     let id = op();
@@ -70,10 +70,12 @@ fn text_note_writes_markdown_without_a_source_file() {
     assert_eq!(saved.id, id);
     assert!(saved.source_name.is_empty());
     assert_eq!(saved.source_sha256, hash(b""));
-    assert!(v.source(&id).unwrap_err().contains("no original photo"));
+    let original=v.source(&id).unwrap();
+    assert_eq!(original.mime_type, "text/plain");
+    assert_eq!(original.bytes, b"pump house valve, uncertain?");
     assert_eq!(
         fs::read_dir(f.0.join("Recall/Sources")).unwrap().count(),
-        0
+        1
     );
     let path = v.note_path(&id);
     let markdown = fs::read_to_string(&path).unwrap();
@@ -90,7 +92,7 @@ fn text_note_writes_markdown_without_a_source_file() {
     assert!(v.capture_note(&op(), "   ").is_err());
     assert_eq!(
         fs::read_dir(f.0.join("Recall/Sources")).unwrap().count(),
-        0
+        1
     );
     let edited = markdown.replace("uncertain?", "Obsidian kept this?");
     fs::write(&path, &edited).unwrap();
@@ -100,7 +102,7 @@ fn text_note_writes_markdown_without_a_source_file() {
     assert_eq!(listed[0].state, "active");
     assert!(listed[0].conflict.is_none());
     assert_eq!(fs::read_to_string(&path).unwrap(), edited);
-    assert!(v.source(&id).is_err());
+    assert_eq!(v.source(&id).unwrap().bytes, b"pump house valve, uncertain?");
 }
 #[test]
 fn capture_reopens_with_original_hash_and_history() {
@@ -2240,4 +2242,55 @@ fn previous_native_typed_publication_artifacts_replay_and_recover_unchanged(){
         assert_eq!(fs::read_to_string(f.0.join(format!("Recall/Memories/{memory}.md"))).unwrap(),previous_document);
         assert_eq!(v.history(memory).unwrap().len(),2);
     }
+}
+
+#[test]
+fn native_library_creation_is_non_destructive_and_recovers_selection_after_restart() {
+    let fixture=Fixture::new();let root=fixture.0.join("My Recall Library");
+    let state=LocalVaultState::new(fixture.0.join("selection.json"));
+    let status=state.create_path(&root).unwrap();let token=status.vault_id.unwrap();let identity=status.vault_identity.unwrap();
+    let memory=state.with(&token,|vault|vault.capture_note(&op(),"Synthetic native authored note")).unwrap();
+    assert!(state.create_path(&root).is_err());
+    let restarted=LocalVaultState::new(fixture.0.join("selection.json"));let restored=restarted.status().unwrap();
+    assert_eq!(restored.vault_identity.as_deref(),Some(identity.as_str()));
+    assert_ne!(restored.vault_id.as_deref(),Some(token.as_str()));
+    assert_eq!(restarted.with(restored.vault_id.as_ref().unwrap(),|vault|vault.list("")).unwrap()[0].id,memory.id);
+}
+
+#[test]
+fn markdown_import_preserves_original_content_and_never_modifies_the_input_file() {
+    let fixture=Fixture::new();let vault=fixture.vault();let source=fixture.0.join("existing.md");
+    let text="---\ntags: [private]\n---\n# Synthetic imported note\n\nAn uncertain number: **42?**\n[[another-note]]\n";
+    fs::write(&source,text).unwrap();let operation=op();
+    let memory=vault.import_markdown_path(&operation,&source).unwrap();
+    assert_eq!(memory.note,text);assert_eq!(fs::read(&source).unwrap(),text.as_bytes());
+    assert_eq!(vault.source(&memory.id).unwrap().bytes,text.as_bytes());
+    assert_eq!(vault.import_markdown_path(&operation,&source).unwrap().id,memory.id);
+    let corrected=vault.correct(&memory.id,1,&op(),"# Human correction\n42 is unknown.").unwrap();
+    assert_eq!(vault.source(&corrected.id).unwrap().bytes,text.as_bytes());
+    let reopened=Vault::open(vault.root()).unwrap();assert_eq!(reopened.history(&memory.id).unwrap().len(),2);
+    assert_eq!(fs::read(source).unwrap(),text.as_bytes());
+}
+
+#[test]
+fn explicitly_restoring_removed_memory_retains_id_original_and_history_without_replaying_old_writes() {
+    let fixture=Fixture::new();let vault=fixture.vault();let capture=op();
+    let memory=vault.capture_note(&capture,"Synthetic recoverable memory?").unwrap();
+    let removed=vault.remove(&memory.id,1,&op(),"active").unwrap();
+    assert!(vault.restore_note(&memory.id,removed.revision,&op()).is_err());
+    assert!(vault.restore_deleted(&memory.id,1,&op()).is_err());
+    let restore=op();let restored=vault.restore_deleted(&memory.id,removed.revision,&restore).unwrap();
+    assert_eq!(restored.id,memory.id);assert_eq!(restored.note,memory.note);assert_eq!(restored.revision,3);
+    assert_eq!(vault.restore_deleted(&memory.id,removed.revision,&restore).unwrap().revision,3);
+    assert_eq!(Vault::open(vault.root()).unwrap().source(&memory.id).unwrap().bytes,memory.note.as_bytes());
+    assert_eq!(vault.history(&memory.id).unwrap().iter().map(|r|r.kind.as_str()).collect::<Vec<_>>(),vec!["capture","remove","restore_deleted"]);
+}
+
+#[test]
+fn restoring_removed_note_never_overwrites_an_external_edit() {
+    let fixture=Fixture::new();let vault=fixture.vault();let m=vault.capture_note(&op(),"Synthetic original").unwrap();
+    let removed=vault.remove(&m.id,1,&op(),"active").unwrap();let path=vault.root().join("Recall/Memories").join(m.note_path.unwrap());
+    fs::write(&path,"External editor content must survive").unwrap();
+    assert!(vault.restore_deleted(&m.id,removed.revision,&op()).is_err());
+    assert_eq!(fs::read_to_string(path).unwrap(),"External editor content must survive");
 }

@@ -40,3 +40,9 @@ it("lifecycle commands preserve exact revision, state, operation identity and in
     ["vault_remove", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 4, operationId: "remove-op", expectedState: "missing" }],
   ]);
 });
+
+it("creates a library through a native picker and imports Markdown with a scoped operation",async()=>{
+ Object.defineProperty(window,"__TAURI_INTERNALS__",{value:{},configurable:true});
+ const library=new NativeLocalVault();await library.create();await library.importMarkdown("session","import-op");
+ expect(vi.mocked(invoke).mock.calls).toEqual([["library_create",undefined],["library_import_markdown",{expectedVaultId:"session",operationId:"import-op"}]]);
+});

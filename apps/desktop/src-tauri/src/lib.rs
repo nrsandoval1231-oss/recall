@@ -207,13 +207,30 @@ fn vault_select(
     state: tauri::State<'_, local_vault::LocalVaultState>,
 ) -> Result<Option<local_vault::VaultStatus>, String> {
     let Some(root) = rfd::FileDialog::new()
-        .set_title("Choose your Obsidian vault folder")
+        .set_title("Open a Recall library or compatible Markdown folder")
         .pick_folder()
     else {
         return Ok(None);
     };
     state.select_path(&root).map(Some)
 }
+#[tauri::command]
+fn library_create(state: tauri::State<'_, local_vault::LocalVaultState>) -> Result<Option<local_vault::VaultStatus>, String> {
+    let Some(root) = rfd::FileDialog::new().set_title("Create a new Recall library folder").set_file_name("Recall Library").save_file() else { return Ok(None); };
+    state.create_path(&root).map(Some)
+}
+#[tauri::command]
+fn library_import_markdown(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, operation_id: String) -> Result<Option<local_vault::VaultMemory>, String> {
+    state.with(&expected_vault_id, |vault| {
+        let Some(path) = rfd::FileDialog::new().set_title("Import Markdown or text without changing the original").add_filter("Markdown and text", &["md", "markdown", "txt"]).pick_file() else { return Ok(None); };
+        vault.import_markdown_path(&operation_id, &path).map(Some)
+    })
+}
+#[tauri::command]
+fn library_restore_deleted(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, expected_revision: u64, operation_id: String) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| vault.restore_deleted(&memory_id, expected_revision, &operation_id))
+}
+
 #[tauri::command]
 fn vault_open_default(
     app: tauri::AppHandle,
@@ -516,6 +533,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             vault_status,
+            library_create,
+            library_import_markdown,
+            library_restore_deleted,
             vault_select,
             vault_open_default,
             vault_capture,

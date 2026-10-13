@@ -27,7 +27,14 @@ export interface VaultRevision {
   note: string;
   recorded_at: string;
   origin: "human:recall" | "human:obsidian" | "model:claude";
-  kind: "capture" | "correct" | "external" | "restore" | "remove" | "organize";
+  kind:
+    | "capture"
+    | "correct"
+    | "external"
+    | "restore"
+    | "remove"
+    | "organize"
+    | "restore_deleted";
 }
 export interface ParserJob {
   operation_id: string;
@@ -56,6 +63,17 @@ export interface SourceAnswer {
 }
 export interface LocalVault {
   readonly available: boolean;
+  create?(): Promise<VaultStatus | null>;
+  importMarkdown?(
+    expectedVaultId: string,
+    operationId: string,
+  ): Promise<VaultMemory | null>;
+  restoreDeleted?(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ): Promise<VaultMemory>;
   captureNote?(
     expectedVaultId: string,
     operationId: string,
@@ -150,6 +168,28 @@ export class NativeLocalVault implements LocalVault {
     return this.call<void>("vault_open_obsidian", {
       expectedVaultId,
       memoryId,
+    });
+  }
+  create() {
+    return this.call<VaultStatus | null>("library_create");
+  }
+  importMarkdown(expectedVaultId: string, operationId: string) {
+    return this.call<VaultMemory | null>("library_import_markdown", {
+      expectedVaultId,
+      operationId,
+    });
+  }
+  restoreDeleted(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ) {
+    return this.call<VaultMemory>("library_restore_deleted", {
+      expectedVaultId,
+      memoryId,
+      expectedRevision,
+      operationId,
     });
   }
   status() {

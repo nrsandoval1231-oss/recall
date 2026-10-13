@@ -165,7 +165,7 @@ it("requires separate source consent and unchecked cost review for the retained 
   expect(review.disabled).toBe(false);
   await user.click(review);
   await screen.findByText(
-    "Organized in Obsidian. Uncertainty and original evidence preserved.",
+    "Organized in Recall. Uncertainty and original evidence preserved.",
   );
   expect(client.organize).not.toHaveBeenCalled();
   expect(client.reviewedOrganize).toHaveBeenCalledWith(
@@ -255,7 +255,7 @@ describe("Memory Surface", () => {
       screen.getByRole("button", { name: "Retry the same import" }),
     );
     expect(
-      (await screen.findAllByText(/Saved in your vault/)).length,
+      (await screen.findAllByText(/Saved in your library/)).length,
     ).toBeGreaterThan(0);
     expect(document.querySelector(".ms")?.getAttribute("data-mode")).toBe(
       "vault",
@@ -400,7 +400,7 @@ describe("Memory Surface", () => {
     render(<MemorySurface vault={client} />);
     await user.click(screen.getByRole("button", { name: "Settings" }));
     await user.click(
-      await screen.findByRole("button", { name: "Use default vault" }),
+      await screen.findByRole("button", { name: "Use default library" }),
     );
     expect(client.openDefault).toHaveBeenCalledWith();
     await user.click(screen.getByRole("button", { name: "Settings" }));
@@ -649,7 +649,7 @@ it("finishing organization of A never replaces B's correction editor after navig
     finish({});
   });
   await screen.findByText(
-    "Organized in Obsidian. Uncertainty and original evidence preserved.",
+    "Organized in Recall. Uncertainty and original evidence preserved.",
   );
   expect(
     (screen.getByLabelText("Your correction") as HTMLTextAreaElement).value,
@@ -792,7 +792,7 @@ it("edits organized note words while preserving native properties in the save pa
   await user.clear(editor);
   await user.type(editor, "Utility is now on time.");
   await user.click(screen.getByRole("button", { name: "Save correction" }));
-  await screen.findByText(/Correction saved in the vault/);
+  await screen.findByText(/Correction saved in the library/);
   expect(client.correct).toHaveBeenCalledWith(
     "session-token",
     saved.id,
@@ -802,7 +802,7 @@ it("edits organized note words while preserving native properties in the save pa
   );
   expect((editor as HTMLTextAreaElement).value).toBe("Utility is now on time.");
   await user.click(screen.getByRole("button", { name: "Home" }));
-  expect(screen.queryByText(/Correction saved in the vault/)).toBeNull();
+  expect(screen.queryByText(/Correction saved in the library/)).toBeNull();
 });
 
 it("replaces failed organization progress with the error rather than a stale checking banner", async () => {
@@ -894,14 +894,14 @@ it("organization completion fills body-only editing without duplicating native p
     finish({});
   });
   await screen.findByText(
-    "Organized in Obsidian. Uncertainty and original evidence preserved.",
+    "Organized in Recall. Uncertainty and original evidence preserved.",
   );
   const editor = screen.getByRole("textbox", {
     name: "Your correction",
   }) as HTMLTextAreaElement;
   expect(editor.value).toBe("Utility late.");
   await user.click(screen.getByRole("button", { name: "Save correction" }));
-  await screen.findByText(/Correction saved in the vault/);
+  await screen.findByText(/Correction saved in the library/);
   expect(client.correct).toHaveBeenCalledWith(
     "session-token",
     initial.id,
@@ -986,7 +986,7 @@ it("keeps failed capture intent scoped to its vault when choosing another vault"
   const firstId = captureNote.mock.calls[0]![1];
   await user.click(screen.getByRole("button", { name: "Settings" }));
   await user.click(
-    screen.getByRole("button", { name: "Choose a vault folder" }),
+    screen.getByRole("button", { name: "Open existing library" }),
   );
   await user.click(screen.getByRole("button", { name: /Write ·/ }));
   expect(
@@ -1030,4 +1030,12 @@ it("restores a pending photo to Camera with the same retry identity", async () =
  const client=vault({capture:vi.fn(async()=>null)});rawRender(<MemorySurface vault={client}/>);
  const retry=await screen.findByRole("button",{name:"Retry the same import"});expect(screen.queryByRole("button",{name:"Save note"})).toBeNull();
  fireEvent.click(retry);await act(async()=>{});expect(client.capture).toHaveBeenCalledWith("session-token",intent.operationId,intent.note);
+});
+
+it("restores a pre-capture writing draft after app restart without inventing a saved memory",async()=>{
+ const user=userEvent.setup();const client=vault();const view=rawRender(<MemorySurface vault={client}/>);
+ await user.click(screen.getByRole("button",{name:/Write ·/}));await user.type(screen.getByLabelText("Your note"),"Unfinished native writing draft?");view.unmount();
+ rawRender(<MemorySurface vault={client}/>);await screen.findByText(/Checking this device/).catch(()=>{});
+ await user.click(screen.getByRole("button",{name:/Write ·/}));expect((screen.getByLabelText("Your note") as HTMLTextAreaElement).value).toBe("Unfinished native writing draft?");
+ expect(client.captureNote).toBeUndefined();expect(screen.queryByTestId("integrity")).toBeNull();
 });
