@@ -38,5 +38,9 @@ export function noteSummary(text: string): string {
     );
     if (lines.length === 3) break;
   }
-  return lines.join(" ").slice(0, 240);
+  const summary = lines.join(" ");
+  if (summary.length <= 240) return summary;
+  const prefix = summary.slice(0, 239);
+  const boundary = prefix.lastIndexOf(" ");
+  return `${(boundary > 0 ? prefix.slice(0, boundary) : prefix).trimEnd()}…`;
 }
