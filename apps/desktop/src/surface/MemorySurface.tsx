@@ -1,3 +1,4 @@
+import { graphTitle } from "./adaptive-graph";
 import { attachmentIntent, clearAttachmentIntent } from "./attachment-intent";
 import { MemoryEditor } from "./MemoryEditor";
 import type { EditorIntent } from "./editor-session";
@@ -554,8 +555,8 @@ export function MemorySurface({
       );
       setNotice(
         kind === "default"
-          ? "Opened the default vault folder."
-          : "Opened the folder you chose.",
+          ? "Opened your default Recall library."
+          : "Opened your Recall library.",
       );
       setExploring(false);
       setSection(restored ? "capture" : "home");
@@ -1935,18 +1936,9 @@ export function MemorySurface({
 }
 
 function titleOf(memory: VaultMemory): string {
-  const title = /^title: (".*")$/m.exec(memory.note)?.[1];
-  if (memory.note.startsWith("---\nrecall_id:") && title) {
-    try {
-      const parsed: unknown = JSON.parse(title);
-      if (typeof parsed === "string") return parsed;
-    } catch {
-      /* User-owned YAML can differ from the generated subset. */
-    }
-  }
-  const name = memory.source_name.replace(/\.[a-z0-9]+$/i, "");
-  return name || "Meeting capture";
+  return graphTitle(memory);
 }
+
 function RailIcon({ id }: { id: Section }) {
   const Icon = {
     graph: GraphIcon,

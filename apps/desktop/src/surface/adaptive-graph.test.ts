@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveGraph } from "./adaptive-graph";
+import { deriveGraph, graphTitle } from "./adaptive-graph";
 import type { VaultMemory } from "../platform/local-vault";
 const row = (id: string, note = ""): VaultMemory => ({
   id,
@@ -46,4 +46,34 @@ describe("derived vault graph", () => {
     expect(g.edges).toHaveLength(1);
     expect(g.edges[0]?.tentative).toBe(true);
   });
+});
+
+it("uses authored headings or words to distinguish native notes without AI or mandatory folders", () => {
+  expect(graphTitle({ ...row("a", "Buy groceries?"), source_name: "" })).toBe(
+    "Buy groceries?",
+  );
+  expect(
+    graphTitle({
+      ...row("a", "---\ntags: [personal]\n---\n# Reading notes\nDetails"),
+      source_name: "",
+    }),
+  ).toBe("Reading notes");
+  expect(graphTitle({ ...row("a", ""), source_name: "" })).toBe(
+    "Untitled memory",
+  );
+  expect(
+    graphTitle({ ...row("a", "x".repeat(200)), source_name: "" }).length,
+  ).toBe(80);
+  expect(
+    graphTitle({
+      ...row("a", "## Unresolved entity mentions"),
+      source_name: "north-lot.png",
+    }),
+  ).toBe("north-lot");
+});
+
+it("bounds interpreted titles consistently without rewriting their metadata", () => {
+  const note = `title: "${"x".repeat(200)}"`;
+  expect(graphTitle(row("a", note)).length).toBe(80);
+  expect(row("a", note).note).toBe(note);
 });

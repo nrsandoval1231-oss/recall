@@ -22,17 +22,33 @@ function position(id: string) {
     hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
   return { x: 120 + (hash % 760), y: 95 + (Math.floor(hash / 997) % 610) };
 }
+function displayTitle(value: string) {
+  const label =
+    value
+      .replace(/\[\[[^\]]+\]\]/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/[*`]/g, "")
+      .trim() || "Untitled memory";
+  return label.length > 80 ? label.slice(0, 79) + "…" : label;
+}
 export function graphTitle(memory: VaultMemory) {
   const title = /^title: (".*")$/m.exec(memory.note)?.[1];
   if (title) {
     try {
       const value: unknown = JSON.parse(title);
-      if (typeof value === "string") return value;
+      if (typeof value === "string") return displayTitle(value);
     } catch {
       /* Keep source name for unfamiliar user YAML. */
     }
   }
-  return memory.source_name.replace(/\.[a-z0-9]+$/i, "") || "Memory";
+  const body = memory.note.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
+  const heading = /^#{1,2}\s+(.+)$/m.exec(body)?.[1];
+  const name = memory.source_name.replace(/\.[a-z0-9]+$/i, "");
+  const line = body
+    .split("\n")
+    .find((value) => value.trim() && !value.trim().startsWith("<!--"))
+    ?.trim();
+  return displayTitle(name || heading || line || "Untitled memory");
 }
 export function deriveGraph(memories: VaultMemory[]) {
   const records = memories
