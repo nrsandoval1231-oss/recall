@@ -1,5 +1,7 @@
 # Recall — Product Requirements Document
 
+Desktop UI authority: [Adaptive Memory Surface](ADAPTIVE-MEMORY-SURFACE-PRD.md) from PR #51, with the exact approved four-panel PNG. Earlier dashboard compositions are historical.
+
 ## Next product milestone — Meeting to Memory
 
 A user dumps disorganized meeting notes without naming, sorting or tagging them. Recall preserves originals, Jev parses evidence and uncertainty, Claude proposes useful Obsidian structure, and trusted code commits Markdown/YAML with wikilinks and history. Recall presents a grounded result with the original. The bounded text loop is implemented and owner-verified on Windows with real providers, restart retrieval and Obsidian original access; handwriting, phone and visual fidelity acceptance remain open. See [Meeting to Memory](MEETING-TO-MEMORY.md).

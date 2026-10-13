@@ -1,4 +1,5 @@
-/* global process, window, document, innerWidth, TextEncoder */
+/* global process, window, document, innerWidth, TextEncoder, localStorage */
+import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
@@ -7,89 +8,106 @@ import AxeBuilder from "@axe-core/playwright";
 import { createHash } from "node:crypto";
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const output = path.resolve(
-  process.env.RECALL_UI_EVIDENCE_DIR || path.join(repo, "docs/audits/ui"),
+  process.env.RECALL_UI_EVIDENCE_DIR || path.join(repo, "docs/audits/adaptive"),
 );
 fs.mkdirSync(output, { recursive: true });
 const uiUrl = process.env.RECALL_UI_URL || "http://127.0.0.1:4173/";
-const launchOptions = process.env.RECALL_CHROMIUM
-  ? { executablePath: process.env.RECALL_CHROMIUM }
-  : {};
-// UI fixtures below emulate IPC only. They never prove native persistence or live inference.
+const reference = path.join(
+  repo,
+  "docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png",
+);
+const referenceBytes = fs.readFileSync(reference);
+if (
+  createHash("sha1")
+    .update(
+      Buffer.concat([
+        Buffer.from(`blob ${referenceBytes.length}\0`),
+        referenceBytes,
+      ]),
+    )
+    .digest("hex") !== "6abf5192ab4ee96708984174ed15e3648c668bf0"
+)
+  throw Error("Approved reference changed");
+const browser = await chromium.launch(
+  process.env.RECALL_CHROMIUM
+    ? { executablePath: process.env.RECALL_CHROMIUM }
+    : {},
+);
+const results = [];
+const errors = [];
 const source =
-  "Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.";
+  "SYNTHETIC UI FIXTURE: Utility late. Call Sarah? Deadline unknown.";
 const sha = createHash("sha256").update(source).digest("hex");
+const photoBytes = Array.from(
+  fs.readFileSync(path.join(repo, "apps/web/src/dev/assets/july-notebook.png")),
+);
+const photoSha = createHash("sha256")
+  .update(Buffer.from(photoBytes))
+  .digest("hex");
 const id = "11111111-1111-4111-8111-111111111111";
-const note = `---\nrecall_id: "${id}"\ntitle: "Utility meeting"\n---\n\n# Utility meeting\n\n## Observations (source statements)\n\n- “Utility late.” — source bytes 27–40\n\n## Follow-ups (not confirmed commitments)\n\n- [ ] “Call Sarah.” — source bytes 41–52\n\n## Unresolved entity mentions\n\n- “Brad” — person candidate; identity unresolved\n- “Sarah” — person candidate; identity unresolved\n- “north” — location candidate; identity unresolved\n\n## Open questions and uncertainty\n\n- “Need generators by Dec?”\n`;
-(async () => {
-  const browser = await chromium.launch({ ...launchOptions });
-  const results = [];
-  for (const [w, h] of [
-    [1182, 789],
-    [1536, 1024],
-    [900, 700],
-    [390, 844],
-  ]) {
-    const page = await browser.newPage({
-      viewport: { width: w, height: h },
-      deviceScaleFactor: 1,
-    });
-    const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
-    await page.goto(uiUrl + "?design=canonical");
-    await page.waitForTimeout(100);
-    await page.screenshot({
-      type: "jpeg",
-      quality: 92,
-      path: path.join(output, `reference-${w}.jpg`),
-    });
-    if (await page.evaluate(() => document.body.scrollWidth > innerWidth))
-      throw new Error(`Overflow at${w}`);
-    results.push({ viewport: [w, h], errors });
-    await page.close();
-  }
-  const nativeContext = await browser.newContext({
-    viewport: { width: 1182, height: 789 },
-    deviceScaleFactor: 1,
+for (const [w, h] of [
+  [1536, 1024],
+  [1182, 789],
+  [900, 700],
+  [390, 844],
+]) {
+  const context = await browser.newContext({
+    viewport: { width: w, height: h },
+    reducedMotion: "reduce",
   });
-  const page = await nativeContext.newPage();
-  const errors = [];
+  const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
-  page.on("console", (msg) => {
-    if (msg.type() === "error") errors.push(msg.text());
-  });
   await page.addInitScript(
-    ({ id, source, sha, note }) => {
-      let row = {
-        id,
-        state: "active",
-        revision: 2,
-        note_path: id + ".md",
-        note,
-        source_name: "meeting.txt",
-        source_sha256: sha,
-        captured_at: "2026-10-12T12:00:00Z",
-        updated_at: "2026-10-12T12:00:00Z",
-        conflict: null,
-      };
-      window.__calls = [];
+    ({ id, source, sha, photoBytes, photoSha }) => {
+      const saved = JSON.parse(localStorage.getItem("synthetic-row") || "null");
+      let rows = saved ? [saved] : [];
+      window.__calls = JSON.parse(localStorage.getItem("synthetic-calls") || "[]");
       window.__TAURI_INTERNALS__ = {
         invoke: async (cmd, args) => {
-          window.__calls.push({ cmd, args });
+          window.__calls.push(cmd);
+        localStorage.setItem("synthetic-calls", JSON.stringify(window.__calls));
           if (cmd === "vault_status")
             return {
-              root: "Synthetic UI test vault",
+              root: "Synthetic browser IPC vault",
               vault_id: "test-session",
               vault_identity: id,
             };
-          if (cmd === "vault_list") return [row];
+          if (cmd === "vault_list") return rows;
           if (cmd === "librarian_status")
             return {
               ready: false,
-              reason: "Providers disabled in browser UI test",
+              reason: "No live providers in synthetic browser test",
               model: null,
+            };
+          if (cmd === "vault_capture_note" || cmd === "vault_capture") {
+            const text = cmd === "vault_capture_note" ? args.note : source;
+            const row = {
+              id,
+              state: "active",
+              revision: 1,
+              note_path: id + ".md",
+              note: text,
+              source_name:
+                cmd === "vault_capture"
+                  ? "synthetic-photo.png"
+                  : "synthetic-meeting.txt",
+              source_sha256: cmd === "vault_capture" ? photoSha : sha,
+              captured_at: "2026-10-13T09:14:00Z",
+              updated_at: "2026-10-13T09:14:00Z",
+              conflict: null,
+            };
+            rows = [row];
+            localStorage.setItem("synthetic-row", JSON.stringify(row));
+            return row;
+          }
+          if (
+            cmd === "vault_source" &&
+            rows[0]?.source_name === "synthetic-photo.png"
+          )
+            return {
+              bytes: photoBytes,
+              mime_type: "image/png",
+              sha256: photoSha,
             };
           if (cmd === "vault_source")
             return {
@@ -98,142 +116,191 @@ const note = `---\nrecall_id: "${id}"\ntitle: "Utility meeting"\n---\n\n# Utilit
               sha256: sha,
             };
           if (cmd === "vault_correct") {
-            row = { ...row, revision: row.revision + 1, note: args.note };
-            return row;
+            rows = [
+              { ...rows[0], note: args.note, revision: rows[0].revision + 1 },
+            ];
+            localStorage.setItem("synthetic-row", JSON.stringify(rows[0]));
+            return rows[0];
+          }
+          if (cmd === "vault_history")
+            return [
+              {
+                revision: 1,
+                note: source,
+                origin: "human:recall",
+                kind: "capture",
+                recorded_at: "2026-10-13T09:14:00Z",
+              },
+            ];
+          if (cmd === "processing_parse")
+            return {
+              operation_id: args.operationId,
+              memory_id: id,
+              expected_revision: rows[0].revision,
+              source_sha256: sha,
+              state: "parsed",
+              message: "Synthetic Jev fixture",
+            };
+          if (cmd === "meeting_organize")
+            return new Promise((resolve) => {
+              window.__finishOrganization = () => resolve({});
+            });
+          if (cmd === "meeting_publish") {
+            rows = [
+              {
+                ...rows[0],
+                revision: rows[0].revision + 1,
+                note: `---\nrecall_id: "${id}"\ntitle: "Synthetic meeting"\ntags: ["utility"]\n---\n\n## Observations (source statements)\n- Utility late.\n\n## Unresolved entity mentions\n- “Sarah” — person candidate; identity unresolved\n\n## Open questions and uncertainty\n- Deadline unknown.`,
+              },
+            ];
+            localStorage.setItem("synthetic-row", JSON.stringify(rows[0]));
+            return rows[0];
           }
           if (cmd === "memory_ask")
             return {
               question: args.question,
               message:
-                "Source-backed matches; synthetic browser bridge fixture.",
-              hits: [
-                {
-                  memory_id: id,
-                  revision: row.revision,
-                  note_basename: id + ".md",
-                  current_excerpt: row.note,
-                  original_excerpt: source,
-                  source_sha256: sha,
-                  mime_type: "text/plain",
-                },
-              ],
+                "Source-backed retrieved quotes; synthetic IPC, no generative answer.",
+              hits: rows.map((row) => ({
+                memory_id: id,
+                revision: row.revision,
+                note_basename: id + ".md",
+                current_excerpt: row.note,
+                original_excerpt: source,
+                source_sha256: sha,
+                mime_type: "text/plain",
+              })),
             };
-          throw Error("Forbidden in UI test: " + cmd);
+          throw Error("Forbidden synthetic IPC command: " + cmd);
         },
       };
     },
-    { id, source, sha, note },
+    { id, source, sha, photoBytes, photoSha },
   );
-  await page.goto(uiUrl + "?design=canonical");
+  await page.goto(uiUrl);
+  await page.getByRole("heading", { name: "Capture", exact: true }).waitFor();
+  const shot = async (name) => {
+    if (await page.evaluate(() => document.body.scrollWidth > innerWidth))
+      throw Error(`Overflow ${w} ${name}`);
+    await page.screenshot({
+      path: path.join(output, `${name}-${w}.jpg`),
+      type: "jpeg",
+      quality: 90,
+    });
+  };
+  await shot("empty");
+  let axe = await new AxeBuilder({ page }).analyze();
+  if (axe.violations.length)
+    throw Error(
+      JSON.stringify(
+        axe.violations.map((v) => ({
+          id: v.id,
+          nodes: v.nodes.map((n) => n.target),
+        })),
+      ),
+    );
+  await page.getByRole("button", { name: /Speak/ }).click({ force: true });
+  await page.getByText(/Voice capture is unavailable/).waitFor();
+  await page.getByRole("button", { name: /Write ·/ }).click();
+  await page.getByLabel("Your note").fill(source);
+  if (await page.getByLabel(/Send this saved source/).isChecked())
+    throw Error("Preselected provider consent");
+  await page.getByRole("button", { name: "Save note", exact: true }).click();
+  await page.getByTestId("integrity").waitFor();
   await page
-    .getByRole("heading", { name: "Utility meeting", exact: true })
+    .getByText(
+      "Saved locally. Agree before sending this source to Jev and Claude.",
+    )
     .waitFor();
-  if (await page.getByText(/Design preview|Synthetic demo/).count())
-    throw Error("Design fixture leaked into native mode");
-  await page.screenshot({
-    type: "jpeg",
-    quality: 92,
-    path: path.join(output, "native-fixture-home.jpg"),
-  });
+  await shot("saved");
+  await page.getByLabel(/Send this source to Jev and Claude/).check();
+  await page.getByRole("button", { name: "Organize this memory" }).click();
+  await page.getByText("Claude is organizing source-linked memory…").waitFor();
+  await shot("processing");
+  await page.evaluate(() => window.__finishOrganization());
   await page
-    .getByRole("button", {
-      name: "Open original: Utility meeting",
-      exact: true,
-    })
-    .click();
-  await page
-    .getByText("Hash matches the vault record. Original bytes are unchanged.")
+    .getByText(
+      "Organized in Obsidian. Uncertainty and original evidence preserved.",
+    )
     .waitFor();
-  await page
-    .getByRole("heading", { name: "Observations (source statements)" })
-    .waitFor();
-  await page.screenshot({
-    type: "jpeg",
-    quality: 92,
-    path: path.join(output, "native-fixture-evidence.jpg"),
-  });
+  await shot("ready");
   await page
     .getByLabel("Your correction")
-    .fill("# Utility meeting\n\nHuman correction: deadline remains unknown.");
+    .fill("# Synthetic meeting\n\nDeadline remains uncertain.");
   await page
     .getByRole("button", { name: "Save correction", exact: true })
     .click();
   await page.getByText(/original source is unchanged/).waitFor();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
-  await page
-    .getByRole("searchbox")
-    .fill("What was going on with that utility delay?");
+  await page.getByRole("tab", { name: "History", exact: true }).click();
+  await page.getByText("Revision 1", { exact: true }).waitFor();
+  await shot("inspection");
+  await page.reload();
+  await page.getByRole("button", { name: "Graph View", exact: true }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Relationship list" }).click();
+  await page.getByRole("region", { name: "Graph relationship list" }).waitFor();
+  await shot("graph");
+  await page.getByRole("button", { name: "Relationship list" }).click();
+  await page.getByRole("searchbox").fill("utility delay");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
-  await page.getByRole("heading", { name: "Source-backed matches" }).waitFor();
-  await page.getByText(source, { exact: true }).waitFor();
-  await page.screenshot({
-    type: "jpeg",
-    quality: 92,
-    path: path.join(output, "native-fixture-search.jpg"),
-  });
-  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Source-backed matches", exact: true })
+    .waitFor();
+  await shot("ask");
+  await page.getByRole("button", { name: "Inspect original evidence" }).click();
+  await page.getByTestId("integrity").waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Zoom in" }).waitFor();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("dialog", { name: "Vault settings" }).waitFor();
   await page.keyboard.press("Escape");
-  if (await page.getByRole("dialog").count())
-    throw Error("Escape did not close settings");
-  await page.getByRole("button", { name: "Capture", exact: true }).click();
-  await page.getByLabel("Optional note").fill("Messy source?");
-  if (await page.getByLabel(/Send this saved source/).isChecked())
-    throw Error("Capture consent was preselected");
-  const calls = await page.evaluate(() => window.__calls);
-  if (calls.some((x) => /processing_|meeting_|librarian_read/.test(x.cmd)))
-    throw Error("UI test made a provider request");
+  await page.getByRole("button", { name: "Timeline", exact: true }).click();
+  await page.getByLabel("Source capture month").selectOption("2026-10");
   await page.getByRole("button", { name: "Home", exact: true }).click();
-  const axe = await new AxeBuilder({ page }).analyze();
-  fs.writeFileSync(
-    path.join(output, "browser-smoke.json"),
-    JSON.stringify(
-      {
-        kind: "Browser UI test with synthetic native IPC fixture, not live providers or native persistence",
-        results,
-        errors,
-        calls,
-        violations: axe.violations.map((v) => ({
-          id: v.id,
-          impact: v.impact,
-          nodes: v.nodes.map((n) => n.target),
-        })),
-      },
-      null,
-      2,
-    ),
-  );
-  process.stdout.write(
-    JSON.stringify({
+  await page.getByRole("button", { name: /Camera ·/ }).click();
+  await page.getByRole("button", { name: "Import photo", exact: true }).click();
+  await page
+    .getByRole("img", { name: "Original photo synthetic-photo.png" })
+    .waitFor();
+  await shot("photo");
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  axe = await new AxeBuilder({ page }).analyze();
+  const calls = await page.evaluate(() => window.__calls);
+  if (calls.some((cmd) => /librarian_read/.test(cmd)))
+    throw Error("Unexpected photo reader request");
+  results.push({
+    viewport: [w, h],
+    violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact })),
+    calls,
+  });
+  await context.close();
+}
+const comparison = await browser.newPage({
+  viewport: { width: 1536, height: 1548 },
+});
+await comparison.setContent(
+  `<style>body{margin:0;background:#eee9e0}h2{font:18px Georgia;margin:12px}img{width:1536px;display:block}</style><h2>Unchanged owner-approved reference · illustrative content</h2><img src="data:image/png;base64,${referenceBytes.toString("base64")}"><h2>Implemented empty native-mode UI · synthetic browser IPC evidence</h2><img src="data:image/jpeg;base64,${fs.readFileSync(path.join(output, "empty-1536.jpg")).toString("base64")}">`,
+);
+await comparison.screenshot({
+  path: path.join(output, "approved-comparison.jpg"),
+  type: "jpeg",
+  quality: 90,
+  fullPage: true,
+});
+fs.writeFileSync(
+  path.join(output, "browser-verification.json"),
+  JSON.stringify(
+    {
+      kind: "Synthetic browser IPC checks; not native persistence, installed Windows, or live-provider acceptance",
+      referenceBlob: "6abf5192ab4ee96708984174ed15e3648c668bf0",
       results,
       errors,
-      violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact })),
-    }) + "\n",
-  );
-  const comparison = await browser.newPage({
-    viewport: { width: 2364, height: 789 },
-    deviceScaleFactor: 1,
-  });
-  const sourcePath = path.join(
-    repo,
-    "docs/assets/recall-desktop-canonical-2026-10-11.png",
-  );
-  await comparison.setContent(
-    `<style>body{margin:0;display:flex}img{width:1182px;height:789px;flex:none}</style><img src="data:image/png;base64,${fs.readFileSync(sourcePath).toString("base64")}"><img src="data:image/jpeg;base64,${fs.readFileSync(path.join(output, "reference-1182.jpg")).toString("base64")}">`,
-  );
-  await comparison.screenshot({
-    type: "jpeg",
-    quality: 92,
-    path: path.join(output, "canonical-comparison.jpg"),
-  });
-  if (
-    errors.length ||
-    results.some((result) => result.errors.length) ||
-    axe.violations.length
-  )
-    throw new Error(
-      "Browser UI verification failed; inspect browser-smoke.json",
-    );
-  await browser.close();
-})();
+    },
+    null,
+    2,
+  ),
+);
+await browser.close();
+if (errors.length || results.some((r) => r.violations.length))
+  throw Error("Browser verification failed");
+process.stdout.write(JSON.stringify({ results, errors }) + "\n");
