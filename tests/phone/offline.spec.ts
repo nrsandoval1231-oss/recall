@@ -180,3 +180,21 @@ test('previously authorized pending processing can resume after desktop restart 
   expect(histories).toHaveLength(1);
   expect(await readFile(join(root, 'Recall/Sources', originals[0]!), 'utf8')).toBe('Synthetic pending interpretation: 5–10 MW?');
 });
+
+test('a library switch removes inspection links for already received copies', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('connection-state')).toContainText('Connected to library');
+  await page.getByLabel('Note, in your words').fill('Synthetic received in original library');
+  await page.getByRole('button', { name: 'Save capture', exact: true }).click();
+  await expect(page.getByTestId('outbox')).toContainText('Received by library');
+  await expect(page.getByRole('link', { name: '· Inspect in library' })).toBeVisible();
+  await stop();
+  const second = await mkdtemp(join(tmpdir(), 'recall-switch-synthetic-'));
+  try {
+    await start(second);
+    await page.getByRole('button', { name: 'Retry queued captures' }).click();
+    await expect(page.getByRole('link', { name: '· Inspect in library' })).toHaveCount(0);
+    await expect(page.getByTestId('outbox')).toContainText('Synthetic received in original library');
+    await expect(page.getByRole('link', { name: 'Save original copy' })).toBeVisible();
+  } finally { await stop(); await rm(second, { recursive: true, force: true }); }
+});

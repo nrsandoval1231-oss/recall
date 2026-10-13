@@ -86,6 +86,9 @@
     if (flushing) return flushing;
     flushing = (async () => {
       const current = await connect();
+      // Received copies retain their original scope even when there is no work
+      // left to send. Remove stale inspection links after a library switch.
+      await render();
       if (!current) return;
       const rows = await storage('captures', 'readonly', s => s.getAll());
       for (const row of rows.filter(r => !r.receipt)) {
