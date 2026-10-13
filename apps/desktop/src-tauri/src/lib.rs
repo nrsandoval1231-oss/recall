@@ -507,6 +507,24 @@ fn memory_ask(
 }
 
 #[tauri::command]
+async fn memory_answer(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    question: String,
+    request_id: String,
+) -> Result<knowledge::MemoryAnswer, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    // Register before the blocking retrieval starts so an immediate cancel
+    // can persist its request tombstone before any model dispatch.
+    let start = knowledge::begin_answer(&vault, &request_id)?;
+    let response = tauri::async_runtime::spawn_blocking(move ||
+        memory_query::answer_with_knowledge(&vault, &question, &request_id, start)
+    ).await.map_err(|_| "Answer worker stopped; local source matches remain available".to_string())??;
+    state.with(&expected_vault_id, |current| if current.id == expected_vault_id { Ok(()) } else { Err("Vault selection changed".into()) })?;
+    Ok(response)
+}
+
+#[tauri::command]
 fn knowledge_status(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String) -> Result<knowledge::KnowledgeStatus, String> {
     let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
     // A status refresh is also the bounded reconnect retry for any pending
@@ -524,6 +542,17 @@ fn knowledge_consent(state: tauri::State<'_, local_vault::LocalVaultState>, expe
         knowledge::refresh(&vault).map_err(|_| "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects.".to_string())?;
     }
     Ok(control)
+}
+#[tauri::command]
+fn knowledge_answer_consent(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, enabled: bool) -> Result<local_vault::KnowledgeControl, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    let control = knowledge::answer_consent(&vault, enabled)?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(control)
+}
+#[tauri::command]
+fn memory_answer_cancel(expected_vault_id: String, request_id: String) -> Result<bool, String> {
+    knowledge::cancel_answer(&expected_vault_id, &request_id)
 }
 #[tauri::command]
 fn knowledge_search(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, query: String, include_history: Option<bool>) -> Result<knowledge::SearchReply, String> {
@@ -587,8 +616,11 @@ pub fn run() {
             meeting_review_status,
             meeting_publish,
             memory_ask,
+            memory_answer,
+            memory_answer_cancel,
             knowledge_status,
             knowledge_consent,
+            knowledge_answer_consent,
             knowledge_search,
             knowledge_dismiss,
             knowledge_rebuild,

@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { KnowledgeSearchReply, LocalVault, SourceAnswer, VaultMemory, VaultStatus } from "../platform/local-vault";
+import type { KnowledgeSearchReply, LocalVault, MemoryAnswer, SourceAnswer, VaultMemory, VaultStatus } from "../platform/local-vault";
 import type { Librarian } from "./librarian";
 import { MemorySurface } from "./MemorySurface";
 
@@ -532,7 +532,7 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
   it("requires reviewed provider disclosure and separate explicit graph consent", async () => {
     const configured = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
     const client = vault({
-      knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Notes and questions may be sent to these providers.", providers: configured, service: { state: "ready", pending: 0, indexed: 0, failed: 0, message: "Ready", providers: configured } })),
+      knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Notes and questions may be sent to these providers.", providers: configured, answer_enabled: false, answer_provider: "provider A", service: { state: "ready", pending: 0, indexed: 0, failed: 0, message: "Ready", providers: configured } })),
       knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 1, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })),
     });
     const user = userEvent.setup(); render(<MemorySurface vault={client} />);
@@ -546,10 +546,55 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
     expect(client.knowledgeConsent).toHaveBeenCalledWith(chosen.vault_id, true, false);
   });
 
+  it("requires separate named-provider approval for quoted answers", async () => {
+    const providers = { extraction: "Anthropic Claude model-x", embedding: "embedder", reranking: "ranker" };
+    const status = vi.fn()
+      .mockResolvedValueOnce({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Graph provider disclosure.", providers, answer_enabled: false, answer_provider: providers.extraction, service: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready", providers } })
+      .mockResolvedValue({ enabled: true, include_existing: false, generation: 2, provider_disclosure: "Graph provider disclosure.", providers, answer_enabled: true, answer_provider: providers.extraction, service: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready", providers } });
+    const answerConsent = vi.fn(async () => ({ version: 2, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 2, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] }));
+    const client = vault({ knowledgeStatus: status, knowledgeAnswerConsent: answerConsent });
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByText(/Configured answer model: Anthropic Claude model-x/);
+    expect(screen.queryByLabelText(/I understand that graph processing/)).toBeNull();
+    expect((screen.getByRole("button", { name: "Enable quoted answers" }) as HTMLButtonElement).disabled).toBe(true);
+    await user.click(screen.getByLabelText(/I approve sending each asked question and its selected current note excerpts/));
+    await user.click(screen.getByRole("button", { name: "Enable quoted answers" }));
+    expect(answerConsent).toHaveBeenCalledWith(chosen.vault_id, true);
+    expect(await screen.findByText(/Enabled for Anthropic Claude model-x/)).toBeTruthy();
+  });
+
+  it("sends quoted answering only after its explicit action and cancels when the question changes", async () => {
+    const source = memory({ note: "Utility late. Crossed out: 8 MW confirmed." });
+    const providers = { extraction: "Anthropic Claude model-x", embedding: "embedder", reranking: "ranker" };
+    const sourceAnswer: SourceAnswer = { question: "utility", message: "Source-backed matches.", hits: [{ memory_id: source.id, revision: source.revision, note_basename: "meeting.md", current_excerpt: source.note, original_excerpt: "Utility late.", source_sha256: source.source_sha256, mime_type: "text/plain" }] };
+    let finish!: (result: MemoryAnswer) => void;
+    const memoryAnswer = vi.fn((_vaultId: string, _question: string, _requestId: string) => new Promise<MemoryAnswer>(resolve => { finish = resolve; }));
+    const client = vault({
+      ask: vi.fn(async () => sourceAnswer),
+      knowledgeStatus: vi.fn(async () => ({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Graph disclosure.", providers, answer_enabled: true, answer_provider: providers.extraction, service: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready", providers } })),
+      memoryAnswer,
+      memoryAnswerCancel: vi.fn(async () => true),
+    }, [source]);
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.type(await screen.findByRole("searchbox", { name: "Ask Recall" }), "utility");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    const answerButton = await screen.findByRole("button", { name: "Answer from notes" });
+    expect(memoryAnswer).not.toHaveBeenCalled();
+    await user.click(answerButton);
+    await screen.findByText("Selecting exact source quotations…");
+    expect(memoryAnswer).toHaveBeenCalledWith(chosen.vault_id, "utility", expect.stringMatching(/^[0-9a-f-]{36}$/i));
+    await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), " changed");
+    expect(client.memoryAnswerCancel).toHaveBeenCalledWith(chosen.vault_id, expect.stringMatching(/^[0-9a-f-]{36}$/i));
+    await act(async () => finish({ sources: sourceAnswer, status: "supported", message: "Selected exact passages from current notes. These quotations are evidence selections, not a verified synthesized answer.", selections: [{ source_id: source.id, revision: source.revision, source_sha256: source.source_sha256, note_sha256: source.source_sha256, quote: "Utility late." }], answer_provider: providers.extraction }));
+    expect(screen.queryByText(/Selected exact passages from current notes/)).toBeNull();
+  });
+
   it("reloads native state after a failed disable and reports remote removal as unconfirmed", async () => {
     const providers = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
     const status = vi.fn(async () => ({ enabled: true, include_existing: true, generation: 4,
       provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
+      answer_enabled: false, answer_provider: "provider A",
       service: { state: "ready", pending: 0, indexed: 2, failed: 0, message: "Ready", providers } }));
     const client = vault({ knowledgeStatus: status,
       knowledgeConsent: vi.fn(async () => { throw new Error("Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects."); }) });
@@ -565,9 +610,11 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
     const providers = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
     const ready = { enabled: true, include_existing: true, generation: 4,
       provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
+      answer_enabled: false, answer_provider: "provider A",
       service: { state: "ready", pending: 0, indexed: 2, failed: 0, message: "Ready", providers } };
     const purging = { enabled: false, include_existing: false, generation: 5,
       provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
+      answer_enabled: false, answer_provider: "provider A",
       service: { state: "purging", pending: 1, indexed: 0, failed: 0, message: "Removal is pending", providers } };
     const status = vi.fn().mockResolvedValueOnce(ready).mockResolvedValue(purging);
     const client = vault({ knowledgeStatus: status,
@@ -582,7 +629,7 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
   });
 
   it("does not offer graph consent when configured providers are unavailable", async () => {
-    const client = vault({ knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Review providers before enabling.", providers: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Local graph service is not configured." } })), knowledgeConsent: vi.fn() });
+    const client = vault({ knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Review providers before enabling.", providers: null, answer_enabled: false, answer_provider: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Local graph service is not configured." } })), knowledgeConsent: vi.fn() });
     const user = userEvent.setup(); render(<MemorySurface vault={client} />);
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     await screen.findByText(/Providers are unavailable or not configured/);
@@ -594,7 +641,7 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
     const providers = { extraction: "extractor", embedding: "embedder", reranking: "ranker" };
     const rebuild = vi.fn(async () => ({ state: "queued", pending: 3, indexed: 4, failed: 0, message: "Rebuild queued", providers }));
     const client = vault({
-      knowledgeStatus: vi.fn(async () => ({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Notes and questions may be sent to configured providers.", providers, service: { state: "ready", pending: 0, indexed: 4, failed: 0, message: "Ready", providers } })),
+      knowledgeStatus: vi.fn(async () => ({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Notes and questions may be sent to configured providers.", providers, answer_enabled: false, answer_provider: "extractor", service: { state: "ready", pending: 0, indexed: 4, failed: 0, message: "Ready", providers } })),
       knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 1, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })),
       knowledgeRebuild: rebuild,
     });

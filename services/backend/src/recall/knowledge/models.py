@@ -59,6 +59,8 @@ class Snapshot(BaseModel):
     eligible_ids: list[str] = Field(max_length=MAX_SOURCES)
     suppressed_facts: list[str] = Field(max_length=10_000)
     rebuild: bool = False
+    answer_allowed: bool = False
+    answer_provider: str = Field(default="", max_length=128)
 
     @field_validator("scope")
     @classmethod
@@ -146,3 +148,99 @@ class Status(BaseModel):
 class SearchResponse(BaseModel):
     status: Status
     relationships: list[Relationship]
+
+
+class AnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: Literal[1]
+    scope: str
+    generation: int = Field(ge=1)
+    request_id: str
+    question: str = Field(max_length=4096)
+    candidate_ids: list[str] = Field(max_length=8)
+
+    @field_validator("scope", "request_id", mode="before")
+    @classmethod
+    def valid_uuid(cls, value: str) -> str:
+        return _uuid(value)
+
+    @field_validator("candidate_ids")
+    @classmethod
+    def valid_candidates(cls, values: list[str]) -> list[str]:
+        ids = [_uuid(value) for value in values]
+        if len(ids) != len(set(ids)):
+            raise ValueError("candidate_ids must be unique")
+        return ids
+
+    @field_validator("question")
+    @classmethod
+    def nonblank_question(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("question must not be blank")
+        return value
+
+
+class AnswerCancelRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: Literal[1]
+    scope: str
+    generation: int = Field(ge=1)
+    request_id: str
+
+    @field_validator("scope", "request_id", mode="before")
+    @classmethod
+    def valid_uuid(cls, value: str) -> str:
+        return _uuid(value)
+
+
+class AnswerSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_id: str
+    revision: int = Field(ge=1)
+    source_sha256: str
+    note_sha256: str
+    quote: str = Field(min_length=1, max_length=800)
+
+    @field_validator("source_id")
+    @classmethod
+    def valid_source(cls, value: str) -> str:
+        return _uuid(value)
+
+    @field_validator("source_sha256", "note_sha256")
+    @classmethod
+    def valid_hash(cls, value: str) -> str:
+        if not SHA256.fullmatch(value):
+            raise ValueError("must be a lowercase SHA-256 hex digest")
+        return value
+
+
+class AnswerResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["supported", "insufficient", "unavailable", "cancelled", "stale"]
+    selections: list[AnswerSelection] = Field(max_length=2)
+    message: str
+
+
+class ModelAnswerSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    source_id: str
+    exact_quote: str = Field(min_length=1, max_length=800)
+
+    @field_validator("source_id")
+    @classmethod
+    def valid_source(cls, value: str) -> str:
+        return _uuid(value)
+
+
+class ModelAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    status: Literal["supported", "insufficient"]
+    selections: list[ModelAnswerSelection] = Field(max_length=2)
+
+    @model_validator(mode="after")
+    def consistent_status(self) -> ModelAnswer:
+        if (self.status == "supported") != bool(self.selections):
+            raise ValueError("supported answers require selections and insufficient answers forbid them")
+        if len({selection.source_id for selection in self.selections}) != len(self.selections):
+            raise ValueError("answer may select at most one quote per source")
+        return self

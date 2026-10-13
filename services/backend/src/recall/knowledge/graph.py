@@ -100,6 +100,16 @@ class GraphAdapter:
             self._clients.clear()
             self._verified_episodes.clear()
 
+    async def flush(self) -> None:
+        """Persist the embedded FalkorDB snapshot before the queue reports success."""
+        if self._db is None:
+            await self.start()
+        client = getattr(self._db, "client", None)
+        save = getattr(client, "save", None)
+        if save is None:
+            raise RuntimeError("Embedded FalkorDB client does not support an awaited SAVE command.")
+        await save()
+
     async def rebuild(self, snapshot: Snapshot) -> None:
         if self._db is None:
             await self.start()
@@ -169,8 +179,14 @@ class GraphAdapter:
                 edge_types=_edge_types(),
                 edge_type_map=_edge_map(),
                 custom_extraction_instructions=(
-                    "Extract only the Recall ontology types. Treat all names and facts as unverified proposals. "
-                    "Do not resolve identity from matching names. Omit unsupported relations."
+                    "Extract only the Recall ontology types. Every entity name, including a Decision, Commitment, "
+                    "or Meeting, must be copied as a contiguous phrase that appears literally in this episode. "
+                    "Never create labels, prepend a type name, or synthesize meeting titles or dates. For example, "
+                    "'use SQLite' or 'SQLite' is valid only when that phrase appears in the episode; "
+                    "'Decision to use SQLite' is invalid unless that full phrase appears. Paraphrases and context "
+                    "may appear only in descriptions or facts, and remain inferred and unverified. Treat all names "
+                    "and facts as unverified proposals. Do not resolve identity from matching names. "
+                    "Omit unsupported relations."
                 ),
             )
 
@@ -244,6 +260,12 @@ class GraphAdapter:
                 continue
             subject_name = str(getattr(subject_node, "name", ""))
             object_name = str(getattr(object_node, "name", ""))
+            subject_type = _node_type(subject_node)
+            object_type = _node_type(object_node)
+            # Count every current episode support before anchoring. Removing a
+            # non-anchoring note here could hide a cross-note Person merge.
+            if _has_ambiguous_person_support(supported_sources, subject_type, object_type):
+                continue
             supported_sources = _anchor_supported_sources(supported_sources, subject_name, object_name)
             if not supported_sources:
                 continue
@@ -276,8 +298,8 @@ class GraphAdapter:
                     source_name=first.source_name,
                     note_path=first.note_path,
                     quote=first.text,
-                    subject_id=_scoped_node_id(scope, getattr(subject_node, "uuid", "")),
-                    object_id=_scoped_node_id(scope, getattr(object_node, "uuid", "")),
+                    subject_id=_relationship_node_id(scope, subject_node, first),
+                    object_id=_relationship_node_id(scope, object_node, first),
                     subject=subject_name,
                     subject_type=_node_type(subject_node),
                     predicate=relation,
@@ -288,7 +310,7 @@ class GraphAdapter:
                     invalid_at=invalid_at,
                     extracted_at=_datetime(getattr(edge, "created_at", None)) or first.updated_at,
                     inferred=True,
-                    uncertainty="Anchored endpoint strings do not verify identity or relation; review source context.",
+                    uncertainty=_relationship_uncertainty(subject_type, object_type),
                     related_source_ids=[s.id for s in supported_sources],
                     supports=supports,
                 )
@@ -355,6 +377,28 @@ def _anchor_supported_sources(sources: list[Source], subject: str, object_: str)
         for source in sources
         if _contains_endpoint_anchor(source.text, subject) and _contains_endpoint_anchor(source.text, object_)
     ]
+
+
+def _has_ambiguous_person_support(sources: list[Source], subject_type: str, object_type: str) -> bool:
+    return len(sources) > 1 and "Person" in {subject_type, object_type}
+
+
+def _relationship_node_id(scope: str, node: Any, source: Source) -> str:
+    upstream_id = str(getattr(node, "uuid", ""))
+    if _node_type(node) == "Person":
+        # Person nodes are source-local mentions until a human identity binding exists.
+        return str(uuid.uuid5(uuid.UUID(scope), f"person:{source.id}:{upstream_id}"))
+    return _scoped_node_id(scope, upstream_id)
+
+
+def _relationship_uncertainty(subject_type: str, object_type: str) -> str:
+    if "Person" in {subject_type, object_type}:
+        return (
+            "Person names are source-local mentions; identity across notes is unverified. "
+            "Human cross-note identity approval is not implemented. "
+            "Anchored endpoint strings do not verify the relation; review source context."
+        )
+    return "Anchored endpoint strings do not verify identity or relation; review source context."
 
 
 def _contains_endpoint_anchor(text: str, endpoint: str) -> bool:

@@ -6,7 +6,7 @@ import { NoteMarkdown, noteSummary } from "./NoteMarkdown";
 import { CaptureCalendar, QuickCards, RecentNotes, memoryTitle } from "./dashboard-parts";
 import { vaultContext, noteBody, noteWithBody, type SourceRow } from "./vault-context";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { KnowledgeRelationship, KnowledgeServiceStatus, KnowledgeStatus, LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
+import type { KnowledgeRelationship, KnowledgeServiceStatus, KnowledgeStatus, LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer, MemoryAnswer } from "../platform/local-vault";
 import { KnowledgePanel } from "./KnowledgePanel";
 import { brooks, FIXTURE_BANNER, fixtureDocuments, fixtureMemory, type FixtureMemory } from "./brooks-fixture";
 import { KEYWORD_LABEL, keywordSearch, type KeywordAnswer } from "./keyword";
@@ -144,11 +144,14 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [panel, setPanel] = useState<Panel>("overview");
   const [answer, setAnswer] = useState<KeywordAnswer | null>(null);
   const [sourceAnswer, setSourceAnswer] = useState<SourceAnswer | null>(null);
+  const [quotedAnswer, setQuotedAnswer] = useState<{ vaultId: string; question: string; requestId: string; result: MemoryAnswer } | null>(null);
+  const [quotedAnswerBusy, setQuotedAnswerBusy] = useState(false);
   const [knowledgeStatus, setKnowledgeStatus] = useState<KnowledgeStatus | null>(null);
   const [knowledgeRows, setKnowledgeRows] = useState<KnowledgeRelationship[]>([]);
   const [knowledgeResultStatus, setKnowledgeResultStatus] = useState<KnowledgeServiceStatus | null>(null);
   const [knowledgeConsentChecked, setKnowledgeConsentChecked] = useState(false);
   const [knowledgeIncludeExisting, setKnowledgeIncludeExisting] = useState(false);
+  const [answerConsentChecked, setAnswerConsentChecked] = useState(false);
   const [knowledgeBusy, setKnowledgeBusy] = useState(false);
   const [processingConsent, setProcessingConsent] = useState(false);
   const [processingState, setProcessingState] = useState("");
@@ -179,6 +182,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   scopeRef.current = selected?.vault_id ?? null;
   const sourceRequest = useRef(0);
   const askRequest = useRef(0);
+  const answerRequest = useRef(0);
+  const activeAnswerRequest = useRef<{ vaultId: string; requestId: string; sequence: number } | null>(null);
   const knowledgeRequest = useRef(0);
   const evidenceRef = useRef<string | null>(null);
   const correctionVersion = useRef(0);
@@ -189,6 +194,38 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     previewRef.current = null; setPreview(null);
   }
   function inScope(vaultId: string) { return alive.current && scopeRef.current === vaultId; }
+  async function cancelMemoryAnswer(explicit = false) {
+    const activeRequest = activeAnswerRequest.current;
+    if (!activeRequest) {
+      if (explicit) setNotice("There is no active quoted-answer request.");
+      return;
+    }
+    activeAnswerRequest.current = null;
+    const sequence = ++answerRequest.current;
+    setQuotedAnswerBusy(false);
+    setQuotedAnswer(null);
+    if (!vault.memoryAnswerCancel) {
+      if (explicit && inScope(activeRequest.vaultId)) setNotice("The answer is no longer shown, but native cancellation is unavailable; provider work or charges may remain.");
+      return;
+    }
+    try {
+      const cancelled = await vault.memoryAnswerCancel(activeRequest.vaultId, activeRequest.requestId);
+      if (explicit && sequence === answerRequest.current && inScope(activeRequest.vaultId)) {
+        setNotice(cancelled
+          ? "The local request was fenced. A provider may still finish work, and any provider charge may remain."
+          : "Cancellation was not confirmed; provider work or charges may remain.");
+      }
+    } catch {
+      if (explicit && sequence === answerRequest.current && inScope(activeRequest.vaultId)) setNotice("Cancellation was not confirmed; provider work or charges may remain.");
+    }
+  }
+  function changeQuestion(value: string) {
+    if (value !== query) {
+      void cancelMemoryAnswer();
+      setQuotedAnswer(null);
+    }
+    setQuery(value);
+  }
   const kept = items.filter(keptMemory);
   const active = kept.filter((memory) => memory.state === "active" && memory.revision > 0 && !memory.conflict);
   const demo = !vault.available;
@@ -199,12 +236,31 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const featured = projectFocus ?? active[0] ?? kept[0] ?? null;
 
   useEffect(() => {
+    if (!quotedAnswer) return;
+    const stillCurrent = quotedAnswer.vaultId === selected?.vault_id && quotedAnswer.question === query.trim()
+      && quotedAnswer.result.selections.every(selection => active.some(memory => memory.id === selection.source_id
+        && memory.revision === selection.revision && memory.source_sha256 === selection.source_sha256));
+    if (!stillCurrent) setQuotedAnswer(null);
+  }, [items, query, quotedAnswer, selected?.vault_id]);
+
+  useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
       if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
     };
   }, []);
+
+  useEffect(() => {
+    const vaultId = selected?.vault_id;
+    return () => {
+      const activeRequest = activeAnswerRequest.current;
+      if (!vaultId || activeRequest?.vaultId !== vaultId) return;
+      activeAnswerRequest.current = null;
+      answerRequest.current += 1;
+      if (vault.memoryAnswerCancel) void vault.memoryAnswerCancel(vaultId, activeRequest.requestId).catch(() => undefined);
+    };
+  }, [selected?.vault_id, vault.memoryAnswerCancel]);
 
   useEffect(() => {
     if (!vault.available) return;
@@ -252,11 +308,11 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
 
   function openSettings() {
     settingsTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setVaultSettings(true); setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false);
+    setVaultSettings(true); setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false); setAnswerConsentChecked(false);
     if (!selected || !vault.knowledgeStatus) { setKnowledgeStatus(null); return; }
     const vaultId = selected.vault_id;
     void vault.knowledgeStatus(vaultId).then(next => { if (inScope(vaultId)) setKnowledgeStatus(next); }).catch(() => {
-      if (inScope(vaultId)) setKnowledgeStatus({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Graph knowledge is unavailable. Keyword search remains available.", providers: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Graph knowledge is unavailable. Keyword search remains available." } });
+      if (inScope(vaultId)) setKnowledgeStatus({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Graph knowledge is unavailable. Keyword search remains available.", providers: null, answer_enabled: false, answer_provider: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Graph knowledge is unavailable. Keyword search remains available." } });
     });
   }
   function closeSettings() { setVaultSettings(false); settingsTrigger.current?.focus(); }
@@ -283,7 +339,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       askRef.current?.focus();
       return;
     }
-    if (section === "ask") setBusy(false);
+    if (section === "ask") { setBusy(false); void cancelMemoryAnswer(); setQuotedAnswer(null); }
     setSection(next);
     evidenceRef.current = null; sourceRequest.current += 1; askRequest.current += 1;
     setEvidenceId(null);
@@ -292,7 +348,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     if (!organizationActive()) setProcessingState("");
     knowledgeRequest.current += 1; setKnowledgeRows([]); setKnowledgeResultStatus(null); setKnowledgeBusy(false);
     setAnswer(null);
-    setSourceAnswer(null);
+    setSourceAnswer(null); setQuotedAnswer(null);
     setVaultHits(null);
     if (next === "home" || next === "projects" || next === "organizations") { setPanel("overview"); setDetail(null); }
     if (next === "topics") { setPanel("topics"); setDetail(null); }
@@ -336,26 +392,49 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       const next = await vault.knowledgeStatus?.(vaultId);
       if (inScope(vaultId) && next) setKnowledgeStatus(next);
       setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false);
-      setNotice(enabled ? "Connected knowledge consent saved. Existing notes are included only if you selected them." : "Connected knowledge is disabled locally; remote removal was requested. The index may take time to clear. Keyword search remains available.");
+      setAnswerConsentChecked(false);
+      if (!enabled) { void cancelMemoryAnswer(); setQuotedAnswer(null); }
+      setNotice(enabled ? "Connected knowledge consent saved. Existing notes are included only if you selected them." : "Connected knowledge and quoted answers are disabled locally. Remote removal was requested; in-flight provider work or costs may remain until cancellation is confirmed. Keyword search remains available.");
     } catch (knowledgeError) {
       if (!inScope(vaultId)) return;
       const failure = message(knowledgeError);
       const remoteUnconfirmed = !enabled && failure.toLowerCase().includes("locally disabled");
       if (remoteUnconfirmed) {
         setKnowledgeConsentChecked(false);
-        setKnowledgeStatus(current => current ? { ...current, enabled: false, include_existing: false, service: { ...current.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } } : current);
+        setAnswerConsentChecked(false); void cancelMemoryAnswer(); setQuotedAnswer(null);
+        setKnowledgeStatus(current => current ? { ...current, enabled: false, include_existing: false, answer_enabled: false, service: { ...current.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } } : current);
       }
       // Reload native state even on rejection: a revocation error can mean the
       // durable local fence committed while loopback cancellation did not.
       try {
         const next = await vault.knowledgeStatus?.(vaultId);
         if (inScope(vaultId) && next) setKnowledgeStatus(remoteUnconfirmed
-          ? { ...next, enabled: false, include_existing: false, service: { ...next.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } }
+          ? { ...next, enabled: false, include_existing: false, answer_enabled: false, service: { ...next.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } }
           : next);
       } catch { /* retain the explicit disabled-but-unconfirmed state above */ }
       if (inScope(vaultId)) setError(remoteUnconfirmed ? "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects." : failure);
     }
     finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
+  }
+
+  async function updateAnswerConsent(enabled: boolean) {
+    if (!selected || !vault.knowledgeAnswerConsent) return;
+    const vaultId = selected.vault_id;
+    setKnowledgeBusy(true); setError("");
+    try {
+      await vault.knowledgeAnswerConsent(vaultId, enabled);
+      if (!inScope(vaultId)) return;
+      if (!enabled) { void cancelMemoryAnswer(); setQuotedAnswer(null); }
+      const next = await vault.knowledgeStatus?.(vaultId);
+      if (!inScope(vaultId)) return;
+      if (next) setKnowledgeStatus(next);
+      setAnswerConsentChecked(false);
+      setNotice(enabled
+        ? `Quoted-answer consent saved for ${next?.answer_provider ?? "the configured answer provider"}. Each answer still requires your separate action.`
+        : "Quoted answers are disabled locally. In-flight provider work or costs may remain until cancellation is confirmed.");
+    } catch (consentError) {
+      if (inScope(vaultId)) setError(message(consentError));
+    } finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
   }
 
   async function rebuildKnowledge() {
@@ -417,6 +496,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
 
   async function ask(event: { preventDefault(): void }) {
     event.preventDefault();
+    void cancelMemoryAnswer(); setQuotedAnswer(null);
     const request = ++askRequest.current;
     evidenceRef.current = null; sourceRequest.current += 1;
     setError("");
@@ -434,7 +514,11 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       if (vault.ask) {
         const response = await vault.ask(selected.vault_id, query);
         if (!inScope(selected.vault_id) || request !== askRequest.current) return;
-        setSourceAnswer(response); setVaultHits(null); setAnswer(null); return;
+        setSourceAnswer(response); setVaultHits(null); setAnswer(null);
+        if (vault.knowledgeStatus) void vault.knowledgeStatus(selected.vault_id).then(next => {
+          if (inScope(selected.vault_id) && request === askRequest.current) setKnowledgeStatus(next);
+        }).catch(() => undefined);
+        return;
       }
       const hits = await vault.list(selected.vault_id, query);
       if (!inScope(selected.vault_id) || request !== askRequest.current) return;
@@ -444,6 +528,35 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       if (inScope(selected.vault_id) && request === askRequest.current) setError(message(askError));
     } finally {
       if (inScope(selected.vault_id) && request === askRequest.current) setBusy(false);
+    }
+  }
+
+  async function answerFromNotes() {
+    if (!selected || demo || !query.trim() || !vault.memoryAnswer || !knowledgeStatus?.answer_enabled || !knowledgeStatus.answer_provider) return;
+    if (activeAnswerRequest.current) return;
+    const requestId = globalThis.crypto?.randomUUID?.();
+    if (!requestId) { setError("This device cannot create an answer request id. Nothing was sent."); return; }
+    const vaultId = selected.vault_id, question = query.trim(), sequence = ++answerRequest.current;
+    activeAnswerRequest.current = { vaultId, requestId, sequence };
+    setQuotedAnswer(null); setQuotedAnswerBusy(true); setError(""); setNotice("");
+    try {
+      const response = await vault.memoryAnswer(vaultId, question, requestId);
+      if (!inScope(vaultId) || answerRequest.current !== sequence || activeAnswerRequest.current?.requestId !== requestId) return;
+      const currentProvider = knowledgeStatus.answer_provider;
+      const selectionsAreCurrent = response.selections.every(selection => active.some(memory =>
+        memory.id === selection.source_id && memory.revision === selection.revision && memory.source_sha256 === selection.source_sha256));
+      const providerChanged = response.status === "supported" && response.answer_provider !== currentProvider;
+      const result = !selectionsAreCurrent || providerChanged
+        ? { ...response, status: "stale", message: "A source or approved provider changed while answering. No quotations are shown; run Ask again after reviewing Settings.", selections: [] }
+        : response;
+      setQuotedAnswer({ vaultId, question, requestId, result });
+    } catch (answerError) {
+      if (inScope(vaultId) && answerRequest.current === sequence) setError(message(answerError));
+    } finally {
+      if (activeAnswerRequest.current?.requestId === requestId) {
+        activeAnswerRequest.current = null;
+        setQuotedAnswerBusy(false);
+      }
     }
   }
 
@@ -751,6 +864,22 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     timer = window.setTimeout(() => void poll(), 2_000);
     return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };
   }, [activeKnowledgeKey, activeKnowledgeStatus?.pending, activeKnowledgeStatus?.failed, activeKnowledgeStatus?.state, knowledgePollable, section, sourceAnswer?.question, selected?.vault_id, vault.knowledgeSearch]);
+  const currentQuotedAnswer = quotedAnswer && selected?.vault_id === quotedAnswer.vaultId && query.trim() === quotedAnswer.question
+    && quotedAnswer.result.selections.every(selection => active.some(memory => memory.id === selection.source_id
+      && memory.revision === selection.revision && memory.source_sha256 === selection.source_sha256))
+    ? quotedAnswer.result : null;
+  const quotedAnswerPanel = selected && !demo && query.trim() && vault.memoryAnswer ? <section className="ms-knowledge-settings" aria-label="Quoted answer from notes">
+    <h2>Quoted answer from notes</h2>
+    {knowledgeStatus?.answer_enabled && knowledgeStatus.answer_provider
+      ? <><p className="ms-fine">Each request sends this question and the selected current note excerpts to {knowledgeStatus.answer_provider}. Recall shows exact source quotations, not a verified synthesized answer.</p>
+        {!quotedAnswerBusy && <button type="button" onClick={() => void answerFromNotes()}>Answer from notes</button>}</>
+      : <p role="status">Quoted answers are off. Review Settings to separately approve a configured answer provider; keyword search remains available.</p>}
+    {quotedAnswerBusy && <><p role="status">Selecting exact source quotations…</p><button type="button" onClick={() => void cancelMemoryAnswer(true)}>Cancel answer</button></>}
+    {currentQuotedAnswer && <article className="ms-hit" aria-label="Quoted answer result"><h3>{currentQuotedAnswer.status === "supported" ? "Selected source quotations" : "No supported quoted answer"}</h3><p>{currentQuotedAnswer.message}</p>{currentQuotedAnswer.answer_provider && <small>Provider: {currentQuotedAnswer.answer_provider}</small>}{currentQuotedAnswer.selections.map(selection => {
+      const memory = active.find(row => row.id === selection.source_id && row.revision === selection.revision && row.source_sha256 === selection.source_sha256);
+      return <div key={`${selection.source_id}:${selection.revision}:${selection.source_sha256}`}><blockquote>{selection.quote}</blockquote>{memory && <><p>{memoryTitle(memory)} · revision {selection.revision}</p><button type="button" onClick={() => void openVaultMemory(memory)}>Inspect supporting note and original</button></>}</div>;
+    })}</article>}
+  </section> : null;
   const ticks: TimelineTick[] = demo ? board.months.map((month) => ({ id: month, label: month })) : vaultTicks(vaultMemories);
   const activeMonth = focusMonth && ticks.some((tick) => tick.id === focusMonth) ? focusMonth : (demo ? board.marker : ticks[ticks.length - 1]?.id ?? "");
   const activeLabel = ticks.find((tick) => tick.id === activeMonth)?.label ?? activeMonth;
@@ -785,13 +914,13 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               <form className="ms-ask" role="search" onSubmit={(event) => void ask(event)}>
                 <SearchIcon />
                 <label className="ms-sr" htmlFor="recall-ask">Ask Recall</label>
-                <input id="recall-ask" ref={askRef} type="search" value={query} placeholder="Ask Recall anything about your notes, projects, people, or business…" onChange={(event) => setQuery(event.target.value)} />
+                <input id="recall-ask" ref={askRef} type="search" value={query} placeholder="Ask Recall anything about your notes, projects, people, or business…" onChange={(event) => changeQuestion(event.target.value)} />
                 <button type="submit" disabled={busy} aria-label="Ask"><ArrowRightIcon aria-hidden="true" /></button>
               </form>
               <button className="ms-mic" type="button" disabled aria-label="Voice ask is not available in this build"><WaveIcon /></button>
             </div>
           </header>
-          <div className="ms-prompts" aria-label="Ask suggestions">{["Find my meeting notes", "What needs a follow-up?", "Find project notes", "Show decisions from this month"].map(prompt => <button type="button" key={prompt} onClick={() => { setQuery(prompt); askRef.current?.focus(); }}>{prompt}</button>)}</div>
+          <div className="ms-prompts" aria-label="Ask suggestions">{["Find my meeting notes", "What needs a follow-up?", "Find project notes", "Show decisions from this month"].map(prompt => <button type="button" key={prompt} onClick={() => { changeQuestion(prompt); askRef.current?.focus(); }}>{prompt}</button>)}</div>
 
           {section === "evidence" ? (
             <>
@@ -871,7 +1000,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                 {!demo && !context.people.length && !context.places.length && !context.related.length && <div className="ms-side"><ContextCard title="Key People" icon={<PeopleMark />} onView={() => go("people")}><p className="ms-fine">People mentioned in your organized notes will appear here.</p></ContextCard><ContextCard title="Key Locations" icon={<LocationMark />} onView={() => go("places")}><p className="ms-fine">Your notes bring the places into focus.</p></ContextCard></div>}
                 <div className="ms-center">
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
-                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{items.find(row => row.id === hit.memory_id) ? memoryTitle(items.find(row => row.id === hit.memory_id)!) : hit.note_basename}</h2><NoteMarkdown>{noteBody({ id: hit.memory_id, note: hit.current_excerpt })}</NoteMarkdown><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}{sourceAnswer.knowledge_status && <KnowledgePanel key={`${selected?.vault_identity ?? "no-vault"}:ask:${sourceAnswer.question}`} relationships={sourceAnswer.graph_relationships ?? []} status={sourceAnswer.knowledge_status} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
+                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{items.find(row => row.id === hit.memory_id) ? memoryTitle(items.find(row => row.id === hit.memory_id)!) : hit.note_basename}</h2><NoteMarkdown>{noteBody({ id: hit.memory_id, note: hit.current_excerpt })}</NoteMarkdown><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}{sourceAnswer.knowledge_status && <KnowledgePanel key={`${selected?.vault_identity ?? "no-vault"}:ask:${sourceAnswer.question}`} relationships={sourceAnswer.graph_relationships ?? []} status={sourceAnswer.knowledge_status} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}{quotedAnswerPanel}</div> : <><AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} />{quotedAnswerPanel}</> : (
                     <>
                       <div className="ms-project-head">
                         <p className="ms-kicker"><ProjectMark />{demo ? board.kicker : "MEMORY"}</p>
@@ -930,6 +1059,13 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               {!knowledgeStatus.enabled && !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim()) && <p role="status">Providers are unavailable or not configured. Keyword search still works; connected knowledge cannot be enabled yet.</p>}
               <button type="button" disabled={knowledgeBusy || (!knowledgeStatus.enabled && (!knowledgeConsentChecked || !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim())))} onClick={() => void updateKnowledgeConsent(!knowledgeStatus.enabled)}>{knowledgeStatus.enabled ? "Disable connected knowledge" : "Enable connected knowledge"}</button>
               {knowledgeStatus.enabled && vault.knowledgeRebuild && <><p>Rebuild reprocesses only notes already allowed by your current consent. Provider charges may apply.</p><button type="button" disabled={knowledgeBusy} onClick={() => void rebuildKnowledge()}>Rebuild connected knowledge</button></>}</> : <p role="status">Loading connected knowledge configuration…</p>}
+            </section>}
+            {selected && knowledgeStatus && vault.knowledgeAnswerConsent && <section className="ms-knowledge-settings" aria-label="Quoted answer settings"><h3>Quoted answers</h3>
+              <p>Separate opt-in: when requested, Recall sends your question and selected current note excerpts to the named answer model. The model can select exact quotations; it cannot write a synthesized answer. This setting does not follow graph-processing consent.</p>
+              {!knowledgeStatus.enabled ? <p role="status">Enable connected knowledge first, then review and separately approve a configured answer model here.</p>
+                : knowledgeStatus.answer_enabled && knowledgeStatus.answer_provider ? <><p role="status">Enabled for {knowledgeStatus.answer_provider}. Every question still requires the Answer from notes action.</p><button type="button" disabled={knowledgeBusy} onClick={() => void updateAnswerConsent(false)}>Disable quoted answers</button><p className="ms-fine">Disabling fences new local requests. In-flight provider work or charges may remain until cancellation is confirmed.</p></>
+                  : knowledgeStatus.answer_provider ? <><p>Configured answer model: {knowledgeStatus.answer_provider}. A changed provider identity requires fresh approval.</p><label className="ms-check"><input type="checkbox" checked={answerConsentChecked} onChange={event => setAnswerConsentChecked(event.target.checked)} /> I approve sending each asked question and its selected current note excerpts to {knowledgeStatus.answer_provider} for exact quotation selection.</label><button type="button" disabled={knowledgeBusy || !answerConsentChecked} onClick={() => void updateAnswerConsent(true)}>Enable quoted answers</button></>
+                    : <p role="status">No configured answer model is available. Keyword Ask and relationship browsing remain available.</p>}
             </section>}
           </div></div>}
         </div>

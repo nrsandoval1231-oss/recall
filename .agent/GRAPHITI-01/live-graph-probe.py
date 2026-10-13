@@ -1,5 +1,5 @@
 """Real Graphiti synthetic ingestion/retrieval probe; no application mocks."""
-import asyncio,json,os,sys,hashlib,sqlite3,traceback
+import asyncio,json,os,sys,hashlib,sqlite3
 from datetime import datetime,timezone
 from pathlib import Path
 os.environ.update(json.loads(sys.stdin.readline()))
@@ -29,7 +29,6 @@ async def run():
         assert not stale, 'Unknown source must suppress every relationship'
         print(json.dumps({'checks':'PASS','persisted_exploration':len(listed),'foreign_scope':len(foreign),'unknown_sources':len(stale)}),flush=True)
     except Exception as e:
-        traceback.print_exc()
         print(json.dumps({'state':'FAIL','error_type':type(e).__name__}),flush=True)
         raise SystemExit(1)
     finally:

@@ -7,6 +7,7 @@
 //! address or loopback unless every interface is explicitly allowed.
 
 use crate::local_vault::{Vault, VaultMemory};
+use sha2::{Digest, Sha256};
 use std::collections::VecDeque;
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -133,7 +134,7 @@ fn serve_one(
         .to_string();
     let limited = match (method.as_str(), path.as_str()) {
         ("POST", "/capture") => !captures.allow(Instant::now()),
-        ("POST", "/ask") => !asks.allow(Instant::now()),
+        ("POST", "/ask" | "/answer") => !asks.allow(Instant::now()),
         _ => false,
     };
     let headers: Vec<(String, String)> = request
@@ -258,7 +259,7 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
     }
     match (request.method, path) {
         ("GET" | "HEAD", "/" | "/index.html") => html(200, home_page()),
-        ("GET" | "HEAD", "/ask" | "/capture") => html(
+        ("GET" | "HEAD", "/ask" | "/capture" | "/answer") => html(
             405,
             page(
                 "Use Capture and Ask",
@@ -291,6 +292,13 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                 return response;
             }
             ask(root, request)
+        }
+        ("POST", "/answer") => {
+            if query_contains_question(query) {
+                return html(400, page("Answer from notes", "<h1>Answer from notes</h1><p>The question stays in the form, not in the address.</p><p><a href=\"/\">Back</a></p>"));
+            }
+            if let Err(response) = same_origin(request.headers) { return response; }
+            answer(root, request)
         }
         ("GET" | "HEAD", path) if path.starts_with("/saved/") => {
             saved(root, &path["/saved/".len()..])
@@ -663,6 +671,122 @@ fn ask(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
     )
 }
 
+fn answer(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
+    let (question, request_id) = match read_answer_request(request) {
+        Ok(form) => form,
+        Err(err) => return html(err.status, page("Answer from notes", &format!("<h1>Answer from notes</h1><p>{}</p>{}", esc(&err.message), ask_form("")))),
+    };
+    let vault = match Vault::open(root) {
+        Ok(vault) => vault,
+        Err(err) => return vault_page(err),
+    };
+    let start = match crate::knowledge::begin_answer(&vault, &request_id) {
+        Ok(start) => start,
+        Err(err) => return html(400, page("Answer from notes", &format!("<h1>Answer from notes</h1><p>{}</p>{}", esc(&err), ask_form(&question)))),
+    };
+    let mut result = match crate::memory_query::answer_with_knowledge(&vault, &question, &request_id, start) {
+        Ok(result) => result,
+        Err(err) => return html(200, page("Answer from notes", &format!("<h1>Answer from notes</h1><p>{}</p>{}", esc(&err), ask_form(&question)))),
+    };
+    let verified_sources = if result.status == "supported" {
+        match verify_answer_sources(&vault, &result.selections) {
+            Some(sources) => sources,
+            None => {
+                result.status = "stale".into();
+                result.message = "A source changed before the phone could display the result. No quotations are shown; search again.".into();
+                result.selections.clear();
+                Vec::new()
+            }
+        }
+    } else { Vec::new() };
+    let rendered = render_memory_answer(result, &verified_sources);
+    html(200, page("Answer from notes", &format!("{rendered}{}", ask_form(&question))))
+}
+
+fn read_answer_request(request: &PhoneRequest<'_>) -> Result<(String, String), FormError> {
+    let content_type = header(request.headers, "content-type").unwrap_or("").to_ascii_lowercase();
+    if !content_type.starts_with("application/x-www-form-urlencoded") {
+        return Err(FormError { status: 400, message: "Use the Answer from notes form.".into() });
+    }
+    if request.body.len() > MAX_QUESTION + 256 {
+        return Err(FormError { status: 400, message: "That question is too long to answer.".into() });
+    }
+    let text = std::str::from_utf8(request.body).map_err(|_| FormError { status: 400, message: "The answer form is not UTF-8.".into() })?;
+    let question = unique_form_value(text, "q")?;
+    let request_id = unique_form_value(text, "request_id")?;
+    if question.trim().is_empty() || question.len() > MAX_QUESTION || question.chars().any(char::is_control) {
+        return Err(FormError { status: 400, message: "Ask a bounded memory question.".into() });
+    }
+    let parsed = Uuid::parse_str(&request_id).map_err(|_| FormError { status: 400, message: "The answer request ID is invalid.".into() })?;
+    if parsed.to_string() != request_id {
+        return Err(FormError { status: 400, message: "The answer request ID is invalid.".into() });
+    }
+    Ok((question, request_id))
+}
+
+fn unique_form_value(body: &str, key: &str) -> Result<String, FormError> {
+    let mut found = None;
+    for pair in body.split('&').filter(|pair| !pair.is_empty()) {
+        let (raw_key, raw_value) = pair.split_once('=').unwrap_or((pair, ""));
+        let decoded_key = url_decode(raw_key).map_err(|message| FormError { status: 400, message })?;
+        if decoded_key != key { continue; }
+        if found.is_some() { return Err(FormError { status: 400, message: format!("The answer form contains duplicate {key} fields.") }); }
+        found = Some(url_decode(raw_value).map_err(|message| FormError { status: 400, message })?);
+    }
+    found.ok_or_else(|| FormError { status: 400, message: format!("The answer form is missing {key}.") })
+}
+
+fn answer_form(question: &str, request_id: &str, provider: &str) -> String {
+    format!("<section aria-label=\"Quoted answer request\"><p>Answer from notes sends this question and its selected current note excerpts to <strong>{}</strong>. Recall shows exact quotations, not a synthesized or verified answer. Provider charges may apply.</p><form method=\"post\" action=\"/answer\"><input type=\"hidden\" name=\"q\" value=\"{}\"><input type=\"hidden\" name=\"request_id\" value=\"{}\"><button class=\"secondary\" type=\"submit\">Answer from notes</button></form></section>", esc(provider), esc(question), esc(request_id))
+}
+
+fn answer_offer(vault: &Vault, question: &str) -> String {
+    match crate::knowledge::status(vault) {
+        Ok(status) if status.answer_enabled => match status.answer_provider.as_deref() {
+            Some(provider) => answer_form(question, &Uuid::new_v4().to_string(), provider),
+            None => "<p class=\"fine\">Quoted answers are unavailable because the configured provider identity could not be confirmed.</p>".into(),
+        },
+        Ok(_) => "<p class=\"fine\">Quoted answers are off. Enable them separately in desktop Settings; this phone cannot change provider consent.</p>".into(),
+        Err(_) => "<p class=\"fine\">Quoted-answer consent could not be checked. No model answer is available.</p>".into(),
+    }
+}
+
+struct VerifiedPhoneAnswerSource { memory: VaultMemory, source_sha256: String }
+
+fn verify_answer_sources(vault: &Vault, selections: &[crate::knowledge::AnswerSelection]) -> Option<Vec<VerifiedPhoneAnswerSource>> {
+    let mut verified = Vec::with_capacity(selections.len());
+    for selection in selections {
+        let snapshot = vault.processing_snapshot(&selection.source_id, selection.revision).ok()?;
+        let note_sha256 = hex::encode(Sha256::digest(snapshot.memory.note.as_bytes()));
+        if snapshot.memory.id != selection.source_id || snapshot.memory.revision != selection.revision
+            || snapshot.memory.state != "active" || snapshot.memory.conflict.is_some()
+            || snapshot.source.sha256 != selection.source_sha256 || note_sha256 != selection.note_sha256 {
+            return None;
+        }
+        verified.push(VerifiedPhoneAnswerSource { memory: snapshot.memory, source_sha256: snapshot.source.sha256 });
+    }
+    if verified.is_empty() { None } else { Some(verified) }
+}
+
+fn render_memory_answer(mut answer: crate::knowledge::MemoryAnswer, current: &[VerifiedPhoneAnswerSource]) -> String {
+    let selections = if answer.status == "supported" { answer.selections.as_slice() } else { &[] };
+    let mut cards = String::new();
+    for selection in selections {
+        let source = current.iter().find(|source| source.memory.id == selection.source_id && source.memory.revision == selection.revision && source.source_sha256 == selection.source_sha256);
+        let Some(source) = source else { continue };
+        let memory = &source.memory;
+        cards.push_str(&format!("<article><h2>Exact passage from {}</h2><blockquote>{}</blockquote><p class=\"path\">Note revision {} · {}</p><p class=\"path\">SHA-256: {}</p><p><a href=\"/saved/{}\">Inspect supporting note and original</a></p></article>",
+            esc(memory.note_path.as_deref().unwrap_or("Captured note")), esc(&selection.quote), selection.revision,
+            esc(memory.note_path.as_deref().unwrap_or("Captured note")), esc(&source.source_sha256), esc(&memory.id)));
+    }
+    if answer.status == "supported" && cards.is_empty() {
+        answer.status = "stale".into();
+        answer.message = "A source changed before display. No quotations are shown; search again.".into();
+    }
+    let provider = answer.answer_provider.as_deref().map(|value| format!("<p class=\"fine\">Answer provider: {}</p>", esc(value))).unwrap_or_default();
+    format!("<section aria-label=\"Quoted answer result\"><h1>Quoted answer from notes</h1><p class=\"fine\">Status: {}</p><p>{}</p>{cards}{provider}<p class=\"fine\">These are exact source quotations selected from current notes, not a verified synthesized answer.</p></section>", esc(&answer.status), esc(&answer.message))
+}
+
 fn read_question(request: &PhoneRequest<'_>) -> Result<String, FormError> {
     let content_type = header(request.headers, "content-type").unwrap_or("");
     let question = if content_type.to_ascii_lowercase().starts_with("multipart/") {
@@ -704,7 +828,7 @@ fn source_answer(vault: &Vault, question: &str) -> Result<String, String> {
         return Ok(abstain("Type a question to search the notes."));
     }
     let answer = crate::memory_query::ask_with_knowledge(vault, question)?;
-    Ok(render_source_answer(answer))
+    Ok(format!("{}{}", render_source_answer(answer), answer_offer(vault, question)))
 }
 
 fn render_source_answer(answer: crate::memory_query::Answer) -> String {
@@ -891,7 +1015,7 @@ fn home_page() -> String {
     page(
         "Recall",
         &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} This retrieves sources; it does not create a generated answer. Enabled graph processing may send the question to disclosed providers.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} This retrieves sources; it does not create a generated answer. Enabled graph processing may send the question to disclosed providers. Quoted answers require separate approval in desktop Settings; this phone cannot enable that consent.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
             capture_form(&Uuid::new_v4().to_string(), ""),
             ask_form("")
         ),
@@ -1461,7 +1585,7 @@ fn startup_banner(root: &Path, vault_id: &str, choice: &BindChoice) -> String {
         BindMode::AllInterfaces => "Reach: every network interface. Tailscale ACLs do not protect a LAN or public address. Do not use this if any interface is reachable from a network you do not trust.",
     };
     format!(
-        "Recall phone companion\nVault: {}\nVault id: {vault_id}\nOpen: {}\n{reach}\nNo login page. No API key in the page. Claude is not called from this process.\nHTTPS certificates, an offline phone queue, and Claude-from-the-phone are not part of this process.",
+        "Recall phone companion\nVault: {}\nVault id: {vault_id}\nOpen: {}\n{reach}\nNo login page. No API key in the page. Answer requests use the configured local service only after separate desktop consent; the phone does not call providers directly.\nHTTPS certificates and an offline phone queue are not provided.",
         root.display(),
         http_url(choice.addr)
     )
@@ -1537,6 +1661,105 @@ mod tests {
         assert!(body.contains("&lt;unsafe&gt;"));
         assert!(!body.contains("Nothing new was written"));
     }
+    #[test]
+    fn phone_answer_form_escapes_values_and_never_changes_consent() {
+        let form = answer_form(
+            "<script>alert(1)</script>",
+            "00000000-0000-4000-8000-000000000001",
+            "<img src=x>",
+        );
+        assert!(form.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+        assert!(form.contains("&lt;img src=x&gt;"));
+        assert!(!form.contains("<script>"));
+        assert!(!form.contains("<img"));
+        assert!(!form.contains("consent"));
+
+        let dir = TempDir::new();
+        let response = call(
+            &dir.0,
+            "POST",
+            "/answer",
+            &[("content-type", "application/x-www-form-urlencoded")],
+            format!("q=hello&request_id={}", Uuid::new_v4()).as_bytes(),
+        );
+        assert_eq!(response.status, 200, "{}", text(&response));
+        let body = text(&response);
+        assert!(body.contains("Model answers are unavailable"));
+        assert!(!body.contains("<script>"));
+        assert!(body.contains("Search notes"));
+    }
+
+    #[test]
+    fn phone_answer_rejects_cross_site_and_ambiguous_requests() {
+        let dir = TempDir::new();
+        let denied = call(
+            &dir.0,
+            "POST",
+            "/answer",
+            &[("host", "127.0.0.1:8787"), ("origin", "https://evil.example")],
+            b"q=hello&request_id=00000000-0000-4000-8000-000000000001",
+        );
+        assert_eq!(denied.status, 403);
+        assert!(!dir.0.join("Recall").exists());
+
+        let duplicate = read_answer_request(&PhoneRequest {
+            method: "POST", target: "/answer", headers: &[("content-type", "application/x-www-form-urlencoded")],
+            body: b"q=one&q=two&request_id=00000000-0000-4000-8000-000000000001",
+        }).unwrap_err();
+        assert!(duplicate.message.contains("duplicate q"));
+        let invalid_uuid = read_answer_request(&PhoneRequest {
+            method: "POST", target: "/answer", headers: &[("content-type", "application/x-www-form-urlencoded")],
+            body: b"q=one&request_id=not-a-uuid",
+        }).unwrap_err();
+        assert!(invalid_uuid.message.contains("request ID is invalid"));
+    }
+
+    #[test]
+    fn phone_answer_revalidates_captured_text_using_native_source_snapshot_hash() {
+        let dir = TempDir::new();
+        let vault = Vault::open(&dir.0).unwrap();
+        let note = "Project Aurora is led by Alice Chen.";
+        let memory = vault.capture_note(&Uuid::new_v4().to_string(), note).unwrap();
+        let snapshot = vault.processing_snapshot(&memory.id, memory.revision).unwrap();
+        let source = vault.source(&memory.id).unwrap();
+        assert_eq!(memory.source_sha256, hex::encode(Sha256::digest(b"")));
+        assert_ne!(memory.source_sha256, source.sha256);
+        assert_eq!(snapshot.source.sha256, source.sha256);
+
+        let selection = crate::knowledge::AnswerSelection {
+            source_id: memory.id.clone(),
+            revision: memory.revision,
+            source_sha256: source.sha256.clone(),
+            note_sha256: hex::encode(Sha256::digest(note.as_bytes())),
+            quote: "Project Aurora is led by Alice Chen.".into(),
+        };
+        let verified = verify_answer_sources(&vault, std::slice::from_ref(&selection))
+            .expect("current text capture should verify against its immutable native source");
+        assert_eq!(verified[0].source_sha256, source.sha256);
+
+        let answer = crate::knowledge::MemoryAnswer {
+            sources: crate::memory_query::Answer {
+                question: "Who works on Project Aurora?".into(),
+                message: "Local match found.".into(),
+                hits: Vec::new(),
+                knowledge_status: None,
+                graph_relationships: Vec::new(),
+            },
+            status: "supported".into(),
+            message: "Selected exact passages from current notes.".into(),
+            selections: vec![selection.clone()],
+            answer_provider: Some("synthetic-test-provider".into()),
+        };
+        let rendered = render_memory_answer(answer, &verified);
+        assert!(rendered.contains("Project Aurora is led by Alice Chen."));
+        assert!(rendered.contains(&source.sha256));
+        assert!(!rendered.contains("Status: stale"));
+
+        let mut wrong_source_hash = selection;
+        wrong_source_hash.source_sha256 = memory.source_sha256;
+        assert!(verify_answer_sources(&vault, &[wrong_source_hash]).is_none());
+    }
+
     #[test]
     fn bind_defaults_to_loopback_and_refuses_every_interface() {
         let choice = decide_bind(None, false, 8787, None).unwrap();
@@ -1622,6 +1845,19 @@ mod tests {
         assert!(!page.contains("Brooks Campus"));
         assert!(!page.contains("300MW"));
         assert!(page.contains("script-src 'none'") || !page.contains("<script"));
+    }
+
+    #[test]
+    fn startup_banner_describes_consent_gated_local_answer_service() {
+        let dir = TempDir::new();
+        let choice = BindChoice { addr: "127.0.0.1:8787".parse().unwrap(), mode: BindMode::Loopback };
+        let banner = startup_banner(&dir.0, "synthetic-vault-id", &choice);
+        assert!(banner.contains("No API key in the page."));
+        assert!(banner.contains("configured local service only after separate desktop consent"));
+        assert!(banner.contains("phone does not call providers directly"));
+        assert!(banner.contains("HTTPS certificates and an offline phone queue are not provided"));
+        assert!(!banner.contains("Claude is not called from this process"));
+        assert!(!banner.contains("Claude-from-the-phone"));
     }
 
     #[test]

@@ -53,6 +53,14 @@ def provider_disclosures() -> dict[str, str]:
     }
 
 
+def configured_extraction_identity() -> str:
+    """Return the exact health disclosure only when provider config can dispatch safely."""
+    identity = provider_disclosures()["extraction"]
+    if identity.endswith(" (configured)"):
+        return identity
+    return ""
+
+
 def configured_clients() -> tuple[Any, Any]:
     """Construct explicit Anthropic and local embedding clients, with pre-call budget reservation."""
     os.environ["GRAPHITI_TELEMETRY_ENABLED"] = "false"
@@ -128,6 +136,11 @@ def configured_clients() -> tuple[Any, Any]:
                     _mark_budget_unknown(budget_path, call_id, time.monotonic() - started)
                 raise
 
+        async def aclose(self) -> None:
+            close = getattr(self.client, "aclose", None)
+            if close is not None:
+                await close()
+
     config = LLMConfig(api_key=api_key, model=model, temperature=1, max_tokens=2048, small_model=model)
     logging.getLogger("graphiti_core").disabled = True
     logging.getLogger("graphiti_core.llm_client.anthropic_client").disabled = True
@@ -145,7 +158,10 @@ def configured_clients() -> tuple[Any, Any]:
             kwargs["output_config"] = {"effort": "low"}
         return await original_create(**kwargs)
 
-    client_proxy = SimpleNamespace(messages=SimpleNamespace(create=compatible_create))
+    async def close_client() -> None:
+        await official_client.close()
+
+    client_proxy = SimpleNamespace(messages=SimpleNamespace(create=compatible_create), aclose=close_client)
 
     class RecallFastEmbedder(LocalFastEmbedder, EmbedderClient):  # type: ignore[misc]
         pass

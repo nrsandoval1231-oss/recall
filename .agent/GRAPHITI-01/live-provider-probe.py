@@ -29,7 +29,7 @@ async def run():
         ], Extracted, max_tokens=512)
         print(json.dumps({'state':'PASS','result':result}))
     except Exception as error:
-        print(json.dumps({'state':'FAIL','error_type':type(error).__name__,'message':str(error)[:1500]}))
+        print(json.dumps({'state':'FAIL','error_type':type(error).__name__}))
         raise SystemExit(1)
     finally:
         with sqlite3.connect(ledger) as db:

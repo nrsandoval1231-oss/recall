@@ -35,6 +35,61 @@ needed for processing/current authorized snapshot; graph episodes do not retain
 raw note bodies. Provider SDK retries are disabled and graph concurrency is one.
 No credentials, source text, or provider response content are written to logs.
 
+Extraction and answer processing disclose provider identities through
+`GET /v1/health`: the Anthropic model, the local FastEmbed model, and local
+reciprocal-rank fusion. Graph processing consent is separate from answer
+consent. A snapshot must set `answer_allowed: true` and copy the current exact
+configured extraction identity into `answer_provider`; both flags must be
+current for an answer to run. Answer consent defaults off and is invalidated
+when the provider identity changes. Answer questions and the selected bounded
+note excerpts are sent to that configured Anthropic model. Embeddings remain
+local, and reranking uses no external provider.
+
+`POST /v1/answer` accepts a scope, current generation, unique request UUID,
+question (up to 4,096 characters), and up to eight current eligible source
+UUIDs. It considers exact contiguous note windows, at most 4,000 characters
+per source and 16,000 characters in total. Long notes without a bounded
+question-word overlap, or with matching passages too far apart, are skipped;
+the response uses a static limitation message when notes were partial or
+skipped. The model may return at most two quotations, each at most 800
+characters. Every quote must be an exact substring of both the excerpt sent
+and its current source. Model prose, unsupported IDs, malformed schema, and
+unmatched quotes are rejected. Responses use `supported`, `insufficient`,
+`unavailable`, `cancelled`, or `stale` status and locally controlled messages.
+Quoted text is source material, not a verified answer or proof of entailment;
+retain context for negation, uncertainty, dates, and qualifications.
+
+`POST /v1/answer/cancel` accepts the same scope, generation, and request UUID.
+Cancellation is recorded durably even if it arrives before answer dispatch.
+Answer request IDs cannot be reused for another billable attempt, including
+after restart; unknown/interrupted calls are not replayed. Provider usage and
+cost are reserved before dispatch. If a call's outcome is ambiguous, its full
+reservation remains unknown spend rather than being refunded or retried. The
+configured budget is an operator-set persistent ledger limit, not a default
+spend authorization.
+
+Graph mutations, including consent revocation purges, issue an awaited
+FalkorDB `SAVE` before the queue reports the generation ready or disabled. A
+failed save does not commit success. If the queue worker encounters a storage
+failure or uncertain operation, health/search/snapshot report a sanitized
+restart-required failure; the service does not blindly replay a possibly
+partial operation. Shutdown still attempts to close the worker, provider
+clients, and graph database; resource-close failures produce fixed sanitized
+diagnostics.
+
+Person identity is deliberately conservative. Person node IDs exposed to the
+desktop are source-local, even when Graphiti reused one node for matching names
+in several notes. Any Person relationship supported by multiple current notes
+is suppressed before endpoint filtering. A same-name mention is not proof of
+identity, and human cross-note identity approval is not implemented. Other
+ontology node types retain their scoped Graphiti IDs. All relationships remain
+inferred proposals.
+
+This is a bounded local pilot: each graph append/rebuild accepts at most 100
+sources, and each source is limited to 32 KiB of text. Larger work fails
+explicitly rather than being silently truncated or skipped. The wire can carry
+larger snapshots, but that does not raise these extraction limits.
+
 The HTTP contract is versioned under `/v1`; requests require the bearer and a
 loopback Host/client with no browser Origin. Snapshot and search requests carry
 a monotonically increasing generation. Deletions, edits, revocations, and
@@ -42,8 +97,9 @@ explicit rebuilds replace the scoped graph; append-only snapshots ingest only
 new episodes. Any stale generation is fenced both before and after graph search.
 
 For development, run focused tests from `services/backend` with
-`uv run --extra graphiti pytest tests/test_knowledge_service.py`. These tests
-use fake graph adapters and do not constitute a real provider/FalkorDB runtime
+`uv run --extra graphiti pytest tests/test_knowledge_service.py
+tests/test_knowledge_answers.py`. The deterministic service/answer tests use
+injected fake clients and do not constitute a real provider/FalkorDB runtime
 smoke. Runtime verification should use synthetic notes and an isolated durable
 database outside the repository. Never use private vault text for setup or
 provider verification.

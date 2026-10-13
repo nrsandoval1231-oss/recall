@@ -12,9 +12,15 @@ const MAX_SOURCES: usize = 10_000;
 const MAX_TEXT: usize = 256 * 1024;
 const MAX_QUERY: usize = 4096;
 const MAX_LIMIT: usize = 50;
+const MAX_ANSWER_CANDIDATES: usize = 8;
 
 type Result<T> = std::result::Result<T, String>;
 fn sha(bytes: &[u8]) -> String { hex::encode(Sha256::digest(bytes)) }
+fn validate_request_id(request_id: &str) -> Result<()> {
+    let request_uuid = uuid::Uuid::parse_str(request_id).map_err(|_| "Answer request ID must be a UUID")?;
+    if request_uuid.to_string() != request_id { return Err("Answer request ID must be a canonical UUID".into()); }
+    Ok(())
+}
 static SCOPE_LOCKS: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = OnceLock::new();
 fn with_scope_lock<T>(scope: &str, operation: impl FnOnce() -> Result<T>) -> Result<T> {
     let locks = SCOPE_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
@@ -79,7 +85,7 @@ pub struct Relationship {
 #[serde(deny_unknown_fields)]
 pub struct SearchReply { pub status: ServiceStatus, pub relationships: Vec<Relationship> }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct KnowledgeStatus { pub enabled: bool, pub include_existing: bool, pub generation: u64, pub service: ServiceStatus, pub provider_disclosure: String, pub providers: Option<ProviderDisclosure> }
+pub struct KnowledgeStatus { pub enabled: bool, pub include_existing: bool, pub generation: u64, pub service: ServiceStatus, pub provider_disclosure: String, pub providers: Option<ProviderDisclosure>, pub answer_enabled: bool, pub answer_provider: Option<String> }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Source {
@@ -88,11 +94,31 @@ struct Source {
 }
 #[derive(Serialize)]
 struct SnapshotRequest<'a> {
-    version: u32, scope: &'a str, generation: u64, processing_allowed: bool,
+    version: u32, scope: &'a str, generation: u64, processing_allowed: bool, answer_allowed: bool, answer_provider: &'a str,
     sources: &'a [Source], eligible_ids: &'a [String], suppressed_facts: &'a BTreeSet<String>, rebuild: bool,
 }
 #[derive(Serialize)]
 struct SearchRequest<'a> { version: u32, scope: &'a str, generation: u64, query: &'a str, limit: usize, include_history: bool }
+#[derive(Serialize)]
+struct AnswerRequest<'a> { version: u32, scope: &'a str, generation: u64, request_id: &'a str, question: &'a str, candidate_ids: &'a [String] }
+#[derive(Serialize)]
+struct CancelAnswerRequest<'a> { version: u32, scope: &'a str, generation: u64, request_id: &'a str }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnswerSelection { pub source_id: String, pub revision: u64, pub source_sha256: String, pub note_sha256: String, pub quote: String }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AnswerReply { status: String, selections: Vec<AnswerSelection>, message: String }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CancelReply { cancelled: bool }
+#[derive(Serialize)]
+pub struct MemoryAnswer { pub sources: crate::memory_query::Answer, pub status: String, pub message: String, pub selections: Vec<AnswerSelection>, pub answer_provider: Option<String> }
+#[derive(Clone)]
+struct ActiveAnswer { scope: String, generation: u64, dispatched: bool }
+#[derive(Clone)]
+pub struct AnswerStart { pub allowed: bool, pub replaced: Option<(String, u64)> }
+static ACTIVE_ANSWERS: OnceLock<Mutex<HashMap<String, ActiveAnswer>>> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct Client { base: String, token: String, agent: Agent }
@@ -128,6 +154,88 @@ impl Client {
         if bytes.len() > 4096 { return Err("Local graph service status exceeds its limit".into()); }
         let mut status: ServiceStatus = serde_json::from_slice(&bytes).map_err(|_| "Local graph service status is invalid".to_owned())?;
         normalize_status(&mut status)?; Ok(status)
+    }
+    fn answer(&self, request: &AnswerRequest<'_>) -> Result<AnswerReply> {
+        let body = serde_json::to_vec(request).map_err(|_| "Could not encode local answer request")?;
+        if body.len() > 64 * 1024 { return Err("Local answer request exceeds its size limit".into()); }
+        let agent = AgentBuilder::new().redirects(0).timeout_connect(Duration::from_secs(1))
+            .timeout_read(Duration::from_secs(60)).timeout_write(Duration::from_secs(4)).build();
+        let response = agent.post(&format!("{}/v1/answer", self.base)).set("Authorization", &format!("Bearer {}", self.token))
+            .set("Content-Type", "application/json").send_bytes(&body).map_err(|_| "Local answer request failed")?;
+        if response.status() != 200 { return Err("Local answer service is unavailable".into()); }
+        let mut bytes = Vec::new(); response.into_reader().take((64 * 1024 + 1) as u64).read_to_end(&mut bytes).map_err(|_| "Local answer response could not be read")?;
+        if bytes.len() > 64 * 1024 { return Err("Local answer response exceeds its size limit".into()); }
+        serde_json::from_slice(&bytes).map_err(|_| "Local answer response is invalid".into())
+    }
+    fn cancel_answer(&self, scope: &str, generation: u64, request_id: &str) -> Result<bool> {
+        let body = CancelAnswerRequest { version: 1, scope, generation, request_id };
+        let bytes = serde_json::to_vec(&body).map_err(|_| "Could not encode answer cancellation")?;
+        let agent = AgentBuilder::new().redirects(0).timeout_connect(Duration::from_millis(250))
+            .timeout_read(Duration::from_millis(750)).timeout_write(Duration::from_millis(750)).build();
+        let response = agent.post(&format!("{}/v1/answer/cancel", self.base)).set("Authorization", &format!("Bearer {}", self.token))
+            .set("Content-Type", "application/json").send_bytes(&bytes).map_err(|_| "Local answer cancellation is unavailable")?;
+        if response.status() != 200 { return Err("Local answer cancellation is unavailable".into()); }
+        let mut body = Vec::new(); response.into_reader().take(1025).read_to_end(&mut body).map_err(|_| "Local answer cancellation response could not be read")?;
+        if body.len() > 1024 { return Err("Local answer cancellation response exceeds its limit".into()); }
+        let reply: CancelReply = serde_json::from_slice(&body).map_err(|_| "Local answer cancellation response is invalid")?;
+        Ok(reply.cancelled)
+    }
+}
+fn cancel_obsolete_answers(scope: &str, generation: u64, client: &Client) {
+    let obsolete = ACTIVE_ANSWERS.get_or_init(|| Mutex::new(HashMap::new())).lock().ok().map(|mut active| {
+        let mut ids = Vec::new();
+        for (id, answer) in active.iter_mut().filter(|(_, answer)| answer.scope == scope && answer.generation != generation) {
+            if answer.dispatched { ids.push(id.clone()); } else { answer.generation = generation; }
+        }
+        ids.into_iter().filter_map(|id| active.remove(&id).map(|answer| (id, answer))).collect::<Vec<_>>()
+    }).unwrap_or_default();
+    for (request_id, answer) in obsolete { let _ = client.cancel_answer(scope, answer.generation, &request_id); }
+}
+pub fn begin_answer(vault: &Vault, request_id: &str) -> Result<AnswerStart> {
+    validate_request_id(request_id)?;
+    let control = vault.knowledge_control()?;
+    if !control.enabled || !control.answer_allowed || control.answer_consent_version != 1
+        || control.approved_answer_provider.is_empty() {
+        return Ok(AnswerStart { allowed: false, replaced: None });
+    }
+    let mut active = ACTIVE_ANSWERS.get_or_init(|| Mutex::new(HashMap::new())).lock().map_err(|_| "Local answer coordinator is unavailable")?;
+    if active.contains_key(request_id) { return Err("Answer request ID was already used by an active request".into()); }
+    let previous = active.iter().find(|(_, answer)| answer.scope == vault.id).map(|(id, answer)| (id.clone(), answer.generation));
+    if let Some((id, _)) = &previous { active.remove(id); }
+    active.insert(request_id.to_owned(), ActiveAnswer { scope: vault.id.clone(), generation: control.generation, dispatched: false });
+    Ok(AnswerStart { allowed: true, replaced: previous })
+}
+pub fn cancel_replaced_answer(scope: &str, previous: &Option<(String, u64)>) {
+    if let (Some((request_id, generation)), Ok(client)) = (previous.as_ref(), Client::from_env()) {
+        let _ = client.cancel_answer(scope, *generation, request_id);
+    }
+}
+pub fn answer_is_active(scope: &str, request_id: &str) -> bool {
+    ACTIVE_ANSWERS.get().and_then(|active| active.lock().ok())
+        .and_then(|active| active.get(request_id).map(|answer| answer.scope == scope)).unwrap_or(false)
+}
+fn mark_answer_dispatched(scope: &str, request_id: &str, generation: u64) -> bool {
+    ACTIVE_ANSWERS.get().and_then(|active| active.lock().ok()).and_then(|mut active| {
+        let answer = active.get_mut(request_id)?;
+        if answer.scope != scope || answer.generation != generation { return Some(false); }
+        answer.dispatched = true;
+        Some(true)
+    }).unwrap_or(false)
+}
+fn remove_active_answer(scope: &str, request_id: &str) {
+    if let Some(active) = ACTIVE_ANSWERS.get() {
+        if let Ok(mut active) = active.lock() {
+            if active.get(request_id).is_some_and(|answer| answer.scope == scope) { active.remove(request_id); }
+        }
+    }
+}
+fn cancel_scope_answers(scope: &str) {
+    let active = ACTIVE_ANSWERS.get_or_init(|| Mutex::new(HashMap::new())).lock().ok().map(|mut rows| {
+        let ids: Vec<String> = rows.iter().filter(|(_, answer)| answer.scope == scope).map(|(id, _)| id.clone()).collect();
+        ids.into_iter().filter_map(|id| rows.remove(&id).map(|answer| (id, answer))).collect::<Vec<_>>()
+    }).unwrap_or_default();
+    if let Ok(client) = Client::from_env() {
+        for (request_id, answer) in active { let _ = client.cancel_answer(scope, answer.generation, &request_id); }
     }
 }
 use std::io::Read;
@@ -193,9 +301,11 @@ fn sources(vault: &Vault) -> Result<Vec<Source>> {
     }
     Ok(out)
 }
-fn source_digest(scope: &str, sources: &[Source], control: &KnowledgeControl) -> Result<String> {
+fn source_digest(scope: &str, sources: &[Source], control: &KnowledgeControl, answer_allowed: bool, answer_provider: &str) -> Result<String> {
     let material = serde_json::to_vec(&(scope, sources, control.enabled, control.include_existing,
-        &control.existing_fence, &control.dismissed_facts)).map_err(|_| "Could not fingerprint local knowledge snapshot")?;
+        &control.existing_fence, &control.dismissed_facts, control.answer_allowed,
+        control.answer_consent_version, &control.approved_answer_provider, answer_allowed, answer_provider))
+        .map_err(|_| "Could not fingerprint local knowledge snapshot")?;
     Ok(sha(&material))
 }
 fn snapshot_with_client(vault: &Vault, rebuild: bool, client: &Client) -> Result<(ServiceStatus, Vec<Source>, KnowledgeControl)> {
@@ -203,15 +313,21 @@ fn snapshot_with_client(vault: &Vault, rebuild: bool, client: &Client) -> Result
     // Revocation/purge snapshots are intentionally independent of source
     // enumeration: even a vault too large to index must be cancellable.
     let rows = if control.enabled { sources(vault)? } else { Vec::new() };
-    let digest = source_digest(&vault.id, &rows, &control)?;
+    let answer_provider = if control.enabled && control.answer_allowed {
+        client.health().ok().and_then(|status| configured_answer_provider(&status).map(str::to_owned))
+            .filter(|provider| provider == &control.approved_answer_provider).unwrap_or_default()
+    } else { String::new() };
+    let answer_allowed = !answer_provider.is_empty() && control.answer_consent_version == 1;
+    let digest = source_digest(&vault.id, &rows, &control, answer_allowed, &answer_provider)?;
     control = vault.set_knowledge_snapshot_hash(&digest)?;
+    cancel_obsolete_answers(&vault.id, control.generation, client);
     let eligible: Vec<String> = if control.enabled {
         rows.iter().filter(|s| control.include_existing || !control.existing_fence.contains(&s.id)).map(|s| s.id.clone()).collect()
     } else { Vec::new() };
     let allowed: BTreeSet<&str> = eligible.iter().map(String::as_str).collect();
     let eligible_sources: Vec<Source> = rows.iter().filter(|s| allowed.contains(s.id.as_str())).cloned().collect();
     let req = SnapshotRequest { version: 1, scope: &vault.id, generation: control.generation,
-        processing_allowed: control.enabled, sources: &eligible_sources, eligible_ids: &eligible,
+        processing_allowed: control.enabled, answer_allowed, answer_provider: &answer_provider, sources: &eligible_sources, eligible_ids: &eligible,
         suppressed_facts: &control.dismissed_facts, rebuild };
     let status: ServiceStatus = client.post("/v1/snapshot", &req, MAX_SNAPSHOT)?;
     Ok((status, rows, control))
@@ -229,11 +345,14 @@ pub fn status(vault: &Vault) -> Result<KnowledgeStatus> {
         message: "Local graph service is not configured or reachable.".into(), providers: None,
     });
     let providers = service.providers.clone();
+    let answer_provider = configured_answer_provider(&service).map(str::to_owned);
+    let answer_enabled = control.enabled && control.answer_allowed && control.answer_consent_version == 1
+        && answer_provider.as_deref() == Some(control.approved_answer_provider.as_str());
     Ok(KnowledgeStatus { enabled: control.enabled, include_existing: control.include_existing, generation: control.generation, service,
-        provider_disclosure: "When enabled, current vault notes and questions may be processed by the listed extraction, embedding, and reranking providers. Review these recipients before enabling. No existing Recall consent is reused.".into(), providers })
+        provider_disclosure: "When enabled, current vault notes and questions may be processed by the listed extraction, embedding, and reranking providers. Review these recipients before enabling. No existing Recall consent is reused.".into(), providers, answer_enabled, answer_provider })
 }
 pub fn consent(vault: &Vault, enabled: bool, include_existing: bool) -> Result<KnowledgeControl> {
-    with_scope_lock(&vault.id, || {
+    let control = with_scope_lock(&vault.id, || {
         if !enabled {
             return vault.set_knowledge_consent(false, false, &BTreeSet::new());
         }
@@ -245,7 +364,222 @@ pub fn consent(vault: &Vault, enabled: bool, include_existing: bool) -> Result<K
         }
         let rows = sources(vault)?; let ids: BTreeSet<String> = rows.iter().map(|s| s.id.clone()).collect();
         vault.set_knowledge_consent(enabled, include_existing, &ids)
+    })?;
+    if !enabled { cancel_scope_answers(&vault.id); }
+    Ok(control)
+}
+fn configured_answer_provider(status: &ServiceStatus) -> Option<&str> {
+    status.providers.as_ref().map(|providers| providers.extraction.as_str())
+        .filter(|identity| !identity.trim().is_empty() && !identity.to_ascii_lowercase().contains("not configured"))
+}
+pub fn answer_consent(vault: &Vault, enabled: bool) -> Result<KnowledgeControl> {
+    let control = with_scope_lock(&vault.id, || {
+        if !enabled { return vault.set_knowledge_answer_consent(false, ""); }
+        let control = vault.knowledge_control()?;
+        if !control.enabled { return Err("Enable connected knowledge before answer consent".into()); }
+        let status = Client::from_env()?.health()?;
+        let provider = configured_answer_provider(&status).ok_or("Model answers are not configured")?;
+        vault.set_knowledge_answer_consent(true, provider)
+    })?;
+    if !enabled { cancel_scope_answers(&vault.id); }
+    Ok(control)
+}
+fn answer_static(status: &str) -> &'static str {
+    match status {
+        "supported" => "Selected exact passages from current notes. These quotations are evidence selections, not a verified synthesized answer.",
+        "insufficient" => "Current source passages do not support an answer to this question.",
+        "cancelled" => "The answer request was cancelled; local source matches remain available.",
+        "stale" => "The source or consent changed while answering; no selections are shown.",
+        _ => "Model answers are unavailable; local source and related-knowledge matches remain available.",
+    }
+}
+fn answer_response(vault: &Vault, question: &str, mut fallback: crate::memory_query::Answer,
+    mut status: &str, mut selections: Vec<AnswerSelection>, provider: Option<String>) -> MemoryAnswer {
+    // The source and graph cards were gathered before the possibly long model
+    // wait. Rebind local hits and graph evidence at the return boundary so a
+    // correction, deletion, fence change, or revocation cannot leak stale cards.
+    if let Ok(current) = crate::memory_query::ask(vault, question) {
+        fallback.hits = current.hits;
+        fallback.message = current.message;
+    } else {
+        fallback.hits.clear();
+    }
+    let binding = (vault.knowledge_control(), sources(vault));
+    let mut graph_current = false;
+    if let (Ok(control), Ok(current_sources)) = binding {
+        fallback.hits.retain(|hit| current_sources.iter().any(|source|
+            source.id == hit.memory_id && source.revision == hit.revision && source.source_sha256 == hit.source_sha256
+        ));
+        let final_control = vault.knowledge_control().ok();
+        if control.enabled && final_control.as_ref().is_some_and(|current| current.generation == control.generation) {
+            fallback.graph_relationships = validate_after_reconcile(
+                std::mem::take(&mut fallback.graph_relationships), &current_sources, &control, control.generation,
+            );
+            graph_current = true;
+            if !control.answer_allowed || control.answer_consent_version != 1
+                || provider.as_deref() != Some(control.approved_answer_provider.as_str()) {
+                if !selections.is_empty() { selections.clear(); status = "stale"; }
+            } else {
+                let eligible: BTreeSet<&str> = current_sources.iter().filter(|source|
+                    control.include_existing || !control.existing_fence.contains(&source.id)
+                ).map(|source| source.id.as_str()).collect();
+                let valid = selections.iter().all(|selection| current_sources.iter().any(|source|
+                    source.id == selection.source_id && eligible.contains(source.id.as_str())
+                        && source.revision == selection.revision && source.source_sha256 == selection.source_sha256
+                        && source.note_sha256 == selection.note_sha256 && source.text.contains(&selection.quote)
+                ));
+                if !valid && !selections.is_empty() { selections.clear(); status = "stale"; }
+            }
+        } else {
+            fallback.graph_relationships.clear();
+            if !selections.is_empty() { selections.clear(); status = "stale"; }
+        }
+    } else {
+        fallback.hits.clear();
+        fallback.graph_relationships.clear();
+        if !selections.is_empty() { selections.clear(); status = "stale"; }
+    }
+    if !graph_current {
+        fallback.knowledge_status = None;
+    }
+    if !fallback.graph_relationships.is_empty() {
+        fallback.message = if fallback.hits.is_empty() {
+            "Related graph knowledge was found. These are inferred, unverified relationships; inspect the cited current notes. This is not a generated answer.".into()
+        } else {
+            "Source-backed matches and related graph knowledge were found. Graph relationships are inferred and unverified; inspect the cited current notes. This is not a generated answer.".into()
+        };
+    }
+    MemoryAnswer { sources: fallback, status: status.into(), message: answer_static(status).into(), selections, answer_provider: provider }
+}
+fn answer_candidates(answer: &crate::memory_query::Answer) -> Vec<String> {
+    let mut candidates = Vec::new();
+    for id in answer.hits.iter().map(|hit| hit.memory_id.as_str()).chain(
+        answer.graph_relationships.iter().flat_map(|row| std::iter::once(row.source_id.as_str()).chain(row.supports.iter().map(|support| support.source_id.as_str())))
+    ) {
+        if uuid::Uuid::parse_str(id).is_ok() && !candidates.iter().any(|candidate| candidate == id) {
+            candidates.push(id.to_owned());
+            if candidates.len() == MAX_ANSWER_CANDIDATES { break; }
+        }
+    }
+    candidates
+}
+fn answer_reply_valid(reply: &AnswerReply, sources: &[Source], eligible_ids: &BTreeSet<String>, candidate_ids: &BTreeSet<String>) -> bool {
+    if reply.status != "supported" { return reply.selections.is_empty(); }
+    if reply.selections.is_empty() || reply.selections.len() > 2 { return false; }
+    let current: BTreeMap<&str, &Source> = sources.iter().filter(|source| eligible_ids.contains(&source.id)).map(|source| (source.id.as_str(), source)).collect();
+    let mut seen = BTreeSet::new();
+    reply.selections.iter().all(|selection| {
+        if !candidate_ids.contains(&selection.source_id) || !eligible_ids.contains(&selection.source_id)
+            || !seen.insert(selection.source_id.as_str()) || selection.revision == 0
+            || selection.quote.trim().is_empty() || selection.quote.chars().count() > 800
+            || selection.quote.chars().any(|ch| ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t') {
+            return false;
+        }
+        current.get(selection.source_id.as_str()).is_some_and(|source| {
+            source.revision == selection.revision && source.source_sha256 == selection.source_sha256
+                && source.note_sha256 == selection.note_sha256 && source.text.contains(&selection.quote)
+        })
     })
+}
+pub fn answer(vault: &Vault, question: &str, request_id: &str, source_answer: crate::memory_query::Answer) -> Result<MemoryAnswer> {
+    if question.trim().is_empty() || question.len() > MAX_QUERY || question.chars().any(char::is_control) {
+        return Err("Ask a bounded memory question".into());
+    }
+    validate_request_id(request_id)?;
+    let control = vault.knowledge_control()?;
+    if !control.enabled || !control.answer_allowed || control.answer_consent_version != 1
+        || control.approved_answer_provider.is_empty() {
+        return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), None));
+    }
+    let client = match Client::from_env() {
+        Ok(client) => client,
+        Err(_) => return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), None)),
+    };
+    let provider = match client.health().ok().and_then(|status| configured_answer_provider(&status).map(str::to_owned)) {
+        Some(provider) if provider == control.approved_answer_provider => provider,
+        _ => return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), None)),
+    };
+    let (snapshot_status, rows, current_control) = match with_scope_lock(&vault.id, || snapshot_with_client(vault, false, &client)) {
+        Ok(snapshot) => snapshot,
+        Err(_) => return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), Some(provider))),
+    };
+    let _ = snapshot_status;
+    if !current_control.enabled || !current_control.answer_allowed || current_control.answer_consent_version != 1
+        || current_control.approved_answer_provider != provider {
+        return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), Some(provider)));
+    }
+    let eligible_ids: BTreeSet<String> = rows.iter().filter(|row|
+        current_control.include_existing || !current_control.existing_fence.contains(&row.id)
+    ).map(|row| row.id.clone()).collect();
+    let candidate_ids: Vec<String> = answer_candidates(&source_answer).into_iter().filter(|id| eligible_ids.contains(id)).take(MAX_ANSWER_CANDIDATES).collect();
+    if candidate_ids.is_empty() {
+        return Ok(answer_response(vault, question, source_answer, "insufficient", Vec::new(), Some(provider)));
+    }
+    let generation = current_control.generation;
+    if !answer_is_active(&vault.id, request_id) {
+        return Ok(answer_response(vault, question, source_answer, "cancelled", Vec::new(), Some(provider)));
+    }
+    if !mark_answer_dispatched(&vault.id, request_id, generation) {
+        return Ok(answer_response(vault, question, source_answer, "cancelled", Vec::new(), Some(provider)));
+    }
+    let request = AnswerRequest { version: 1, scope: &vault.id, generation, request_id,
+        question, candidate_ids: &candidate_ids };
+    let reply = client.answer(&request);
+    let still_active = ACTIVE_ANSWERS.get().and_then(|active| active.lock().ok()).and_then(|active|
+        active.get(request_id).map(|current| current.scope == vault.id && current.generation == generation));
+    if still_active != Some(true) {
+        let current = vault.knowledge_control()?;
+        if !current.enabled || !current.answer_allowed || current.generation != generation
+            || current.approved_answer_provider != provider {
+            remove_active_answer(&vault.id, request_id);
+            return Ok(answer_response(vault, question, source_answer, "stale", Vec::new(), Some(provider)));
+        }
+        remove_active_answer(&vault.id, request_id);
+        return Ok(answer_response(vault, question, source_answer, "cancelled", Vec::new(), Some(provider)));
+    }
+    let (_current_status, current_rows, current_control) = match with_scope_lock(&vault.id, || snapshot_with_client(vault, false, &client)) {
+        Ok(snapshot) => snapshot,
+        Err(_) => {
+            remove_active_answer(&vault.id, request_id);
+            return Ok(answer_response(vault, question, source_answer, "stale", Vec::new(), Some(provider)));
+        },
+    };
+    let current_provider = client.health().ok().and_then(|status| configured_answer_provider(&status).map(str::to_owned));
+    if !current_control.enabled || !current_control.answer_allowed || current_control.answer_consent_version != 1
+        || current_control.generation != generation || current_control.approved_answer_provider != provider
+        || current_provider.as_deref() != Some(provider.as_str()) {
+        remove_active_answer(&vault.id, request_id);
+        return Ok(answer_response(vault, question, source_answer, "stale", Vec::new(), Some(provider)));
+    }
+    remove_active_answer(&vault.id, request_id);
+    let reply = match reply {
+        Ok(reply) => reply,
+        Err(_) => return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), Some(provider))),
+    };
+    if !["supported", "insufficient", "unavailable", "cancelled", "stale"].contains(&reply.status.as_str()) {
+        return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), Some(provider)));
+    }
+    if reply.status != "supported" {
+        if !reply.selections.is_empty() { return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), Some(provider))); }
+        return Ok(answer_response(vault, question, source_answer, &reply.status, Vec::new(), Some(provider)));
+    }
+    let current_eligible: BTreeSet<String> = current_rows.iter().filter(|row|
+        current_control.include_existing || !current_control.existing_fence.contains(&row.id)
+    ).map(|row| row.id.clone()).collect();
+    if !answer_reply_valid(&reply, &current_rows, &current_eligible, &candidate_ids.iter().cloned().collect()) {
+        return Ok(answer_response(vault, question, source_answer, "unavailable", Vec::new(), Some(provider)));
+    }
+    Ok(answer_response(vault, question, source_answer, "supported", reply.selections, Some(provider)))
+}
+pub fn cancel_answer(scope: &str, request_id: &str) -> Result<bool> {
+    validate_request_id(request_id)?;
+    let active = ACTIVE_ANSWERS.get_or_init(|| Mutex::new(HashMap::new())).lock()
+        .map_err(|_| "Local answer coordinator is unavailable")?.get(request_id).filter(|active| active.scope == scope).cloned();
+    let Some(active) = active else { return Ok(false); };
+    remove_active_answer(scope, request_id);
+    let client = Client::from_env()?;
+    let cancelled = client.cancel_answer(scope, active.generation, request_id)?;
+    Ok(cancelled)
 }
 pub fn dismiss(vault: &Vault, fact_id: &str) -> Result<KnowledgeControl> { with_scope_lock(&vault.id, || vault.dismiss_knowledge_fact(fact_id)) }
 pub fn search(vault: &Vault, query: &str, include_history: bool) -> Result<SearchReply> {
@@ -415,7 +749,8 @@ mod tests {
         };
         let mut control = KnowledgeControl { version: 1, vault_id: "00000000-0000-4000-8000-000000000099".into(),
             enabled: false, include_existing: false, generation: 0, snapshot_sha256: String::new(),
-            existing_fence: BTreeSet::new(), dismissed_facts: BTreeSet::new() };
+            existing_fence: BTreeSet::new(), dismissed_facts: BTreeSet::new(), answer_allowed: false,
+            answer_consent_version: 0, approved_answer_provider: String::new() };
         control.enabled = true; control.generation = 7;
         assert_eq!(validate_after_reconcile(vec![relationship.clone()], &[source.clone()], &control, 7).len(), 1);
         control.generation = 8;
@@ -442,6 +777,130 @@ mod tests {
         assert!(persisted.enabled && persisted.existing_fence.contains(&memory));
         assert!(persisted.dismissed_facts.contains("synthetic-fact"));
         assert!(persisted.generation > enabled.generation);
+    }
+    #[test]
+    fn version_one_controls_read_without_rewrite_and_migrate_only_on_answer_opt_in() {
+        use crate::librarian::organization_tests as fixture;
+        let (temp, vault, _, memory_id) = fixture::setup();
+        let original = vault.processing_snapshot(&memory_id, 1).unwrap().source.bytes;
+        let control_path = temp.0.join("Recall/_meta/knowledge/control.json");
+        std::fs::create_dir_all(control_path.parent().unwrap()).unwrap();
+        let legacy = format!(r#"{{"version":1,"vault_id":"{}","enabled":true,"include_existing":true,"generation":8,"snapshot_sha256":"","existing_fence":[],"dismissed_facts":[]}}"#, vault.id);
+        std::fs::write(&control_path, legacy.as_bytes()).unwrap();
+        let read = vault.knowledge_control().unwrap();
+        assert_eq!(read.version, 1);
+        assert!(!read.answer_allowed && read.answer_consent_version == 0 && read.approved_answer_provider.is_empty());
+        assert_eq!(std::fs::read(&control_path).unwrap(), legacy.as_bytes(), "reading v1 must preserve bytes");
+
+        let provider = "Anthropic Claude synthetic-model (configured)";
+        let migrated = vault.set_knowledge_answer_consent(true, provider).unwrap();
+        assert_eq!(migrated.version, 2);
+        assert!(migrated.answer_allowed && migrated.answer_consent_version == 1);
+        assert_eq!(migrated.approved_answer_provider, provider);
+        assert!(migrated.generation > read.generation && migrated.snapshot_sha256.is_empty());
+        let reopened = Vault::open(&temp.0).unwrap();
+        let after = reopened.processing_snapshot(&memory_id, 1).unwrap();
+        assert_eq!(after.source.bytes, original);
+        assert!(reopened.knowledge_control().unwrap().answer_allowed);
+    }
+    #[test]
+    fn answer_quote_validation_is_all_or_nothing_and_source_bound() {
+        let source = Source { id: "00000000-0000-4000-8000-000000000001".into(), revision: 2,
+            source_sha256: "a".repeat(64), note_sha256: "b".repeat(64), text: "# Synthetic\nProject Aurora is led by Alice Chen.".into(),
+            source_name: "synthetic.txt".into(), note_path: "synthetic.md".into(), captured_at: "2026-10-13T00:00:00Z".into(), updated_at: "2026-10-13T00:00:00Z".into() };
+        let selected = AnswerSelection { source_id: source.id.clone(), revision: 2, source_sha256: source.source_sha256.clone(),
+            note_sha256: source.note_sha256.clone(), quote: "Project Aurora is led by Alice Chen.".into() };
+        let eligible = BTreeSet::from([source.id.clone()]);
+        let candidates = eligible.clone();
+        let reply = AnswerReply { status: "supported".into(), selections: vec![selected.clone()], message: "untrusted remote prose".into() };
+        assert!(answer_reply_valid(&reply, &[source.clone()], &eligible, &candidates));
+        let mut forged = selected.clone(); forged.quote = "Alice Chen founded a different company.".into();
+        assert!(!answer_reply_valid(&AnswerReply { selections: vec![forged], ..reply.clone() }, &[source.clone()], &eligible, &candidates));
+        let mut stale = selected.clone(); stale.source_sha256 = "c".repeat(64);
+        assert!(!answer_reply_valid(&AnswerReply { selections: vec![stale], ..reply.clone() }, &[source.clone()], &eligible, &candidates));
+        assert!(!answer_reply_valid(&AnswerReply { selections: vec![selected.clone(), selected.clone(), selected], ..reply.clone() }, &[source], &eligible, &candidates));
+        assert!(answer_reply_valid(&AnswerReply { status: "insufficient".into(), selections: Vec::new(), message: String::new() }, &[], &eligible, &candidates));
+        assert!(!answer_reply_valid(&AnswerReply { status: "insufficient".into(), selections: vec![AnswerSelection { source_id: "x".into(), revision: 1, source_sha256: String::new(), note_sha256: String::new(), quote: "bad".into() }], message: String::new() }, &[], &eligible, &candidates));
+    }
+    #[test]
+    fn answer_without_separate_consent_returns_local_fallback_without_provider_configuration() {
+        use crate::librarian::organization_tests as fixture;
+        let (_temp, vault, _, _) = fixture::setup();
+        let base = crate::memory_query::ask(&vault, "Project Aurora").unwrap();
+        let result = answer(&vault, "Project Aurora", &uuid::Uuid::new_v4().to_string(), base).unwrap();
+        assert_eq!(result.status, "unavailable");
+        assert!(result.selections.is_empty());
+        assert!(result.message.contains("local source"));
+    }
+    #[test]
+    fn answer_fallback_rebinds_keyword_cards_and_suppresses_stale_or_revoked_graph_evidence() {
+        use crate::librarian::organization_tests as fixture;
+        let (_temp, vault, _, memory_id) = fixture::setup();
+        let before = sources(&vault).unwrap();
+        let old_source = before.iter().find(|source| source.id == memory_id).unwrap().clone();
+        let old_quote = "Utility late.";
+        assert!(old_source.text.contains(old_quote));
+        vault.set_knowledge_consent(true, true, &BTreeSet::from([memory_id.clone()])).unwrap();
+        let mut prior = crate::memory_query::ask(&vault, "utility late").unwrap();
+        prior.graph_relationships.push(Relationship {
+            id: "synthetic-stale-fact".into(), source_id: old_source.id.clone(), revision: old_source.revision,
+            source_sha256: old_source.source_sha256.clone(), note_sha256: old_source.note_sha256.clone(),
+            source_name: old_source.source_name.clone(), note_path: old_source.note_path.clone(), quote: old_quote.into(),
+            subject_id: uuid::Uuid::new_v4().to_string(), subject: "Utility".into(), subject_type: "topic".into(),
+            predicate: "status".into(), object_id: uuid::Uuid::new_v4().to_string(), object: "late".into(), object_type: "status".into(),
+            fact: "Utility is late".into(), valid_at: None, invalid_at: None, extracted_at: "2026-10-13T00:00:00Z".into(),
+            inferred: true, uncertainty: "Inferred".into(), related_source_ids: vec![],
+            supports: vec![RelationshipSupport { source_id: old_source.id.clone(), revision: old_source.revision,
+                source_sha256: old_source.source_sha256.clone(), note_sha256: old_source.note_sha256.clone(), quote: old_quote.into() }],
+        });
+        let changed = vault.correct(&memory_id, 1, &uuid::Uuid::new_v4().to_string(), "Utility remains under review; no delivery date confirmed.").unwrap();
+        let rebound = answer_response(&vault, "utility", prior, "stale", Vec::new(), None);
+        assert_eq!(rebound.status, "stale");
+        assert_eq!(rebound.sources.hits.len(), 1);
+        assert_eq!(rebound.sources.hits[0].revision, changed.revision);
+        assert!(rebound.sources.hits[0].current_excerpt.contains("no delivery date confirmed"));
+        assert!(rebound.sources.graph_relationships.is_empty(), "old-revision graph evidence must be suppressed");
+
+        let current_source = sources(&vault).unwrap().into_iter().find(|source| source.id == memory_id).unwrap();
+        let mut pre_revocation = crate::memory_query::ask(&vault, "utility").unwrap();
+        pre_revocation.graph_relationships.push(Relationship {
+            id: "synthetic-current-fact".into(), source_id: current_source.id.clone(), revision: current_source.revision,
+            source_sha256: current_source.source_sha256.clone(), note_sha256: current_source.note_sha256.clone(),
+            source_name: current_source.source_name.clone(), note_path: current_source.note_path.clone(), quote: "no delivery date confirmed".into(),
+            subject_id: uuid::Uuid::new_v4().to_string(), subject: "Utility".into(), subject_type: "topic".into(),
+            predicate: "status".into(), object_id: uuid::Uuid::new_v4().to_string(), object: "under review".into(), object_type: "status".into(),
+            fact: "Utility remains under review".into(), valid_at: None, invalid_at: None, extracted_at: "2026-10-13T00:00:00Z".into(),
+            inferred: true, uncertainty: "Inferred".into(), related_source_ids: vec![],
+            supports: vec![RelationshipSupport { source_id: current_source.id.clone(), revision: current_source.revision,
+                source_sha256: current_source.source_sha256.clone(), note_sha256: current_source.note_sha256.clone(), quote: "no delivery date confirmed".into() }],
+        });
+        vault.set_knowledge_consent(false, false, &BTreeSet::new()).unwrap();
+        let revoked = answer_response(&vault, "utility", pre_revocation, "stale", Vec::new(), None);
+        assert!(revoked.sources.graph_relationships.is_empty(), "revoked graph evidence must be suppressed");
+        assert_eq!(revoked.sources.hits.len(), 1, "current local keyword evidence remains available after graph revocation");
+        assert!(revoked.sources.knowledge_status.is_none());
+    }
+    #[test]
+    fn answer_registration_precedes_dispatch_and_cancelled_preparation_cannot_charge() {
+        use crate::librarian::organization_tests as fixture;
+        let (_temp, vault, _, memory_id) = fixture::setup();
+        vault.set_knowledge_consent(true, true, &BTreeSet::from([memory_id])).unwrap();
+        vault.set_knowledge_answer_consent(true, "Anthropic Claude synthetic-model (configured)").unwrap();
+        let first = uuid::Uuid::new_v4().to_string();
+        let started = begin_answer(&vault, &first).unwrap();
+        assert!(started.allowed);
+        assert!(answer_is_active(&vault.id, &first), "request must be cancellable before retrieval begins");
+        // Mirrors cancel-before-dispatch: native removes the authorized scope
+        // entry first; the answer worker's atomic dispatch mark must then fail.
+        remove_active_answer(&vault.id, &first);
+        assert!(!mark_answer_dispatched(&vault.id, &first, vault.knowledge_control().unwrap().generation));
+        let second = uuid::Uuid::new_v4().to_string();
+        let _ = begin_answer(&vault, &first).unwrap();
+        let replacement = begin_answer(&vault, &second).unwrap();
+        assert_eq!(replacement.replaced.as_ref().map(|(id, _)| id.as_str()), Some(first.as_str()));
+        assert!(!answer_is_active(&vault.id, &first));
+        assert!(answer_is_active(&vault.id, &second));
+        remove_active_answer(&vault.id, &second);
     }
     #[test]
     fn revocation_skips_failed_source_enumeration_and_retries_empty_snapshot() {
@@ -559,5 +1018,62 @@ mod tests {
         assert_eq!(answer.hits.len(), 1);
         assert!(answer.hits[0].current_excerpt.contains("Example Labs"));
         assert_eq!(vault.knowledge_control().unwrap().generation, control_before.generation);
+    }
+    #[test]
+    #[ignore = "opt-in: sends two bounded questions about the retained synthetic vault to the configured answer provider"]
+    fn synthetic_loopback_answers_are_current_source_quotes_and_abstain_without_evidence() {
+        let root = std::env::var("RECALL_GRAPH_SYNTHETIC_VAULT").expect("set to the retained synthetic integration vault");
+        let root = std::path::PathBuf::from(root);
+        assert!(root.is_absolute(), "synthetic vault path must be absolute");
+        assert!(root.join("Recall/_meta/manifest.json").exists(), "run the synthetic loopback integration first");
+        let vault = Vault::open(&root).unwrap();
+        let before = sources(&vault).unwrap();
+        let source = before.iter().find(|source| source.text.contains("Fictional Alice Chen works on Project Aurora for Example Labs"))
+            .expect("retained synthetic capture must be present").clone();
+        let source_bytes = vault.source(&source.id).unwrap().bytes;
+        let before_control = vault.knowledge_control().unwrap();
+        assert!(before_control.enabled && before_control.include_existing);
+        let consent = answer_consent(&vault, true).expect("synthetic answer consent should bind to configured provider");
+        assert!(consent.answer_allowed && consent.answer_consent_version == 1);
+
+        // Wait for the already-existing source to be current before issuing a
+        // single attempt. Answer requests are deliberately never auto-retried.
+        let deadline = std::time::Instant::now() + Duration::from_secs(120);
+        loop {
+            let refreshed = refresh(&vault).expect("loopback snapshot should synchronize");
+            if refreshed.pending == 0 && refreshed.indexed > 0 { break; }
+            assert!(std::time::Instant::now() < deadline, "synthetic snapshot did not become answer-ready");
+            std::thread::sleep(Duration::from_millis(500));
+        }
+        let status = status(&vault).unwrap();
+        assert!(status.answer_enabled);
+        assert_eq!(status.answer_provider.as_deref(), Some(consent.approved_answer_provider.as_str()));
+
+        let supported_id = uuid::Uuid::new_v4().to_string();
+        let supported_start = begin_answer(&vault, &supported_id).unwrap();
+        let supported = crate::memory_query::answer_with_knowledge(
+            &vault, "What does Fictional Alice Chen do on Project Aurora?", &supported_id, supported_start,
+        ).expect("synthetic supported answer request");
+        assert_eq!(supported.status, "supported");
+        assert!(!supported.selections.is_empty());
+        assert!(supported.selections.iter().all(|selection| {
+            selection.source_id == source.id && selection.revision == source.revision
+                && selection.source_sha256 == source.source_sha256 && selection.note_sha256 == source.note_sha256
+                && source.text.contains(&selection.quote)
+        }), "answers must quote only exact current source text");
+
+        let unsupported_id = uuid::Uuid::new_v4().to_string();
+        let unsupported_start = begin_answer(&vault, &unsupported_id).unwrap();
+        let unsupported = crate::memory_query::answer_with_knowledge(
+            &vault, "What is Fictional Alice Chen's favorite color on Project Aurora?", &unsupported_id, unsupported_start,
+        ).expect("synthetic unsupported answer request");
+        assert_eq!(unsupported.status, "insufficient");
+        assert!(unsupported.selections.is_empty());
+
+        let after = vault.source(&source.id).unwrap();
+        assert_eq!(after.bytes, source_bytes, "answering must not mutate original evidence");
+        let current = sources(&vault).unwrap().into_iter().find(|candidate| candidate.id == source.id).unwrap();
+        assert_eq!(current.revision, source.revision, "answering must not mutate source revision");
+        assert_eq!(current.note_sha256, source.note_sha256);
     }
 }

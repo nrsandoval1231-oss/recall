@@ -8,7 +8,7 @@ export interface ParserJob { operation_id: string; memory_id: string; expected_r
 export interface OrganizationReviewStatus { prior_operation_id: string; reuse_operation: boolean }
 export interface ProviderDisclosure { extraction: string; embedding: string; reranking: string }
 export interface KnowledgeServiceStatus { state: string; pending: number; indexed: number; failed: number; message: string; providers?: ProviderDisclosure | null }
-export interface KnowledgeStatus { enabled: boolean; include_existing: boolean; generation: number; service: KnowledgeServiceStatus; provider_disclosure: string; providers: ProviderDisclosure | null }
+export interface KnowledgeStatus { enabled: boolean; include_existing: boolean; generation: number; service: KnowledgeServiceStatus; provider_disclosure: string; providers: ProviderDisclosure | null; answer_enabled: boolean; answer_provider: string | null }
 export interface RelationshipSupport { source_id: string; revision: number; source_sha256: string; note_sha256: string; quote: string }
 export interface KnowledgeRelationship {
   id: string; source_id: string; revision: number; source_sha256: string; note_sha256: string; source_name: string; note_path: string; quote: string;
@@ -18,6 +18,8 @@ export interface KnowledgeRelationship {
 export interface KnowledgeSearchReply { status: KnowledgeServiceStatus; relationships: KnowledgeRelationship[] }
 export interface KnowledgeControl { version: number; vault_id: string; enabled: boolean; include_existing: boolean; generation: number; snapshot_sha256: string; existing_fence: string[]; dismissed_facts: string[] }
 export interface SourceAnswer { question: string; message: string; hits: { memory_id: string; revision: number; note_basename: string; current_excerpt: string; original_excerpt: string; source_sha256: string; mime_type: string }[]; knowledge_status?: KnowledgeServiceStatus | null; graph_relationships?: KnowledgeRelationship[] }
+export interface AnswerSelection { source_id: string; revision: number; source_sha256: string; note_sha256: string; quote: string }
+export interface MemoryAnswer { sources: SourceAnswer; status: "supported" | "insufficient" | "unavailable" | "cancelled" | "stale" | string; message: string; selections: AnswerSelection[]; answer_provider: string | null }
 export interface LocalVault {
   readonly available: boolean;
   captureNote?(expectedVaultId: string, operationId: string, note: string): Promise<VaultMemory>;
@@ -43,6 +45,9 @@ export interface LocalVault {
   knowledgeSearch?(expectedVaultId: string, query: string, includeHistory?: boolean): Promise<KnowledgeSearchReply>;
   knowledgeDismiss?(expectedVaultId: string, factId: string): Promise<KnowledgeControl>;
   knowledgeRebuild?(expectedVaultId: string): Promise<KnowledgeServiceStatus>;
+  knowledgeAnswerConsent?(expectedVaultId: string, enabled: boolean): Promise<KnowledgeControl>;
+  memoryAnswer?(expectedVaultId: string, question: string, requestId: string): Promise<MemoryAnswer>;
+  memoryAnswerCancel?(expectedVaultId: string, requestId: string): Promise<boolean>;
 }
 export class NativeLocalVault implements LocalVault {
   readonly available = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -73,4 +78,7 @@ export class NativeLocalVault implements LocalVault {
   knowledgeSearch(expectedVaultId: string, query: string, includeHistory = false) { return this.call<KnowledgeSearchReply>("knowledge_search", { expectedVaultId, query, includeHistory }); }
   knowledgeDismiss(expectedVaultId: string, factId: string) { return this.call<KnowledgeControl>("knowledge_dismiss", { expectedVaultId, factId }); }
   knowledgeRebuild(expectedVaultId: string) { return this.call<KnowledgeServiceStatus>("knowledge_rebuild", { expectedVaultId }); }
+  knowledgeAnswerConsent(expectedVaultId: string, enabled: boolean) { return this.call<KnowledgeControl>("knowledge_answer_consent", { expectedVaultId, enabled }); }
+  memoryAnswer(expectedVaultId: string, question: string, requestId: string) { return this.call<MemoryAnswer>("memory_answer", { expectedVaultId, question, requestId }); }
+  memoryAnswerCancel(expectedVaultId: string, requestId: string) { return this.call<boolean>("memory_answer_cancel", { expectedVaultId, requestId }); }
 }

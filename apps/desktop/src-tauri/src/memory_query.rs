@@ -61,6 +61,15 @@ pub fn ask_with_knowledge(vault:&Vault,question:&str)->Result<Answer,String> {
     }
     Ok(answer)
 }
+pub fn answer_with_knowledge(vault:&Vault, question:&str, request_id:&str, start:crate::knowledge::AnswerStart) -> Result<crate::knowledge::MemoryAnswer,String> {
+    crate::knowledge::cancel_replaced_answer(&vault.id, &start.replaced);
+    let sources = if start.allowed && !crate::knowledge::answer_is_active(&vault.id, request_id) {
+        ask(vault, question)?
+    } else {
+        ask_with_knowledge(vault, question)?
+    };
+    crate::knowledge::answer(vault, question, request_id, sources)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
