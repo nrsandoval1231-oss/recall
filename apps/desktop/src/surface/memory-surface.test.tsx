@@ -211,7 +211,7 @@ describe("Memory Surface", () => {
     await user.type(field, "The gate code was not legible.");
     await user.click(screen.getByRole("button", { name: "Save correction" }));
     expect(client.correct).toHaveBeenCalledWith("session-token", page.id, 1, expect.stringMatching(/^[0-9a-f-]{36}$/i), "The gate code was not legible.");
-    expect(await screen.findByText(/original photo is unchanged/)).toBeTruthy();
+    expect(await screen.findByText(/original source is unchanged/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "History" }));
     expect(await screen.findByText(/Revision 1/)).toBeTruthy();
   });
@@ -361,6 +361,10 @@ it("finishing organization of A never replaces B's correction editor after navig
   await user.click(screen.getByRole("button", { name: "Calendar" }));
   await user.click(await screen.findByRole("button", { name: /Aug 21, 2026 · B/ }));
   expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("B human draft");
+  await user.click(screen.getByRole("button", { name: "Home" }));
+  expect(screen.getByText("Claude is organizing source-linked memory…")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Calendar" }));
+  await user.click(await screen.findByRole("button", { name: /Aug 21, 2026 · B/ }));
   await act(async () => { finish({}); });
   await screen.findByText("Organized in Obsidian. Uncertainty and original evidence preserved.");
   expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("B human draft");
@@ -451,6 +455,28 @@ it("edits organized note words while preserving native properties in the save pa
   await screen.findByText(/Correction saved in the vault/);
   expect(client.correct).toHaveBeenCalledWith("session-token", saved.id, 2, expect.any(String), header + "Utility is now on time.");
   expect((editor as HTMLTextAreaElement).value).toBe("Utility is now on time.");
+  await user.click(screen.getByRole("button", { name: "Home" }));
+  expect(screen.queryByText(/Correction saved in the vault/)).toBeNull();
+});
+
+it("replaces failed organization progress with the error rather than a stale checking banner", async () => {
+  const initial = memory({ source_name: "Draft.txt", note: "Utility late." });
+  const client = vault({
+    source: vi.fn(async () => ({ bytes: Array.from(new TextEncoder().encode(initial.note)), mime_type: "text/plain", sha256: initial.source_sha256 })),
+    parse: vi.fn(async (_scope, id, revision, operation) => ({ memory_id: id, expected_revision: revision, operation_id: operation, source_sha256: initial.source_sha256, state: "parsed", message: "Synthetic parser" })),
+    organize: vi.fn(async () => { throw new Error("Synthetic provider failure"); }),
+    publish: vi.fn(),
+  }, [initial]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Open original: Draft" }));
+  await user.click(screen.getByLabelText(/Send this source to Jev and Claude/));
+  await user.click(screen.getByRole("button", { name: "Organize this memory" }));
+  await screen.findByRole("alert");
+  expect(screen.queryByText(/Claude organization stopped/)).toBeNull();
+  expect(screen.queryByText(/Claude is organizing/)).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Home" }));
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(client.publish).not.toHaveBeenCalled();
 });
 
 it("organization completion fills body-only editing without duplicating native properties on save", async () => {

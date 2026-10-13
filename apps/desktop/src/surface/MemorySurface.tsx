@@ -174,6 +174,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const askRequest = useRef(0);
   const evidenceRef = useRef<string | null>(null);
   const correctionVersion = useRef(0);
+  const organizationRequests = useRef(new Map<string, number>());
+  function organizationActive() { return Boolean(selected?.vault_id && organizationRequests.current.get(selected.vault_id)); }
   function clearPreview() {
     if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
     previewRef.current = null; setPreview(null);
@@ -270,6 +272,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     evidenceRef.current = null; sourceRequest.current += 1; askRequest.current += 1;
     setEvidenceId(null);
     setError("");
+    setNotice("");
+    if (!organizationActive()) setProcessingState("");
     setAnswer(null);
     setSourceAnswer(null);
     setVaultHits(null);
@@ -342,6 +346,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   async function organizeMemory(memory: VaultMemory, reviewRetry = false) {
     if (!selected) return;
     const scope = selected;
+    organizationRequests.current.set(scope.vault_id, (organizationRequests.current.get(scope.vault_id) ?? 0) + 1);
     const draftVersion = correctionVersion.current;
     const acknowledged = reviewRetryAcknowledged;
     setReviewRetryAcknowledged(false);
@@ -356,8 +361,16 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
         setHistory(null); setProcessingConsent(false); setReviewRetryAcknowledged(false);
       }
     } catch (processingError) {
-      if (inScope(scope.vault_id)) setError(message(processingError));
-    } finally { if (inScope(scope.vault_id)) setBusy(false); }
+      if (inScope(scope.vault_id)) {
+        if (organizationRequests.current.get(scope.vault_id) === 1) setProcessingState("");
+        setError(message(processingError));
+      }
+    } finally {
+      const remaining = (organizationRequests.current.get(scope.vault_id) ?? 1) - 1;
+      if (remaining) organizationRequests.current.set(scope.vault_id, remaining);
+      else organizationRequests.current.delete(scope.vault_id);
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
   }
 
   async function saveNote() {
@@ -442,7 +455,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     if (!selected || !openable(memory)) return;
     setBusy(true); setError("");
     setHistory(null);
-    setProcessingState(""); setProcessingConsent(false); setReviewRetryAcknowledged(false);
+    if (!organizationActive()) setProcessingState("");
+    setProcessingConsent(false); setReviewRetryAcknowledged(false);
     clearPreview();
     setReading(null);
     setConsent(false);
@@ -475,7 +489,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       if (!alive.current) return;
       setItems((rows) => rows.map((row) => row.id === saved.id ? saved : row));
       if (evidenceRef.current === memory.id) { setEvidenceId(saved.id); setCorrection(noteBody(saved)); setHistory(null); setReading(null); }
-      setNotice("Correction saved in the vault. The original photo is unchanged. This is your note, not a verified fact.");
+      if (!organizationActive()) setProcessingState("");
+      setNotice("Correction saved in the vault. The original source is unchanged. This is your note, not a verified fact.");
     } catch (correctError) {
       if (alive.current) setError(`${message(correctError)} The draft is still here. Reload the note before saving again.`);
     } finally {
@@ -512,7 +527,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setSection("home");
       setEvidenceId(null);
       setConfirmRemove(false);
-      setNotice("Removed from Recall. The original photo and history remain in the vault.");
+      setNotice("Removed from Recall. The original source and history remain in the vault.");
     } catch (removeError) {
       if (alive.current) setError(message(removeError));
     } finally {
@@ -951,7 +966,7 @@ function Evidence(props: {
                 {props.history.map((revision) => <li key={revision.revision} className="ms-hit"><strong>Revision {revision.revision}</strong><NoteMarkdown>{noteBody({ id: memory.id, note: revision.note }) || "No note added."}</NoteMarkdown><small>{revision.kind} · {revision.origin} · {revision.recorded_at}</small></li>)}
               </ol>
             )}
-            <label className="ms-check"><input type="checkbox" checked={props.confirmRemove} onChange={(event) => props.onConfirmRemove(event.target.checked)} /> Remove from Recall. The photo and history stay in the vault.</label>
+            <label className="ms-check"><input type="checkbox" checked={props.confirmRemove} onChange={(event) => props.onConfirmRemove(event.target.checked)} /> Remove from Recall. The original source and history stay in the vault.</label>
             <button type="button" disabled={props.busy || !props.confirmRemove} onClick={props.onRemove}>Remove from Recall</button>
             {props.canProcess && <section aria-label="Meeting processing"><h2>Organize in Obsidian</h2><label className="ms-check"><input type="checkbox" checked={props.processingConsent} onChange={(event) => props.onProcessingConsent(event.target.checked)} /> Send this source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type="button" disabled={props.busy || !props.processingConsent || memory.state !== "active" || Boolean(memory.conflict)} onClick={props.onOrganize}>Organize this memory</button></section>}
             {props.canReviewOrganization && <section aria-label="Reviewed organization retry"><h2>Review an organization retry</h2><p>The previous request may have incurred charges. Its record and reserved budget stay intact. Review authorizes one new Claude operation using the saved Jev result.</p><label className="ms-check"><input type="checkbox" disabled={props.busy} checked={props.reviewRetryAcknowledged} onChange={(event) => props.onReviewRetryAcknowledged(event.target.checked)} /> I reviewed the failed attempt and acknowledge that another request may incur additional charges.</label><button type="button" disabled={props.busy || !props.processingConsent || !props.reviewRetryAcknowledged} onClick={props.onReviewedRetry}>Review and retry organization</button></section>}

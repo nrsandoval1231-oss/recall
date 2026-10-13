@@ -158,7 +158,7 @@ const note = `---\nrecall_id: "${id}"\ntitle: "Utility meeting"\n---\n\n# Utilit
   await page
     .getByRole("button", { name: "Save correction", exact: true })
     .click();
-  await page.getByText(/original photo is unchanged/).waitFor();
+  await page.getByText(/original source is unchanged/).waitFor();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await page
     .getByRole("searchbox")

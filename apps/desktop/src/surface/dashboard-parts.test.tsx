@@ -77,3 +77,11 @@ it("never promotes retracted-only statements into a home summary", () => {
     ),
   ).toBe("");
 });
+it("marks a shortened preview with an ellipsis without splitting its final word", () => {
+  const text = "Follow up with the operator about the proposed tour. ".repeat(8);
+  const summary = noteSummary(text);
+  expect(summary.length).toBeLessThanOrEqual(240);
+  expect(summary.endsWith("…")).toBe(true);
+  expect(text.startsWith(summary.slice(0, -1))).toBe(true);
+  expect(summary.slice(0, -1)).toMatch(/\b(tour\.|proposed|the|about|operator|with|up|Follow)$/);
+});
