@@ -6,10 +6,12 @@ export function NoteMarkdown({
   children,
   memories = [],
   onOpen,
+  onAttachment,
 }: {
   children: string;
   memories?: VaultMemory[];
   onOpen?: (memory: VaultMemory) => void;
+  onAttachment?: (fileName: string) => void;
 }) {
   const links = new Map<string, VaultMemory>();
   const content = children.replace(
@@ -37,6 +39,21 @@ export function NoteMarkdown({
         components={{
           a: ({ children, href }) => {
             const memory = href && links.get(href);
+            const attachment =
+              href &&
+              /^\.\.\/Sources\/([0-9a-f-]{36}\.(png|jpg|jpeg|webp|pdf|md|txt))$/.exec(
+                href,
+              )?.[1];
+            if (attachment && onAttachment)
+              return (
+                <button
+                  type="button"
+                  className="ms-internal-link"
+                  onClick={() => onAttachment(attachment)}
+                >
+                  {children}
+                </button>
+              );
             return memory ? (
               <button
                 type="button"

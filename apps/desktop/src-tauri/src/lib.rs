@@ -13,6 +13,7 @@ mod persistence;
 pub mod phone;
 mod secrets;
 mod obsidian;
+mod attachments;
 
 use managed_export::ManagedExportState;
 use persistence::{NativeStore, PendingCommand, Scope, Snapshot, SyncEvent};
@@ -222,6 +223,7 @@ fn library_create(state: tauri::State<'_, local_vault::LocalVaultState>) -> Resu
 #[tauri::command]
 fn library_import_markdown(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, operation_id: String) -> Result<Option<local_vault::VaultMemory>, String> {
     state.with(&expected_vault_id, |vault| {
+        if let Some(memory)=vault.resume_import(&operation_id)? {return Ok(Some(memory));}
         let Some(path) = rfd::FileDialog::new().set_title("Import Markdown or text without changing the original").add_filter("Markdown and text", &["md", "markdown", "txt"]).pick_file() else { return Ok(None); };
         vault.import_markdown_path(&operation_id, &path).map(Some)
     })
@@ -229,6 +231,29 @@ fn library_import_markdown(state: tauri::State<'_, local_vault::LocalVaultState>
 #[tauri::command]
 fn library_restore_deleted(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, expected_revision: u64, operation_id: String) -> Result<local_vault::VaultMemory, String> {
     state.with(&expected_vault_id, |vault| vault.restore_deleted(&memory_id, expected_revision, &operation_id))
+}
+
+#[tauri::command]
+fn library_attach(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, expected_revision: u64, operation_id: String) -> Result<Option<local_vault::VaultMemory>, String> {
+    state.with(&expected_vault_id, |vault| {
+        if let Some(saved)=attachments::resume(vault,&memory_id,expected_revision,&operation_id)? { return Ok(Some(saved)); }
+        let Some(path)=rfd::FileDialog::new().set_title("Attach a document or image").add_filter("Supported attachments", &["png","jpg","jpeg","webp","pdf","md","txt"]).pick_file() else {return Ok(None);};
+        attachments::add_from_path(vault,&memory_id,expected_revision,&operation_id,&path).map(Some)
+    })
+}
+#[tauri::command]
+fn library_attachment(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, file_name: String) -> Result<attachments::Attachment, String> {
+    state.with(&expected_vault_id, |vault| attachments::inspect(vault,&memory_id,&file_name))
+}
+
+#[tauri::command]
+fn library_attachment_save(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, file_name: String) -> Result<bool, String> {
+    state.with(&expected_vault_id, |vault| {
+        let attachment = attachments::inspect(vault, &memory_id, &file_name)?;
+        let Some(path) = rfd::FileDialog::new().set_title("Save a copy of the original attachment").set_file_name(&attachment.name).save_file() else { return Ok(false); };
+        attachments::save_copy(&path, &attachment.bytes)?;
+        Ok(true)
+    })
 }
 
 #[tauri::command]
@@ -534,6 +559,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             vault_status,
             library_create,
+            library_attach,
+            library_attachment,
+            library_attachment_save,
             library_import_markdown,
             library_restore_deleted,
             vault_select,

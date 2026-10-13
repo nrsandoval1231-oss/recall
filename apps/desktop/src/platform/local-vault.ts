@@ -61,8 +61,27 @@ export interface SourceAnswer {
     mime_type: string;
   }[];
 }
+export interface LibraryAttachment extends VaultSource {
+  name: string;
+}
 export interface LocalVault {
   readonly available: boolean;
+  attach?(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ): Promise<VaultMemory | null>;
+  attachment?(
+    expectedVaultId: string,
+    memoryId: string,
+    fileName: string,
+  ): Promise<LibraryAttachment>;
+  saveAttachment?(
+    expectedVaultId: string,
+    memoryId: string,
+    fileName: string,
+  ): Promise<boolean>;
   create?(): Promise<VaultStatus | null>;
   importMarkdown?(
     expectedVaultId: string,
@@ -168,6 +187,33 @@ export class NativeLocalVault implements LocalVault {
     return this.call<void>("vault_open_obsidian", {
       expectedVaultId,
       memoryId,
+    });
+  }
+  saveAttachment(expectedVaultId: string, memoryId: string, fileName: string) {
+    return this.call<boolean>("library_attachment_save", {
+      expectedVaultId,
+      memoryId,
+      fileName,
+    });
+  }
+  attach(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ) {
+    return this.call<VaultMemory | null>("library_attach", {
+      expectedVaultId,
+      memoryId,
+      expectedRevision,
+      operationId,
+    });
+  }
+  attachment(expectedVaultId: string, memoryId: string, fileName: string) {
+    return this.call<LibraryAttachment>("library_attachment", {
+      expectedVaultId,
+      memoryId,
+      fileName,
     });
   }
   create() {

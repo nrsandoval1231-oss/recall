@@ -14,10 +14,18 @@ New regression evidence includes pre-capture draft recovery, interrupted-save re
 
 ## Acceptance boundaries
 
-Actual installed Windows, physical iPhone, handwriting/live Jev/Claude quality and real Obsidian protocol launch are not established by these local checks. Phone offline recovery, broader semantic retrieval, full-library export/restore, and attachments remain the subsequent implementation work; this initial commit does not claim the entire native-memory mission complete. Native library and editor are the owner's current priority.
+Actual installed Windows, physical iPhone, handwriting/live Jev/Claude quality and real Obsidian protocol launch are not established by these local checks. Phone offline recovery, broader semantic retrieval, full-library export/restore, remain the subsequent implementation work; this initial commit does not claim the entire native-memory mission complete. Native library and editor are the owner's current priority.
 
 ## Actual native runtime walkthrough
 
 [Native runtime results](runtime/native-runtime.json) and [native editor screenshot](runtime/native-autosaved-editor.png) come from the actual Linux Tauri debug executable running under WebKit/Xvfb with the production frontend, real native IPC and real filesystem writes. Only the content is synthetic; no IPC responses or model results are mocked. Obsidian is not installed. The native app created its library, saved immutable original text, autosaved a human correction, retrieved source-backed quotes, restarted, and retrieved the same memory with an unchanged original hash. This is Linux development-runtime evidence, not installed Windows/iPhone or live-provider acceptance.
 
 The walkthrough uncovered an inherited `unknown path` failure when no Documents directory is configured. Default-library creation now honors an explicit native override without consulting Documents, and falls back to the native home Documents location when needed. A Rust regression covers both branches.
+
+## Slice 2 — native attachments and recovery repairs
+
+Native Attach file preserves selected PNG/JPEG/WebP/PDF/Markdown/text bytes under an application-assigned immutable path before linking them through a human revision. Inspection verifies native library/memory ownership and the exact returned SHA-256. Save attachment copy uses a native destination picker and refuses overwriting existing files. Neither control invokes a provider. Durable library-scoped import and attachment intents retain exact operation identities across restart; imports resume native receipts before reopening a picker. Attachment recovery offers explicit retry or clearing only the pending intent while preserving stored originals/receipts. Corrupt editor drafts are archived before replacement; keyboard saves respect busy controls.
+
+Verification: 249 native Rust tests, 113 desktop tests / 271 workspace tests, lint/typechecks, production frontend and Linux native builds passed. Four-size browser visual/accessibility checks passed with zero measured violations. Independent review identified recovery identity and attachment read-integrity issues; these were repaired before publication.
+
+[Actual attachment evidence](runtime/native-attachment-runtime.json) and [native inspection screenshot](runtime/native-attachment-inspection.png) show a real Linux Tauri native picker attaching text, inspecting it inside Recall, and saving a byte-identical copy with the original capture hash unchanged. Modal native pickers blocked WebDriver and required X11 input; that limitation is recorded, rather than representing browser mock tests as native acceptance. Installed Windows/iPhone and live providers remain unverified. Full-library export/restore is the next library slice.

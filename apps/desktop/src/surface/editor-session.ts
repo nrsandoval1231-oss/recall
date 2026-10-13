@@ -35,6 +35,7 @@ export class EditorSession {
   private readonly key: string;
   private memory: VaultMemory;
   private latest: VaultMemory;
+  private corruptJournal: string | null = null;
   private attempt: EditorIntent | null = null;
   private running: Promise<void> | null = null;
   private listeners = new Set<() => void>();
@@ -62,11 +63,13 @@ export class EditorSession {
     try {
       const raw = store.getItem(this.key);
       if (raw) {
+        this.corruptJournal = raw;
         const d: unknown = JSON.parse(raw);
         if (!this.valid(d))
           throw Error(
             "Saved editor draft needs recovery; it was not discarded.",
           );
+        this.corruptJournal = null;
         this.memory = { ...memory, revision: d.baseRevision, note: d.baseNote };
         this.attempt = d.attempt;
         this.snapshot = {
@@ -133,7 +136,17 @@ export class EditorSession {
     this.snapshot = { ...this.snapshot, ...values };
     this.listeners.forEach((fn) => fn());
   }
+  private archiveCorruptJournal() {
+    if (this.corruptJournal !== null) {
+      this.store.setItem(
+        `${this.key}:recovery:${crypto.randomUUID()}`,
+        this.corruptJournal,
+      );
+      this.corruptJournal = null;
+    }
+  }
   private persist() {
+    this.archiveCorruptJournal();
     const d: Draft = {
       format: "recall-editor-v1",
       body: this.snapshot.body,
@@ -206,7 +219,13 @@ export class EditorSession {
     if (this.running) return;
     this.memory = this.latest;
     this.attempt = null;
-    this.store.removeItem(this.key);
+    try {
+      this.archiveCorruptJournal();
+      this.store.removeItem(this.key);
+    } catch (error) {
+      this.update({ paused: true, error: String(error) });
+      return;
+    }
     this.update({
       body: noteBody(this.latest),
       latestBody: noteBody(this.latest),

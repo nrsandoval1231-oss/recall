@@ -18,6 +18,9 @@ export function MemoryEditor({
   memories,
   onOpen,
   disabled,
+  onAttach,
+  onResetAttachment,
+  onAttachment,
 }: {
   identity: string;
   memory: VaultMemory;
@@ -27,6 +30,9 @@ export function MemoryEditor({
   memories: VaultMemory[];
   onOpen: (memory: VaultMemory) => void;
   disabled: boolean;
+  onAttach?: () => void;
+  onResetAttachment?: () => void;
+  onAttachment?: (fileName: string) => void;
 }) {
   const callbacks = useRef({ commit, onChange });
   callbacks.current = { commit, onChange };
@@ -102,6 +108,15 @@ export function MemoryEditor({
     <section className="memory-editor" aria-label="Native memory editor">
       <div className="editor-top">
         <span>Memory editor</span>
+        {onAttach && (
+          <button
+            type="button"
+            disabled={disabled || state.dirty || state.saving || state.paused}
+            onClick={onAttach}
+          >
+            Attach file
+          </button>
+        )}
         <button
           type="button"
           aria-pressed={preview}
@@ -110,6 +125,23 @@ export function MemoryEditor({
           {preview ? "Edit" : "Preview"}
         </button>
       </div>
+      {onAttach && onResetAttachment && (
+        <details>
+          <summary>Attachment recovery</summary>
+          <p>
+            Retry Attach file to resume the previous attempt. Start a new
+            attempt only after reviewing an error; any saved attachment bytes
+            and receipts stay in your library.
+          </p>
+          <button
+            type="button"
+            disabled={disabled || state.saving}
+            onClick={onResetAttachment}
+          >
+            Clear pending attachment attempt
+          </button>
+        </details>
+      )}
       <p className="ms-fine">
         Your edits are human revisions. Original evidence stays unchanged. AI
         interpretations are proposals; revision history records their origin.
@@ -220,7 +252,11 @@ export function MemoryEditor({
       >
         <label htmlFor={`editor-${memory.id}`}>Your correction</label>
         {preview ? (
-          <NoteMarkdown memories={memories} onOpen={onOpen}>
+          <NoteMarkdown
+            memories={memories}
+            onOpen={onOpen}
+            onAttachment={onAttachment}
+          >
             {state.body}
           </NoteMarkdown>
         ) : (
@@ -236,7 +272,7 @@ export function MemoryEditor({
                 event.key.toLowerCase() === "s"
               ) {
                 event.preventDefault();
-                void session.save();
+                if (!disabled && !state.saving) void session.save();
               }
               if (
                 (event.ctrlKey || event.metaKey) &&

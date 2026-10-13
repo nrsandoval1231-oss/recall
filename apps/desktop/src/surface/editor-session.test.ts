@@ -125,3 +125,28 @@ it("keeps a machine proposal paused after restart until explicit human review", 
   await reopened.save();
   expect(calls).toBe(0);
 });
+
+it("preserves a corrupt recovery journal before accepting any replacement draft", () => {
+  const map = new Map<string, string>();
+  const key = "recall.editor.v1:a:memory-a";
+  map.set(key, "{broken original draft");
+  const store = {
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      map.set(k, v);
+    },
+    removeItem: (k: string) => {
+      map.delete(k);
+    },
+  };
+  const session = new EditorSession("a", memory, store, async () => memory);
+  expect(session.getSnapshot().paused).toBe(true);
+  session.edit("New draft");
+  expect(
+    [...map.entries()].some(
+      ([k, v]) =>
+        k.startsWith(`${key}:recovery:`) && v === "{broken original draft",
+    ),
+  ).toBe(true);
+  expect(session.getSnapshot().paused).toBe(true);
+});

@@ -1,3 +1,4 @@
+import { attachmentIntent, clearAttachmentIntent } from "./attachment-intent";
 import { MemoryEditor } from "./MemoryEditor";
 import type { EditorIntent } from "./editor-session";
 import { AdaptiveGraph } from "./AdaptiveGraph";
@@ -283,6 +284,11 @@ export function MemorySurface({
     null,
   );
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
+  const [attachmentView, setAttachmentView] = useState<Preview | null>(null);
+  const attachmentRequest = useRef(0);
+  const [attachmentFile, setAttachmentFile] = useState<string | null>(null);
+  const attachmentRef = useRef<Preview | null>(null);
+  attachmentRef.current = attachmentView;
   const [preview, setPreview] = useState<Preview | null>(null);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<PendingCapture | null>(null);
@@ -315,7 +321,15 @@ export function MemorySurface({
       selected?.vault_id && organizationRequests.current.get(selected.vault_id),
     );
   }
+  function closeAttachment() {
+    attachmentRequest.current++;
+    if (attachmentRef.current) URL.revokeObjectURL(attachmentRef.current.url);
+    attachmentRef.current = null;
+    setAttachmentView(null);
+    setAttachmentFile(null);
+  }
   function clearPreview() {
+    closeAttachment();
     if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
     previewRef.current = null;
     setPreview(null);
@@ -331,6 +345,7 @@ export function MemorySurface({
     return () => {
       alive.current = false;
       if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
+      if (attachmentRef.current) URL.revokeObjectURL(attachmentRef.current.url);
     };
   }, []);
 
@@ -428,6 +443,7 @@ export function MemorySurface({
   }, [vaultSettings]);
 
   function go(next: Section) {
+    closeAttachment();
     if (
       (section === "evidence" || section === "capture") &&
       next !== "evidence" &&
@@ -876,17 +892,25 @@ export function MemorySurface({
   async function importMarkdown() {
     if (!selected || !vault.importMarkdown) return;
     const scope = selected;
-    const operation = importOperation ?? operationId();
-    setImportOperation(operation);
+    const key = `recall.import.v1:${scope.vault_identity ?? scope.vault_id}`;
     setBusy(true);
     setError("");
     try {
+      const operation = localStorage.getItem(key) ?? operationId();
+      if (!/^[0-9a-f-]{36}$/.test(operation))
+        throw new Error(
+          "Import recovery identity needs review; it was preserved.",
+        );
+      localStorage.setItem(key, operation);
+      setImportOperation(operation);
       const saved = await vault.importMarkdown(scope.vault_id, operation);
       if (!inScope(scope.vault_id)) return;
       if (!saved) {
+        localStorage.removeItem(key);
         setImportOperation(null);
         return;
       }
+      localStorage.removeItem(key);
       setImportOperation(null);
       setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
       closeSettings();
@@ -894,6 +918,135 @@ export function MemorySurface({
       setNotice(
         "Imported into your library. The original file was not changed.",
       );
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function attachFile(memory: VaultMemory) {
+    if (!selected || !vault.attach) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const intent = attachmentIntent(
+        localStorage,
+        scope.vault_identity ?? scope.vault_id,
+        memory.id,
+        memory.revision,
+      );
+      const saved = await vault.attach(
+        scope.vault_id,
+        memory.id,
+        intent.revision,
+        intent.operation,
+      );
+      if (!inScope(scope.vault_id)) return;
+      intent.acknowledge();
+      if (!saved) return;
+      setItems((rows) =>
+        rows.map((row) => (row.id === saved.id ? saved : row)),
+      );
+      if (evidenceRef.current === saved.id) {
+        setCorrection(noteBody(saved));
+        setHistory(null);
+      }
+      setNotice(
+        "Attachment saved in your library. Original evidence was not changed.",
+      );
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  function resetAttachment(memory: VaultMemory) {
+    if (!selected) return;
+    try {
+      clearAttachmentIntent(
+        localStorage,
+        selected.vault_identity ?? selected.vault_id,
+        memory.id,
+      );
+      setError("");
+      setNotice(
+        "Pending attachment attempt cleared. Previously stored attachment bytes and receipts remain in your library; a new attachment will use a new operation.",
+      );
+    } catch (error) {
+      setError(message(error));
+    }
+  }
+  async function inspectAttachment(memory: VaultMemory, fileName: string) {
+    if (!selected || !vault.attachment) return;
+    const scope = selected;
+    const request = ++attachmentRequest.current;
+    setBusy(true);
+    setError("");
+    try {
+      const source = await vault.attachment(
+        scope.vault_id,
+        memory.id,
+        fileName,
+      );
+      if (
+        !inScope(scope.vault_id) ||
+        evidenceRef.current !== memory.id ||
+        request !== attachmentRequest.current
+      )
+        return;
+      if (attachmentRef.current) URL.revokeObjectURL(attachmentRef.current.url);
+      const text =
+        source.mime_type === "text/plain"
+          ? new TextDecoder("utf-8", { fatal: true }).decode(
+              Uint8Array.from(source.bytes),
+            )
+          : undefined;
+      const actual = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest("SHA-256", Uint8Array.from(source.bytes)),
+        ),
+        (byte) => byte.toString(16).padStart(2, "0"),
+      ).join("");
+      if (
+        !inScope(scope.vault_id) ||
+        evidenceRef.current !== memory.id ||
+        request !== attachmentRequest.current
+      )
+        return;
+      if (actual !== source.sha256)
+        throw new Error("Attachment bytes did not match the native receipt.");
+      const url = URL.createObjectURL(
+        new Blob([Uint8Array.from(source.bytes)], { type: source.mime_type }),
+      );
+      setAttachmentFile(fileName);
+      setAttachmentView({
+        url,
+        text,
+        name: source.name,
+        mime: source.mime_type,
+        sha256: source.sha256,
+        matches: true,
+      });
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function saveAttachmentCopy(memory: VaultMemory, fileName: string) {
+    if (!selected || !vault.saveAttachment) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await vault.saveAttachment(
+        scope.vault_id,
+        memory.id,
+        fileName,
+      );
+      if (saved && inScope(scope.vault_id))
+        setNotice("Attachment copy saved. Library evidence is unchanged.");
     } catch (error) {
       if (inScope(scope.vault_id)) setError(message(error));
     } finally {
@@ -1102,8 +1255,10 @@ export function MemorySurface({
   }, [section]);
   useEffect(() => {
     function escape(event: KeyboardEvent) {
-      if (event.key === "Escape" && !vaultSettings)
-        go(exploring ? "graph" : "home");
+      if (event.key === "Escape" && !vaultSettings) {
+        if (attachmentRef.current) closeAttachment();
+        else go(exploring ? "graph" : "home");
+      }
     }
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
@@ -1294,6 +1449,20 @@ export function MemorySurface({
                     onCorrection={(value) => {
                       correctionVersion.current += 1;
                       setCorrection(value);
+                    }}
+                    onResetAttachment={
+                      evidenceMemory
+                        ? () => resetAttachment(evidenceMemory)
+                        : undefined
+                    }
+                    onAttach={
+                      vault.attach && evidenceMemory
+                        ? () => void attachFile(evidenceMemory)
+                        : undefined
+                    }
+                    onAttachment={(fileName) => {
+                      if (evidenceMemory)
+                        void inspectAttachment(evidenceMemory, fileName);
                     }}
                     editorIdentity={selected?.vault_identity ?? "unavailable"}
                     editorMemories={kept}
@@ -1657,6 +1826,55 @@ export function MemorySurface({
               </div>
             </div>
           )}
+          {attachmentView && (
+            <div
+              className="attachment-sheet glass"
+              role="region"
+              aria-label="Attachment inspection"
+            >
+              <header>
+                <h2>{attachmentView.name}</h2>
+                <button
+                  onClick={() => {
+                    attachmentRequest.current++;
+                    setAttachmentFile(null);
+                    if (attachmentRef.current)
+                      URL.revokeObjectURL(attachmentRef.current.url);
+                    attachmentRef.current = null;
+                    setAttachmentView(null);
+                  }}
+                >
+                  Close attachment
+                </button>
+              </header>
+              {attachmentView.text !== undefined ? (
+                <pre>{attachmentView.text}</pre>
+              ) : attachmentView.mime?.startsWith("image/") ? (
+                <img
+                  src={attachmentView.url}
+                  alt={`Attachment ${attachmentView.name}`}
+                />
+              ) : (
+                <p>
+                  Original PDF retained. Download to inspect with a PDF viewer.
+                </p>
+              )}
+              <p className="ms-fine">
+                Native receipt and byte hash match. SHA-256:{" "}
+                {attachmentView.sha256}
+              </p>
+              {vault.saveAttachment && attachmentFile && evidenceMemory && (
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void saveAttachmentCopy(evidenceMemory, attachmentFile)
+                  }
+                >
+                  Save attachment copy
+                </button>
+              )}
+            </div>
+          )}
           {section === "evidence" && (
             <div
               className="compact-capture"
@@ -1825,6 +2043,9 @@ function Evidence(props: {
   librarian: Librarian;
   onBack: () => void;
   onCorrection: (value: string) => void;
+  onResetAttachment?: () => void;
+  onAttach?: () => void;
+  onAttachment?: (fileName: string) => void;
   editorIdentity: string;
   editorMemories: VaultMemory[];
   commitEdit: (intent: EditorIntent) => Promise<VaultMemory>;
@@ -1983,7 +2204,11 @@ function Evidence(props: {
                     : "Saved in your library. The note below is human text, not a verified reading."}
               </p>
               {memory.conflict && <p role="alert">{memory.conflict}</p>}
-              <NoteMarkdown>
+              <NoteMarkdown
+                memories={props.editorMemories}
+                onOpen={props.onRelated}
+                onAttachment={props.onAttachment}
+              >
                 {noteBody(memory) || "No note added."}
               </NoteMarkdown>
               <MemoryEditor
@@ -1995,6 +2220,9 @@ function Evidence(props: {
                 commit={props.commitEdit}
                 memories={props.editorMemories}
                 onOpen={props.onRelated}
+                onResetAttachment={props.onResetAttachment}
+                onAttach={props.onAttach}
+                onAttachment={props.onAttachment}
                 disabled={props.busy}
               />
               <div className="ms-actions">

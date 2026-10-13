@@ -171,6 +171,7 @@ pub struct Vault {
 }
 impl Vault {
     pub(crate) fn validate_for_processing(&self) -> Result<()> { self.validate() }
+    pub(crate) fn identity(&self) -> &str { &self.id }
     pub(crate) fn root(&self) -> &Path {
         &self.root
     }
@@ -305,7 +306,7 @@ fn identity_prefix(path: &Path, len: usize) -> Result<Vec<u8>> {
         .map_err(fail)?;
     Ok(bytes)
 }
-fn sync_dir(path: &Path) -> Result<()> {
+pub(crate) fn sync_dir(path: &Path) -> Result<()> {
     safe(path)?;
     #[cfg(unix)]
     {
@@ -329,7 +330,7 @@ pub(crate) fn create(path: &Path, bytes: &[u8]) -> Result<()> {
     boundary!("sync_after", path);
     sync_dir(path.parent().ok_or("No parent")?)
 }
-fn immutable(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn immutable(path: &Path, bytes: &[u8]) -> Result<()> {
     if path.try_exists().map_err(fail)? {
         if read(path, bytes.len() as u64)? != bytes {
             return Err("Immutable file mismatch; recovery required".into());
@@ -437,7 +438,7 @@ fn entries(path: &Path) -> Result<Vec<PathBuf>> {
     out.sort();
     Ok(out)
 }
-fn image_type(bytes: &[u8]) -> Result<&'static str> {
+pub(crate) fn image_type(bytes: &[u8]) -> Result<&'static str> {
     if bytes.len() as u64 > MAX_PHOTO {
         return Err("Photo exceeds 25 MiB limit".into());
     }
@@ -1319,6 +1320,17 @@ impl Vault {
                 return Err("Operation ID reused with different payload".into());
             }
             return self.current(&e.memory.id, &pending).map(Some);
+        }
+        Ok(None)
+    }
+    pub fn resume_import(&self, operation_id: &str) -> Result<Option<VaultMemory>> {
+        let _lock = self.lock()?;
+        id(operation_id)?;
+        let pending = self.recover()?;
+        if let Some(error)=pending.get(operation_id){return Err(error.clone());}
+        if let Some(event)=self.receipt(operation_id)? {
+            if event.kind != "capture" || !event.memory.source_name.is_empty(){return Err("Import receipt does not match a text import".into());}
+            return self.current(&event.memory.id,&pending).map(Some);
         }
         Ok(None)
     }

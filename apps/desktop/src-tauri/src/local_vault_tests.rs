@@ -2269,7 +2269,12 @@ fn markdown_import_preserves_original_content_and_never_modifies_the_input_file(
     let corrected=vault.correct(&memory.id,1,&op(),"# Human correction\n42 is unknown.").unwrap();
     assert_eq!(vault.source(&corrected.id).unwrap().bytes,text.as_bytes());
     let reopened=Vault::open(vault.root()).unwrap();assert_eq!(reopened.history(&memory.id).unwrap().len(),2);
-    assert_eq!(fs::read(source).unwrap(),text.as_bytes());
+    assert_eq!(reopened.resume_import(&operation).unwrap().unwrap().id,memory.id);
+    assert_eq!(reopened.resume_import(&operation).unwrap().unwrap().revision,2);
+    fs::write(&source,"Externally changed input").unwrap();
+    assert_eq!(reopened.resume_import(&operation).unwrap().unwrap().note,corrected.note);
+    assert_eq!(reopened.source(&memory.id).unwrap().bytes,text.as_bytes());
+    assert!(reopened.resume_import(&op()).unwrap().is_none());
 }
 
 #[test]
