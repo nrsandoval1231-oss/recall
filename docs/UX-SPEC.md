@@ -314,3 +314,7 @@ The product loop remains:
 The experience-level rule beneath it is:
 
 > **Evidence underneath. Understanding above it. Memory moves through depth.**
+
+## Current canonical UI implementation (2026-10-12)
+
+The owner requested direct implementation of the committed reference. This supersedes historical owner cuts below wherever they conflict with the selected recent-notes/calendar/bottom-action composition and decorative background. Decorative generated imagery never represents an original capture. Actual vault data determines names, counts, dates, note titles and context. A labeled browser-only reference preview may reproduce the image's illustrative data, but the native app must never substitute it into an empty vault. The current calendar shows capture dates and explicitly unscheduled follow-ups; reference schedules and project business metadata do not establish user commitments. Unsupported voice input remains visibly unavailable. Saved frontmatter tags supply Topics; entity mentions remain source-scoped and unresolved.

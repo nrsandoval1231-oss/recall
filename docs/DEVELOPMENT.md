@@ -281,3 +281,7 @@ Preconditions: owner-approved budget and key, provider retention/training terms 
 4. Ask each held-out question; record answered/abstained, whether every material sentence is supported by the cited page (entailment), and whether the correct original is cited. Include deliberately unsupported questions; they must abstain.
 5. Revoke consent; confirm queued work stops and Ask returns `unavailable` with sources.
 6. Record model id, effort, prompt/processor version (`interpret-v1`), dataset version, and results in ACCEPTANCE. Do not tune prompts against the held-out answers.
+
+### Reproduce canonical desktop UI verification
+
+Install dependencies with `npm ci`, then run `npm run dev -w @recall/desktop -- --host 127.0.0.1 --port 4173 --strictPort`. In another terminal run `npm run test:visual -w @recall/desktop` with an installed Playwright Chromium browser. `RECALL_CHROMIUM` may select a local executable; `RECALL_UI_URL` overrides the development URL and `RECALL_UI_EVIDENCE_DIR` redirects generated artifacts. The script captures four viewports, tests an explicitly synthetic native IPC fixture through inspection/correction/Ask/settings/capture, rejects provider calls, scans accessibility and console errors, and saves a side-by-side canonical comparison. It does not establish live provider or Windows/Tauri acceptance. See `design-qa.md` for measured visual checks and remaining refinements.

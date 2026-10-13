@@ -9,11 +9,17 @@ function section(document: string, heading: string): string[] {
 }
 function unescape(text: string): string { return text.replace(/\\([\\`*_[\]<>#!|])/g, "$1").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&"); }
 export function vaultContext(memories: VaultMemory[], focusId?: string) {
-  const people: SourceRow[] = [], places: SourceRow[] = [], projects: SourceRow[] = [], agenda: SourceRow[] = [], related: SourceRow[] = [];
+  const people: SourceRow[] = [], places: SourceRow[] = [], projects: SourceRow[] = [], agenda: SourceRow[] = [], related: SourceRow[] = [], topics: SourceRow[] = [];
   const active = memories.filter(memory => memory.state === "active" && !memory.conflict);
   for (const memory of active.filter(memory => focusId === undefined || memory.id === focusId)) {
     // Read native document fields only as display hints. They never authorize a write or identity merge.
     if (!memory.note.startsWith(`---\nrecall_id: "${memory.id}"\n`)) continue;
+    const boundary = memory.note.indexOf("\n---\n");
+    const properties = boundary < 0 ? "" : memory.note.slice(0, boundary);
+    const tags = /^tags: \[([^\n]{0,512})\]$/m.exec(properties)?.[1];
+    if (tags) for (const tag of tags.split(",").map(value => value.trim().replace(/^"(.*)"$/, "$1")).filter(Boolean)) {
+      topics.push({ label: tag, note: `Saved note tag · source revision ${memory.revision}`, memory });
+    }
     for (const line of section(memory.note, "Unresolved entity mentions")) {
       const match = /^- “(.*)” — (person|location|project|organization) candidate; identity unresolved$/.exec(line);
       if (!match) continue; // Retracted mentions never populate context.
@@ -30,7 +36,7 @@ export function vaultContext(memories: VaultMemory[], focusId?: string) {
       if (target?.note_path) related.push({ label: target.note_path, note: `Possible relationship from ${memory.note_path}; review`, memory: target });
     }
   }
-  return { people, places, projects, agenda, related };
+  return { people, places, projects, agenda, related, topics };
 }
 
 function noteParts(memory: Pick<VaultMemory, "id" | "note">): { prefix: string; body: string } | null {
