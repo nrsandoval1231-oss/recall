@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import unicodedata
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -241,6 +242,11 @@ class GraphAdapter:
             object_node = node_map.get(str(getattr(edge, "target_node_uuid", "")))
             if subject_node is None or object_node is None:
                 continue
+            subject_name = str(getattr(subject_node, "name", ""))
+            object_name = str(getattr(object_node, "name", ""))
+            supported_sources = _anchor_supported_sources(supported_sources, subject_name, object_name)
+            if not supported_sources:
+                continue
             relation = str(getattr(edge, "name", "RELATES_TO")).upper()
             if relation not in RELATION_NAMES:
                 relation = "RELATES_TO"
@@ -272,17 +278,17 @@ class GraphAdapter:
                     quote=first.text,
                     subject_id=_scoped_node_id(scope, getattr(subject_node, "uuid", "")),
                     object_id=_scoped_node_id(scope, getattr(object_node, "uuid", "")),
-                    subject=str(getattr(subject_node, "name", "")),
+                    subject=subject_name,
                     subject_type=_node_type(subject_node),
                     predicate=relation,
-                    object=str(getattr(object_node, "name", "")),
+                    object=object_name,
                     object_type=_node_type(object_node),
                     fact=fact,
                     valid_at=valid_at,
                     invalid_at=invalid_at,
                     extracted_at=_datetime(getattr(edge, "created_at", None)) or first.updated_at,
                     inferred=True,
-                    uncertainty="Graph extraction is inferred and requires source-context judgment.",
+                    uncertainty="Anchored endpoint strings do not verify identity or relation; review source context.",
                     related_source_ids=[s.id for s in supported_sources],
                     supports=supports,
                 )
@@ -338,6 +344,43 @@ def _map_current_episodes(
     if require_complete and names != set(expected):
         raise GraphIndexMissing("persistent graph is missing one or more current source episodes")
     return mapped
+
+
+def _anchor_supported_sources(sources: list[Source], subject: str, object_: str) -> list[Source]:
+    """Retain only notes that contain both endpoint names as bounded Unicode phrases."""
+    if not subject.strip() or not object_.strip():
+        return []
+    return [
+        source
+        for source in sources
+        if _contains_endpoint_anchor(source.text, subject) and _contains_endpoint_anchor(source.text, object_)
+    ]
+
+
+def _contains_endpoint_anchor(text: str, endpoint: str) -> bool:
+    haystack = _normalize_anchor_text(text)
+    needle = _normalize_anchor_text(endpoint)
+    if not needle:
+        return False
+    position = haystack.find(needle)
+    while position >= 0:
+        end = position + len(needle)
+        left_ok = position == 0 or not _anchor_word_char(haystack[position - 1])
+        right_ok = end == len(haystack) or not _anchor_word_char(haystack[end])
+        if left_ok and right_ok:
+            return True
+        position = haystack.find(needle, position + 1)
+    return False
+
+
+def _normalize_anchor_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    return " ".join(unicodedata.normalize("NFKC", normalized).split())
+
+
+def _anchor_word_char(value: str) -> bool:
+    category = unicodedata.category(value)
+    return category[0] in {"L", "M", "N"} or category == "Pc"
 
 
 def _graphiti_client(graphiti_cls: Any, driver: Any) -> Any:

@@ -509,13 +509,20 @@ fn memory_ask(
 #[tauri::command]
 fn knowledge_status(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String) -> Result<knowledge::KnowledgeStatus, String> {
     let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    // A status refresh is also the bounded reconnect retry for any pending
+    // revocation; disabled snapshots contain no sources.
+    knowledge::best_effort_refresh(&vault);
     knowledge::status(&vault)
 }
 #[tauri::command]
 fn knowledge_consent(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, enabled: bool, include_existing: bool) -> Result<local_vault::KnowledgeControl, String> {
     let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
     let control = knowledge::consent(&vault, enabled, include_existing)?;
-    let _ = knowledge::refresh(&vault);
+    if enabled {
+        knowledge::best_effort_refresh(&vault);
+    } else {
+        knowledge::refresh(&vault).map_err(|_| "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects.".to_string())?;
+    }
     Ok(control)
 }
 #[tauri::command]

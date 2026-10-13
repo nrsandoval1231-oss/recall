@@ -198,9 +198,11 @@ fn source_digest(scope: &str, sources: &[Source], control: &KnowledgeControl) ->
         &control.existing_fence, &control.dismissed_facts)).map_err(|_| "Could not fingerprint local knowledge snapshot")?;
     Ok(sha(&material))
 }
-fn snapshot(vault: &Vault, rebuild: bool) -> Result<(ServiceStatus, Vec<Source>, KnowledgeControl)> {
-    let rows = sources(vault)?;
+fn snapshot_with_client(vault: &Vault, rebuild: bool, client: &Client) -> Result<(ServiceStatus, Vec<Source>, KnowledgeControl)> {
     let mut control = vault.knowledge_control()?;
+    // Revocation/purge snapshots are intentionally independent of source
+    // enumeration: even a vault too large to index must be cancellable.
+    let rows = if control.enabled { sources(vault)? } else { Vec::new() };
     let digest = source_digest(&vault.id, &rows, &control)?;
     control = vault.set_knowledge_snapshot_hash(&digest)?;
     let eligible: Vec<String> = if control.enabled {
@@ -211,8 +213,12 @@ fn snapshot(vault: &Vault, rebuild: bool) -> Result<(ServiceStatus, Vec<Source>,
     let req = SnapshotRequest { version: 1, scope: &vault.id, generation: control.generation,
         processing_allowed: control.enabled, sources: &eligible_sources, eligible_ids: &eligible,
         suppressed_facts: &control.dismissed_facts, rebuild };
-    let status: ServiceStatus = Client::from_env()?.post("/v1/snapshot", &req, MAX_SNAPSHOT)?;
+    let status: ServiceStatus = client.post("/v1/snapshot", &req, MAX_SNAPSHOT)?;
     Ok((status, rows, control))
+}
+fn snapshot(vault: &Vault, rebuild: bool) -> Result<(ServiceStatus, Vec<Source>, KnowledgeControl)> {
+    let client = Client::from_env()?;
+    snapshot_with_client(vault, rebuild, &client)
 }
 pub fn refresh(vault: &Vault) -> Result<ServiceStatus> { with_scope_lock(&vault.id, || snapshot(vault, false).map(|(status,_,_)| status)) }
 pub fn rebuild(vault: &Vault) -> Result<ServiceStatus> { with_scope_lock(&vault.id, || snapshot(vault, true).map(|(status,_,_)| status)) }
@@ -228,6 +234,9 @@ pub fn status(vault: &Vault) -> Result<KnowledgeStatus> {
 }
 pub fn consent(vault: &Vault, enabled: bool, include_existing: bool) -> Result<KnowledgeControl> {
     with_scope_lock(&vault.id, || {
+        if !enabled {
+            return vault.set_knowledge_consent(false, false, &BTreeSet::new());
+        }
         if enabled {
             let status = Client::from_env()?.health()?;
             if !providers_authorize_enable(&status) {
@@ -433,6 +442,82 @@ mod tests {
         assert!(persisted.enabled && persisted.existing_fence.contains(&memory));
         assert!(persisted.dismissed_facts.contains("synthetic-fact"));
         assert!(persisted.generation > enabled.generation);
+    }
+    #[test]
+    fn revocation_skips_failed_source_enumeration_and_retries_empty_snapshot() {
+        use crate::librarian::organization_tests as fixture;
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let (temp, vault, _, memory) = fixture::setup();
+        let existing = BTreeSet::from([memory]);
+        vault.set_knowledge_consent(true, true, &existing).unwrap();
+        let before = vault.knowledge_control().unwrap().generation;
+        // Make source enumeration fail in this disposable vault while keeping
+        // the managed directory valid for the journaled consent writer.
+        let invalid_entry = temp.0.join("Recall/History/not-a-uuid");
+        std::fs::write(&invalid_entry, b"synthetic malformed entry").unwrap();
+        assert!(sources(&vault).is_err(), "fixture must make source enumeration fail");
+        let disabled = consent(&vault, false, false).expect("oversized notes cannot block local revocation");
+        assert!(!disabled.enabled);
+        assert!(disabled.generation > before);
+        assert!(vault.knowledge_control().unwrap().generation == disabled.generation);
+
+        // A failed loopback transport leaves the local fence persisted.
+        let closed = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = closed.local_addr().unwrap().port();
+        drop(closed);
+        let offline = Client { base: format!("http://127.0.0.1:{port}"), token: "x".repeat(32),
+            agent: AgentBuilder::new().redirects(0).timeout_connect(Duration::from_millis(200))
+                .timeout_read(Duration::from_millis(200)).timeout_write(Duration::from_millis(200)).build() };
+        assert!(snapshot_with_client(&vault, false, &offline).is_err());
+        assert!(!vault.knowledge_control().unwrap().enabled);
+
+        // On reconnect, the only acceptable payload is an empty disabled
+        // snapshot; an accepted async purge remains pending, not complete.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+            let mut bytes = Vec::new();
+            let mut chunk = [0u8; 4096];
+            let mut content_length = None;
+            loop {
+                let count = stream.read(&mut chunk).unwrap();
+                bytes.extend_from_slice(&chunk[..count]);
+                if content_length.is_none() {
+                    if let Some(end) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                        let headers = String::from_utf8_lossy(&bytes[..end]);
+                        content_length = headers.lines().find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length").then(|| value.trim().parse::<usize>().ok()).flatten()
+                        });
+                    }
+                }
+                if let (Some(end), Some(length)) = (bytes.windows(4).position(|window| window == b"\r\n\r\n"), content_length) {
+                    if bytes.len() >= end + 4 + length { break; }
+                }
+            }
+            let end = bytes.windows(4).position(|window| window == b"\r\n\r\n").unwrap();
+            let length = content_length.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&bytes[end + 4..end + 4 + length]).unwrap();
+            let response = r#"{"state":"purging","pending":1,"indexed":0,"failed":0,"message":"purge accepted"}"#;
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", response.len(), response).unwrap();
+            body
+        });
+        let online = Client { base: format!("http://127.0.0.1:{port}"), token: "x".repeat(32),
+            agent: AgentBuilder::new().redirects(0).timeout_connect(Duration::from_secs(1))
+                .timeout_read(Duration::from_secs(2)).timeout_write(Duration::from_secs(2)).build() };
+        let (status, rows, control) = snapshot_with_client(&vault, false, &online).unwrap();
+        let payload = server.join().unwrap();
+        assert!(rows.is_empty());
+        assert!(payload["sources"].as_array().unwrap().is_empty());
+        assert!(payload["eligible_ids"].as_array().unwrap().is_empty());
+        assert_eq!(payload["processing_allowed"], false);
+        assert_eq!(payload["generation"], control.generation);
+        assert_eq!(status.state, "purging");
+        assert_ne!(status.state, "disabled", "accepted purge is still pending");
     }
     #[test]
     #[ignore = "opt-in: uses only a fresh synthetic vault and an explicitly configured loopback Graphiti service"]

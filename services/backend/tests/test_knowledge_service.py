@@ -14,6 +14,7 @@ from recall.knowledge.app import create_app
 from recall.knowledge.graph import (
     GraphCapacityError,
     GraphIndexMissing,
+    _anchor_supported_sources,
     _map_current_episodes,
     _relationship_id,
     _scoped_node_id,
@@ -168,6 +169,26 @@ def test_graph_episode_mapping_requires_all_current_scoped_revisions() -> None:
             {current.id: current},
             [SimpleNamespace(uuid="episode-foreign", name=episode_key(current), group_id=str(uuid.uuid4()))],
         )
+
+
+def test_endpoint_anchors_require_both_names_in_same_supporting_note() -> None:
+    grounded = source("Alice joined Project Aurora.")
+    other = source("Project Aurora is ready.")
+    mentions_subject_only = source("Alice moved to another team.")
+    assert _anchor_supported_sources([grounded], "Alice", "Project Aurora") == [grounded]
+    assert _anchor_supported_sources([other, mentions_subject_only], "Alice", "Project Aurora") == []
+    assert _anchor_supported_sources([grounded], "Alice", "Invented Initiative") == []
+    assert _anchor_supported_sources([grounded], "Alicia", "Project Aurora") == []
+
+
+def test_endpoint_anchors_are_unicode_aware_case_insensitive_and_word_bounded() -> None:
+    unicode_note = source("E\u0301LODIE met Zoë and discussed STRASSE.")
+    assert _anchor_supported_sources([unicode_note], "Élodie", "zoë") == [unicode_note]
+    assert _anchor_supported_sources([unicode_note], "Zoë", "Straße") == [unicode_note]
+
+    case_note = source("acme Corporation hired Annette.")
+    assert _anchor_supported_sources([case_note], "ACME Corporation", "annette") == [case_note]
+    assert _anchor_supported_sources([case_note], "ACME", "Ann") == []
 
 
 def test_dismissal_identity_ignores_model_prose_and_support_order() -> None:

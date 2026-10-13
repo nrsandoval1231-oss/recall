@@ -55,3 +55,13 @@ Open product gates: physical phone/installed distribution, private retained-corp
 - Provider total after native ingestion:USD0.217044,37settled calls, effectively zero reserved (floating-point residual1.39e-17), no unknown calls. Synthetic records only. Search/restart used local embeddings and incurred no new model calls.
 - Current origin/main rechecked:8f90e5a5ead9dd05b58beaecb6811b2b197088e2 unchanged. Original dirty owner checkout untouched.
 - Lane: full, Luna bounded builders + Sol contract review + Terra targeted runtime diagnosis. Model tokens/config load identity/aggregate planning and build durations UNKNOWN. Measured command runtimes are recorded above; no speedup or elapsed-to-accepted claim. Independent candidate review pending.
+
+## Independent review and repair
+
+Sol reviewed candidate 9fab143a92c662e6eaac5bb9ad8d9a22cf6de4bb: **FIX**. Findings: oversized source enumeration could block disabling consent; native consent command discarded remote purge failure; model-created endpoint names lacked a deterministic source anchor. Controller direction CORRECT; bounded R1/R2 ownership is recorded in REPAIR-01.md. This candidate is not independently accepted.
+
+Supplemental root verification on that frozen candidate: `npm run test:ui` exit0,42passed,27.5s. These browser tests do not replace the blocked native desktop runtime inspection or physical phone verification.
+
+Next approved product node A1 is a model-selected, exact-quote Ask answer with separate answer-purpose consent, budgeted provider calls, cancellation and native source revalidation. See ASK-PACKET.md. This is implementation scope, not completed capability.
+
+R1/R2 controller affected verification: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib knowledge::tests -- --nocapture exit0 (8passed,2opt-inignored); desktop memory-surface.test.tsx exit0 (34passed); uv run pytest tests/test_knowledge_service.py -q exit0 (18passed). Repair candidate requires independent re-review after A1 integration; no acceptance implied. R1 regression forces source enumeration failure in a disposable synthetic vault, confirms local disable, unavailable transport fence, then empty reconnect purge payload with pending state.

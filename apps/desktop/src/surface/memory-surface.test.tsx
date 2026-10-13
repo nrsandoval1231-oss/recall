@@ -546,6 +546,41 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
     expect(client.knowledgeConsent).toHaveBeenCalledWith(chosen.vault_id, true, false);
   });
 
+  it("reloads native state after a failed disable and reports remote removal as unconfirmed", async () => {
+    const providers = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
+    const status = vi.fn(async () => ({ enabled: true, include_existing: true, generation: 4,
+      provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
+      service: { state: "ready", pending: 0, indexed: 2, failed: 0, message: "Ready", providers } }));
+    const client = vault({ knowledgeStatus: status,
+      knowledgeConsent: vi.fn(async () => { throw new Error("Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects."); }) });
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await user.click(await screen.findByRole("button", { name: "Disable connected knowledge" }));
+    expect(await screen.findByText(/Locally disabled; remote purge is unconfirmed/)).toBeTruthy();
+    expect(await screen.findByText(/Connected knowledge is locally disabled; remote purge is unconfirmed/)).toBeTruthy();
+    expect(status.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("reports accepted asynchronous removal as pending rather than completed", async () => {
+    const providers = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
+    const ready = { enabled: true, include_existing: true, generation: 4,
+      provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
+      service: { state: "ready", pending: 0, indexed: 2, failed: 0, message: "Ready", providers } };
+    const purging = { enabled: false, include_existing: false, generation: 5,
+      provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
+      service: { state: "purging", pending: 1, indexed: 0, failed: 0, message: "Removal is pending", providers } };
+    const status = vi.fn().mockResolvedValueOnce(ready).mockResolvedValue(purging);
+    const client = vault({ knowledgeStatus: status,
+      knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: false,
+        include_existing: false, generation: 5, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })) });
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await user.click(await screen.findByRole("button", { name: "Disable connected knowledge" }));
+    expect(await screen.findByText(/remote removal was requested/i)).toBeTruthy();
+    expect(await screen.findByText("Removal is pending", { exact: false })).toBeTruthy();
+    expect(screen.queryByText(/service confirmed the purge/i)).toBeNull();
+  });
+
   it("does not offer graph consent when configured providers are unavailable", async () => {
     const client = vault({ knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Review providers before enabling.", providers: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Local graph service is not configured." } })), knowledgeConsent: vi.fn() });
     const user = userEvent.setup(); render(<MemorySurface vault={client} />);

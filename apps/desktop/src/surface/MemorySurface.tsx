@@ -336,8 +336,25 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       const next = await vault.knowledgeStatus?.(vaultId);
       if (inScope(vaultId) && next) setKnowledgeStatus(next);
       setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false);
-      setNotice(enabled ? "Connected knowledge consent saved. Existing notes are included only if you selected them." : "Connected knowledge is disabled; keyword search remains available.");
-    } catch (knowledgeError) { if (inScope(vaultId)) setError(message(knowledgeError)); }
+      setNotice(enabled ? "Connected knowledge consent saved. Existing notes are included only if you selected them." : "Connected knowledge is disabled locally; remote removal was requested. The index may take time to clear. Keyword search remains available.");
+    } catch (knowledgeError) {
+      if (!inScope(vaultId)) return;
+      const failure = message(knowledgeError);
+      const remoteUnconfirmed = !enabled && failure.toLowerCase().includes("locally disabled");
+      if (remoteUnconfirmed) {
+        setKnowledgeConsentChecked(false);
+        setKnowledgeStatus(current => current ? { ...current, enabled: false, include_existing: false, service: { ...current.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } } : current);
+      }
+      // Reload native state even on rejection: a revocation error can mean the
+      // durable local fence committed while loopback cancellation did not.
+      try {
+        const next = await vault.knowledgeStatus?.(vaultId);
+        if (inScope(vaultId) && next) setKnowledgeStatus(remoteUnconfirmed
+          ? { ...next, enabled: false, include_existing: false, service: { ...next.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } }
+          : next);
+      } catch { /* retain the explicit disabled-but-unconfirmed state above */ }
+      if (inScope(vaultId)) setError(remoteUnconfirmed ? "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects." : failure);
+    }
     finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
   }
 
