@@ -14,6 +14,7 @@ function fixture() {
   vault.organize = vi.fn(async () => ({}));
   vault.reviewOrganization = vi.fn(async (_scope,_parser,prior) => ({prior_operation_id:prior,reuse_operation:false}));
   vault.publish = vi.fn(async () => ({ ...memory, revision: 2, note: "---\nrecall_id: fixture\n" }));
+  vault.history = vi.fn(async () => [{ revision: 2, note: "Organized fixture", recorded_at: "", origin: "model:claude" as const, kind: "organize" as const }]);
   return vault;
 }
 it("consent is checked before even creating or invoking provider operations", async () => {
@@ -33,6 +34,34 @@ it("unavailable parsing leaves saved evidence pending without organization or pu
   const vault = fixture(); vi.mocked(vault.parse).mockImplementation(async (_scope, id, revision, operation) => ({ memory_id: id, expected_revision: revision, operation_id: operation, source_sha256: "a".repeat(64), state: "pending", message: "Native configuration missing" }));
   const state = vi.fn(); expect(await processMeeting(vault, selected, memory, true, state)).toBeNull();
   expect(state).toHaveBeenLastCalledWith("Native configuration missing"); expect(vault.organize).not.toHaveBeenCalled(); expect(vault.publish).not.toHaveBeenCalled();
+});
+it("a correction after incomplete parsing is not mistaken for interrupted publication", async () => {
+  const vault = fixture();
+  vi.mocked(vault.parse).mockImplementation(async (_scope, id, revision, operation) => ({ memory_id: id, expected_revision: revision, operation_id: operation, source_sha256: "a".repeat(64), state: "pending", message: "Parser outcome uncertain" }));
+  await processMeeting(vault, selected, memory, true, vi.fn());
+  const key = `recall.meeting.v1:${selected.vault_identity}:${memory.id}`;
+  const before = localStorage.getItem(key);
+  vault.history = vi.fn(async () => [{ revision: 2, note: "Human correction", recorded_at: "", origin: "human:recall" as const, kind: "correct" as const }]);
+  const state = vi.fn();
+  expect(await processMeeting(vault, selected, { ...memory, revision: 2, note: "Human correction" }, true, state)).toBeNull();
+  expect(state).toHaveBeenLastCalledWith("Your correction is saved. The earlier processing attempt did not publish; corrected notes require review before reprocessing. No provider request was sent.");
+  expect(vault.publish).not.toHaveBeenCalled();
+  expect(vault.organize).not.toHaveBeenCalled();
+  expect(vault.parse).toHaveBeenCalledTimes(1);
+  expect(localStorage.getItem(key)).toBe(before);
+});
+it("unreadable native history cannot authorize publication or a provider resend", async () => {
+  const vault = fixture();
+  vi.mocked(vault.organize).mockRejectedValueOnce(new Error("Interrupted"));
+  await expect(processMeeting(vault, selected, memory, true, vi.fn())).rejects.toThrow("Interrupted");
+  const key = `recall.meeting.v1:${selected.vault_identity}:${memory.id}`;
+  const before = localStorage.getItem(key);
+  vault.history = vi.fn(async () => { throw new Error("History unavailable"); });
+  await expect(processMeeting(vault, selected, { ...memory, revision: 2 }, true, vi.fn())).rejects.toThrow("History unavailable");
+  expect(vault.publish).not.toHaveBeenCalled();
+  expect(vault.parse).toHaveBeenCalledTimes(1);
+  expect(vault.organize).toHaveBeenCalledTimes(1);
+  expect(localStorage.getItem(key)).toBe(before);
 });
 it("recovers native publication receipt after renderer interruption without another provider call", async () => {
   const vault = fixture(); vi.mocked(vault.publish).mockRejectedValueOnce(new Error("Renderer lost response"));

@@ -35,6 +35,16 @@ export async function processMeeting(vault: LocalVault, selected: { vault_id: st
     localStorage.setItem(key, JSON.stringify(intent));
   }
   if (intent.published || memory.revision !== intent.revision) {
+    if (!intent.published) {
+      // Revision changes can also be human corrections, not a lost publish
+      // response. History is a read-only eligibility check; the native writer
+      // still verifies the exact receipt before returning any publication.
+      const history = await vault.history(selected.vault_id, memory.id);
+      if (!history.some((entry) => entry.revision === intent.revision + 1 && entry.kind === "organize" && entry.origin === "model:claude")) {
+        onState("Your correction is saved. The earlier processing attempt did not publish; corrected notes require review before reprocessing. No provider request was sent.");
+        return null;
+      }
+    }
     // A native publish may have succeeded before this renderer recorded completion.
     // Only replay its exact receipt; never send changed source or invent a new operation.
     onState("Checking the previous native publication…");
