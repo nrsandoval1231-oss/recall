@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { LocalVault, SourceAnswer, VaultMemory, VaultStatus } from "../platform/local-vault";
+import type { KnowledgeSearchReply, LocalVault, SourceAnswer, VaultMemory, VaultStatus } from "../platform/local-vault";
 import type { Librarian } from "./librarian";
 import { MemorySurface } from "./MemorySurface";
 
@@ -528,3 +528,46 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
     expect(document.querySelector(".ms")?.getAttribute("data-mode")).toBe("vault");
   } finally { history.replaceState(null, "", "/"); }
 });
+
+  it("requires reviewed provider disclosure and separate explicit graph consent", async () => {
+    const configured = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
+    const client = vault({
+      knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Notes and questions may be sent to these providers.", providers: configured, service: { state: "ready", pending: 0, indexed: 0, failed: 0, message: "Ready", providers: configured } })),
+      knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 1, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })),
+    });
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByText(/Notes and questions may be sent/);
+    const enable = screen.getByRole("button", { name: "Enable connected knowledge" }) as HTMLButtonElement;
+    expect(enable.disabled).toBe(true);
+    await user.click(screen.getByLabelText(/I understand that graph processing/));
+    expect((screen.getByLabelText(/Also process existing notes/) as HTMLInputElement).checked).toBe(false);
+    await user.click(enable);
+    expect(client.knowledgeConsent).toHaveBeenCalledWith(chosen.vault_id, true, false);
+  });
+
+  it("does not offer graph consent when configured providers are unavailable", async () => {
+    const client = vault({ knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Review providers before enabling.", providers: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Local graph service is not configured." } })), knowledgeConsent: vi.fn() });
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    await screen.findByText(/Providers are unavailable or not configured/);
+    expect((screen.getByRole("button", { name: "Enable connected knowledge" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(client.knowledgeConsent).not.toHaveBeenCalled();
+  });
+
+  it("discards a late relationship response after switching vaults", async () => {
+    let finish!: (reply: KnowledgeSearchReply) => void;
+    const nextVault = { ...chosen, root: "/other/vault", vault_id: "other-session", vault_identity: "22222222-2222-4222-8222-222222222222" };
+    const client = vault({
+      openDefault: vi.fn(async () => nextVault),
+      knowledgeSearch: vi.fn((_vaultId: string, _query: string) => new Promise<KnowledgeSearchReply>(resolve => { finish = resolve; })),
+    }, [memory()]);
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.click(await screen.findByRole("tab", { name: /^Related/ }));
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Use default vault" }));
+    await screen.findByText("Opened the default vault folder.");
+    await act(async () => finish({ status: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Stale response" }, relationships: [] }));
+    expect(screen.queryByText("Stale response")).toBeNull();
+    expect(screen.queryByText("Checking connected knowledge…")).toBeNull();
+  });

@@ -6,7 +6,8 @@ import { NoteMarkdown, noteSummary } from "./NoteMarkdown";
 import { CaptureCalendar, QuickCards, RecentNotes, memoryTitle } from "./dashboard-parts";
 import { vaultContext, noteBody, noteWithBody, type SourceRow } from "./vault-context";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
+import type { KnowledgeRelationship, KnowledgeServiceStatus, KnowledgeStatus, LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
+import { KnowledgePanel } from "./KnowledgePanel";
 import { brooks, FIXTURE_BANNER, fixtureDocuments, fixtureMemory, type FixtureMemory } from "./brooks-fixture";
 import { KEYWORD_LABEL, keywordSearch, type KeywordAnswer } from "./keyword";
 import { hasPendingMeeting, processMeeting } from "./meeting-workflow";
@@ -143,6 +144,12 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [panel, setPanel] = useState<Panel>("overview");
   const [answer, setAnswer] = useState<KeywordAnswer | null>(null);
   const [sourceAnswer, setSourceAnswer] = useState<SourceAnswer | null>(null);
+  const [knowledgeStatus, setKnowledgeStatus] = useState<KnowledgeStatus | null>(null);
+  const [knowledgeRows, setKnowledgeRows] = useState<KnowledgeRelationship[]>([]);
+  const [knowledgeResultStatus, setKnowledgeResultStatus] = useState<KnowledgeServiceStatus | null>(null);
+  const [knowledgeConsentChecked, setKnowledgeConsentChecked] = useState(false);
+  const [knowledgeIncludeExisting, setKnowledgeIncludeExisting] = useState(false);
+  const [knowledgeBusy, setKnowledgeBusy] = useState(false);
   const [processingConsent, setProcessingConsent] = useState(false);
   const [processingState, setProcessingState] = useState("");
   const [reviewRetryAcknowledged, setReviewRetryAcknowledged] = useState(false);
@@ -172,6 +179,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   scopeRef.current = selected?.vault_id ?? null;
   const sourceRequest = useRef(0);
   const askRequest = useRef(0);
+  const knowledgeRequest = useRef(0);
   const evidenceRef = useRef<string | null>(null);
   const correctionVersion = useRef(0);
   const organizationRequests = useRef(new Map<string, number>());
@@ -242,7 +250,15 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     return () => { cancel = true; };
   }, [librarian]);
 
-  function openSettings() { settingsTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; setVaultSettings(true); }
+  function openSettings() {
+    settingsTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setVaultSettings(true); setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false);
+    if (!selected || !vault.knowledgeStatus) { setKnowledgeStatus(null); return; }
+    const vaultId = selected.vault_id;
+    void vault.knowledgeStatus(vaultId).then(next => { if (inScope(vaultId)) setKnowledgeStatus(next); }).catch(() => {
+      if (inScope(vaultId)) setKnowledgeStatus({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Graph knowledge is unavailable. Keyword search remains available.", providers: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Graph knowledge is unavailable. Keyword search remains available." } });
+    });
+  }
   function closeSettings() { setVaultSettings(false); settingsTrigger.current?.focus(); }
   useEffect(() => {
     if (!vaultSettings) return;
@@ -251,7 +267,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     function dialogKeys(event: KeyboardEvent) {
       if (event.key === "Escape") { setVaultSettings(false); settingsTrigger.current?.focus(); }
       if (event.key === "Tab") {
-        const controls = dialog?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+        const controls = dialog?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])');
         const first = controls?.[0], last = controls?.[controls.length - 1];
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -274,12 +290,67 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setError("");
     setNotice("");
     if (!organizationActive()) setProcessingState("");
+    knowledgeRequest.current += 1; setKnowledgeRows([]); setKnowledgeResultStatus(null); setKnowledgeBusy(false);
     setAnswer(null);
     setSourceAnswer(null);
     setVaultHits(null);
     if (next === "home" || next === "projects" || next === "organizations") { setPanel("overview"); setDetail(null); }
     if (next === "topics") { setPanel("topics"); setDetail(null); }
     if (next === "people" || next === "places" || next === "equipment" || next === "timeline" || next === "recent") setPanel(panelFor(next));
+    if (next === "timeline" && !demo) void loadKnowledge("");
+  }
+
+  async function loadKnowledge(queryText: string) {
+    if (!selected || !vault.knowledgeSearch) return;
+    const vaultId = selected.vault_id, request = ++knowledgeRequest.current;
+    setKnowledgeBusy(true); setKnowledgeRows([]); setKnowledgeResultStatus(null);
+    try {
+      const result = await vault.knowledgeSearch(vaultId, queryText);
+      if (inScope(vaultId) && request === knowledgeRequest.current) { setKnowledgeRows(result.relationships); setKnowledgeResultStatus(result.status); }
+    } catch (knowledgeError) {
+      if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeResultStatus({ state: "unavailable", pending: 0, indexed: 0, failed: 0, message: message(knowledgeError) });
+    } finally { if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeBusy(false); }
+  }
+
+  async function loadMemoryKnowledge(memory: VaultMemory) {
+    if (!selected || !vault.knowledgeSearch) return;
+    const vaultId = selected.vault_id, request = ++knowledgeRequest.current;
+    setKnowledgeBusy(true); setKnowledgeRows([]); setKnowledgeResultStatus(null);
+    try {
+      const result = await vault.knowledgeSearch(vaultId, "");
+      if (!inScope(vaultId) || request !== knowledgeRequest.current) return;
+      setKnowledgeRows(result.relationships.filter(row => row.source_id === memory.id || row.supports.some(support => support.source_id === memory.id)));
+      setKnowledgeResultStatus(result.status);
+    } catch (knowledgeError) {
+      if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeResultStatus({ state: "unavailable", pending: 0, indexed: 0, failed: 0, message: message(knowledgeError) });
+    } finally { if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeBusy(false); }
+  }
+
+  async function updateKnowledgeConsent(enabled: boolean) {
+    if (!selected || !vault.knowledgeConsent) return;
+    const vaultId = selected.vault_id;
+    setKnowledgeBusy(true); setError("");
+    try {
+      await vault.knowledgeConsent(vaultId, enabled, enabled && knowledgeIncludeExisting);
+      if (!inScope(vaultId)) return;
+      const next = await vault.knowledgeStatus?.(vaultId);
+      if (inScope(vaultId) && next) setKnowledgeStatus(next);
+      setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false);
+      setNotice(enabled ? "Connected knowledge consent saved. Existing notes are included only if you selected them." : "Connected knowledge is disabled; keyword search remains available.");
+    } catch (knowledgeError) { if (inScope(vaultId)) setError(message(knowledgeError)); }
+    finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
+  }
+
+  async function dismissKnowledge(factId: string) {
+    if (!selected || !vault.knowledgeDismiss) throw new Error("Connected knowledge dismissal is unavailable.");
+    const vaultId = selected.vault_id;
+    try {
+      await vault.knowledgeDismiss(vaultId, factId);
+      if (!inScope(vaultId)) return;
+    } catch (dismissError) {
+      if (inScope(vaultId)) setError(message(dismissError));
+      throw dismissError;
+    }
   }
 
   function selectMonth(id: string) {
@@ -297,6 +368,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       if (!next) { setNotice("Folder choice cancelled. Nothing was written."); return; }
       clearPreview(); evidenceRef.current = null; askRequest.current += 1;
       setSourceAnswer(null); setProcessingState(""); setProcessingConsent(false); setReviewRetryAcknowledged(false);
+      knowledgeRequest.current += 1; setKnowledgeStatus(null); setKnowledgeRows([]); setKnowledgeResultStatus(null); setKnowledgeBusy(false);
       sourceRequest.current += 1;
       setStatus(next);
       const chosen = selectedFrom(next);
@@ -467,6 +539,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     askRequest.current += 1;
     setEvidenceId(memory.id);
     setSection("evidence");
+    void loadMemoryKnowledge(memory);
     try { await loadSource(selected.vault_id, memory); }
     catch (sourceError) { if (alive.current) setError(message(sourceError)); }
     finally { if (alive.current) setBusy(false); }
@@ -638,6 +711,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
           <div className="ms-prompts" aria-label="Ask suggestions">{["Find my meeting notes", "What needs a follow-up?", "Find project notes", "Show decisions from this month"].map(prompt => <button type="button" key={prompt} onClick={() => { setQuery(prompt); askRef.current?.focus(); }}>{prompt}</button>)}</div>
 
           {section === "evidence" ? (
+            <>
             <Evidence
               demo={demo}
               demoMemory={demoEvidence}
@@ -669,6 +743,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               onReviewRetryAcknowledged={setReviewRetryAcknowledged}
               onReviewedRetry={() => evidenceMemory && void organizeMemory(evidenceMemory, true)}
             />
+            {evidenceMemory && vault.knowledgeSearch && <KnowledgePanel key={`${selected?.vault_identity ?? "no-vault"}:${evidenceMemory.id}`} relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
+            </>
           ) : section === "capture" ? (
             <section className="glass ms-project" aria-label="Capture">
               <p className="ms-kicker">CAPTURE</p>
@@ -712,7 +788,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                 {!demo && !context.people.length && !context.places.length && !context.related.length && <div className="ms-side"><ContextCard title="Key People" icon={<PeopleMark />} onView={() => go("people")}><p className="ms-fine">People mentioned in your organized notes will appear here.</p></ContextCard><ContextCard title="Key Locations" icon={<LocationMark />} onView={() => go("places")}><p className="ms-fine">Your notes bring the places into focus.</p></ContextCard></div>}
                 <div className="ms-center">
                 <article className="glass ms-project" aria-label={demo ? "Brooks Campus" : "Your vault"}>
-                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{items.find(row => row.id === hit.memory_id) ? memoryTitle(items.find(row => row.id === hit.memory_id)!) : hit.note_basename}</h2><NoteMarkdown>{noteBody({ id: hit.memory_id, note: hit.current_excerpt })}</NoteMarkdown><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
+                  {section === "ask" ? sourceAnswer ? <div><h1>Source-backed matches</h1><p>{sourceAnswer.message}</p>{sourceAnswer.hits.map((hit) => <article className="ms-hit" key={hit.memory_id}><h2>{items.find(row => row.id === hit.memory_id) ? memoryTitle(items.find(row => row.id === hit.memory_id)!) : hit.note_basename}</h2><NoteMarkdown>{noteBody({ id: hit.memory_id, note: hit.current_excerpt })}</NoteMarkdown><h3>Original evidence</h3><p className="ms-note">{hit.original_excerpt}</p><small>SHA-256: {hit.source_sha256}</small><button type="button" onClick={() => { const memory = items.find((row) => row.id === hit.memory_id); if (memory) void openVaultMemory(memory); }}>Inspect original evidence</button></article>)}{sourceAnswer.knowledge_status && <KnowledgePanel key={`${selected?.vault_identity ?? "no-vault"}:ask:${sourceAnswer.question}`} relationships={sourceAnswer.graph_relationships ?? []} status={sourceAnswer.knowledge_status} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}</div> : <AskResults demo={demo} answer={answer} hits={vaultHits} onOpenDemo={(id) => { const memory = fixtureMemory(id); if (memory) openDemoMemory(memory); else setDetail(detailFrom(id)); }} onOpenVault={(memory) => void openVaultMemory(memory)} /> : (
                     <>
                       <div className="ms-project-head">
                         <p className="ms-kicker"><ProjectMark />{demo ? board.kicker : "MEMORY"}</p>
@@ -728,6 +804,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       {demo && !referencePreview && panel === "overview" && !detail && <p className="ms-fine">{board.caveat}</p>}
                       {panel === "timeline" && !demo && <><h2>Agenda</h2><SourceList rows={context.agenda} empty="No source follow-ups saved yet." onOpen={(memory) => void openVaultMemory(memory)} /><h2>Capture calendar</h2></>}
                       {panel === "timeline" && <MemoryList demo={demo} demoMemories={demoMemories} vaultMemories={vaultMemories} month={activeMonth} monthLabel={activeLabel} onDemo={openDemoMemory} onVault={(memory) => void openVaultMemory(memory)} />}
+                      {panel === "timeline" && !demo && vault.knowledgeSearch && <KnowledgePanel key={`${selected?.vault_identity ?? "no-vault"}:timeline`} temporalOnly relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
                       {panel === "people" && !detail && !demo && <SourceList rows={context.people} empty="No unresolved people mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
                       {panel === "people" && !detail && demo && <SimpleList demo={demo} rows={board.people.map((person) => ({ label: person.name, note: person.note }))} empty="People are not inferred from your notes." />}
                       {panel === "places" && !detail && !demo && <SourceList rows={context.places} empty="No unresolved location mentions saved yet." onOpen={(memory) => void openVaultMemory(memory)} />}
@@ -735,7 +812,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       {panel === "equipment" && <SimpleList demo={demo} rows={board.equipment.map((item) => ({ label: item.label, note: item.note }))} empty="Equipment is not inferred from your notes." />}
                       {panel === "topics" && !demo && <><h2>Saved note tags</h2><SourceList rows={context.topics} empty="No note tags saved yet. Tags you keep in Obsidian appear here." onOpen={memory => void openVaultMemory(memory)} /></>}
                       {panel === "topics" && demo && <SimpleList demo rows={board.topics.map(topic => ({ label: topic.label, note: topic.note }))} empty="" />}
-                      {panel === "related" && !demo && <SourceList rows={context.related} empty="No saved related memories." onOpen={(memory) => void openVaultMemory(memory)} />}
+                      {panel === "related" && !demo && <><SourceList rows={context.related} empty="No saved related memories." onOpen={(memory) => void openVaultMemory(memory)} />{knowledgeBusy && <p role="status">Checking connected knowledge…</p>}{vault.knowledgeSearch && <KnowledgePanel key={`${selected?.vault_identity ?? "no-vault"}:related`} relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}</>}
                       {panel === "related" && demo && <SimpleList demo={demo} rows={board.related.map((item) => ({ label: item.label, note: item.note }))} empty="Connections are not inferred. Ask searches the note text you saved." />}
                       {referencePreview ? <dl className="ms-project-properties"><div><CrosshairIcon weight="light" /><span>Market</span><strong>Oil &amp; Gas</strong></div><div><MapPinIcon weight="light" /><span>Region</span><strong>Permian Basin, TX</strong></div><div><ChartBarIcon weight="light" /><span>Stage</span><strong>Opportunity</strong></div><div><CalendarBlankIcon weight="light" /><span>Target Start</span><strong>Q4 2025</strong></div></dl> : <dl className="ms-stats">
                         <div><dt>Memories</dt><dd>{demo ? board.stats.memories : projectFocus ? 1 : active.length}</dd></div>
@@ -750,7 +827,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       {demo && !referencePreview && <p className="ms-fine">{board.statsNote}</p>}
                       <div className="ms-tabs" role="tablist" aria-label="Project">
                         {(["overview", "timeline", "people", "places", "topics", "related"] as const).map((tab) => (
-                          <button key={tab} type="button" role="tab" aria-selected={panel === tab} onClick={() => { setPanel(tab); setDetail(null); }}>{tab === "overview" ? "Overview" : `${tab === "timeline" ? "Notes" : tab === "places" ? "Locations" : `${tab[0]?.toUpperCase()}${tab.slice(1)}`} (${referencePreview ? { timeline: 12, people: 6, places: 3, topics: 5, related: 8 }[tab] : tab === "timeline" ? vaultMemories.length : tab === "people" ? context.people.length : tab === "places" ? context.places.length : tab === "topics" ? context.topics.length : context.related.length})`}</button>
+                          <button key={tab} type="button" role="tab" aria-selected={panel === tab} onClick={() => { setPanel(tab); setDetail(null); if ((tab === "related" || tab === "timeline") && !demo) void loadKnowledge(""); }}>{tab === "overview" ? "Overview" : `${tab === "timeline" ? "Notes" : tab === "places" ? "Locations" : `${tab[0]?.toUpperCase()}${tab.slice(1)}`} (${referencePreview ? { timeline: 12, people: 6, places: 3, topics: 5, related: 8 }[tab] : tab === "timeline" ? vaultMemories.length : tab === "people" ? context.people.length : tab === "places" ? context.places.length : tab === "topics" ? context.topics.length : tab === "related" ? knowledgeRows.length : context.topics.length})`}</button>
                         ))}
                       </div>
 
@@ -765,7 +842,12 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
             </>
           )}
           {section !== "evidence" && section !== "capture" && <QuickCards referencePreview={referencePreview} projects={new Set(allContext.projects.map(row => row.memory.id)).size} memories={active.length} openItems={allContext.agenda.length} onProjects={() => go("projects")} onWeek={() => go("recent")} onItems={() => go("timeline")} onCapture={() => go("capture")} />}
-          {vaultSettings && <div className="ms-modal-backdrop" onClick={closeSettings}><div data-vault-dialog className="ms-vault-settings" role="dialog" aria-modal="true" aria-label="Vault settings" onClick={event => event.stopPropagation()}><header><h2>Your Obsidian vault</h2><button type="button" onClick={closeSettings} aria-label="Close vault settings">Close</button></header><p>Memory stays in the folder you choose. Originals and history stay with it.</p><p className="ms-root">{selected?.root || "No vault selected"}</p><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("select")}>Choose a vault folder</button><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("default")}>Use default vault</button></div></div>}
+          {vaultSettings && <div className="ms-modal-backdrop" onClick={closeSettings}><div data-vault-dialog className="ms-vault-settings" role="dialog" aria-modal="true" aria-label="Vault settings" onClick={event => event.stopPropagation()}><header><h2>Your Obsidian vault</h2><button type="button" onClick={closeSettings} aria-label="Close vault settings">Close</button></header><p>Memory stays in the folder you choose. Originals and history stay with it.</p><p className="ms-root">{selected?.root || "No vault selected"}</p><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("select")}>Choose a vault folder</button><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("default")}>Use default vault</button>
+            {selected && vault.knowledgeStatus && vault.knowledgeConsent && <section className="ms-knowledge-settings" aria-label="Connected knowledge settings"><h3>Connected knowledge</h3>{knowledgeStatus ? <><p>{knowledgeStatus.provider_disclosure}</p><p role="status">{knowledgeStatus.enabled ? "Enabled" : "Disabled"} · {knowledgeStatus.service.message} {knowledgeStatus.service.pending ? `${knowledgeStatus.service.pending} pending.` : ""}</p>{knowledgeStatus.providers && <p>Configured providers: extraction {knowledgeStatus.providers.extraction}; embeddings {knowledgeStatus.providers.embedding}; reranking {knowledgeStatus.providers.reranking}.</p>}{!knowledgeStatus.enabled && <><label className="ms-check"><input type="checkbox" checked={knowledgeConsentChecked} onChange={event => setKnowledgeConsentChecked(event.target.checked)} /> I understand that graph processing may send notes and Ask questions to the configured providers above.</label><label className="ms-check"><input type="checkbox" checked={knowledgeIncludeExisting} onChange={event => setKnowledgeIncludeExisting(event.target.checked)} /> Also process existing notes (optional; off by default).</label></>}
+              {!knowledgeStatus.enabled && !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim()) && <p role="status">Providers are unavailable or not configured. Keyword search still works; connected knowledge cannot be enabled yet.</p>}
+              <button type="button" disabled={knowledgeBusy || (!knowledgeStatus.enabled && (!knowledgeConsentChecked || !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim())))} onClick={() => void updateKnowledgeConsent(!knowledgeStatus.enabled)}>{knowledgeStatus.enabled ? "Disable connected knowledge" : "Enable connected knowledge"}</button></> : <p role="status">Loading connected knowledge configuration…</p>}
+            </section>}
+          </div></div>}
         </div>
       </main>
     </div>

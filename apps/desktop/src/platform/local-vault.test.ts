@@ -40,3 +40,20 @@ it("lifecycle commands preserve exact revision, state, operation identity and in
     ["vault_remove", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 4, operationId: "remove-op", expectedState: "missing" }],
   ]);
 });
+
+it("uses only the frozen native knowledge commands and selected-vault scope", async () => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+  const vault = new NativeLocalVault();
+  await vault.knowledgeStatus("vault-a");
+  await vault.knowledgeConsent("vault-a", true, false);
+  await vault.knowledgeSearch("vault-a", "May opening", false);
+  await vault.knowledgeDismiss("vault-a", "fact-id");
+  await vault.knowledgeRebuild("vault-a");
+  expect(vi.mocked(invoke).mock.calls).toEqual([
+    ["knowledge_status", { expectedVaultId: "vault-a" }],
+    ["knowledge_consent", { expectedVaultId: "vault-a", enabled: true, includeExisting: false }],
+    ["knowledge_search", { expectedVaultId: "vault-a", query: "May opening", includeHistory: false }],
+    ["knowledge_dismiss", { expectedVaultId: "vault-a", factId: "fact-id" }],
+    ["knowledge_rebuild", { expectedVaultId: "vault-a" }],
+  ]);
+});
