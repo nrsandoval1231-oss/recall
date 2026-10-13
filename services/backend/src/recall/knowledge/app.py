@@ -223,9 +223,9 @@ def create_app(
             raise
         except GraphCapacityError as exc:
             message = (
-                "Indexing capacity exceeded; increase service capacity or select fewer sources."
-                if "snapshot" in str(exc)
-                else "Source exceeds the 32 KiB indexing limit; no sources were silently skipped."
+                "Indexing batch exceeds 100 sources; split it into smaller batches."
+                if str(exc) == "source_count"
+                else "Source exceeds the 32,768-character indexing limit; no sources were silently skipped."
             )
             queue_store.failed(snapshot.scope, generation, message)
         except Exception:

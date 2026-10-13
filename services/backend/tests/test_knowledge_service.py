@@ -779,3 +779,91 @@ def test_revocation_cancels_in_flight_extraction_before_following_job(service) -
     assert graph.first_rebuild_cancelled
     assert len(graph.rebuilds) == 2
     assert graph.rebuilds[-1][1] == []
+
+
+def capacity_adapter(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from recall.knowledge.graph import episode_key
+
+    stored = {}
+    cleared = []
+    batches = []
+
+    async def clear_data(driver, group_ids):
+        cleared.append(group_ids)
+        stored.clear()
+
+    module = ModuleType("graphiti_core.utils.maintenance.graph_data_operations")
+    module.clear_data = clear_data
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    adapter = GraphAdapter("synthetic-unused.db")
+    adapter._db = object()
+    monkeypatch.setattr(adapter, "_driver_for_scope", AsyncMock(return_value=object()))
+    monkeypatch.setattr(adapter, "_ensure_client", AsyncMock())
+
+    async def add(scope, sources):
+        _validate_capacity(sources)
+        batches.append(len(sources))
+        stored.update({s.id: episode_key(s) for s in sources})
+
+    monkeypatch.setattr(adapter, "_add_sources", add)
+    return adapter, stored, cleared, batches
+
+
+def test_incremental_collection_can_rebuild_after_correction(monkeypatch):
+    from recall.knowledge.graph import episode_key
+
+    adapter, stored, cleared, batches = capacity_adapter(monkeypatch)
+    sources = [source(f"Synthetic source {i}") for i in range(101)]
+
+    async def exercise():
+        await adapter.append(SCOPE, sources[:100])
+        await adapter.append(SCOPE, sources[100:])
+        assert len(stored) == 101
+        sources[0] = source("Synthetic corrected text", identifier=sources[0].id, revision=2)
+        await adapter.rebuild(snapshot(2, sources, rebuild=True))
+        assert stored == {s.id: episode_key(s) for s in sources}
+        assert cleared == [[SCOPE]]
+        assert all(size <= 100 for size in batches)
+
+    asyncio.run(exercise())
+
+
+def test_invalid_rebuild_is_rejected_before_clearing_existing_graph(monkeypatch):
+    from recall.knowledge.graph import MAX_SOURCE_CHARS
+
+    adapter, stored, cleared, _ = capacity_adapter(monkeypatch)
+    original = source("Synthetic original")
+
+    async def exercise():
+        await adapter.append(SCOPE, [original])
+        prior = dict(stored)
+        oversized = source("x" * (MAX_SOURCE_CHARS + 1))
+        with pytest.raises(GraphCapacityError, match="source_size"):
+            await adapter.rebuild(snapshot(2, [original, oversized]))
+        assert cleared == []
+        assert stored == prior
+        await adapter.rebuild(snapshot(3, [], allowed=False))
+        assert stored == {}
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("reason, expected", [("source_count", "100 sources"), ("source_size", "32,768-character")])
+def test_capacity_status_distinguishes_batch_count_from_source_size(service, monkeypatch, reason, expected):
+    client, store, graph = service
+
+    async def reject(snapshot):
+        raise GraphCapacityError(reason)
+
+    monkeypatch.setattr(graph, "rebuild", reject)
+    response = client.post(
+        "/v1/snapshot", headers=headers(), json=snapshot(1, [source("Synthetic")]).model_dump(mode="json")
+    )
+    assert response.status_code == 200
+    deadline = time.monotonic() + 2
+    while store.status(SCOPE).state != "failed":
+        assert time.monotonic() < deadline
+        time.sleep(0.01)
+    assert expected in store.status(SCOPE).message

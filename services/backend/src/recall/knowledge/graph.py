@@ -111,6 +111,11 @@ class GraphAdapter:
         await save()
 
     async def rebuild(self, snapshot: Snapshot) -> None:
+        # Preflight every eligible source before replacing any derived state.
+        sources = [s for s in snapshot.sources if s.id in snapshot.eligible_ids] if snapshot.processing_allowed else []
+        batches = [sources[i : i + MAX_SOURCES_PER_REBUILD] for i in range(0, len(sources), MAX_SOURCES_PER_REBUILD)]
+        for batch in batches:
+            _validate_capacity(batch)
         if self._db is None:
             await self.start()
         from graphiti_core.utils.maintenance.graph_data_operations import clear_data
@@ -121,12 +126,11 @@ class GraphAdapter:
         await clear_data(driver, group_ids=[scope])
         if not snapshot.processing_allowed:
             return
-        sources = [s for s in snapshot.sources if s.id in snapshot.eligible_ids]
         if not sources:
             return
-        _validate_capacity(sources)
         await self._ensure_client(scope)
-        await self._add_sources(scope, sources)
+        for batch in batches:
+            await self._add_sources(scope, batch)
 
     async def append(self, scope: str, sources: list[Source]) -> None:
         if not sources:
