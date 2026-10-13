@@ -150,3 +150,36 @@ it("preserves a corrupt recovery journal before accepting any replacement draft"
   ).toBe(true);
   expect(session.getSnapshot().paused).toBe(true);
 });
+
+it("explicitly records a reviewed proposal even when its text matches, then skips clean saves", async () => {
+  const intents: unknown[] = [];
+  const s = new EditorSession("a", memory, storage(), async (intent) => {
+    intents.push(intent);
+    return { ...memory, revision: 2, note: intent.note };
+  });
+  s.propose(memory.note);
+  await s.save();
+  expect(intents).toHaveLength(0);
+  s.keepDraftAfterReview();
+  await s.save(true);
+  expect(intents).toHaveLength(1);
+  await s.save();
+  expect(intents).toHaveLength(1);
+});
+
+it("saves a conflicting draft only after review against the latest revision", async () => {
+  const intents: { expectedRevision: number; note: string }[] = [];
+  const s = new EditorSession("a", memory, storage(), async (intent) => {
+    intents.push(intent);
+    return { ...memory, revision: 3, note: intent.note };
+  });
+  s.edit("My correction");
+  s.reconcile({ ...memory, revision: 2, note: "External correction" });
+  await s.save();
+  expect(intents).toHaveLength(0);
+  s.keepDraftAfterReview();
+  await s.save();
+  expect(intents).toEqual([expect.objectContaining({ expectedRevision: 2, note: "My correction" })]);
+  await s.save();
+  expect(intents).toHaveLength(1);
+});
