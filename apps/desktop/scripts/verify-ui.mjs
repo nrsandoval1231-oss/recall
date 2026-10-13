@@ -166,6 +166,7 @@ const note = `---\nrecall_id: "${id}"\ntitle: "Utility meeting"\n---\n\n# Utilit
   await page
     .getByRole("heading", { name: "Observations (source statements)" })
     .waitFor();
+  await page.locator(".ms-evidence").evaluate(async node => { await Promise.all(node.getAnimations({ subtree:true }).map(animation => animation.finished)); });
   await page.screenshot({
     type: "jpeg",
     quality: 92,
