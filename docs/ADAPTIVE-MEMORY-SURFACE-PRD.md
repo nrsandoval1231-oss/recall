@@ -2,10 +2,14 @@
 Date: 2026-10-13
 Status: owner-approved visual and interaction direction; implementation not yet verified
 
+## Verified owner-approved visual reference
+
+The owner committed the final four-panel, photo-free adaptive Recall UI reference to `main` at [docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png](https://github.com/nrsandoval1231-oss/recall/blob/main/docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png). Its Git blob SHA is `6abf5192ab4ee96708984174ed15e3648c668bf0`. This is the **canonical visual authority** for Capture, Processing, Memory Inspection, and Graph View. Use the exact existing PNG; do not rename, move, redraw, substitute generated images, or commit a duplicate. Illustrative text and nodes in the mockup are not user data. The separate, earlier three-bubble and post-capture concept images are historical supporting references only.
+
 ## Authority and supersession
 This document supersedes prior Recall desktop visual compositions (including the warm dashboard / project-card grid described in PR #48, draft PR #49, and earlier UX-SPEC imagery) **for desktop UI layout and interactions only**. Existing Obsidian-first, Tauri, Jev, Claude, source integrity, no-login product and security contracts continue unchanged. PR #26 remains isolated. Draft PR #50's Graphiti work is an independent data capability and must not become a rendering dependency or source of unverified facts. Historical design assets may be retained as labeled history, not competing authorities.
 
-The owner selected the ivory graph-field design on 2026-10-12/13: graph connections fill the background, with an initially near-empty screen centered around three circular capture actions: Camera, Speak, Write. A second approved concept shows the same surface adapting after camera capture with a source-backed right-side processing/inspection panel. Concept renders are illustrative and are not evidence of actual functionality. Preserve their exact image bytes if supplied as build assets; do not approximate a missing reference and call it pixel-verified.
+The owner selected the ivory graph-field design on 2026-10-12/13: graph connections fill the background, with an initially near-empty screen centered around three circular capture actions: Camera, Speak, Write. A second approved concept shows the same surface adapting after camera capture with a source-backed right-side processing/inspection panel. Concept renders are illustrative and are not evidence of actual functionality. The final four-screen image is committed on `main` at the canonical reference above. Use it directly for visual verification; do not approximate it.
 
 ## Product objective
 Recall should feel like a calm, continuously adaptive external memory rather than a dashboard, editor, Obsidian replica, or 3D planet graph. A new or returning user sees the same signature open ivory mindspace: a genuine navigable graph background, a restrained left rail and center capture controls. Details emerge only after a concrete action: capture, search, select graph node, inspect evidence, correct, or navigate time.
