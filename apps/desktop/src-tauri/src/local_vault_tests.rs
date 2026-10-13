@@ -2294,3 +2294,10 @@ fn restoring_removed_note_never_overwrites_an_external_edit() {
     assert!(vault.restore_deleted(&m.id,removed.revision,&op()).is_err());
     assert_eq!(fs::read_to_string(path).unwrap(),"External editor content must survive");
 }
+
+#[test]
+fn default_library_creation_never_requires_a_documents_lookup_for_an_explicit_native_override() {
+ let root=std::env::temp_dir().join("synthetic-recall-directory");
+ assert_eq!(default_library_directory(Some(root.to_str().unwrap()),||Err("unknown path".into()),||Err("home unavailable".into())).unwrap(),root);
+ let home=std::env::temp_dir();assert_eq!(default_library_directory(None,||Err("unknown path".into()),||Ok(home.clone())).unwrap(),home.join("Documents/Recall"));
+}

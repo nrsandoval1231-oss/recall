@@ -238,10 +238,10 @@ fn vault_open_default(
 ) -> Result<local_vault::VaultStatus, String> {
     // The webview cannot pass a folder. RECALL_VAULT_DIR is a process setting
     // for local development; otherwise the folder is Documents/Recall.
-    let documents = app.path().document_dir().map_err(fail)?;
-    let root = local_vault::default_vault_directory(
+    let root = local_vault::default_library_directory(
         std::env::var("RECALL_VAULT_DIR").ok().as_deref(),
-        &documents,
+        || app.path().document_dir().map_err(fail),
+        || app.path().home_dir().map_err(fail),
     )?;
     std::fs::create_dir_all(&root).map_err(fail)?;
     state.select_path(&root)

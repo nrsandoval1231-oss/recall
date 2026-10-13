@@ -1947,6 +1947,19 @@ pub fn default_vault_directory(override_dir: Option<&str>, documents: &Path) -> 
     Ok(documents.join("Recall"))
 }
 
+/// Prefer an explicit native setting; otherwise tolerate an unconfigured Documents directory.
+pub fn default_library_directory(
+    override_dir: Option<&str>,
+    documents: impl FnOnce() -> Result<PathBuf>,
+    home: impl FnOnce() -> Result<PathBuf>,
+) -> Result<PathBuf> {
+    if let Some(value) = override_dir.map(str::trim).filter(|value| !value.is_empty()) {
+        return default_vault_directory(Some(value), Path::new(""));
+    }
+    let documents = documents().or_else(|_| home().map(|path| path.join("Documents")))?;
+    default_vault_directory(None, &documents)
+}
+
 /// Native-selected scope only. Commands hold this mutex throughout each operation,
 /// including pickers, so switching cannot redirect an in-flight capture.
 struct Selected {
