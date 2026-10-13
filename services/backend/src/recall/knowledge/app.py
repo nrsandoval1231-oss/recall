@@ -366,13 +366,15 @@ def create_app(
             value = Snapshot.model_validate_json(raw)
             if len(value.model_dump_json().encode("utf-8")) > MAX_SNAPSHOT:
                 raise HTTPException(413, "Request exceeds service limit.")
+            previous = queue_store.generation(value.scope)
             status = queue_store.submit(value)
             active = active_jobs.get(value.scope)
             if active is not None and (active[0] != value.generation or value.rebuild):
                 # The ledger is fenced before cancelling further source processing.
                 active[1].cancel()
             active_answer = active_answers.get(value.scope)
-            if active_answer is not None:
+            generation_changed = previous is None or previous[0] != value.generation
+            if active_answer is not None and generation_changed:
                 active_answer[1].cancel()
             return status
         except StaleGeneration:

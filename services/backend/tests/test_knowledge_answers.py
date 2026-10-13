@@ -88,6 +88,27 @@ class BlockingAnswerClient(FakeAnswerClient):
         raise AssertionError("cancelled provider call unexpectedly returned")
 
 
+class ReleasableAnswerClient(FakeAnswerClient):
+    def __init__(self, item: Source) -> None:
+        super().__init__({"status": "supported", "selections": [{"source_id": item.id, "exact_quote": item.text}]})
+        self.started = threading.Event()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._release: asyncio.Event | None = None
+
+    async def generate_response(self, messages, **_kwargs):
+        self.calls += 1
+        self.messages = messages
+        self._loop = asyncio.get_running_loop()
+        self._release = asyncio.Event()
+        self.started.set()
+        await self._release.wait()
+        return self.response
+
+    def release(self) -> None:
+        assert self._loop is not None and self._release is not None
+        self._loop.call_soon_threadsafe(self._release.set)
+
+
 class ClosableAnswerClient(FakeAnswerClient):
     def __init__(self, item: Source) -> None:
         super().__init__({"status": "supported", "selections": [{"source_id": item.id, "exact_quote": item.text}]})
@@ -228,6 +249,33 @@ def test_answer_endpoint_returns_only_validated_current_quote(tmp_path, monkeypa
     ]
     assert "not a verified answer" in data["message"]
     assert fake.calls == 1
+
+
+def test_identical_snapshot_refresh_does_not_cancel_active_answer(tmp_path, monkeypatch) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    configure_provider(monkeypatch)
+    item = source("Synthetic decision with stable exact evidence.")
+    snapshot = consented_snapshot(item)
+    store = _ready_store(tmp_path / "queue.sqlite", item)
+    fake = ReleasableAnswerClient(item)
+    app = create_app(store=store, adapter=object(), token=TOKEN, db_path=tmp_path / "graph.db", answer_client=fake)
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    body = _answer_body(item)
+    with TestClient(app, base_url="http://127.0.0.1") as client, ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(client.post, "/v1/answer", headers=headers, json=body)
+        assert fake.started.wait(timeout=3)
+        refreshed = client.post(
+            "/v1/snapshot",
+            headers=headers,
+            json=snapshot.model_dump(mode="json"),
+        )
+        assert refreshed.status_code == 200
+        fake.release()
+        result = pending.result(timeout=3).json()
+    assert result["status"] == "supported"
+    assert result["selections"][0]["quote"] == item.text
+    assert store.answer_state(SCOPE, str(body["request_id"])) == "supported"
 
 
 def test_invalid_provider_output_logs_only_static_reason_code(tmp_path, monkeypatch, caplog) -> None:
