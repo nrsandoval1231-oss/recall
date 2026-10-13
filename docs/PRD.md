@@ -1,3 +1,5 @@
+> **CANONICAL DESKTOP EXPERIENCE — 2026-10-13:** See [Adaptive Memory Surface PRD](ADAPTIVE-MEMORY-SURFACE-PRD.md) and [Screen Specification](ADAPTIVE-MEMORY-SURFACE-SCREENS.md). Ivory graph-field Home, centered Camera/Speak/Write, and contextual expansion supersede historical dashboard visual requirements below. Data integrity, Obsidian vault authority and Jev/Claude workflow are unchanged.
+
 # Recall — Product Requirements Document
 
 ## Next product milestone — Meeting to Memory
