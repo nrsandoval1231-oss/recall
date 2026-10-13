@@ -136,3 +136,55 @@ test("device storage failure retains the form and never sends its original", asy
   await expect(page.getByLabel('Note, in your words')).toHaveValue('Synthetic unsaved draft');
   expect(await readdir(join(root, 'Recall/Sources'))).toHaveLength(0);
 });
+
+for (const failFirst of [false, true]) {
+  test(`capture queued during upload drains automatically (first fails: ${failFirst})`, async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('connection-state')).toContainText('Connected to library');
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const attempts: string[] = [];
+    await page.route('**/capture', async route => {
+      const body = route.request().postData() || '';
+      attempts.push(body);
+      if (attempts.length === 1) {
+        await held;
+        if (failFirst) { await route.fulfill({ status: 503, body: 'Synthetic outage' }); return; }
+      }
+      await route.continue();
+    });
+    await page.getByLabel('Note, in your words').fill('Synthetic first in flight');
+    await page.getByRole('button', { name: 'Save capture', exact: true }).click();
+    await expect.poll(() => attempts.length).toBe(1);
+    await page.getByLabel('Note, in your words').fill('Synthetic second queued during upload');
+    await page.getByRole('button', { name: 'Save capture', exact: true }).click();
+    await expect(page.getByTestId('outbox')).toContainText('Synthetic second queued');
+    release();
+    const second = page.getByTestId('outbox').locator('article').filter({ hasText: 'Synthetic second queued' });
+    await expect(second).toContainText('Received by library');
+    const first = page.getByTestId('outbox').locator('article').filter({ hasText: 'Synthetic first in flight' });
+    await expect(first).toContainText(failFirst ? 'Original retained' : 'Received by library');
+    // A failed row is attempted once in this drain, not retried forever.
+    await page.waitForTimeout(300);
+    expect(attempts).toHaveLength(2);
+    expect(await readdir(join(root, 'Recall/Sources'))).toHaveLength(failFirst ? 1 : 2);
+  });
+}
+
+test('a library switch removes inspection links for already received copies', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('connection-state')).toContainText('Connected to library');
+  await page.getByLabel('Note, in your words').fill('Synthetic received in original library');
+  await page.getByRole('button', { name: 'Save capture', exact: true }).click();
+  await expect(page.getByTestId('outbox')).toContainText('Received by library');
+  await expect(page.getByRole('link', { name: '· Inspect in library' })).toBeVisible();
+  await stop();
+  const second = await mkdtemp(join(tmpdir(), 'recall-switch-synthetic-'));
+  try {
+    await start(second);
+    await page.getByRole('button', { name: 'Retry queued captures' }).click();
+    await expect(page.getByRole('link', { name: '· Inspect in library' })).toHaveCount(0);
+    await expect(page.getByTestId('outbox')).toContainText('Synthetic received in original library');
+    await expect(page.getByRole('link', { name: 'Save original copy' })).toBeVisible();
+  } finally { await stop(); await rm(second, { recursive: true, force: true }); }
+});

@@ -9,6 +9,7 @@
   let db;
   let library;
   let flushing;
+  let flushRequested = false;
   let saving = false;
   let urls = [];
   const uuid = () => {
@@ -83,44 +84,52 @@
     }
   }
   async function flush() {
+    flushRequested = true;
     if (flushing) return flushing;
     flushing = (async () => {
-      const current = await connect();
-      if (!current) return;
-      const rows = await storage('captures', 'readonly', s => s.getAll());
-      for (const row of rows.filter(r => !r.receipt)) {
-        if (row.library !== current) {
-          row.error = 'Different library. Reconnect the original library to send this capture.';
-        } else {
-          const data = new FormData();
-          data.set('operation_id', row.id); data.set('note', row.note);
-          if (row.photo) data.set('photo', row.photo, row.filename);
-          if (row.consent) data.set('process_consent', 'true');
-          try {
-            const response = await request('/capture', { method: 'POST', body: data,
-              headers: { accept: 'application/json', 'x-recall-library-id': row.library } });
-            if (!response.ok) throw Error(response.status === 409 ? 'Library changed or busy. Review and retry.' : `Desktop did not acknowledge receipt (${response.status}).`);
-            const receipt = await response.json();
-            if (receipt.format !== 'recall-capture-receipt-v1' || receipt.state !== 'received' ||
-                receipt.library_id !== row.library || receipt.memory_id !== row.id ||
-                !Number.isSafeInteger(receipt.revision) || receipt.revision < 1 ||
-                !/^[0-9a-f]{64}$/.test(receipt.source_sha256)) throw Error('Receipt did not match this capture.');
-            row.receipt = receipt; row.error = '';
-          } catch (error) {
-            row.error = `${error.message || 'Desktop unavailable'}. Original retained; retry uses the same capture ID.`;
-          }
-        }
-        // Do not resurrect a copy removed in another tab while the request ran.
-        await new Promise((resolve, reject) => {
-          const tx = db.transaction('captures', 'readwrite'); const store = tx.objectStore('captures');
-          const get = store.get(row.id);
-          get.onsuccess = () => {
-            if (get.result) store.put(get.result.receipt && !row.receipt ? get.result : row);
-          };
-          tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error);
-        });
+      // Coalesce triggers, but never retry the same failed upload within this drain.
+      const attempted = new Set();
+      do {
+        flushRequested = false;
+        const current = await connect();
         await render();
-      }
+        if (!current) return;
+        const rows = await storage('captures', 'readonly', s => s.getAll());
+        for (const row of rows.filter(r => !r.receipt && !attempted.has(r.id))) {
+          attempted.add(row.id);
+          if (row.library !== current) {
+            row.error = 'Different library. Reconnect the original library to send this capture.';
+          } else {
+            const data = new FormData();
+            data.set('operation_id', row.id); data.set('note', row.note);
+            if (row.photo) data.set('photo', row.photo, row.filename);
+            if (row.consent) data.set('process_consent', 'true');
+            try {
+              const response = await request('/capture', { method: 'POST', body: data,
+                headers: { accept: 'application/json', 'x-recall-library-id': row.library } });
+              if (!response.ok) throw Error(response.status === 409 ? 'Library changed or busy. Review and retry.' : `Desktop did not acknowledge receipt (${response.status}).`);
+              const receipt = await response.json();
+              if (receipt.format !== 'recall-capture-receipt-v1' || receipt.state !== 'received' ||
+                  receipt.library_id !== row.library || receipt.memory_id !== row.id ||
+                  !Number.isSafeInteger(receipt.revision) || receipt.revision < 1 ||
+                  !/^[0-9a-f]{64}$/.test(receipt.source_sha256)) throw Error('Receipt did not match this capture.');
+              row.receipt = receipt; row.error = '';
+            } catch (error) {
+              row.error = `${error.message || 'Desktop unavailable'}. Original retained; retry uses the same capture ID.`;
+            }
+          }
+          // Do not resurrect a copy removed in another tab while the request ran.
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction('captures', 'readwrite'); const store = tx.objectStore('captures');
+            const get = store.get(row.id);
+            get.onsuccess = () => {
+              if (get.result) store.put(get.result.receipt && !row.receipt ? get.result : row);
+            };
+            tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error);
+          });
+          await render();
+        }
+      } while (flushRequested);
     })().catch(() => { status.textContent = 'Receipt could not be saved on this device. Original retained; retry to confirm.'; })
       .finally(() => { flushing = null; });
     return flushing;
