@@ -504,10 +504,7 @@ def _answer_context_fingerprint(scope: str, generation: int, provider: str, sour
         "generation": generation,
         "provider": provider,
         "answer_allowed": True,
-        "sources": [
-            [source.id, source.revision, source.source_sha256, source.note_sha256]
-            for source in sources
-        ],
+        "sources": [[source.id, source.revision, source.source_sha256, source.note_sha256] for source in sources],
     }
     serialized = json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

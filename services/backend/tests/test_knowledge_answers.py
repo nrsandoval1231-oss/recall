@@ -128,7 +128,10 @@ def test_model_quotes_must_be_exact_source_substrings_and_schema_strict() -> Non
     async def run() -> None:
         windows, _ = select_candidate_windows(request.question, [item])
         valid = FakeAnswerClient(
-            {"status": "supported", "selections": [{"source_id": item.id, "exact_quote": "not approved; approval remains uncertain"}]}
+            {
+                "status": "supported",
+                "selections": [{"source_id": item.id, "exact_quote": "not approved; approval remains uncertain"}],
+            }
         )
         result = await request_quoted_answer(request, windows, valid)
         assert result.status == "supported"
@@ -200,7 +203,10 @@ def test_answer_endpoint_returns_only_validated_current_quote(tmp_path, monkeypa
     item = source("Synthetic record: the launch was not approved; timing remains uncertain.")
     store = _ready_store(tmp_path / "queue.sqlite", item)
     fake = FakeAnswerClient(
-        {"status": "supported", "selections": [{"source_id": item.id, "exact_quote": "not approved; timing remains uncertain"}]}
+        {
+            "status": "supported",
+            "selections": [{"source_id": item.id, "exact_quote": "not approved; timing remains uncertain"}],
+        }
     )
     app = create_app(store=store, adapter=object(), token=TOKEN, db_path=tmp_path / "graph.db", answer_client=fake)
     with TestClient(app, base_url="http://127.0.0.1") as client:
@@ -328,9 +334,7 @@ def test_answer_clients_are_cached_per_disclosure_and_closed_at_shutdown(tmp_pat
             }
         )
         store.submit(replacement)
-        response = client.post(
-            "/v1/answer", headers=headers, json=_answer_body(item, generation=2)
-        )
+        response = client.post("/v1/answer", headers=headers, json=_answer_body(item, generation=2))
         assert response.json()["status"] == "supported"
         assert len(clients) == 2
         assert clients[0].calls == 2
@@ -349,4 +353,3 @@ def test_request_id_is_durable_and_never_replayed_after_restart(tmp_path, monkey
     assert reopened.answer_state(SCOPE, request.request_id) == "unknown"
     with pytest.raises(DuplicateAnswerRequest):
         reopened.begin_answer(request, provider)
-

@@ -100,11 +100,7 @@ def select_candidate_windows(question: str, sources: list[Source]) -> tuple[list
             start, end = 0, len(text)
             partial = False
         else:
-            matches = [
-                token
-                for token in _WORD.finditer(text)
-                if _normalize_token(token.group()) in query_terms
-            ]
+            matches = [token for token in _WORD.finditer(text) if _normalize_token(token.group()) in query_terms]
             if not matches:
                 limited = True
                 continue
@@ -135,8 +131,7 @@ def answer_messages(question: str, windows: list[CandidateWindow]) -> list[Answe
         "question": question,
         "excerpts_are_partial_when_marked": True,
         "sources": [
-            {"source_id": window.source.id, "excerpt": window.excerpt, "partial": window.partial}
-            for window in windows
+            {"source_id": window.source.id, "excerpt": window.excerpt, "partial": window.partial} for window in windows
         ],
     }
     return [
