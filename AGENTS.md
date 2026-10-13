@@ -2,7 +2,7 @@
 
 ## Active next packet — Meeting to Memory
 
-Read `docs/MEETING-TO-MEMORY.md` before any new intelligence or desktop UI work. It defines the smallest Jev → Claude → deterministic Obsidian writer implementation, acceptance gates, and scope boundaries. Keep PR #26 isolated; do not import its divergent vault-only/no-Claude vision. The single active UI direction is the latest warm-glass business board in `docs/UX-SPEC.md`; do not revive older visual alternatives.
+Read `docs/MEETING-TO-MEMORY.md` before any new intelligence or desktop UI work. It defines the smallest Jev → Claude → deterministic Obsidian writer implementation, acceptance gates, and scope boundaries. Keep PR #26 isolated; do not import its divergent vault-only/no-Claude vision. The single active desktop UI direction is PR #51’s Adaptive Memory Surface. Read `docs/ADAPTIVE-MEMORY-SURFACE-PRD.md`, `docs/ADAPTIVE-MEMORY-SURFACE-SCREENS.md`, and `docs/ADAPTIVE-MEMORY-SURFACE-BUILDER.md`; use the exact approved `docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png`. Older dashboard designs from PRs #48/#49 and earlier UX imagery are historical.
 
 
 ## Start here
