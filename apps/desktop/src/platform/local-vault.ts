@@ -64,7 +64,15 @@ export interface SourceAnswer {
 export interface LibraryAttachment extends VaultSource {
   name: string;
 }
+export interface LibraryBackup {
+  path: string;
+  sha256: string;
+  files: number;
+  bytes: number;
+}
 export interface LocalVault {
+  exportLibrary?(expectedVaultId: string): Promise<LibraryBackup | null>;
+  restoreLibrary?(): Promise<VaultStatus | null>;
   readonly available: boolean;
   attach?(
     expectedVaultId: string,
@@ -188,6 +196,14 @@ export class NativeLocalVault implements LocalVault {
       expectedVaultId,
       memoryId,
     });
+  }
+  exportLibrary(expectedVaultId: string) {
+    return this.call<LibraryBackup | null>("library_export", {
+      expectedVaultId,
+    });
+  }
+  restoreLibrary() {
+    return this.call<VaultStatus | null>("library_restore", {});
   }
   saveAttachment(expectedVaultId: string, memoryId: string, fileName: string) {
     return this.call<boolean>("library_attachment_save", {

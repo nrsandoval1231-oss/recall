@@ -1,0 +1,23 @@
+# Native-memory journey acceptance ledger
+
+Authority: `docs/NATIVE-MEMORY-PRODUCT-CONTRACT.md` (PR #53). Current implementation priority: native library and editor. These entries distinguish implemented code, independent static review, real Linux development runtime, synthetic tests, and outstanding product acceptance.
+
+| Criterion | Implementation / verification | Exact evidence / remaining gate |
+|---|---|---|
+| 1. Open without Obsidian | Implemented; real Linux Tauri verified | `runtime/native-runtime.json`; no Obsidian installed in runtime container. Installed Windows acceptance pending. |
+| 2. Create/open a Recall library | Implemented; native creation/open/restart tests and real default creation/backup-open verified | `local_vault_tests.rs`: `native_library_creation_is_non_destructive_and_recovers_selection_after_restart`; `runtime/native-runtime.json`, `runtime/native-backup-runtime.json`. |
+| 3. Capture handwritten note/document | Native capture and immutable source path implemented; synthetic native image tests, real text/document attachment intake verified | `attachments.rs` tests; `runtime/native-attachment-runtime.json`. Physical handwriting/photo quality and live Jev recognition remain unverified. |
+| 4. Preserve original | Implemented; native tests and real runtime hashes verified | Original SHA `27496f1710e14ff9d52d6e76eb2ffee52689a3106325736712dc5c38180a55de` unchanged through edit/restart/attachment/export/restore; runtime JSON artifacts. |
+| 5. Process and organize | Existing Jev → Claude → deterministic validation/publication preserved | Native `processing.rs`, `meeting_commands.rs`, publication regression tests. No live-provider acceptance in this packet. |
+| 6. Open/edit inside Recall | Implemented; independently reviewed; real native autosave, formatting/link/editor tests verified | `MemoryEditor.test.tsx`, `editor-session.test.ts`, `runtime/native-autosaved-editor.png`. |
+| 7. Ask a vague question | Existing offline source-backed lexical retrieval usable and real native verified | `runtime/native-source-backed-ask.png`, `runtime/native-restart-retrieval.png`. Broader semantic/relationship retrieval remains outside this slice. |
+| 8. Evidence-backed answer | Current notes plus original quote/hash implemented and real native verified | `runtime/native-runtime.json`; UI explicitly labels retrieved quotes. General synthesized factual-answer quality is not established. |
+| 9. Explore related graph memories | Canonical graph uses real saved memory IDs/validated document links; existing tests retained | `adaptive-graph.test.ts`, prior canonical UI evidence in PR #52. Real multi-memory relationship exploration remains unverified here. |
+| 10. Correct interpretation | Human editor correction implemented; no silent original overwrite; machine proposals require explicit review | `editor-session.test.ts`, native correction/organization guards, `runtime/native-autosaved-editor.png`. Live-provider correction/reprocessing acceptance pending. |
+| 11. Restart and verify persistence | Implemented and real Linux native verified | `runtime/native-runtime.json`: `restart_retrieval`, `original_unchanged_after_restart`; native attachment recovery boundary regression; restarted app later exported its persisted attachment. |
+| 12. Export/restore library | Implemented; independently reviewed; real Linux native verified | `library_backup.rs` six tests, `runtime/native-backup-runtime.json`: 17 file hashes match, original library retained, restored retrieval/editor/attachment inspection. Installed Windows runtime pending. |
+| 13. Phone capture/retrieval/offline sync | Existing companion preserved; no new complete acceptance claim | Native phone regression suite passes. Physical iPhone, desktop unavailability/offline replay and completed cross-device sync remain unverified/outside current priority. |
+
+Final local packet: 255 native Rust tests; 113 desktop / 271 workspace tests; lint/typechecks; production frontend build; Linux native binary build; four browser sizes with zero measured axe violations and no JavaScript errors. Browser IPC/provider fixtures are synthetic and do not establish native hardware or model acceptance. Runtime screenshots/JSON use actual Tauri IPC and filesystem writes with synthetic content.
+
+Independent static review found import/attachment restart-identity gaps, an attachment read race, stale attachment retry revisions, an export snapshot validation race and inconsistent backup limits. All important findings were repaired and re-reviewed before committing the affected slices. Tests passing and static review do not mean the complete native-memory mission is accepted.

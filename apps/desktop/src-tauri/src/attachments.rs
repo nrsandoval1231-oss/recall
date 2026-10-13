@@ -216,6 +216,29 @@ pub fn inspect(vault: &Vault, memory: &str, file_name: &str) -> Result<Attachmen
         name: record.name,
     })
 }
+pub fn validate_all(vault: &Vault) -> Result<(), String> {
+    let directory = vault.root().join("Recall/_meta/attachments");
+    local_vault::safe(&directory)?;
+    if !directory.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(directory).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let record: Receipt =
+            serde_json::from_slice(&local_vault::read(&entry.path(), 2 * 1024 * 1024)?)
+                .map_err(|_| "Invalid attachment receipt")?;
+        if entry.path() != receipt_path(vault, &record.operation_id)? {
+            return Err("Unexpected attachment receipt filename".into());
+        }
+        load(
+            vault,
+            &record.memory_id,
+            record.expected_revision,
+            &record.operation_id,
+        )?;
+    }
+    Ok(())
+}
 pub fn save_copy(path: &Path, bytes: &[u8]) -> Result<(), String> {
     local_vault::safe(path)?;
     use std::io::Write;

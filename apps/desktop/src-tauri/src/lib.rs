@@ -1,3 +1,4 @@
+mod library_backup;
 #[allow(dead_code)]
 mod jev;
 mod processing;
@@ -254,6 +255,21 @@ fn library_attachment_save(state: tauri::State<'_, local_vault::LocalVaultState>
         attachments::save_copy(&path, &attachment.bytes)?;
         Ok(true)
     })
+}
+
+#[tauri::command]
+fn library_export(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String) -> Result<Option<library_backup::BackupResult>, String> {
+    state.with(&expected_vault_id, |vault| {
+        let Some(path)=rfd::FileDialog::new().set_title("Export Recall library with originals and history").set_file_name("Recall Library.zip").add_filter("Recall library backup", &["zip"]).save_file() else {return Ok(None);};
+        library_backup::export(vault,&path).map(Some)
+    })
+}
+#[tauri::command]
+fn library_restore(state: tauri::State<'_, local_vault::LocalVaultState>) -> Result<Option<local_vault::VaultStatus>, String> {
+    let Some(archive)=rfd::FileDialog::new().set_title("Restore a Recall library backup").add_filter("Recall library backup", &["zip"]).pick_file() else {return Ok(None);};
+    let Some(destination)=rfd::FileDialog::new().set_title("Choose a new folder for the restored library").set_file_name("Restored Recall Library").save_file() else {return Ok(None);};
+    library_backup::restore(&archive,&destination)?;
+    state.select_path(&destination).map(Some)
 }
 
 #[tauri::command]
@@ -562,6 +578,8 @@ pub fn run() {
             library_attach,
             library_attachment,
             library_attachment_save,
+            library_export,
+            library_restore,
             library_import_markdown,
             library_restore_deleted,
             vault_select,

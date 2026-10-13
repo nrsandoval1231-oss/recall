@@ -14,7 +14,7 @@ New regression evidence includes pre-capture draft recovery, interrupted-save re
 
 ## Acceptance boundaries
 
-Actual installed Windows, physical iPhone, handwriting/live Jev/Claude quality and real Obsidian protocol launch are not established by these local checks. Phone offline recovery, broader semantic retrieval, full-library export/restore, remain the subsequent implementation work; this initial commit does not claim the entire native-memory mission complete. Native library and editor are the owner's current priority.
+Actual installed Windows, physical iPhone, handwriting/live Jev/Claude quality and real Obsidian protocol launch are not established by these local checks. Phone offline recovery, broader semantic retrieval, remain the subsequent implementation work; this initial commit does not claim the entire native-memory mission complete. Native library and editor are the owner's current priority.
 
 ## Actual native runtime walkthrough
 
@@ -28,4 +28,14 @@ Native Attach file preserves selected PNG/JPEG/WebP/PDF/Markdown/text bytes unde
 
 Verification: 249 native Rust tests, 113 desktop tests / 271 workspace tests, lint/typechecks, production frontend and Linux native builds passed. Four-size browser visual/accessibility checks passed with zero measured violations. Independent review identified recovery identity and attachment read-integrity issues; these were repaired before publication.
 
-[Actual attachment evidence](runtime/native-attachment-runtime.json) and [native inspection screenshot](runtime/native-attachment-inspection.png) show a real Linux Tauri native picker attaching text, inspecting it inside Recall, and saving a byte-identical copy with the original capture hash unchanged. Modal native pickers blocked WebDriver and required X11 input; that limitation is recorded, rather than representing browser mock tests as native acceptance. Installed Windows/iPhone and live providers remain unverified. Full-library export/restore is the next library slice.
+[Actual attachment evidence](runtime/native-attachment-runtime.json) and [native inspection screenshot](runtime/native-attachment-inspection.png) show a real Linux Tauri native picker attaching text, inspecting it inside Recall, and saving a byte-identical copy with the original capture hash unchanged. Modal native pickers blocked WebDriver and required X11 input; that limitation is recorded, rather than representing browser mock tests as native acceptance. Installed Windows/iPhone and live providers remain unverified. Full-library export/restore follows in Slice 3 below.
+
+## Slice 3 — portable full-library backup and restore
+
+Native Export library backup includes the owned `Recall/` tree: Markdown, originals, attachments, history, journals, validated interpretations and indexes. It excludes the transient writer lock and does not include OS credentials or unrelated files outside `Recall/`. Import external Markdown before exporting it as Recall memory. Unsaved editor drafts remain device-local; the management screen explicitly asks users to save them first.
+
+Export stages a standard ZIP, verifies the exact archived snapshot through the restore validator, compares live files for concurrent external changes, and publishes with atomic no-replace rename. Restore checks paths, duplicate/case aliases, links, entry counts, total/per-file/manifest sizes, every SHA-256, native history/source integrity and attachment receipts. It creates a new library folder, preserving library and memory IDs; existing libraries and backup files are never merged/overwritten. Failed restore staging remains available for inspection. Current bounded limits are 2 GiB total, 64 MiB per file, 100,000 archive entries and 16 MiB manifest.
+
+255 Rust tests passed; lint, typechecks, 271 workspace tests, production frontend and Linux native builds passed. Independent review found an export snapshot race and mismatched limits; both were repaired. A deterministic regression changes original bytes after preflight and confirms no invalid archive is published. Additional tests cover edited and deleted memory roundtrips, attachments/history, tampered ZIP rejection, original-integrity refusal and overwrite protection.
+
+[Real native export/restore results](runtime/native-backup-runtime.json), [export screenshot](runtime/native-library-export.png) and [restored attachment screenshot](runtime/native-library-restored-attachment.png) verify the final Linux Tauri implementation using actual native pickers and filesystem writes. All 17 archived file hashes matched; the original library remained present; retrieval, editor and attachment inspection worked from the restored library. Native walkthrough source: `tests/native/library_backup_runtime.py`. Installed Windows runtime acceptance remains unverified.

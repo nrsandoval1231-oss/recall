@@ -340,7 +340,7 @@ pub(crate) fn immutable(path: &Path, bytes: &[u8]) -> Result<()> {
         atomic_new(path, bytes)
     }
 }
-fn rename(from: &Path, to: &Path) -> Result<()> {
+pub(crate) fn rename(from: &Path, to: &Path) -> Result<()> {
     boundary!("rename_before", from);
     safe(from)?;
     safe(to)?;
@@ -1322,6 +1322,19 @@ impl Vault {
             return self.current(&e.memory.id, &pending).map(Some);
         }
         Ok(None)
+    }
+    pub(crate) fn validate_backup_integrity(&self) -> Result<()> {
+        let _lock=self.lock()?;
+        if !self.recover()?.is_empty(){return Err("Resolve pending library recovery before exporting".into());}
+        for item in fs::read_dir(self.path("History")).map_err(fail)? {
+            let item=item.map_err(fail)?;let memory_id=item.file_name().into_string().map_err(|_|"Invalid history identity")?;
+            let records=self.records(&memory_id)?;let original=&records.first().ok_or("Missing original history")?.memory;
+            if absent_original(original) {
+                let source=self.path(&format!("Sources/{memory_id}.txt"));
+                if source.exists() && read(&source,MAX_NOTE as u64)? != original.note.as_bytes(){return Err("Original text differs from immutable capture".into());}
+            } else {self.verify_source(original)?;}
+        }
+        Ok(())
     }
     pub fn resume_import(&self, operation_id: &str) -> Result<Option<VaultMemory>> {
         let _lock = self.lock()?;

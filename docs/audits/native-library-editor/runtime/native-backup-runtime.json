@@ -1,0 +1,11 @@
+{
+  "kind": "Actual Linux Tauri native backup and restore pickers, real native IPC and filesystem; synthetic content; no mocks",
+  "library_id": "4eb78282-43bd-4887-a4ae-b6043dc85b7e",
+  "files_verified": 17,
+  "all_archived_hashes_match": true,
+  "original_library_preserved": true,
+  "restored_native_retrieval": true,
+  "restored_native_editor": true,
+  "restored_attachment_inspection": true,
+  "backup_sha256": "2961d1de88ab27be34f2c74aed1a547020044e5fea06de6717024cc5363d6497"
+}

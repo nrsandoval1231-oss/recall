@@ -500,16 +500,18 @@ export function MemorySurface({
       setPanel(panelFor(next));
   }
 
-  async function choose(kind: "select" | "default" | "create") {
+  async function choose(kind: "select" | "default" | "create" | "restore") {
     setBusy(true);
     setError("");
     try {
       const next =
         kind === "select"
           ? await vault.select()
-          : kind === "create"
-            ? await vault.create?.()
-            : await vault.openDefault();
+          : kind === "restore"
+            ? await vault.restoreLibrary?.()
+            : kind === "create"
+              ? await vault.create?.()
+              : await vault.openDefault();
       if (!alive.current) return;
       if (!next) {
         setNotice("Folder choice cancelled. Nothing was written.");
@@ -1047,6 +1049,23 @@ export function MemorySurface({
       );
       if (saved && inScope(scope.vault_id))
         setNotice("Attachment copy saved. Library evidence is unchanged.");
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function exportLibrary() {
+    if (!selected || !vault.exportLibrary) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const backup = await vault.exportLibrary(scope.vault_id);
+      if (backup && inScope(scope.vault_id))
+        setNotice(
+          `Exported ${backup.files} library files with originals and history. Backup SHA-256: ${backup.sha256}. Unsaved editor drafts are device-local; save them before restoring on another device.`,
+        );
     } catch (error) {
       if (inScope(scope.vault_id)) setError(message(error));
     } finally {
@@ -1787,6 +1806,12 @@ export function MemorySurface({
                 >
                   Use default library
                 </button>
+                <button
+                  disabled={busy || !vault.restoreLibrary}
+                  onClick={() => void choose("restore")}
+                >
+                  Restore library backup
+                </button>
                 {selected && (
                   <section aria-label="Library management">
                     <p>
@@ -1807,6 +1832,18 @@ export function MemorySurface({
                     >
                       Refresh and recover library
                     </button>
+                    <button
+                      disabled={busy || !vault.exportLibrary}
+                      onClick={() => void exportLibrary()}
+                    >
+                      Export library backup
+                    </button>
+                    <p className="ms-fine">
+                      Backups contain this library’s Recall Markdown, original
+                      sources, attachments and revision history. Restore always
+                      creates a new folder and preserves existing libraries.
+                      Save any editor drafts before exporting.
+                    </p>
                     {removed.map((memory) => (
                       <article key={memory.id}>
                         <p>
