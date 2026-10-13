@@ -47,6 +47,7 @@ mod tests {
     #[test]
     fn only_a_current_note_from_this_vault_can_be_opened() {
         let root = std::env::temp_dir().join(format!("recall-obsidian-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let id = uuid::Uuid::new_v4().to_string();
         assert!(note_uri(&vault, &id).is_err());
