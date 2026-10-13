@@ -36,23 +36,27 @@ export function RecentNotes({
   memories,
   onOpen,
   onAll,
+  limit = 5,
+  title = "Recent Memories",
+  showAllAction = true,
 }: {
   referencePreview?: boolean;
   onReference?: (title: string, text: string) => void;
   memories: VaultMemory[];
   onOpen: (memory: VaultMemory) => void;
   onAll: () => void;
+  limit?: number; title?: string; showAllAction?: boolean;
 }) {
   const rows = [...memories]
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-    .slice(0, 4);
+    .slice(0, limit);
   return (
     <section className="glass ms-recent-notes" aria-label="Recent Notes">
       <header>
-        <h2>Recent Notes</h2>
-        <button type="button" onClick={onAll}>
+        <h2>{title}</h2>
+        {showAllAction && <button type="button" onClick={onAll}>
           View all <ArrowRightIcon />
-        </button>
+        </button>}
       </header>
       {referencePreview ? (
         <ul>
@@ -107,13 +111,15 @@ export function RecentNotes({
               <button
                 className="ms-recent-open"
                 type="button"
+                aria-label={`Open original: ${memoryTitle(memory)}`}
+                disabled={Boolean(memory.conflict) || memory.state === "conflict" || memory.revision < 1}
                 onClick={() => onOpen(memory)}
               >
                 <span className="ms-note-icon">
                   <FileTextIcon weight="light" />
                 </span>
                 <span className="ms-recent-copy">
-                  <strong>{memoryTitle(memory)}</strong>
+                  <h3>{memoryTitle(memory)}</h3>
                   <small>
                     {noteSummary(noteBody(memory)) ||
                       "Original saved in your vault."}
@@ -129,9 +135,7 @@ export function RecentNotes({
                     })}
                   </time>
                   <span className="ms-pill">
-                    {memory.note.startsWith("---\nrecall_id:")
-                      ? "Needs review"
-                      : "Captured"}
+                    {memory.conflict || memory.state === "conflict" ? "Needs attention" : memory.state === "missing" ? "Note missing" : memory.note.startsWith("---\nrecall_id:") ? "Needs review" : "Captured"}
                   </span>
                 </span>
               </button>
@@ -198,28 +202,15 @@ export function CaptureCalendar({
     setDay(null);
   }
   return (
-    <aside className="glass ms-calendar" aria-label="Capture calendar">
+    <aside className="glass ms-calendar" data-selected-day={day !== null || undefined} aria-label="Capture calendar">
       <header>
-        <h2>
-          {month.toLocaleDateString("en-US", {
-            month: "long",
-            year: "numeric",
-            timeZone: "UTC",
-          })}
-        </h2>
+        <h2><CalendarBlankIcon aria-hidden="true" /> Capture Calendar</h2>
         <div>
-          <button
-            type="button"
-            aria-label="Previous month"
-            onClick={() => move(-1)}
-          >
-            <CaretLeftIcon />
-          </button>
-          <button type="button" aria-label="Next month" onClick={() => move(1)}>
-            <CaretRightIcon />
-          </button>
+          <button type="button" aria-label="Previous month" onClick={() => move(-1)}><CaretLeftIcon /></button>
+          <button type="button" aria-label="Next month" onClick={() => move(1)}><CaretRightIcon /></button>
         </div>
       </header>
+      <h3 className="approved-calendar-month">{month.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })}</h3>
       <div className="ms-weekdays">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
           <span key={label}>{label}</span>
@@ -324,9 +315,10 @@ export function CaptureCalendar({
             <ul>
               {selectedRows.map((memory) => (
                 <li key={memory.id}>
-                  <button type="button" onClick={() => onOpen(memory)}>
+                  <button type="button" disabled={Boolean(memory.conflict) || memory.state === "conflict" || memory.revision < 1} onClick={() => onOpen(memory)}>
                     {memoryTitle(memory)}
                   </button>
+                  {(memory.conflict || memory.state === "conflict" || memory.revision < 1) && <small>Inspection unavailable. Review this note and reload.</small>}
                 </li>
               ))}
             </ul>
@@ -335,7 +327,7 @@ export function CaptureCalendar({
           )
         ) : agenda.length ? (
           <ul className="ms-agenda-list">
-            {agenda.slice(0, 4).map((row, index) => (
+            {agenda.slice(0, 5).map((row, index) => (
               <li key={`${row.memory.id}-${index}`}>
                 <span className="ms-agenda-dot" />
                 <button type="button" onClick={() => onOpen(row.memory)}>

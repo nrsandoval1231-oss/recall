@@ -1,0 +1,122 @@
+/* Owner-approved October 12 composition. No decorative photographs or invented records. */
+.ms.approved-desktop {
+  --ink: #292720; --muted: #514b42; --quiet: #61594e; --line: rgba(119,98,72,.20);
+  --glass: rgba(255,252,247,.33); color: var(--ink); background: radial-gradient(ellipse at 55% 0%, #f8f2e9, transparent 70%), #e8dfd3;
+  grid-template-columns: 15.5% minmax(0,1fr); font-family: Georgia, "Times New Roman", serif; font-size: 14px; accent-color: #b28b4d;
+}
+.approved-desktop .ms-rail { padding: 38px 12px 22px; background: linear-gradient(140deg,#2a2925,#20201d); color: #e4ded2; box-shadow: 3px 0 12px #51453240; border-right: 1px solid #fff8; }
+.approved-desktop .ms-brand { gap: 12px; margin: 0 12px 34px; }
+.approved-desktop .ms-brand-logo { background: none; width: 32px; height: 32px; flex-basis: 32px; border: 2px solid #bc9c61; border-radius: 50%; box-shadow: inset 2px -1px 0 #e8cc9780, 1px 1px 0 #e8cc9780; transform: rotate(-12deg); }
+.approved-desktop .ms-mark { font: 28px Georgia,serif; letter-spacing: -.5px; margin: 0; color:#f4f0e8; }
+.approved-desktop .ms-tagline { font-size: 10px; color:#c8c1b4; margin: 2px 0; font-style: normal; white-space: nowrap; }
+.approved-desktop .ms-nav { gap: 3px; }
+.approved-desktop .ms-nav button { min-height: 48px; gap: 17px; padding: 0 17px; border-radius: 10px; color:#c8c1b4; font-size: 15px; transition: background 140ms, box-shadow 140ms; }
+.approved-desktop .ms-nav button[aria-current="page"] { background: linear-gradient(90deg,#a98b4d33,#ffffff10); box-shadow: inset 2px 0 0 #dcc184,inset 0 0 15px #c8a86915; border: 1px solid #ac97782e; color:#fff7e6; }
+.approved-desktop .ms-rail-bottom { margin: 22px 15px 0; padding-top: 12px; gap: 0; }
+.approved-desktop .ms-rail-bottom button { min-height: 42px; font-size:14px; color:#c8c1b4; }
+.approved-desktop .ms-rail-bottom button:first-child { font-family:"Segoe UI",sans-serif; font-size:12px; }
+.approved-desktop .ms-rail-quote { margin: auto 20px 100px; padding-top: 60px; color:#b9a17e; font-size: 15px; line-height:1.5; }
+.approved-desktop .ms-stage { padding: 38px 28px 22px; }
+.approved-desktop .ms-atmosphere { background:none; }
+.approved-desktop .ms-ui { gap:0; }
+.approved-desktop .glass { background: var(--glass); color:var(--ink); border:1px solid #fff9; border-radius:9px; backdrop-filter:blur(12px); box-shadow:0 2px 12px #8b72500b, inset 0 0 0 1px #77624810; }
+.approved-desktop .ms-mast { padding:0; display:grid; grid-template-columns:minmax(0,2.2fr) minmax(190px,1fr); gap:28px; align-items:center; margin-bottom:12px; }
+.approved-desktop .ms-askrow { grid-column:1; grid-row:1; display:block; }
+.approved-desktop .ms-ask { min-height:56px; border-radius:19px; background:#fffcf6b3; border:1px solid #fff; box-shadow:0 6px 14px #856c4620; padding:8px 17px; gap:14px; position:relative; }
+.approved-desktop .ms-ask input { font:18px Georgia,serif; padding:0; min-height:36px; color:#292720; }
+.approved-desktop .ms-ask input::placeholder { color:#4b463e; }
+.approved-desktop .ms-ask kbd { order:3; font:12px "Segoe UI",sans-serif; white-space:nowrap; color:#625a4c; border:1px solid #c5b9a44f; border-radius:5px; padding:4px 7px; }
+.approved-desktop .ms-ask button { width:28px; min-width:28px; background:none; color:#625a4c; border:0; }
+.approved-desktop .ms-greeting { grid-column:2; grid-row:1; padding:0 10px; }
+.approved-desktop .ms-greeting strong { font:16px Georgia,serif; color:var(--ink); }
+.approved-desktop .ms-greeting small { font:16px Georgia,serif; color:var(--ink); }
+.approved-desktop .ms-greeting > svg,.approved-desktop .ms-profile,.approved-desktop .ms-mic,.approved-desktop .ms-prompts { display:none !important; }
+.approved-motto { margin:6px 30% 22px 0; text-align:center; font-size:17px; font-style:italic; }
+.approved-board { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(250px,1fr); gap:20px; align-items:start; }
+.approved-main,.approved-right { min-width:0; display:flex; flex-direction:column; gap:18px; }
+.approved-main { gap:22px; }
+.approved-projects header,.approved-followups header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.approved-projects h1 { font:23px Georgia,serif; margin:0 0 10px; display:flex; align-items:center; gap:12px; }
+.approved-projects h1 svg,.approved-followups h2 svg { width:23px; height:23px; }
+.approved-projects header button,.approved-followups header button { font-size:12px; padding:0; }
+.approved-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 16px; }
+.approved-desktop button.approved-project { display:flex; flex-direction:column; text-align:left; justify-content:center; min-height:118px; padding:20px; border-radius:7px; border:1px solid #fff9; background:linear-gradient(150deg,#a4a79a45,#f4ece0ab 75%); box-shadow:inset 0 0 0 1px #74614b16,0 2px 5px #7862430c; transition:transform 140ms,box-shadow 140ms,background 240ms; }
+.approved-desktop button.tone-1 { background:linear-gradient(150deg,#abb0ab60,#eee6dbb0 75%); }
+.approved-desktop button.tone-2 { background:linear-gradient(150deg,#b69d8d55,#f4eee4b0 75%); }
+.approved-project strong { font-size:18px; font-weight:500; line-height:1.15; margin-bottom:10px; overflow-wrap:anywhere; }
+.approved-project span { display:flex; align-items:center; justify-content:space-between; font-size:12px; gap:5px; }
+.approved-project small { font:10px "Segoe UI",sans-serif; color:#62594b; margin-top:6px; }
+.approved-desktop button.approved-project[aria-pressed="true"] { border:2px solid #fff5dc; box-shadow:0 0 0 1px #ba955e,0 0 12px #b9985260; background:linear-gradient(150deg,#7a705b,#a48b62); color:#fff9ee; }
+.approved-project[aria-pressed="true"] small { color:#fff4d7; }
+.approved-desktop button.approved-project:hover { transform:translateY(-2px); box-shadow:0 4px 12px #80694925; }
+.approved-empty { grid-column:1/-1; min-height:238px; border:1px dashed #ae977d70; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:24px; color:#62594b; }
+.approved-empty svg { width:32px; height:32px; }.approved-empty p { font-size:18px; margin:12px 0; }
+.approved-desktop .ms-recent-notes { border:0; background:none; box-shadow:none; backdrop-filter:none; padding:0; }
+.approved-desktop .ms-recent-notes > header { margin-bottom:8px; }
+.approved-desktop .ms-recent-notes h2 { font:23px Georgia,serif; margin:0; color:var(--ink); }
+.approved-desktop .ms-recent-notes > ul { border:1px solid #fff8; border-radius:8px; background:#fff8; padding:0; }
+.approved-desktop .ms-recent-notes li { border-color:#9b89751c; }
+.approved-desktop .ms-recent-open { padding:10px 16px; min-height:63px; gap:14px; }
+.approved-desktop .ms-note-icon { background:none; width:38px; height:38px; color:#554b3c; }.approved-desktop .ms-note-icon svg { width:25px; height:25px; }
+.approved-desktop .ms-recent-copy strong { font:15px Georgia,serif; color:#292720; }.approved-desktop .ms-recent-copy small { font:12px Georgia,serif; color:#514b42; }
+.approved-desktop .ms-recent-meta { color:#514b42; font:12px Georgia,serif; }.approved-desktop .ms-pill { background:#cdb99530; color:#5c513f; }
+.approved-desktop .ms-empty { min-height:210px; color:#62594b; border:1px solid #fff8; background:#fff4; border-radius:8px; }
+.approved-desktop .ms-calendar { padding:17px; }.approved-desktop .ms-calendar > header h2 { font:18px Georgia,serif; }.approved-desktop .ms-calendar-days button { min-height:36px; color:#292720; font-size:13px; }.approved-desktop .ms-calendar-days button:disabled { color:#8d867c; }.approved-desktop .ms-calendar-days button[data-today="true"] { background:linear-gradient(#c9a869,#9e773d); color:white; }.approved-desktop .ms-calendar-days button[aria-pressed="true"] { border:1px solid #8e6839; }.approved-desktop .ms-weekdays { margin-block:16px 9px; font-size:12px; color:#514b42; }.approved-desktop .ms-capture-dots { color:#9b7839; }
+.approved-desktop .ms-calendar .ms-agenda { margin-top:8px; padding:8px 0 0; background:none; border:0; }.approved-desktop .ms-calendar:not([data-selected-day]) .ms-agenda:has(.ms-fine) { display:none; }.approved-desktop .ms-add-note { display:none; }
+.approved-followups { padding:15px 17px; }.approved-followups h2 { font:20px Georgia,serif; margin:0; display:flex; gap:10px; align-items:center; }.approved-followups ul { list-style:none; padding:0; margin:12px 0 0; }.approved-followups li button { display:flex; width:100%; align-items:center; gap:12px; text-align:left; padding:8px 0; }.approved-followups li button > svg { width:18px; flex-shrink:0; }.approved-followups li button span { flex:1; min-width:0; }.approved-followups strong { display:block; font-size:13px; font-weight:500; }.approved-followups small { display:block; font-size:12px; color:#61594e; margin-top:3px; }
+.approved-quote { margin:0; min-height:164px; padding:32px 18px 20px; text-align:center; font-style:italic; line-height:1.5; border:1px solid #fff9; border-radius:8px; background:linear-gradient(175deg,#f8f1e680,#c4b39b90); }.approved-quote span { display:block; color:#ac8242; font-style:normal; margin-top:12px; }
+.approved-capture { border:1px dashed #9b897555; border-radius:9px; padding:12px; display:flex; gap:8px; align-items:center; background:#fff2; }.approved-capture > svg { width:30px; height:30px; margin:0 7px; flex-shrink:0; }.approved-capture button { display:flex; align-items:center; gap:6px; border:1px solid #fff8; border-radius:8px; box-shadow:0 2px 8px #7964441a; background:#fff8; padding:8px 12px; font-size:12px; white-space:nowrap; }.approved-capture button:first-of-type { flex:1; display:block; text-align:left; padding:0; background:none; box-shadow:none; border:0; white-space:normal; }.approved-capture strong { display:block; font-size:14px; font-weight:500; }.approved-capture small { display:block; font-size:12px; color:#61594e; margin-top:3px; }.approved-capture button svg { width:18px; height:18px; }
+.approved-desktop .ms-project,.approved-desktop .ms-evidence > .glass { padding:24px; }.approved-desktop .ms-project h1 { color:var(--ink); }.approved-desktop .ms-fine { color:#61594e; }.approved-desktop .ms-form textarea,.approved-desktop .ms-form input { color:#292720; background:#fff8; border:1px solid #9b897555; }.approved-desktop .ms-form button,.approved-desktop .ms-actions button { background:#d2bb8e50; color:#292720; border:1px solid #9b897555; border-radius:7px; }.approved-desktop .ms-banner,.approved-desktop .ms-notice { background:#fff8; color:#514b42; border-color:#9b897540; margin-bottom:10px; }.approved-desktop .ms-error { background:#fff0e8; color:#7b3325; }.approved-desktop .ms-modal-backdrop .ms-vault-settings { background:#f0e9df; color:#292720; }.approved-desktop .ms-evidence { animation:approved-focus 260ms ease-out; }.approved-desktop .ms-evidence img,.approved-desktop .ms-paper-view { animation:approved-focus 230ms ease-out; }.approved-desktop :focus-visible { outline:2px solid #a37a3e; outline-offset:3px; }.approved-desktop button { transition:background 140ms,box-shadow 140ms; }.approved-desktop button:hover:not(:disabled) { background-color:#b6985730; }
+@keyframes approved-focus { from { opacity:.5; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@media(min-width:1500px) { .approved-desktop .ms-stage { padding:46px 34px 26px; }.approved-desktop .ms-rail { padding-top:46px; }.approved-desktop .ms-nav button { min-height:55px; }.approved-desktop .ms-brand { margin-bottom:40px; }.approved-grid { gap:15px 19px; }.approved-desktop button.approved-project { min-height:136px; }.approved-main { gap:28px; }.approved-desktop .ms-recent-open { min-height:72px; }.approved-desktop .ms-calendar-days button { min-height:42px; }.approved-quote { min-height:180px; } }
+@media(max-width:1050px) { .ms.approved-desktop { grid-template-columns:160px minmax(0,1fr); }.approved-desktop .ms-stage { padding:25px 20px; }.approved-desktop .ms-rail { padding:30px 8px 16px; }.approved-desktop .ms-brand { margin-inline:8px; gap:9px; }.approved-desktop .ms-mark { font-size:24px; }.approved-desktop .ms-tagline { font-size:8px; }.approved-desktop .ms-nav button { padding-inline:12px; gap:12px; min-height:42px; }.approved-board { grid-template-columns:minmax(0,1fr) 230px; gap:14px; }.approved-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.approved-desktop button.approved-project { padding:14px; min-height:105px; }.approved-project strong { font-size:16px; }.approved-capture { flex-wrap:wrap; }.approved-capture button:first-of-type { flex-basis:70%; }.approved-desktop .ms-mast { grid-template-columns:minmax(0,1fr) 230px; gap:14px; }.approved-desktop .ms-ask input { font-size:15px; }.approved-desktop .ms-greeting strong,.approved-desktop .ms-greeting small { font-size:13px; }.approved-desktop .ms-rail-quote { margin-bottom:20px; }.approved-desktop .ms-recent-meta { display:none; } }
+@media(max-width:760px) { .ms.approved-desktop { grid-template-columns:70px minmax(0,1fr); }.approved-desktop .ms-nav button span,.approved-desktop .ms-brand > div,.approved-desktop .ms-rail-bottom span,.approved-desktop .ms-rail-quote { display:none; }.approved-desktop .ms-nav button { justify-content:center; padding:0; }.approved-desktop .ms-brand { margin:0 auto 24px; }.approved-board { grid-template-columns:minmax(0,1fr); }.approved-desktop .ms-mast { grid-template-columns:1fr; }.approved-desktop .ms-greeting { display:none; }.approved-motto { margin-right:0; font-size:15px; }.approved-desktop .ms-stage { padding:20px 15px; }.approved-desktop .ms-evidence { grid-template-columns:1fr; }.approved-right { display:grid; grid-template-columns:1fr; }.approved-desktop .ms-ask kbd { display:none; } }
+@media(prefers-reduced-motion:reduce) { .approved-desktop *, .approved-desktop *::before, .approved-desktop *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
+.approved-calendar-month { margin:14px 0 0; text-align:center; font:18px Georgia,serif; }
+.approved-desktop .ms-recent-copy h3 { font:15px Georgia,serif; color:#292720; margin:0 0 5px; }
+.approved-desktop .ms-recent-notes header h2::before { content:"▤"; margin-right:12px; font-size:22px; color:#554b3c; }
+
+.approved-inspection-context { position:absolute; inset:145px 0 0; opacity:.12; transform:scale(.985); pointer-events:none; transition:opacity 260ms,transform 260ms; }
+.approved-workspace { transition:opacity 260ms,transform 260ms; }
+.approved-desktop .ms-evidence { position:relative; z-index:2; }.approved-desktop .ms-evidence > .glass { background:#f5efe5ee; }
+.approved-desktop .ms-calendar:not([data-selected-day]) .ms-agenda { display:none; }
+.approved-desktop .ms-brand { margin-inline:8px; }.approved-desktop .ms-tagline { font-size:8px; }
+.approved-desktop .ms-rail { background:linear-gradient(140deg,#2a2925,#20201d); }
+.approved-desktop .ms-brand-logo { flex-shrink:0; }
+/* Match the compact density of the approved 1280-wide reference. */
+@media (min-width:1051px) and (max-width:1499px) {
+  .approved-desktop button.approved-project { min-height:100px; padding:16px; }
+  .approved-desktop .ms-recent-open { min-height:50px; padding:6px 14px; }
+  .approved-desktop .ms-recent-copy { gap:0; }
+  .approved-main { gap:18px; }
+  .approved-desktop .ms-recent-meta { gap:3px; }
+}
+.approved-desktop .ms-calendar > header h2 { display:flex; gap:8px; align-items:center; }.approved-desktop .ms-calendar > header h2 svg { width:22px; height:22px; }
+.approved-desktop .ms-recent-copy h3 { line-height:1.2; }
+.approved-desktop .ms-recent-notes { margin:0; }
+@media (min-width:1051px) and (max-width:1499px) {
+  .approved-motto { margin-bottom:16px; }
+  .approved-projects header > button { min-height:30px; }
+  .approved-desktop button.approved-project { min-height:92px; padding:14px; }
+  .approved-desktop .ms-recent-notes > header button { min-height:32px; }
+}
+@media (min-width:1500px) {
+  .approved-desktop button.approved-project { min-height:118px; }
+  .approved-desktop .ms-recent-open { min-height:64px; }
+  .approved-desktop .ms-recent-copy { gap:0; }
+  .approved-projects h1,.approved-desktop .ms-recent-notes h2 { font-size:27px; }
+}
+@media(min-width:761px) and (max-width:1050px) {
+  .approved-desktop .ms-nav button span,.approved-desktop .ms-rail-bottom button span { display:block; }
+  .approved-desktop .ms-brand > div { display:block; }.approved-desktop .ms-tagline { display:none; }
+  .approved-desktop .ms-calendar > header h2 { font-size:15px; white-space:nowrap; gap:6px; }
+  .approved-desktop .ms-calendar > header h2 svg { width:18px; height:18px; }
+  .approved-desktop .ms-nav button { font-size:14px; }
+}
+.approved-desktop .ms-greeting { display:flex; }
+@media(max-width:760px) { .approved-desktop .ms-greeting { display:none; } }
+@media(min-width:761px) and (max-width:1100px) {
+  .approved-desktop .ms-nav button { justify-content:flex-start; }
+  .approved-desktop .ms-nav button span { position:static; width:auto; height:auto; margin:0; overflow:visible; clip:auto; white-space:normal; display:block; }
+  .approved-desktop .ms-brand > div { display:block; }.approved-desktop .ms-tagline { display:none; }
+}

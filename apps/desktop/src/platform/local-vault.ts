@@ -19,6 +19,7 @@ export interface LocalVault {
   status(): Promise<VaultStatus>;
   select(): Promise<VaultStatus | null>;
   openDefault(): Promise<VaultStatus>;
+  capturePath?(expectedVaultId: string, operationId: string, note: string, path: string): Promise<VaultMemory>;
   capture(expectedVaultId: string, operationId: string, note: string): Promise<VaultMemory | null>;
   list(expectedVaultId: string, query: string, includeDeleted?: boolean): Promise<VaultMemory[]>;
   rebuild(expectedVaultId: string, includeDeleted?: boolean): Promise<VaultMemory[]>;
@@ -38,6 +39,7 @@ export class NativeLocalVault implements LocalVault {
   select() { return this.call<VaultStatus | null>("vault_select"); }
   openDefault() { return this.call<VaultStatus>("vault_open_default"); }
   capture(expectedVaultId: string, operationId: string, note: string) { return this.call<VaultMemory | null>("vault_capture", { expectedVaultId, operationId, note }); }
+  capturePath(expectedVaultId: string, operationId: string, note: string, path: string) { return this.call<VaultMemory>("vault_capture_path", { expectedVaultId, operationId, note, path }); }
   captureNote(expectedVaultId: string, operationId: string, note: string) { return this.call<VaultMemory>("vault_capture_note", { expectedVaultId, operationId, note }); }
   parse(expectedVaultId: string, memoryId: string, expectedRevision: number, operationId: string, consent: boolean) { return this.call<ParserJob>("processing_parse", { expectedVaultId, memoryId, expectedRevision, operationId, consent }); }
   organize(expectedVaultId: string, parserOperationId: string, operationId: string, consent: boolean) { return this.call<unknown>("meeting_organize", { expectedVaultId, parserOperationId, operationId, consent }); }

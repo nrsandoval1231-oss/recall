@@ -40,3 +40,9 @@ it("lifecycle commands preserve exact revision, state, operation identity and in
     ["vault_remove", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 4, operationId: "remove-op", expectedState: "missing" }],
   ]);
 });
+
+it("sends dropped photo import with the selected session and retry operation", async () => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+  await new NativeLocalVault().capturePath("session", "drop-operation", "note", "/user/photo.png");
+  expect(invoke).toHaveBeenCalledWith("vault_capture_path", { expectedVaultId: "session", operationId: "drop-operation", note: "note", path: "/user/photo.png" });
+});

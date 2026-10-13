@@ -34,7 +34,8 @@ export function noteSummary(text: string): string {
       line
         .trim()
         .replace(/^-\s*(\[[ x]\]\s*)?/, "")
-        .replace(/[*`]/g, ""),
+        .replace(/[*`]/g, "")
+        .replace(/ — source bytes \d+–\d+$/, ""),
     );
     if (lines.length === 3) break;
   }

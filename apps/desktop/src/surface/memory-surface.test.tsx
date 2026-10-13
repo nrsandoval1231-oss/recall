@@ -82,31 +82,11 @@ it("requires separate source consent and unchecked cost review for the retained 
 });
 
 describe("Memory Surface", () => {
-  it("shows the synthetic Brooks Campus surface when no vault is open", () => {
-    const { container } = render(<MemorySurface vault={preview} />);
-    expect(screen.getByText("RECALL")).toBeTruthy();
-    expect(screen.getByText("Your knowledge. In context.")).toBeTruthy();
-    for (const label of ["Search", "Home", "People", "Locations", "Projects", "Organizations", "Topics", "Calendar", "Capture"]) {
-      expect(screen.getByRole("button", { name: label })).toBeTruthy();
-    }
-    expect(screen.getByRole("heading", { name: "Brooks Campus" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Blake Combs/ })).toBeTruthy();
-    expect(screen.getByText(/Synthetic demo/)).toBeTruthy();
-    expect(screen.getAllByText(/Potential 300MW \(phased\)/).length).toBeGreaterThan(0);
-    expect(container.querySelector(".ms-desk, .ms-paper, .ms-polaroid, .ms-mug, img")).toBeNull();
-    expect(screen.queryByText("Important conversations deserve a long memory.")).toBeNull();
-    expect(screen.queryByRole("img", { name: /site illustration/i })).toBeNull();
-    expect(screen.queryByText("Synthetic site illustration")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Recent Memories" })).toBeNull();
-    expect(screen.queryByRole("region", { name: "Timeline and recent memories" })).toBeNull();
-    expect(screen.getByRole("button", { name: /View all/ })).toBeTruthy();
-    expect(screen.getByRole("complementary", { name: "Capture calendar" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Key People" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Key Locations" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Topics" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /^Related/ })).toBeTruthy();
-    expect(screen.queryByText("Email me a sign-in link")).toBeNull();
-    expect((screen.getByRole("button", { name: "Voice ask is not available in this build" }) as HTMLButtonElement).disabled).toBe(true);
+  it("shows an honest empty surface in a browser with no vault", () => {
+    render(<MemorySurface vault={preview} />);
+    expect(screen.getByRole("heading", { name: "Projects" })).toBeTruthy();
+    expect(screen.getByText("No project sources yet.")).toBeTruthy();
+    expect(screen.queryByText("Brooks Campus")).toBeNull();
   });
 
   it("keeps original evidence separate from the decorative workspace asset", () => {
@@ -117,37 +97,12 @@ describe("Memory Surface", () => {
     expect(css).not.toMatch(/memory-surface-reference|\.jpg|\.png|\.webp/i);
   });
 
-  it("moves the timeline marker without a recent-memories strip", async () => {
-    const user = userEvent.setup();
-    render(<MemorySurface vault={preview} />);
-    await user.click(screen.getByRole("button", { name: "Calendar" }));
-    await user.click(screen.getByRole("button", { name: "SEP" }));
-    expect(screen.getByRole("button", { name: "SEP" }).getAttribute("aria-current")).toBe("true");
-    expect(screen.getByRole("button", { name: /Utility Discussion/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Preliminary Plan/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Meeting Notes/ })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Recent Memories" })).toBeNull();
-  });
-
-  it("answers the reference question from the fixture and opens the sample notebook", async () => {
-    const user = userEvent.setup();
-    render(<MemorySurface vault={preview} />);
-    await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "What do you know about Brooks Campus?");
-    await user.click(screen.getByRole("button", { name: "Ask" }));
-    expect(screen.getByText(/Keyword search. Not a Claude answer/)).toBeTruthy();
-    expect(screen.getByText(/synthetic Brooks Campus fixture/)).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Open Meeting Notes" }));
-    expect(screen.getByText(/not a photographed page/)).toBeTruthy();
-    expect(screen.getByText(/Potential 300MW \(phased\)/)).toBeTruthy();
-  });
-
-  it("abstains when the fixture has no matching words", async () => {
-    const user = userEvent.setup();
-    render(<MemorySurface vault={preview} />);
-    await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "xylophone quantum");
-    await user.click(screen.getByRole("button", { name: "Ask" }));
-    expect(screen.getByText("Nothing in the notes matches that. This is keyword search on this device, not a Claude answer.")).toBeTruthy();
-    expect(screen.getByText(/Keyword search\. Not a Claude answer\./)).toBeTruthy();
+  it("requires a native vault before retrieving evidence", async () => {
+    const user = userEvent.setup(); render(<MemorySurface vault={preview} />);
+    await user.type(screen.getByRole("searchbox"), "Brooks Campus");
+    await user.click(screen.getByRole("button", { name: "Submit question" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/choose your vault/);
+    expect(screen.queryByText(/Potential 300MW/)).toBeNull();
   });
 
   it("uses vault notes instead of the fixture and opens the original", async () => {
@@ -165,9 +120,9 @@ describe("Memory Surface", () => {
     expect(screen.getByRole("complementary", { name: "Capture calendar" })).toBeTruthy();
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
     await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "laydown");
-    await user.click(screen.getByRole("button", { name: "Ask" }));
+    await user.click(screen.getByRole("button", { name: "Submit question" }));
     expect(screen.getByText(/Markdown notes in your vault/)).toBeTruthy();
-    expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
+    expect(screen.getAllByText(/Gate code 48\?/).length).toBeGreaterThan(0);
     await user.click(screen.getByRole("button", { name: "Open original: north-lot" }));
     expect(client.source).toHaveBeenCalledWith("session-token", page.id);
     expect((await screen.findByTestId("integrity")).textContent).toMatch(/Hash matches the vault record/);
@@ -182,7 +137,7 @@ describe("Memory Surface", () => {
       .mockResolvedValueOnce(saved);
     const client = vault({ capture, status: async () => chosen }, []);
     render(<MemorySurface vault={client} />);
-    expect(await screen.findByRole("heading", { name: "Your memory starts here" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Capture" }));
     await user.type(screen.getByRole("textbox", { name: "Optional note" }), "North lot, confirm the gate");
     await user.click(screen.getByRole("button", { name: "Import photo" }));
@@ -267,10 +222,10 @@ describe("Memory Surface", () => {
     const client = vault({ status: async () => emptyStatus }, []);
     client.list = vi.fn(async () => []);
     render(<MemorySurface vault={client} />);
-    await user.click(screen.getByRole("button", { name: /^Vault/ }));
+    await user.click(screen.getByRole("button", { name: "Settings" }));
     await user.click(await screen.findByRole("button", { name: "Use default vault" }));
     expect(client.openDefault).toHaveBeenCalledWith();
-    await user.click(screen.getByRole("button", { name: /^Vault/ }));
+    await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(await screen.findByText("/home/me/Documents/Recall")).toBeTruthy();
 
     cleanup();
@@ -308,8 +263,8 @@ describe("Memory Surface", () => {
     expect(client.correct).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "laydown");
-    await user.click(screen.getByRole("button", { name: "Ask" }));
-    expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Submit question" }));
+    expect(screen.getAllByText(/Gate code 48\?/).length).toBeGreaterThan(0);
     expect(client.list).toHaveBeenCalledWith("session-token", "laydown");
   });
 
@@ -340,7 +295,7 @@ it("saves messy text without provider consent and retrieves original source quot
   expect(captureNote).toHaveBeenCalledWith("session-token", expect.any(String), text); expect(parse).not.toHaveBeenCalled();
   expect(screen.getAllByText(text).length).toBeGreaterThan(0); expect(screen.getByTestId("integrity").textContent).toContain("Hash matches");
   expect(screen.queryByRole("img")).toBeNull();
-  await user.type(screen.getByRole("searchbox"), "What happened with that utility delay?"); await user.click(screen.getByRole("button", { name: "Ask" }));
+  await user.type(screen.getByRole("searchbox"), "What happened with that utility delay?"); await user.click(screen.getByRole("button", { name: "Submit question" }));
   expect(await screen.findByRole("heading", { name: "Source-backed matches" })).toBeTruthy();
   expect(ask).toHaveBeenCalledWith("session-token", "What happened with that utility delay?");
   expect(screen.getByRole("button", { name: "Inspect original evidence" })).toBeTruthy(); expect(screen.getByText(`SHA-256: ${sha}`)).toBeTruthy();
@@ -359,12 +314,12 @@ it("finishing organization of A never replaces B's correction editor after navig
   await user.click(screen.getByRole("button", { name: "Organize this memory" }));
   await screen.findByText("Claude is organizing source-linked memory…");
   await user.click(screen.getByRole("button", { name: "Calendar" }));
-  await user.click(await screen.findByRole("button", { name: /Aug 21, 2026 · B/ }));
+  await user.click(await screen.findByRole("button", { name: "Open original: B" }));
   expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("B human draft");
   await user.click(screen.getByRole("button", { name: "Home" }));
   expect(screen.getByText("Claude is organizing source-linked memory…")).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Calendar" }));
-  await user.click(await screen.findByRole("button", { name: /Aug 21, 2026 · B/ }));
+  await user.click(await screen.findByRole("button", { name: "Open original: B" }));
   await act(async () => { finish({}); });
   await screen.findByText("Organized in Obsidian. Uncertainty and original evidence preserved.");
   expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("B human draft");
@@ -396,49 +351,27 @@ it("preserves a newer unsaved draft when organization finishes on the same memor
   expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("Newer unsaved human draft");
 });
 
-it("shows saved unresolved people and source agenda in the existing panels", async () => {
-  const user = userEvent.setup();
+it("keeps source follow-ups unscheduled and inspectable", async () => {
   const id = "11111111-1111-4111-8111-111111111111";
-  const saved = memory({ note: `---\nrecall_id: "${id}"\n---\n## Unresolved entity mentions\n\n- “Sarah” — person candidate; identity unresolved\n## Follow-ups (not confirmed commitments)\n\n- [ ] “Call Sarah” — source bytes 20–30\n## Open questions and uncertainty\n\n-  “Need generators by Dec?” — source bytes 31–55\n` });
+  const saved = memory({ note: `---\nrecall_id: "${id}"\n---\n## Follow-ups (not confirmed commitments)\n\n- [ ] “Call Sarah” — source bytes 20–30\n` });
   render(<MemorySurface vault={vault({}, [saved])} />);
-  await screen.findByText(/Last updated/);
-  await user.click(screen.getByRole("button", { name: "People" }));
-  expect(screen.getAllByRole("button", { name: /^Sarah/ })[0]).toBeTruthy();
-  expect(screen.getAllByText(/person candidate; identity unresolved/)[0]).toBeTruthy();
-  await user.click(screen.getByRole("button", { name: "Calendar" }));
-  expect(screen.getByRole("heading", { name: "Agenda" })).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: /Call Sarah/ }).length).toBeGreaterThan(0);
-  expect(screen.getByText(/Unscheduled source follow-up/)).toBeTruthy();
+  expect(await screen.findByRole("button", { name: /Call Sarah/ })).toBeTruthy();
+  expect(screen.getByText(/Unscheduled · inspect source/)).toBeTruthy();
 });
 
-it("keeps the board in the center grid slot with related context alone", async () => {
-  const id = "11111111-1111-4111-8111-111111111111";
-  const saved = memory({ note: `---\nrecall_id: "${id}"\n---\n## Related memories\n\n- [[Recall/Memories/target|Related source-backed memory]] (possible relationship; review)\n` });
-  const { container } = render(<MemorySurface vault={vault({}, [saved, memory({ id: "22222222-2222-4222-8222-222222222222", note_path: "target.md" })])} />);
-  await screen.findByRole("tab", { name: /^Related/ });
-  const columns = container.querySelector(".ms-columns")!;
-  expect(columns.children).toHaveLength(3);
-  expect(columns.children[0]?.classList.contains("ms-side")).toBe(true);
-  expect(columns.children[1]?.classList.contains("ms-center")).toBe(true);
-  expect(columns.children[2]?.classList.contains("ms-calendar")).toBe(true);
-});
-
-it("opens a source-focused project board and keeps unrelated people out", async () => {
+it("filters project sources and restores the project selection after inspection", async () => {
   const user = userEvent.setup();
-  const first = memory({ captured_at: "2026-05-12T15:00:00Z", note: `---\nrecall_id: "11111111-1111-4111-8111-111111111111"\ntitle: "First meeting"\n---\n## Unresolved entity mentions\n\n- “Alpha” — project candidate; identity unresolved\n- “Sarah” — person candidate; identity unresolved\n` });
-  const second = memory({ id: "22222222-2222-4222-8222-222222222222", note: `---\nrecall_id: "22222222-2222-4222-8222-222222222222"\n---\n## Unresolved entity mentions\n\n- “Beta” — project candidate; identity unresolved\n- “Brad” — person candidate; identity unresolved\n` });
+  const first = memory({ note: `---\nrecall_id: "11111111-1111-4111-8111-111111111111"\ntitle: "First meeting"\n---\n## Unresolved entity mentions\n\n- “Alpha” — project candidate; identity unresolved\n` });
+  const second = memory({ id: "22222222-2222-4222-8222-222222222222", source_name: "second.png", note: `---\nrecall_id: "22222222-2222-4222-8222-222222222222"\n---\n## Unresolved entity mentions\n\n- “Beta” — project candidate; identity unresolved\n` });
   render(<MemorySurface vault={vault({}, [first, second])} />);
-  await screen.findByText(/Last updated/);
-  await user.click(screen.getByRole("button", { name: "Projects" }));
-  await user.click(screen.getByRole("button", { name: "Alpha" }));
-  expect(screen.getByText(/Context from this source only/)).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /^Brad/ })).toBeNull();
-  expect(screen.getByRole("button", { name: /^Sarah/ })).toBeTruthy();
-  await user.click(screen.getByRole("tab", { name: /^Notes/ }));
-  expect(screen.queryByText(/No notes fall/)).toBeNull();
-  expect(screen.getAllByRole("button", { name: /First meeting/ })).toHaveLength(3);
+  await user.click(await screen.findByRole("button", { name: /^Alpha/ }));
+  expect(screen.queryByRole("button", { name: "Open original: second" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Open original: First meeting" }));
+  await screen.findByLabelText("Your correction");
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("button", { name: /^Alpha/ }).getAttribute("aria-pressed")).toBe("true");
   await user.click(screen.getByRole("button", { name: "All project sources" }));
-  expect(screen.getByRole("button", { name: "Beta" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Open original: second" })).toBeTruthy();
 });
 
 it("edits organized note words while preserving native properties in the save payload", async () => {
@@ -505,7 +438,7 @@ it("organization completion fills body-only editing without duplicating native p
   expect(client.correct).toHaveBeenCalledWith("session-token", initial.id, 2, expect.any(String), published.note);
 });
 
-it.each(["Organizations", "Topics"])("discards a late Ask result after navigating to %s", async label => {
+it.each(["Follow-ups", "Corrections"])("discards a late Ask result after navigating to %s", async label => {
   let finish!: (value: SourceAnswer) => void;
   const ask = vi.fn(() => new Promise<SourceAnswer>(resolve => { finish = resolve; }));
   render(<MemorySurface vault={vault({ ask }, [memory()])} />);
@@ -522,9 +455,77 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
   history.replaceState(null, "", "/?design=canonical");
   try {
     render(<MemorySurface vault={vault()} />);
-    await screen.findByRole("heading", { name: "Your memory starts here" });
+    await screen.findByRole("heading", { name: "Projects" });
     expect(screen.queryByText("Permian Power Expansion")).toBeNull();
     expect(screen.queryByText("Blake Combs")).toBeNull();
     expect(document.querySelector(".ms")?.getAttribute("data-mode")).toBe("vault");
   } finally { history.replaceState(null, "", "/"); }
+});
+
+it("offers the approved navigation and an honest empty project board", async () => {
+  render(<MemorySurface vault={vault()} />);
+  await screen.findByRole("heading", { name: "Projects" });
+  for (const name of ["Home", "Capture", "Ask", "Projects", "Calendar", "Follow-ups", "Recent", "Corrections", "Settings", "Help"]) {
+    expect(screen.getByRole("button", { name })).toBeTruthy();
+  }
+  expect(screen.getByText("No project sources yet.")).toBeTruthy();
+  expect(screen.queryByText("Permian Power Expansion")).toBeNull();
+});
+
+it("reveals memories beyond the home preview from Recent", async () => {
+  const rows = Array.from({ length: 7 }, (_, index) => memory({ id: `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`, source_name: `source-${index}.png` }));
+  const user = userEvent.setup(); render(<MemorySurface vault={vault({}, rows)} />);
+  await screen.findByRole("button", { name: "Open original: source-0" });
+  expect(screen.queryByRole("button", { name: "Open original: source-6" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Recent" }));
+  expect(screen.getByRole("button", { name: "Open original: source-6" })).toBeTruthy();
+});
+
+it("drops text into capture without saving or enabling provider consent", async () => {
+  const client = vault({ captureNote: vi.fn() });
+  render(<MemorySurface vault={client} />);
+  await screen.findByRole("heading", { name: "Projects" });
+  fireEvent.drop(document.querySelector(".approved-capture")!, { dataTransfer: { getData: () => "Original dropped note?" } });
+  expect((screen.getByLabelText("Optional note") as HTMLTextAreaElement).value).toBe("Original dropped note?");
+  expect((screen.getByLabelText(/Send this saved source/) as HTMLInputElement).checked).toBe(false);
+  expect(client.captureNote).not.toHaveBeenCalled();
+});
+
+it("the quick photo action cannot reuse consent from a previous memory", async () => {
+  const page = memory(); const parse = vi.fn();
+  const client = vault({ parse, capture: vi.fn(async () => memory({ id: "22222222-2222-4222-8222-222222222222" })) }, [page]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Open original: north-lot" }));
+  await user.click(screen.getByLabelText(/Send this source to Jev and Claude/));
+  await user.click(screen.getByRole("button", { name: "Back" }));
+  await user.click(screen.getByRole("button", { name: "Add Photo" }));
+  await screen.findByText(/Saved in your vault. The original photo/);
+  expect(parse).not.toHaveBeenCalled();
+});
+
+it("retries an unavailable original without discarding an unsaved correction", async () => {
+  const source = vi.fn().mockRejectedValueOnce(new Error("Source temporarily unavailable")).mockResolvedValue({ bytes: [137,80,78,71], mime_type:"image/png", sha256:"ab".repeat(32) });
+  const user = userEvent.setup(); render(<MemorySurface vault={vault({ source }, [memory()])} />);
+  await user.click(await screen.findByRole("button", { name:"Open original: north-lot" }));
+  await screen.findByRole("alert");
+  await user.clear(screen.getByLabelText("Your correction"));
+  await user.type(screen.getByLabelText("Your correction"), "Unsaved human wording");
+  await user.click(screen.getByRole("button", { name:"Retry original" }));
+  await screen.findByTestId("integrity");
+  expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).value).toBe("Unsaved human wording");
+});
+
+it("keeps a missing Markdown note's original accessible for restoration", async () => {
+  const user = userEvent.setup(); const missing = memory({ state: "missing" });
+  render(<MemorySurface vault={vault({}, [missing])} />);
+  await user.click(await screen.findByRole("button", { name:"Open original: north-lot" }));
+  await screen.findByRole("button", { name:"Restore missing note" });
+  expect(screen.getByText(/Markdown note missing. The original is still in the vault/)).toBeTruthy();
+});
+
+it("shows conflicting notes honestly and keeps their unsafe inspection disabled", async () => {
+  render(<MemorySurface vault={vault({}, [memory({ state:"conflict", conflict:"Local note needs review" })])} />);
+  expect(await screen.findByRole("heading", { name:"Notes needing attention" })).toBeTruthy();
+  expect((screen.getByRole("button", { name:"Open original: north-lot" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("button", { name:"Reload: north-lot.png" })).toBeTruthy();
 });

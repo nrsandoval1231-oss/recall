@@ -85,3 +85,15 @@ it("marks a shortened preview with an ellipsis without splitting its final word"
   expect(text.startsWith(summary.slice(0, -1))).toBe(true);
   expect(summary.slice(0, -1)).toMatch(/\b(tour\.|proposed|the|about|operator|with|up|Follow)$/);
 });
+
+it("keeps uncertain source wording in compact previews without byte-offset metadata", () => {
+  expect(noteSummary("## Observations (source statements)\n- “Need 5–10 MW?” — source bytes 2–15")).toBe("“Need 5–10 MW?”");
+});
+
+it("makes unavailable calendar originals visibly disabled with a review explanation", async () => {
+  const user = userEvent.setup(); const onOpen = vi.fn();
+  render(<CaptureCalendar initialMonth="2026-05" memories={[{ ...memory, state:"conflict", conflict:"Review local note" }]} agenda={[]} onOpen={onOpen} onCapture={vi.fn()} />);
+  await user.click(screen.getByRole("button", { name:"May 12, 2026, 1 captured notes" }));
+  expect((screen.getByRole("button", { name:"Utility meeting" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("Inspection unavailable. Review this note and reload.")).toBeTruthy();
+});

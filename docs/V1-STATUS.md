@@ -5,6 +5,10 @@
 
 This is the implementation ledger for the V1 build from accepted baseline `92b4c33aafda412f89d745f38b87858f2d4b2837`. A PASS below means deterministic implementation evidence, not live product quality. Physical devices, live infrastructure and model quality have separate gates.
 
+## Approved desktop implementation — 2026-10-13
+
+The existing React/Tauri shell now implements the approved project grid, compact memory rows, separate capture calendar/follow-ups, capture bar and contextual original/interpretation inspection. Real vault projections supply content; empty vaults remain empty. Photo drops use a native OS-authorized path allowlist and the existing validated writer/receipt behavior. See [evidence and remaining gates](audits/approved-desktop/README.md). Browser checks and standalone drop authorization tests do not establish installed Windows acceptance or full native compilation. The exact approved PNG commit remains open.
+
 ## What works
 
 ### Desktop Obsidian Memory Surface

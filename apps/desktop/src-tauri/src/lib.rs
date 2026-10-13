@@ -12,6 +12,7 @@ mod managed_export;
 mod persistence;
 pub mod phone;
 mod secrets;
+mod photo_drop;
 
 use managed_export::ManagedExportState;
 use persistence::{NativeStore, PendingCommand, Scope, Snapshot, SyncEvent};
@@ -250,6 +251,24 @@ fn vault_capture(
     })
 }
 #[tauri::command]
+fn vault_capture_path(
+    drops: tauri::State<'_, photo_drop::PhotoDrops>,
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    operation_id: String,
+    note: String,
+    path: String,
+) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| {
+        if let Some(saved) = vault.capture_receipt(&operation_id, &note)? {
+            return Ok(saved);
+        }
+        drops.capture(std::path::Path::new(&path), || {
+            vault.capture_path(&operation_id, &note, std::path::Path::new(&path))
+        })
+    })
+}
+#[tauri::command]
 fn vault_capture_note(
     state: tauri::State<'_, local_vault::LocalVaultState>,
     expected_vault_id: String,
@@ -484,6 +503,12 @@ fn memory_ask(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(photo_drop::PhotoDrops::default())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                window.state::<photo_drop::PhotoDrops>().authorize(paths);
+            }
+        })
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -506,6 +531,7 @@ pub fn run() {
             vault_select,
             vault_open_default,
             vault_capture,
+            vault_capture_path,
             vault_capture_note,
             vault_list,
             vault_correct,

@@ -1,9 +1,11 @@
+import { ApprovedBoard } from "./ApprovedBoard";
+import "./approved-desktop.css";
 import { canonicalFixture } from "./canonical-fixture";
-import { ArrowRightIcon, CalendarBlankIcon, CameraIcon, CaretRightIcon, ChartBarIcon, DotsThreeIcon, CrosshairIcon, CubeIcon, FileTextIcon, FolderSimpleIcon, GearSixIcon, HouseIcon, MapPinIcon, MagnifyingGlassIcon, WaveformIcon, SunIcon, TagIcon, UsersIcon, BuildingsIcon } from "@phosphor-icons/react";
-import workspaceBackground from "./assets/recall-workspace.webp";
+import { BellIcon, ClockIcon, PencilSimpleIcon, QuestionIcon, ArrowRightIcon, CalendarBlankIcon, CameraIcon, CaretRightIcon, ChartBarIcon, DotsThreeIcon, CrosshairIcon, CubeIcon, FileTextIcon, FolderSimpleIcon, GearSixIcon, HouseIcon, MapPinIcon, MagnifyingGlassIcon, WaveformIcon, SunIcon, TagIcon, UsersIcon, BuildingsIcon } from "@phosphor-icons/react";
+
 import canonicalReference from "../../../../docs/assets/recall-desktop-canonical-2026-10-11.png";
 import { NoteMarkdown, noteSummary } from "./NoteMarkdown";
-import { CaptureCalendar, QuickCards, RecentNotes, memoryTitle } from "./dashboard-parts";
+import { CaptureCalendar, RecentNotes, memoryTitle } from "./dashboard-parts";
 import { vaultContext, noteBody, noteWithBody, type SourceRow } from "./vault-context";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { LocalVault, VaultMemory, VaultRevision, VaultStatus, SourceAnswer } from "../platform/local-vault";
@@ -12,17 +14,17 @@ import { KEYWORD_LABEL, keywordSearch, type KeywordAnswer } from "./keyword";
 import { hasPendingMeeting, processMeeting } from "./meeting-workflow";
 import { unavailableLibrarian, type Librarian, type Reading } from "./librarian";
 
-type Section = "organizations" | "topics" | "settings" | "vault" | "home" | "ask" | "recent" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
+type Section = "followups" | "corrections" | "help" | "organizations" | "topics" | "settings" | "vault" | "home" | "ask" | "recent" | "people" | "places" | "projects" | "equipment" | "timeline" | "capture" | "evidence";
 type Panel = "topics" | "overview" | "timeline" | "people" | "places" | "equipment" | "related";
 interface Selected { root: string; vault_id: string; vault_identity: string }
-interface PendingCapture { operationId: string; note: string; kind?: "photo" | "text" }
+interface PendingCapture { operationId: string; note: string; kind?: "photo" | "text"; path?: string }
 interface Preview { text?: string; mime?: string; url: string; sha256: string; matches: boolean; name: string }
 
 const RAIL: { id: Section; label: string }[] = [
   { id: "home", label: "Home" }, { id: "capture", label: "Capture" },
-  { id: "projects", label: "Projects" }, { id: "people", label: "People" },
-  { id: "organizations", label: "Organizations" }, { id: "topics", label: "Topics" },
-  { id: "places", label: "Locations" }, { id: "timeline", label: "Calendar" }, { id: "ask", label: "Search" },
+  { id: "ask", label: "Ask" }, { id: "projects", label: "Projects" },
+  { id: "timeline", label: "Calendar" }, { id: "followups", label: "Follow-ups" },
+  { id: "recent", label: "Recent" }, { id: "corrections", label: "Corrections" },
 ];
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -63,7 +65,9 @@ function readPending(identity: string): PendingCapture | null {
   }
   const kind = "kind" in data ? data.kind : undefined;
   if (kind !== undefined && kind !== "photo" && kind !== "text") throw new Error("Pending capture kind is invalid.");
-  return { operationId: operationIdValue, note, kind };
+  const path = "path" in data ? data.path : undefined;
+  if (path !== undefined && (typeof path !== "string" || !path || path.length > 4096)) throw new Error("Pending photo path is invalid.");
+  return { operationId: operationIdValue, note, kind, path };
 }
 function displayDate(iso: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
@@ -150,6 +154,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [detail, setDetail] = useState<{ title: string; text: string } | null>(null);
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [droppedPath, setDroppedPath] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<PendingCapture | null>(null);
   const [correction, setCorrection] = useState("");
@@ -161,6 +166,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [readOp, setReadOp] = useState<string | null>(null);
   const [projectFocusId, setProjectFocusId] = useState<string | null>(null);
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
+  const returnContext = useRef<{ section: Section; scroll: number; trigger?: HTMLElement }>({ section: "home", scroll: 0 });
   const askRef = useRef<HTMLInputElement>(null);
   const settingsTrigger = useRef<HTMLElement | null>(null);
   const alive = useRef(true);
@@ -183,7 +189,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   function inScope(vaultId: string) { return alive.current && scopeRef.current === vaultId; }
   const kept = items.filter(keptMemory);
   const active = kept.filter((memory) => memory.state === "active" && memory.revision > 0 && !memory.conflict);
-  const demo = !vault.available;
+  const demo = false; // The approved desktop never substitutes a synthetic design surface.
   const referencePreview = demo && new URLSearchParams(globalThis.location?.search ?? "").get("design") === "canonical";
   const board = referencePreview ? canonicalFixture : brooks;
   const allContext = vaultContext(kept);
@@ -263,11 +269,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
 
   function go(next: Section) {
     if (next === "vault" || next === "settings") { openSettings(); return; }
-    if (next === "ask") {
-      askRef.current?.focus();
-      return;
-    }
-    if (section === "ask") setBusy(false);
+    if (next === "ask") askRef.current?.focus();
+    if ((section === "ask" || section === "evidence") && !organizationActive()) setBusy(false);
     setSection(next);
     evidenceRef.current = null; sourceRequest.current += 1; askRequest.current += 1;
     setEvidenceId(null);
@@ -277,6 +280,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setAnswer(null);
     setSourceAnswer(null);
     setVaultHits(null);
+    if (next === "capture") setProcessingConsent(false);
     if (next === "home" || next === "projects" || next === "organizations") { setPanel("overview"); setDetail(null); }
     if (next === "topics") { setPanel("topics"); setDetail(null); }
     if (next === "people" || next === "places" || next === "equipment" || next === "timeline" || next === "recent") setPanel(panelFor(next));
@@ -288,6 +292,20 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setDetail(null);
     if (section === "ask") setSection("home");
   }
+
+  useEffect(() => {
+    if (!vault.available || !vault.capturePath) return;
+    let cancelled = false; let stop: (() => void) | undefined;
+    void import("@tauri-apps/api/webviewWindow").then(({ getCurrentWebviewWindow }) => getCurrentWebviewWindow().onDragDropEvent(event => {
+      if (event.payload.type !== "drop" || busy) return;
+      if (pending) { setNotice("Finish or retry the pending import before selecting another photo."); return; }
+      const paths = event.payload.paths;
+      if (paths.length !== 1 || !/\.(png|jpe?g|webp)$/i.test(paths[0] ?? "")) { setError("Drop one PNG, JPEG or WebP photo. Other files are not supported."); return; }
+      setDroppedPath(paths[0]!); setProcessingConsent(false); go("capture");
+      setNotice("Photo selected. Import it to preserve the original in your vault.");
+    })).then(unlisten => { if (cancelled) unlisten(); else stop = unlisten; }).catch(error => { if (!cancelled) setError(message(error)); });
+    return () => { cancelled = true; stop?.(); };
+  }, [vault, busy, pending]);
 
   async function choose(kind: "select" | "default") {
     setBusy(true); setError("");
@@ -322,7 +340,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     setSourceAnswer(null);
     if (!selected) {
       setVaultHits(null);
-      setAnswer(keywordSearch(query, fixtureDocuments()));
+      setAnswer(demo ? keywordSearch(query, fixtureDocuments()) : null);
+      if (!demo) setError("Open Recall and choose your vault to search saved sources.");
       return;
     }
     setBusy(true);
@@ -394,7 +413,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     finally { if (inScope(scope.vault_id)) setBusy(false); }
   }
 
-  async function importPhoto() {
+  async function importPhoto(organizeAfterSave = true) {
     if (!vault.available) {
       setError("Open the Recall desktop app to import a photo. This preview cannot write a vault.");
       return;
@@ -404,12 +423,12 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       return;
     }
     if (pending?.kind === "text") { setError("Retry the pending text save before importing a photo."); return; }
-    const intent = pending ?? { operationId: operationId(), note: draft, kind: "photo" as const };
+    const intent = pending ?? { operationId: operationId(), note: draft, kind: "photo" as const, ...(droppedPath ? { path: droppedPath } : {}) };
     sessionStorage.setItem(captureKey(selected.vault_identity), JSON.stringify(intent));
     setPending(intent);
     setBusy(true); setError("");
     try {
-      const saved = await vault.capture(selected.vault_id, intent.operationId, intent.note);
+      const saved = intent.path ? await vault.capturePath?.(selected.vault_id, intent.operationId, intent.note, intent.path) : await vault.capture(selected.vault_id, intent.operationId, intent.note);
       if (!alive.current) return;
       if (!saved) {
         sessionStorage.removeItem(captureKey(selected.vault_identity));
@@ -419,7 +438,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       }
       sessionStorage.removeItem(captureKey(selected.vault_identity));
       setPending(null);
-      setDraft("");
+      setDroppedPath(null); setDraft("");
       setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
       setNotice("Saved in your vault. The original photo and a Markdown note are on this device.");
       setSection("evidence");
@@ -427,7 +446,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       setEvidenceId(saved.id);
       setCorrection(noteBody(saved));
       await loadSource(selected.vault_id, saved);
-      await organizeMemory(saved);
+      if (organizeAfterSave) await organizeMemory(saved);
     } catch (importError) {
       if (alive.current) setError(`${message(importError)} Retry uses the same import, so a completed save is not duplicated.`);
     } finally {
@@ -451,8 +470,18 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     });
   }
 
+  async function retrySource(memory: VaultMemory) {
+    if (!selected) return;
+    const scope = selected;
+    setBusy(true); setError("");
+    try { await loadSource(scope.vault_id, memory); }
+    catch (sourceError) { if (inScope(scope.vault_id) && evidenceRef.current === memory.id) setError(message(sourceError)); }
+    finally { if (inScope(scope.vault_id) && evidenceRef.current === memory.id) setBusy(false); }
+  }
+
   async function openVaultMemory(memory: VaultMemory) {
     if (!selected || !openable(memory)) return;
+    returnContext.current = { section, scroll: document.querySelector(".ms-stage")?.scrollTop ?? 0, trigger: document.activeElement instanceof HTMLElement ? document.activeElement : undefined };
     setBusy(true); setError("");
     setHistory(null);
     if (!organizationActive()) setProcessingState("");
@@ -599,10 +628,22 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const activeMonth = focusMonth && ticks.some((tick) => tick.id === focusMonth) ? focusMonth : (demo ? board.marker : ticks[ticks.length - 1]?.id ?? "");
   const activeLabel = ticks.find((tick) => tick.id === activeMonth)?.label ?? activeMonth;
 
+  function returnFromMemory() {
+    setSection(returnContext.current.section); setEvidenceId(null); evidenceRef.current = null; sourceRequest.current += 1;
+    requestAnimationFrame(() => { const stage = document.querySelector(".ms-stage"); if (stage) stage.scrollTop = returnContext.current.scroll; returnContext.current.trigger?.focus({ preventScroll: true }); });
+  }
+  useEffect(() => {
+    if (section === "evidence") document.querySelector<HTMLButtonElement>(".ms-evidence button")?.focus();
+    function keys(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); askRef.current?.focus(); }
+      if (event.key === "Escape" && !vaultSettings && section === "evidence") returnFromMemory();
+    }
+    window.addEventListener("keydown", keys); return () => window.removeEventListener("keydown", keys);
+  }, [section, vaultSettings]);
   return (
-    <div className="ms" data-mode={demo ? "demo" : "vault"} style={{ backgroundImage: `url(${workspaceBackground})` }}>
+    <div className="ms approved-desktop" data-mode={demo ? "demo" : "vault"} >
       <aside className="ms-rail" aria-label="Recall">
-        <div className="ms-brand"><span className="ms-brand-logo" style={{ backgroundImage: `url(${canonicalReference})` }} aria-hidden="true" /><div><p className="ms-mark">RECALL</p><p className="ms-tagline">Your knowledge. In context.</p></div></div>
+        <div className="ms-brand"><span className="ms-brand-logo" aria-hidden="true" /><div><p className="ms-mark">Recall</p><p className="ms-tagline">Your memories. Always there.</p></div></div>
         <nav className="ms-nav" aria-label="Memory">
           {RAIL.map((item) => (
             <button key={item.id} type="button" aria-current={section === item.id ? "page" : undefined} onClick={() => go(item.id)}>
@@ -611,8 +652,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
             </button>
           ))}
         </nav>
-        <div className="ms-rail-bottom"><button type="button" aria-label={`Vault ${selected ? "Connected" : "Not connected"}`} onClick={() => go("vault")}><CubeIcon weight="light" /><span>Vault<small><i data-connected={Boolean(selected)} />{selected ? "Connected" : "Not connected"}</small></span></button><button type="button" aria-label="Settings" onClick={() => go("settings")}><GearSixIcon weight="light" /><span>Settings</span></button></div>
-        <blockquote className="ms-rail-quote">“Information<br />compounds when<br />it’s connected.”</blockquote>
+        <div className="ms-rail-bottom"><button type="button" aria-label="Settings" onClick={() => go("settings")}><GearSixIcon weight="light" /><span>Settings</span></button><button type="button" onClick={() => go("help")}><QuestionIcon /><span>Help</span></button></div>
+        <blockquote className="ms-rail-quote">Capture.<br />Understand.<br />Remember.</blockquote>
 
       </aside>
       <main className="ms-stage">
@@ -624,25 +665,29 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
           {notice && <p className="ms-notice" role="status">{notice}</p>}
           {processingState && <p className="ms-notice" role="status">{processingState}</p>}
           <header className="ms-mast">
-            <div className="ms-greeting"><SunIcon weight="light" /><div><strong>{referencePreview ? "Good evening, Nick" : "Your day, in context."}</strong><small>Focus creates freedom.</small></div><button type="button" aria-label="Open settings" className="ms-profile" onClick={openSettings}>{referencePreview ? "NS" : <UsersIcon weight="light" />}</button></div>
+            <div className="ms-greeting"><SunIcon weight="light" /><div><strong>{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</strong><small>Welcome back.</small></div><button type="button" aria-label="Open settings" className="ms-profile" onClick={openSettings}>{referencePreview ? "NS" : <UsersIcon weight="light" />}</button></div>
             <div className="ms-askrow">
               <form className="ms-ask" role="search" onSubmit={(event) => void ask(event)}>
-                <SearchIcon />
+                <SearchIcon /><kbd>Ctrl K</kbd>
                 <label className="ms-sr" htmlFor="recall-ask">Ask Recall</label>
-                <input id="recall-ask" ref={askRef} type="search" value={query} placeholder="Ask Recall anything about your notes, projects, people, or business…" onChange={(event) => setQuery(event.target.value)} />
-                <button type="submit" disabled={busy} aria-label="Ask"><ArrowRightIcon aria-hidden="true" /></button>
+                <input id="recall-ask" ref={askRef} type="search" value={query} placeholder="Ask Recall anything..." onChange={(event) => setQuery(event.target.value)} />
+                <button type="submit" disabled={busy} aria-label="Submit question"><ArrowRightIcon aria-hidden="true" /></button>
               </form>
               <button className="ms-mic" type="button" disabled aria-label="Voice ask is not available in this build"><WaveIcon /></button>
             </div>
           </header>
           <div className="ms-prompts" aria-label="Ask suggestions">{["Find my meeting notes", "What needs a follow-up?", "Find project notes", "Show decisions from this month"].map(prompt => <button type="button" key={prompt} onClick={() => { setQuery(prompt); askRef.current?.focus(); }}>{prompt}</button>)}</div>
 
-          {section === "evidence" ? (
+          <p className="approved-motto">“Not just notes. A more capable you.”</p>
+          {!demo && <div className={section === "evidence" ? "approved-inspection-context" : "approved-workspace"} inert={section === "evidence"} hidden={!(["home", "projects", "recent", "timeline", "followups", "corrections", "evidence"].includes(section))}><ApprovedBoard memories={kept} focusId={projectFocusId} view={section === "evidence" ? returnContext.current.section : section} onSelect={setProjectFocusId} onOpen={memory => void openVaultMemory(memory)} onView={next => setSection(next)} onCapture={photo => { go("capture"); if (photo) void importPhoto(false); }} onDropText={text => { setDraft(text); go("capture"); }} onDropError={setError} onReload={memory => void reload(memory)} /></div>}
+          {section === "help" ? <section className="glass ms-project"><h1>Using Recall</h1><p>Choose your Obsidian vault in Settings. Capture text or a photo, then opt in to organization. Ask searches your saved sources. Open a memory to inspect the original, correct its interpretation, or read revision history.</p><p>Ctrl / ⌘ K focuses Ask. Escape returns from memory inspection. Recording and document capture are not supported in this build.</p></section> : ["home", "projects", "recent", "timeline", "followups", "corrections"].includes(section) && !demo ? null : section === "evidence" ? (
             <Evidence
               demo={demo}
               demoMemory={demoEvidence}
               memory={evidenceMemory}
               preview={preview}
+              sourceError={error}
+              onRetrySource={() => evidenceMemory && void retrySource(evidenceMemory)}
               correction={correction}
               history={history}
               busy={busy}
@@ -650,7 +695,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               consent={consent}
               reading={reading}
               librarian={reader}
-              onBack={() => go("home")}
+              onBack={returnFromMemory}
               onCorrection={(value) => { correctionVersion.current += 1; setCorrection(value); }}
               onSave={() => evidenceMemory && void saveCorrection(evidenceMemory)}
               onReload={() => evidenceMemory && void reload(evidenceMemory)}
@@ -675,6 +720,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               <h1>Capture a note or photo</h1>
               <p>Save messy notes or import a photo. Originals stay in your vault. Organization runs after your consent.</p>
               <form className="ms-form" onSubmit={(event) => { event.preventDefault(); void importPhoto(); }}>
+                {(pending?.path ?? droppedPath) && <p>Selected photo: {(pending?.path ?? droppedPath)?.split(/[\\/]/).pop()} <button type="button" disabled={Boolean(pending)} onClick={() => setDroppedPath(null)}>Clear selection</button></p>}
                 <label htmlFor="capture-note">Optional note</label>
                 <textarea id="capture-note" disabled={busy} value={draft} onChange={(event) => setDraft(event.target.value)} />
                 <label className="ms-check"><input type="checkbox" checked={processingConsent} onChange={(event) => setProcessingConsent(event.target.checked)} /> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label>
@@ -764,7 +810,7 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
               {(section === "timeline" || section === "recent") && ticks.length > 0 && <TimelineStrip ticks={ticks} active={activeMonth} onSelect={selectMonth} />}
             </>
           )}
-          {section !== "evidence" && section !== "capture" && <QuickCards referencePreview={referencePreview} projects={new Set(allContext.projects.map(row => row.memory.id)).size} memories={active.length} openItems={allContext.agenda.length} onProjects={() => go("projects")} onWeek={() => go("recent")} onItems={() => go("timeline")} onCapture={() => go("capture")} />}
+
           {vaultSettings && <div className="ms-modal-backdrop" onClick={closeSettings}><div data-vault-dialog className="ms-vault-settings" role="dialog" aria-modal="true" aria-label="Vault settings" onClick={event => event.stopPropagation()}><header><h2>Your Obsidian vault</h2><button type="button" onClick={closeSettings} aria-label="Close vault settings">Close</button></header><p>Memory stays in the folder you choose. Originals and history stay with it.</p><p className="ms-root">{selected?.root || "No vault selected"}</p><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("select")}>Choose a vault folder</button><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("default")}>Use default vault</button></div></div>}
         </div>
       </main>
@@ -785,8 +831,8 @@ function detailFrom(id: string): { title: string; text: string } | null {
 }
 
 function RailIcon({ id }: { id: Section }) {
-  const Icon = { ask: MagnifyingGlassIcon, home: HouseIcon, recent: FileTextIcon, people: UsersIcon, places: MapPinIcon, projects: FolderSimpleIcon, equipment: CubeIcon, timeline: CalendarBlankIcon, capture: CameraIcon, evidence: FileTextIcon, organizations: BuildingsIcon, topics: TagIcon, settings: GearSixIcon, vault: CubeIcon }[id];
-  return <Icon size={22} weight={id === "home" ? "fill" : "light"} aria-hidden="true" />;
+  const Icon = { ask: MagnifyingGlassIcon, home: HouseIcon, recent: ClockIcon, people: UsersIcon, places: MapPinIcon, projects: FolderSimpleIcon, equipment: CubeIcon, timeline: CalendarBlankIcon, capture: CameraIcon, evidence: FileTextIcon, organizations: BuildingsIcon, topics: TagIcon, settings: GearSixIcon, vault: CubeIcon, followups: BellIcon, corrections: PencilSimpleIcon, help: QuestionIcon }[id];
+  return <Icon size={22} weight="light" aria-hidden="true" />;
 }
 
 function ContextCard({ title, icon, children, onView }: { title: string; icon: ReactNode; children: ReactNode; onView?: () => void }) {
@@ -895,6 +941,8 @@ function Evidence(props: {
   demoMemory: FixtureMemory | undefined;
   memory: VaultMemory | null;
   preview: Preview | null;
+  sourceError: string;
+  onRetrySource: () => void;
   correction: string;
   history: VaultRevision[] | null;
   busy: boolean;
@@ -942,7 +990,7 @@ function Evidence(props: {
             {memory.note_path && <p className="ms-fine">Recall/Memories/{memory.note_path}</p>}
           </>
         )}
-        {memory && !preview && <p role="status">Opening the original…</p>}
+        {memory && !preview && <><p role="status">{props.sourceError ? "Original unavailable. Your correction draft stays here." : "Opening the original…"}</p>{props.sourceError && <button type="button" disabled={props.busy} onClick={props.onRetrySource}>Retry original</button>}</>}
       </div>
       <div className="glass">
         {demo && <p>Choose a vault to save a correction. This demo is not written to disk.</p>}
