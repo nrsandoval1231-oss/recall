@@ -46,7 +46,8 @@ export function AdaptiveGraph({
       .flatMap((e) => [e.from, e.to]),
   );
   return (
-    <div className={`adaptive-graph ${explore ? "is-exploring" : ""}`}>
+    <div className={`adaptive-graph ${explore ? "is-exploring" : ""}`} role="region" aria-label="Memory graph environment">
+      {explore && <h1 className="ms-sr">Graph View</h1>}
       <svg
         viewBox="0 0 1000 800"
         preserveAspectRatio="xMidYMid slice"

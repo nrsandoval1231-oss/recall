@@ -180,6 +180,9 @@ for (const [w, h] of [
   await page.goto(uiUrl);
   await page.getByRole("heading", { name: "Capture", exact: true }).waitFor();
   const shot = async (name) => {
+    await page.locator(".adaptive-inspector").evaluateAll(panes=>panes.forEach(pane=>{pane.scrollTop=0;}));
+    const accessibility=await new AxeBuilder({page}).analyze();
+    if(accessibility.violations.length)throw Error(JSON.stringify({state:name,width:w,violations:accessibility.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))}));
     if (await page.evaluate(() => document.body.scrollWidth > innerWidth))
       throw Error(`Overflow ${w} ${name}`);
     await page.screenshot({

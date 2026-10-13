@@ -1366,7 +1366,7 @@ export function MemorySurface({
                             note: hit.current_excerpt,
                           })}
                         </NoteMarkdown>
-                        <h3>Original evidence</h3>
+                        <h2>Original evidence</h2>
                         <p>{hit.original_excerpt}</p>
                         <small>SHA-256: {hit.source_sha256}</small>
                         <button
