@@ -9,7 +9,7 @@ pub struct Hit {
     pub mime_type:String,
 }
 #[derive(Debug,Serialize)]
-pub struct Answer {pub question:String,pub message:String,pub hits:Vec<Hit>}
+pub struct Answer {pub question:String,pub message:String,pub hits:Vec<Hit>,pub knowledge_status:Option<crate::knowledge::ServiceStatus>,pub graph_relationships:Vec<crate::knowledge::Relationship>}
 fn terms(question:&str)->BTreeSet<String> {
     let ignored=["what","that","with","about","going","there","this","were","when","have","does","which","would","could","please","recall","tell","from","happened"];
     let mut words:BTreeSet<_>=question.split(|c:char|!c.is_alphanumeric()).filter(|w|w.len()>=3)
@@ -36,7 +36,7 @@ pub fn ask(vault:&Vault,question:&str)->Result<Answer,String> {
         hits.push(Hit{memory_id:memory.id,revision:memory.revision,note_basename:memory.note_path.ok_or("Missing note destination")?,
             current_excerpt:memory.note.chars().take(1200).collect(),original_excerpt:original,source_sha256:snapshot.source.sha256,mime_type:snapshot.source.mime_type});
     }
-    Ok(Answer{question:question.into(),message:if hits.is_empty(){"No verified local memory matched this wording."}else{"Source-backed matches. Review current notes and original evidence; these are retrieved quotes, not a generated answer."}.into(),hits})
+    Ok(Answer{question:question.into(),message:if hits.is_empty(){"No verified local memory matched this wording."}else{"Source-backed matches. Review current notes and original evidence; these are retrieved quotes, not a generated answer."}.into(),hits,knowledge_status:None,graph_relationships:Vec::new()})
 }
 #[cfg(test)]
 mod tests {
