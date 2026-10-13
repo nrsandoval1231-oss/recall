@@ -1,3 +1,5 @@
+> **CANONICAL UI UPDATE — 2026-10-13:** The owner-approved Adaptive Memory Surface supersedes the desktop visual compositions described below. Use [Adaptive Memory Surface PRD](ADAPTIVE-MEMORY-SURFACE-PRD.md) and [Screen Specification](ADAPTIVE-MEMORY-SURFACE-SCREENS.md) as current visual and interaction authority. The earlier mockups are historical. The Obsidian-first safety/product requirements remain active.
+
 # Recall — Canonical Experience & Visual System
 
 > **CURRENT PRODUCT CENTER — 2026-10-10.** The [pilot amendment](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The desktop Memory Surface is the primary shell. The phone is the capture/ask companion. No login or email-auth UX. PR #16 remains an optional web companion and enrollment transport. The 2026-10-09 PWA-only pilot note is historical.
