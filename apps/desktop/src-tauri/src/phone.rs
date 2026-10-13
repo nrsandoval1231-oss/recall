@@ -20,7 +20,7 @@ const MAX_BODY: usize = 26 * 1024 * 1024;
 const MAX_QUESTION: usize = 4096;
 const CAPTURES_PER_MINUTE: u32 = 30;
 const ASKS_PER_MINUTE: u32 = 60;
-const KEYWORD_LABEL: &str = "Keyword search. Not a Claude answer.";
+const KEYWORD_LABEL: &str = "Local keyword retrieval. Related graph knowledge is optional and inferred.";
 const ICON_PNG: &[u8] = include_bytes!("../icons/32x32.png");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -348,6 +348,7 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             if let Err(error) = vault.processing_snapshot(&memory.id, memory.revision) {
                 return saved_processing_error(&memory.id, &error);
             }
+            crate::knowledge::best_effort_refresh(&vault);
             if form.process_consent {
                 match crate::companion_processing::consent(&vault, &memory, true) {
                     Ok(Some(intent)) => {
@@ -702,14 +703,16 @@ fn source_answer(vault: &Vault, question: &str) -> Result<String, String> {
     if question.trim().is_empty() {
         return Ok(abstain("Type a question to search the notes."));
     }
-    let answer = crate::memory_query::ask(vault, question)?;
-    if answer.hits.is_empty() {
-        return Ok(abstain(
-            "Nothing in the notes matches that. This is local retrieval, not a Claude answer.",
-        ));
+    let answer = crate::memory_query::ask_with_knowledge(vault, question)?;
+    Ok(render_source_answer(answer))
+}
+
+fn render_source_answer(answer: crate::memory_query::Answer) -> String {
+    if answer.hits.is_empty() && answer.graph_relationships.is_empty() {
+        return abstain("Nothing in the notes or related knowledge matches that. This is retrieval, not a generated answer.");
     }
     let mut cards = String::new();
-    for hit in answer.hits {
+    for hit in &answer.hits {
         let extension = match hit.mime_type.as_str() {
             "image/png" => "png",
             "image/jpeg" => "jpg",
@@ -722,7 +725,22 @@ fn source_answer(vault: &Vault, question: &str) -> Result<String, String> {
         );
         cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><h3>Original evidence</h3><p>{}</p><p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id)));
     }
-    Ok(format!("<h1>Source-backed matches</h1><p>{}</p><p class=\"fine\">{KEYWORD_LABEL} Retrieved local quotes and evidence; nothing was sent to Claude.</p>{cards}",esc(&answer.message)))
+    let mut graph_cards = String::new();
+    for relationship in &answer.graph_relationships {
+        graph_cards.push_str(&format!("<article class=\"inferred\" data-fact=\"{}\"><h2>Related knowledge (inferred)</h2><p>{}</p><p>{} ({}) — {} → {} ({})</p><p class=\"fine\">Inferred and unverified. These source notes support the association; they do not prove identity or certainty.</p><ul>",
+            esc(&relationship.id), esc(&relationship.fact), esc(&relationship.subject), esc(&relationship.subject_type), esc(&relationship.predicate), esc(&relationship.object), esc(&relationship.object_type)));
+        for support in &relationship.supports {
+            graph_cards.push_str(&format!("<li><a href=\"/sources/{}\">Open original source</a><p>Current Markdown note quote:</p><blockquote>{}</blockquote></li>", esc(&support.source_id), esc(&support.quote)));
+        }
+        graph_cards.push_str("</ul></article>");
+    }
+    let heading = if answer.hits.is_empty() { "Related inferred knowledge" } else { "Source-backed matches and related knowledge" };
+    let disclosure = if answer.graph_relationships.is_empty() {
+        format!("{KEYWORD_LABEL} Retrieved local note quotes and original evidence.")
+    } else {
+        "Graph relationships are inferred and unverified. When enabled, the question and eligible notes may be processed by the configured, disclosed providers. This is retrieval, not a generated answer.".to_owned()
+    };
+    format!("<h1>{heading}</h1><p>{}</p><p class=\"fine\">{}</p>{cards}{graph_cards}",esc(&answer.message),esc(&disclosure))
 }
 
 fn saved(root: &Path, id: &str) -> PhoneResponse {
@@ -873,7 +891,7 @@ fn home_page() -> String {
     page(
         "Recall",
         &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} This retrieves sources; it does not create a generated answer. Enabled graph processing may send the question to disclosed providers.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
             capture_form(&Uuid::new_v4().to_string(), ""),
             ask_form("")
         ),
@@ -1607,6 +1625,50 @@ mod tests {
     }
 
     #[test]
+    fn phone_ask_escapes_inferred_facts_and_links_each_support() {
+        let source_id = "00000000-0000-4000-8000-000000000001".to_string();
+        let answer = crate::memory_query::Answer {
+            question: "synthetic query".into(),
+            message: "Related graph knowledge was found.".into(),
+            hits: Vec::new(), knowledge_status: None,
+            graph_relationships: vec![crate::knowledge::Relationship {
+                id: "synthetic-rel".into(), source_id: source_id.clone(), revision: 1,
+                source_sha256: "a".repeat(64), note_sha256: "b".repeat(64), source_name: "synthetic.txt".into(), note_path: "synthetic.md".into(),
+                quote: "<script>support</script>".into(), subject_id: Uuid::new_v4().to_string(), subject: "<script>subject</script>".into(), subject_type: "person".into(),
+                predicate: "works with".into(), object_id: Uuid::new_v4().to_string(), object: "<img src=x>".into(), object_type: "project".into(),
+                fact: "<script>alert(1)</script>".into(), valid_at: None, invalid_at: None, extracted_at: "2026-10-12T00:00:00Z".into(), inferred: true,
+                uncertainty: "unverified".into(), related_source_ids: vec![source_id.clone()], supports: vec![crate::knowledge::RelationshipSupport {
+                    source_id: source_id.clone(), revision: 1, source_sha256: "a".repeat(64), note_sha256: "b".repeat(64), quote: "<script>support</script>".into()
+                }],
+            }],
+        };
+        let rendered = render_source_answer(answer);
+        assert!(rendered.contains("Related inferred knowledge"));
+        assert!(rendered.contains("Inferred and unverified"));
+        assert!(rendered.contains(&format!("href=\"/sources/{source_id}\"")));
+        assert!(rendered.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+        assert!(rendered.contains("&lt;script&gt;support&lt;/script&gt;"));
+        assert!(!rendered.contains("<script>") && !rendered.contains("<img src=x>"));
+    }
+
+    #[test]
+    fn phone_ask_keeps_keyword_evidence_when_graph_search_is_unavailable() {
+        let answer = crate::memory_query::Answer {
+            question: "synthetic query".into(), message: "Local source matches remain available.".into(),
+            hits: vec![crate::memory_query::Hit { memory_id: Uuid::new_v4().to_string(), revision: 1,
+                note_basename: "synthetic.md".into(), current_excerpt: "<b>Local evidence</b>".into(),
+                original_excerpt: "Synthetic original".into(), source_sha256: "c".repeat(64), mime_type: "text/plain".into() }],
+            knowledge_status: Some(crate::knowledge::ServiceStatus { state:"unavailable".into(),pending:0,indexed:0,failed:0,message:"temporarily unavailable".into(),providers:None }),
+            graph_relationships: Vec::new(),
+        };
+        let rendered = render_source_answer(answer);
+        assert!(rendered.contains("Source-backed matches"));
+        assert!(rendered.contains("&lt;b&gt;Local evidence&lt;/b&gt;"));
+        assert!(rendered.contains("Local keyword retrieval"));
+        assert!(!rendered.contains("Related knowledge (inferred)"));
+    }
+
+    #[test]
     fn capture_writes_original_then_note_and_retry_is_idempotent() {
         let dir = TempDir::new();
         Vault::open(&dir.0).unwrap();
@@ -1623,6 +1685,7 @@ mod tests {
         body.extend(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"C:\\\\DCIM\\\\page.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").into_bytes());
         body.extend(jpeg());
         body.extend(format!("\r\n--{boundary}--\r\n").into_bytes());
+        let save_started = std::time::Instant::now();
         let response = call(
             &dir.0,
             "POST",
@@ -1633,6 +1696,7 @@ mod tests {
             )],
             &body,
         );
+        assert!(save_started.elapsed() < std::time::Duration::from_secs(2), "capture save waited on the optional graph service");
         assert_eq!(response.status, 303, "{}", text(&response));
         assert_eq!(
             response
@@ -1931,7 +1995,7 @@ mod tests {
         let page = text(&ask);
         assert_eq!(ask.status, 200, "{page}");
         assert!(page.contains(KEYWORD_LABEL));
-        assert!(page.contains("Not a Claude answer"));
+        assert!(page.contains("not a generated answer"));
         assert!(page.contains("Obsidian kept this?"));
         assert!(page.contains(&format!("/sources/{id}")));
         assert!(page.contains(&format!("Recall/Memories/{id}.md")));
@@ -1949,8 +2013,8 @@ mod tests {
             &[("content-type", "application/x-www-form-urlencoded")],
             b"q=xylophone+quantum",
         );
-        assert!(text(&miss).contains("Nothing in the notes matches"));
-        assert!(text(&miss).contains("not a Claude answer"));
+        assert!(text(&miss).contains("Nothing in the notes or related knowledge matches"));
+        assert!(text(&miss).contains("not a generated answer"));
 
         let fresh = TempDir::new();
         Vault::open(&fresh.0).unwrap();
@@ -1961,7 +2025,7 @@ mod tests {
             &[("content-type", "application/x-www-form-urlencoded")],
             b"q=Brooks+Campus",
         );
-        assert!(text(&no_fixture).contains("Nothing in the notes matches"));
+        assert!(text(&no_fixture).contains("Nothing in the notes or related knowledge matches"));
         assert!(!text(&no_fixture).contains("300MW"));
     }
 

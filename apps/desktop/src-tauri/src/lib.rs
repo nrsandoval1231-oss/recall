@@ -292,9 +292,12 @@ fn vault_correct(
     operation_id: String,
     note: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| {
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
         vault.correct(&memory_id, expected_revision, &operation_id, &note)
-    })
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 #[tauri::command]
 fn vault_restore_note(
@@ -304,9 +307,12 @@ fn vault_restore_note(
     expected_revision: u64,
     operation_id: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| {
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
         vault.restore_note(&memory_id, expected_revision, &operation_id)
-    })
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 #[tauri::command]
 fn vault_remove(
@@ -317,14 +323,17 @@ fn vault_remove(
     operation_id: String,
     expected_state: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| {
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
         vault.remove(
             &memory_id,
             expected_revision,
             &operation_id,
             &expected_state,
         )
-    })
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 #[tauri::command]
 fn vault_rebuild(
@@ -477,8 +486,12 @@ fn meeting_publish(
     organization_operation_id: String,
     operation_id: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| vault.publish_meeting(
-        &parser_operation_id, &organization_operation_id, &operation_id))
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
+        vault.publish_meeting(&parser_operation_id, &organization_operation_id, &operation_id)
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 
 #[tauri::command]
@@ -488,11 +501,7 @@ fn memory_ask(
     question: String,
 ) -> Result<memory_query::Answer, String> {
     let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
-    let mut answer = memory_query::ask(&vault, &question)?;
-    match knowledge::search(&vault, &question, false) {
-        Ok(reply) => { answer.knowledge_status = Some(reply.status); answer.graph_relationships = reply.relationships; }
-        Err(_) => { answer.knowledge_status = Some(knowledge::ServiceStatus { state: "unavailable".into(), pending: 0, indexed: 0, failed: 0, message: "Related knowledge is temporarily unavailable; local source search remains available.".into(), providers: None }); }
-    }
+    let answer = memory_query::ask_with_knowledge(&vault, &question)?;
     state.with(&expected_vault_id, |current| if current.id == vault.id { Ok(()) } else { Err("Vault selection changed".into()) })?;
     Ok(answer)
 }

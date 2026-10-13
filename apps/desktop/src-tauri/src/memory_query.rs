@@ -38,6 +38,29 @@ pub fn ask(vault:&Vault,question:&str)->Result<Answer,String> {
     }
     Ok(Answer{question:question.into(),message:if hits.is_empty(){"No verified local memory matched this wording."}else{"Source-backed matches. Review current notes and original evidence; these are retrieved quotes, not a generated answer."}.into(),hits,knowledge_status:None,graph_relationships:Vec::new()})
 }
+pub fn ask_with_knowledge(vault:&Vault,question:&str)->Result<Answer,String> {
+    let mut answer=ask(vault,question)?;
+    match crate::knowledge::search(vault,question,false) {
+        Ok(reply) => {
+            answer.knowledge_status=Some(reply.status);
+            answer.graph_relationships=reply.relationships;
+            if !answer.graph_relationships.is_empty() {
+                answer.message=if answer.hits.is_empty() {
+                    "Related graph knowledge was found. These are inferred, unverified relationships; inspect the cited current notes. This is not a generated answer.".into()
+                } else {
+                    "Source-backed matches and related graph knowledge were found. Graph relationships are inferred and unverified; inspect the cited current notes. This is not a generated answer.".into()
+                };
+            }
+        }
+        Err(_) => {
+            answer.knowledge_status=Some(crate::knowledge::ServiceStatus {
+                state:"unavailable".into(),pending:0,indexed:0,failed:0,
+                message:"Related knowledge is temporarily unavailable; local source search remains available.".into(),providers:None,
+            });
+        }
+    }
+    Ok(answer)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

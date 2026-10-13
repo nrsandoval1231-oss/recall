@@ -4,7 +4,7 @@
 use crate::local_vault::{KnowledgeControl, Vault};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::{BTreeMap, BTreeSet, HashMap}, sync::{Arc, Mutex, OnceLock}, time::Duration};
+use std::{collections::{BTreeMap, BTreeSet, HashMap}, sync::{mpsc::{sync_channel, SyncSender, TrySendError}, Arc, Mutex, OnceLock}, time::Duration};
 use ureq::{Agent, AgentBuilder};
 
 const MAX_SNAPSHOT: usize = 16 * 1024 * 1024;
@@ -24,6 +24,36 @@ fn with_scope_lock<T>(scope: &str, operation: impl FnOnce() -> Result<T>) -> Res
     };
     let _guard = lock.lock().map_err(|_| "Local knowledge coordinator is unavailable")?;
     operation()
+}
+struct RefreshEntry { vault: Vault, dirty: bool }
+struct RefreshWorker { sender: SyncSender<String>, entries: Arc<Mutex<HashMap<String, RefreshEntry>>> }
+static REFRESH_WORKER: OnceLock<RefreshWorker> = OnceLock::new();
+fn refresh_worker() -> &'static RefreshWorker {
+    REFRESH_WORKER.get_or_init(|| {
+        let (sender, receiver) = sync_channel::<String>(32);
+        let entries = Arc::new(Mutex::new(HashMap::<String, RefreshEntry>::new()));
+        let worker_entries = entries.clone();
+        std::thread::spawn(move || {
+            while let Ok(scope) = receiver.recv() {
+                // Let the just-completed capture return and immediate read-after-
+                // write pages finish before the advisory index touches the vault.
+                std::thread::sleep(Duration::from_millis(250));
+                loop {
+                    let vault = match worker_entries.lock().ok().and_then(|mut rows| rows.get_mut(&scope).map(|row| {
+                        row.dirty = false; row.vault.clone()
+                    })) { Some(vault) => vault, None => break };
+                    let _ = refresh(&vault);
+                    let mut rows = match worker_entries.lock() { Ok(rows) => rows, Err(_) => break };
+                    match rows.get(&scope) {
+                        Some(row) if row.dirty => continue,
+                        Some(_) => { rows.remove(&scope); break; }
+                        None => break,
+                    }
+                }
+            }
+        });
+        RefreshWorker { sender, entries }
+    })
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -116,12 +146,20 @@ fn normalize_status(status: &mut ServiceStatus) -> Result<()> {
     }
     status.message = match status.state.as_str() {
         "ready" => "Local knowledge index is ready.".into(),
-        "pending" | "processing" => "Local knowledge indexing is in progress.".into(),
+        "pending" | "processing" | "queued" => "Local knowledge indexing is queued or in progress.".into(),
+        "purging" => "Local knowledge data is being removed.".into(),
+        "empty" => "Local knowledge index has no indexed relationships yet.".into(),
+        "capacity_exceeded" => "Local knowledge index is at its configured capacity.".into(),
         "disabled" => "Graph processing is disabled for this vault.".into(),
         "unavailable" | "failed" => "Local knowledge indexing is unavailable.".into(),
         _ => { status.state = "unknown".into(); "Local graph service returned an unknown status.".into() }
     };
     Ok(())
+}
+fn providers_authorize_enable(status: &ServiceStatus) -> bool {
+    status.providers.as_ref().is_some_and(|p| !p.extraction.trim().is_empty()
+        && !p.extraction.to_ascii_lowercase().contains("not configured")
+        && !p.embedding.trim().is_empty() && !p.reranking.trim().is_empty())
 }
 
 fn sources(vault: &Vault) -> Result<Vec<Source>> {
@@ -132,12 +170,24 @@ fn sources(vault: &Vault) -> Result<Vec<Source>> {
         if memory.note.len() > MAX_TEXT { return Err("A memory exceeds the local knowledge text limit".into()); }
         let snap = match vault.processing_snapshot(&memory.id, memory.revision) { Ok(value) => value, Err(_) => continue };
         let note_path = match snap.memory.note_path { Some(path) => path, None => continue };
+        let source_hash_valid = if memory.source_name.is_empty() {
+            // Text captures intentionally persist the empty-bytes sentinel in
+            // legacy metadata. processing_snapshot resolves and verifies the
+            // immutable Recall/Sources/{id}.txt bytes from the capture journal;
+            // use that canonical hash for graph provenance, never the sentinel.
+            memory.source_sha256 == sha(b"") && snap.source.mime_type == "text/plain"
+                && sha(&snap.source.bytes) == snap.source.sha256
+        } else {
+            snap.source.sha256 == memory.source_sha256
+        };
         if snap.memory.id != memory.id || snap.memory.revision != memory.revision || snap.memory.note != memory.note
-            || snap.source.sha256 != memory.source_sha256 { continue; }
-        estimate = estimate.saturating_add(memory.note.len()).saturating_add(memory.source_name.len()).saturating_add(note_path.len()).saturating_add(512);
+            || snap.memory.source_name != memory.source_name || snap.memory.source_sha256 != memory.source_sha256
+            || !source_hash_valid { continue; }
+        let source_name = if memory.source_name.is_empty() { format!("{}.txt", memory.id) } else { memory.source_name };
+        estimate = estimate.saturating_add(memory.note.len()).saturating_add(source_name.len()).saturating_add(note_path.len()).saturating_add(512);
         if estimate > MAX_SNAPSHOT { return Err("Current eligible vault text exceeds the Graphiti snapshot limit".into()); }
         out.push(Source { id: memory.id, revision: memory.revision, source_sha256: snap.source.sha256,
-            note_sha256: sha(memory.note.as_bytes()), text: memory.note, source_name: memory.source_name,
+            note_sha256: sha(memory.note.as_bytes()), text: memory.note, source_name,
             note_path, captured_at: memory.captured_at, updated_at: memory.updated_at });
         if out.len() > MAX_SOURCES { return Err("Vault exceeds the local knowledge record limit".into()); }
     }
@@ -180,7 +230,7 @@ pub fn consent(vault: &Vault, enabled: bool, include_existing: bool) -> Result<K
     with_scope_lock(&vault.id, || {
         if enabled {
             let status = Client::from_env()?.health()?;
-            if status.providers.as_ref().is_none_or(|p| p.extraction.is_empty() || p.embedding.is_empty() || p.reranking.is_empty()) {
+            if !providers_authorize_enable(&status) {
                 return Err("Review the configured graph providers before enabling knowledge processing".into());
             }
         }
@@ -250,7 +300,22 @@ fn validate_relationships(relationships: Vec<Relationship>, sources: &[Source]) 
             && r.supports.iter().any(|s| s.source_id == r.source_id && s.quote == r.quote)
     }).collect()
 }
-pub fn best_effort_refresh(vault: &Vault) { let _ = refresh(vault); }
+/// Queue a coalesced background snapshot. This is called after durable writes;
+/// the bounded single worker keeps provider/service latency off capture paths.
+pub fn best_effort_refresh(vault: &Vault) {
+    let worker = refresh_worker();
+    let scope = vault.id.clone();
+    let mut rows = match worker.entries.lock() { Ok(rows) => rows, Err(_) => return };
+    if let Some(entry) = rows.get_mut(&scope) {
+        entry.vault = vault.clone(); entry.dirty = true; return;
+    }
+    if rows.len() >= 32 { return; }
+    rows.insert(scope.clone(), RefreshEntry { vault: vault.clone(), dirty: false });
+    drop(rows);
+    if matches!(worker.sender.try_send(scope.clone()), Err(TrySendError::Full(_)) | Err(TrySendError::Disconnected(_))) {
+        if let Ok(mut rows) = worker.entries.lock() { rows.remove(&scope); }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -263,6 +328,23 @@ mod tests {
         }
         std::env::remove_var("RECALL_GRAPH_URL"); std::env::remove_var("RECALL_GRAPH_TOKEN");
         assert!(Client::from_env().is_err());
+    }
+    #[test]
+    fn provider_disclosure_must_be_configured_before_consent() {
+        let status = |extraction: &str| ServiceStatus { state:"empty".into(),pending:0,indexed:0,failed:0,message:String::new(),providers:Some(ProviderDisclosure {
+            extraction:extraction.into(),embedding:"Local embeddings".into(),reranking:"Local RRF".into() }) };
+        assert!(providers_authorize_enable(&status("Anthropic Claude sonnet (configured)")));
+        assert!(!providers_authorize_enable(&status("Anthropic Claude sonnet (not configured)")));
+        assert!(!providers_authorize_enable(&ServiceStatus { providers:None, ..status("configured") }));
+    }
+    #[test]
+    fn known_backend_statuses_keep_honest_ui_messages() {
+        for (state, message) in [("queued", "queued or in progress"), ("purging", "being removed"),
+            ("empty", "no indexed relationships"), ("capacity_exceeded", "configured capacity")] {
+            let mut status = ServiceStatus { state:state.into(),pending:0,indexed:0,failed:0,message:"untrusted backend detail".into(),providers:None };
+            normalize_status(&mut status).unwrap();
+            assert!(status.message.contains(message));
+        }
     }
     #[test]
     fn graph_support_rejects_stale_missing_and_unquoted_sources() {
@@ -288,6 +370,24 @@ mod tests {
         let mut name_match = relationship(2, "meeting quote", vec![RelationshipSupport { source_id:source.id.clone(),revision:2,source_sha256:source.source_sha256.clone(),note_sha256:source.note_sha256.clone(),quote:"meeting quote".into() }]);
         name_match.predicate = "same_person".into();
         assert!(validate_relationships(vec![name_match], &[source]).is_empty());
+    }
+    #[test]
+    fn native_text_capture_uses_verified_original_hash_in_graph_snapshot() {
+        use crate::librarian::organization_tests as fixture;
+        let (_temp, vault, _, _) = fixture::setup();
+        let id = uuid::Uuid::new_v4().to_string();
+        let note = "Synthetic native text capture: Alice Chen works on Project Aurora.";
+        let captured = vault.capture_note(&id, note).unwrap();
+        assert_eq!(captured.source_sha256, sha(b"")); // legacy no-attachment sentinel
+        let original = vault.processing_snapshot(&id, captured.revision).unwrap();
+        assert_eq!(original.source.mime_type, "text/plain");
+        assert_eq!(original.source.bytes, note.as_bytes());
+        let snapshot = sources(&vault).unwrap().into_iter().find(|source| source.id == id).expect("real native text capture should be graph eligible");
+        assert_eq!(snapshot.source_sha256, sha(note.as_bytes()));
+        assert_ne!(snapshot.source_sha256, captured.source_sha256);
+        assert_eq!(snapshot.source_name, format!("{id}.txt"));
+        assert_eq!(snapshot.note_sha256, sha(captured.note.as_bytes()));
+        assert!(snapshot.text.contains("Project Aurora"));
     }
     #[test]
     fn post_search_reconciliation_enforces_generation_consent_fence_and_dismissals() {
@@ -344,20 +444,35 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let operation = uuid::Uuid::new_v4().to_string();
-        let memory = vault.capture_note(&operation, "Synthetic graph fixture. The fictional Cedar meeting moved to October 19.").unwrap();
+        let memory = vault.capture_note(&operation, "Synthetic graph fixture. Fictional Alice Chen works on Project Aurora for Example Labs.").unwrap();
         let consent = consent(&vault, true, true).unwrap();
         assert!(consent.enabled && consent.include_existing);
         let indexed = rebuild(&vault).expect("configured loopback graph service must accept synthetic snapshot");
         assert_ne!(indexed.state, "unavailable");
-        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        let deadline = std::time::Instant::now() + Duration::from_secs(120);
         let result = loop {
-            let result = search(&vault, "fictional Cedar meeting", false).expect("native graph search should complete");
+            let result = search(&vault, "Fictional Alice Chen Project Aurora", false).expect("native graph search should complete");
             if !result.relationships.is_empty() { break result; }
             assert!(std::time::Instant::now() < deadline, "Graphiti did not return a supported synthetic relationship before the bounded deadline");
             std::thread::sleep(Duration::from_millis(500));
         };
         assert!(!result.relationships.is_empty());
         assert!(result.relationships.iter().all(|relationship| relationship.supports.iter().any(|support| support.source_id == memory.id)));
-        assert!(memory.note.contains("Synthetic graph fixture"));
+        assert!(memory.note.contains("Fictional Alice Chen works on Project Aurora for Example Labs"));
+    }
+    #[test]
+    #[ignore = "opt-in: opens the retained synthetic integration vault read-only after restart"]
+    fn synthetic_vault_resume_is_read_only_and_retains_native_sources() {
+        let root = std::env::var("RECALL_GRAPH_SYNTHETIC_VAULT").expect("set to the retained synthetic integration vault");
+        let root = std::path::PathBuf::from(root);
+        assert!(root.is_absolute(), "synthetic vault path must be absolute");
+        assert!(root.join("Recall/_meta/manifest.json").exists(), "run the synthetic loopback integration first");
+        let vault = Vault::open(&root).unwrap();
+        let control_before = vault.knowledge_control().unwrap();
+        assert!(control_before.enabled && control_before.include_existing);
+        let answer = crate::memory_query::ask(&vault, "Fictional Alice Chen Project Aurora").unwrap();
+        assert_eq!(answer.hits.len(), 1);
+        assert!(answer.hits[0].current_excerpt.contains("Example Labs"));
+        assert_eq!(vault.knowledge_control().unwrap().generation, control_before.generation);
     }
 }
