@@ -1,6 +1,10 @@
 # Recall — Adaptive Memory Surface screen-by-screen specification
 Date: 2026-10-13 | Companion to ADAPTIVE-MEMORY-SURFACE-PRD.md
 
+## Verified owner-approved visual reference
+
+The owner committed the final four-panel, photo-free adaptive Recall UI reference to `main` at [docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png](https://github.com/nrsandoval1231-oss/recall/blob/main/docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png). Its Git blob SHA is `6abf5192ab4ee96708984174ed15e3648c668bf0`. This is the **canonical visual authority** for Capture, Processing, Memory Inspection, and Graph View. Use the exact existing PNG; do not rename, move, redraw, substitute generated images, or commit a duplicate. Illustrative text and nodes in the mockup are not user data. The separate, earlier three-bubble and post-capture concept images are historical supporting references only.
+
 ## Global shell
 One continuous ivory edge-to-edge stage, restrained charcoal and cognac iconography, fine graph edges across entire background, top-left Recall brand, slim left navigation, accessible top-level Ask entry, optional contextual user/date area only when real. Graph remains mounted through view transitions; pan/zoom/selection and viewport persist. Avoid permanent sidebar text labels unless expanded/focused. No dashboard grid.
 
