@@ -245,9 +245,9 @@ export function MemoryEditor({
         className="ms-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (session.getSnapshot().reviewRequired)
-            session.keepDraftAfterReview();
-          void session.save(true);
+          const reviewedProposal = session.getSnapshot().reviewRequired;
+          if (reviewedProposal) session.keepDraftAfterReview();
+          void session.save(reviewedProposal);
         }}
       >
         <label htmlFor={`editor-${memory.id}`}>Your correction</label>
