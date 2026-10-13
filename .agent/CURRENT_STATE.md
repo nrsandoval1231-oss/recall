@@ -1,0 +1,2 @@
+# Current state
+Active owner mission Graphiti. Dedicated branch integrate/graphiti at base 8f90e5a. See GRAPHITI-01/PACKET.md. Prior dirty original checkout preserved. Runtime feasibility underway; no integration capability accepted. Next: freeze wire and assign disjoint Python/native implementation. Parent finish contract is owner's 14-part mission; production/device/provider claims remain UNKNOWN.
