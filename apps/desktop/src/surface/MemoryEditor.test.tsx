@@ -106,3 +106,16 @@ it("does not autosave an unreviewed machine reading until explicit save", async 
   await act(async () => {});
   expect(save).toHaveBeenCalledTimes(1);
 });
+
+it("does not submit unchanged corrections before or after an actual edit", async () => {
+  const save = vi.fn(async (intent) => ({ ...memory, revision: 2, note: intent.note }));
+  render(<MemoryEditor identity="library" memory={memory} value={memory.note}
+    onChange={() => {}} commit={save} memories={[memory]} onOpen={() => {}} disabled={false} />);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save correction" })));
+  expect(save).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Your correction"), { target: { value: "Actual edit" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save correction" })));
+  expect(save).toHaveBeenCalledTimes(1);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save correction" })));
+  expect(save).toHaveBeenCalledTimes(1);
+});
