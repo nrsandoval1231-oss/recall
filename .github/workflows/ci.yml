@@ -72,6 +72,11 @@ jobs:
       - run: npm ci
       - working-directory: apps/desktop/src-tauri
         run: cargo test --lib -- --nocapture && cargo check
+      - name: Build native phone companion
+        run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin recall-phone
+      - run: npx playwright install --with-deps chromium
+      - name: Real native companion and browser offline recovery (synthetic data)
+        run: npm run test:phone
   windows-native:
     runs-on: windows-latest
     steps:

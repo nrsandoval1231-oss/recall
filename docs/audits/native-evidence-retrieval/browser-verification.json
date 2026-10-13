@@ -1,0 +1,111 @@
+{
+  "kind": "Synthetic browser IPC checks; not native persistence, installed Windows, or live-provider acceptance",
+  "referenceBlob": "6abf5192ab4ee96708984174ed15e3648c668bf0",
+  "results": [
+    {
+      "viewport": [
+        1536,
+        1024
+      ],
+      "violations": [],
+      "calls": [
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "vault_capture_note",
+        "vault_source",
+        "processing_parse",
+        "meeting_organize",
+        "meeting_publish",
+        "vault_correct",
+        "vault_history",
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "memory_ask",
+        "vault_source",
+        "vault_capture",
+        "vault_source"
+      ]
+    },
+    {
+      "viewport": [
+        1182,
+        789
+      ],
+      "violations": [],
+      "calls": [
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "vault_capture_note",
+        "vault_source",
+        "processing_parse",
+        "meeting_organize",
+        "meeting_publish",
+        "vault_correct",
+        "vault_history",
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "memory_ask",
+        "vault_source",
+        "vault_capture",
+        "vault_source"
+      ]
+    },
+    {
+      "viewport": [
+        900,
+        700
+      ],
+      "violations": [],
+      "calls": [
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "vault_capture_note",
+        "vault_source",
+        "processing_parse",
+        "meeting_organize",
+        "meeting_publish",
+        "vault_correct",
+        "vault_history",
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "memory_ask",
+        "vault_source",
+        "vault_capture",
+        "vault_source"
+      ]
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "violations": [],
+      "calls": [
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "vault_capture_note",
+        "vault_source",
+        "processing_parse",
+        "meeting_organize",
+        "meeting_publish",
+        "vault_correct",
+        "vault_history",
+        "vault_status",
+        "librarian_status",
+        "vault_list",
+        "memory_ask",
+        "vault_source",
+        "vault_capture",
+        "vault_source"
+      ]
+    }
+  ],
+  "errors": []
+}

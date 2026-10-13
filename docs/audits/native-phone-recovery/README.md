@@ -21,7 +21,7 @@ The service worker caches only `/`, `/companion.js`, `/manifest.webmanifest` and
 - Initial browser test teardown waited on an already stopped process; fixed the test harness. A rerun exposed offline setup overwriting the local-storage error message; repaired production status handling and reran all six checks.
 - Screenshots: `offline-device-copy.png`, `received-by-library.png` from the actual browser/native-server workflow, not native desktop screenshots or physical phone evidence.
 
-Run the browser suite after building the native companion. It uses port 18787 and deletes only its own synthetic temporary libraries. `RECALL_CHROMIUM` can select an installed Chromium executable. Default: `/usr/bin/chromium`.
+Run the browser suite after building the native companion. It uses port 18787 and deletes only its own synthetic temporary libraries. `RECALL_CHROMIUM` can select an installed Chromium executable. Otherwise the Playwright-installed Chromium is used. Local verification used `/usr/bin/chromium`.
 
 ## Remaining acceptance boundaries
 

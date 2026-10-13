@@ -525,6 +525,10 @@ it("saves messy text without provider consent and retrieves original source quot
         note_basename: "meeting.md",
         current_excerpt: text,
         original_excerpt: text,
+        match_reason: "Wording match in the current saved note.",
+        human_corrected: true,
+        original_start_byte: 0,
+        original_end_byte: bytes.length,
         source_sha256: sha,
         mime_type: "text/plain",
       },
@@ -581,6 +585,9 @@ it("saves messy text without provider consent and retrieves original source quot
     screen.getByRole("button", { name: "Inspect original evidence" }),
   ).toBeTruthy();
   expect(screen.getByText(`SHA-256: ${sha}`)).toBeTruthy();
+  expect(screen.getByText("Wording match in the current saved note.")).toBeTruthy();
+  expect(screen.getByText(/Includes user corrections/)).toBeTruthy();
+  expect(screen.getByText(`Original excerpt: bytes 0–${bytes.length}`)).toBeTruthy();
 });
 
 it("finishing organization of A never replaces B's correction editor after navigation", async () => {
