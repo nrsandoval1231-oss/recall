@@ -2,7 +2,7 @@
 import { webcrypto } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { KnowledgeSearchReply, LocalVault, SourceAnswer, VaultMemory, VaultStatus } from "../platform/local-vault";
@@ -553,6 +553,44 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
     await screen.findByText(/Providers are unavailable or not configured/);
     expect((screen.getByRole("button", { name: "Enable connected knowledge" }) as HTMLButtonElement).disabled).toBe(true);
     expect(client.knowledgeConsent).not.toHaveBeenCalled();
+  });
+
+  it("explicitly rebuilds enabled connected knowledge and reports the native result", async () => {
+    const providers = { extraction: "extractor", embedding: "embedder", reranking: "ranker" };
+    const rebuild = vi.fn(async () => ({ state: "queued", pending: 3, indexed: 4, failed: 0, message: "Rebuild queued", providers }));
+    const client = vault({
+      knowledgeStatus: vi.fn(async () => ({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Notes and questions may be sent to configured providers.", providers, service: { state: "ready", pending: 0, indexed: 4, failed: 0, message: "Ready", providers } })),
+      knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 1, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })),
+      knowledgeRebuild: rebuild,
+    });
+    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+    await user.click(await screen.findByRole("button", { name: "Settings" }));
+    expect(await screen.findByRole("button", { name: "Rebuild connected knowledge" })).toBeTruthy();
+    expect(screen.getByText(/Rebuild reprocesses only notes already allowed by your current consent/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Rebuild connected knowledge" }));
+    expect(rebuild).toHaveBeenCalledWith(chosen.vault_id);
+    await screen.findAllByText(/Rebuild queued/);
+  });
+
+  it("refreshes a processing graph once it finishes indexing without revisiting the view", async () => {
+    const relationship = {
+      id: "fact-1", source_id: memory().id, revision: 1, source_sha256: memory().source_sha256, note_sha256: memory().source_sha256,
+      source_name: "north-lot.png", note_path: memory().note_path, quote: "North lot is the laydown yard.",
+      subject_id: "entity-yard", subject: "North lot", subject_type: "Location", predicate: "WORKS_ON",
+      object_id: "entity-project", object: "East project", object_type: "Project", fact: "North lot works on East project",
+      valid_at: null, invalid_at: null, extracted_at: "2026-08-21T15:04:00Z", inferred: true, uncertainty: "",
+      related_source_ids: [memory().id], supports: [{ source_id: memory().id, revision: 1, source_sha256: memory().source_sha256, note_sha256: memory().source_sha256, quote: "North lot is the laydown yard." }],
+    };
+    const search = vi.fn()
+      .mockResolvedValueOnce({ status: { state: "processing", pending: 1, indexed: 0, failed: 0, message: "Indexing" }, relationships: [] })
+      .mockResolvedValue({ status: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready" }, relationships: [relationship] });
+    const user = userEvent.setup();
+    render(<MemorySurface vault={vault({ knowledgeSearch: search }, [memory()])} />);
+    await user.click(await screen.findByRole("tab", { name: /^Related/ }));
+    expect(await screen.findByText(/1 pending/)).toBeTruthy();
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    expect(await screen.findByRole("button", { name: /North lot Works on East project/ })).toBeTruthy();
+    expect(screen.getByText(/1 indexed/)).toBeTruthy();
   });
 
   it("discards a late relationship response after switching vaults", async () => {

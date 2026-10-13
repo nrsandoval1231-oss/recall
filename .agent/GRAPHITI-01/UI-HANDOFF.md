@@ -33,3 +33,16 @@ Commands run from the repository root unless noted:
 - `git diff --check -- <seven owned files>` — PASS, exit 0.
 
 Intermediate focused tests caught and resolved assertion mismatches around the selected fact and multiple supporting-note actions. The complete suite passed on the final G3 repair. No private captures, production provider calls, deployment or PR actions were used for this UI work. Native-installed runtime, live Graphiti extraction/retrieval, combined-candidate gates, and independent review remain outside this worker's evidence and acceptance remains open.
+
+## Operability follow-up
+
+- Settings now exposes an explicit **Rebuild connected knowledge** action only when consent is enabled and the native adapter exists. The adjacent disclosure says rebuild reprocesses only notes already allowed by consent and provider charges may apply. Native result, busy state, and errors are scoped to the active vault.
+- Related, Timeline, Evidence, and Ask views refresh a pending index every two seconds for at most 60 seconds. The loop cancels on unmount, vault/view change, completion, failure, or timeout; failed indexing is surfaced without retrying. Regression coverage verifies an index becoming ready in-place and the explicit rebuild result.
+- Supporting evidence with no attachment name now shows a note-path fallback instead of a blank source label.
+
+Follow-up validation:
+
+- `npm run typecheck --workspace @recall/desktop` — PASS.
+- `npm run test --workspace @recall/desktop -- --run src/surface/memory-surface.test.tsx src/surface/KnowledgePanel.test.tsx --reporter=dot` — PASS, 2 files / 36 tests.
+- `npx eslint src/surface/MemorySurface.tsx src/surface/memory-surface.test.tsx src/surface/KnowledgePanel.tsx src/surface/KnowledgePanel.test.tsx` from `apps/desktop` — PASS.
+- `git diff --check` on the four changed UI source/test files — PASS.

@@ -1,0 +1,7 @@
+{
+  "productName": "Recall Graphiti Verification",
+  "identifier": "app.recall.graphiti.verification",
+  "app": {
+    "windows": [{ "title": "Recall Graphiti Verification", "width": 1440, "height": 960, "minWidth": 960, "minHeight": 640 }]
+  }
+}

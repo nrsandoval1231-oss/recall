@@ -93,10 +93,11 @@ export function KnowledgePanel({ relationships, status, memories, onInspect, onC
         <h3>{selected.fact}</h3><p>{selected.uncertainty || "Inferred from note evidence; not independently verified."}</p>
         {selected.supports.length ? selected.supports.map((support, index) => {
           const memory = memories.find(row => row.id === support.source_id);
+          const sourceLabel = memory?.source_name.trim() || memory?.note_path?.split(/[\\/]/).filter(Boolean).at(-1) || "Captured note";
           return <div className="ms-knowledge-support" key={`${support.source_id}:${support.revision}:${index}`}>
-            <p><strong>Supporting quote {index + 1}</strong>{memory ? ` · ${memory.source_name} · revision ${support.revision}` : ` · source ${support.source_id} · revision ${support.revision}`}</p>
+            <p><strong>Supporting quote {index + 1}</strong>{memory ? ` · ${sourceLabel} · revision ${support.revision}` : ` · source ${support.source_id} · revision ${support.revision}`}</p>
             <blockquote>{support.quote}</blockquote>
-            {memory && <div className="ms-knowledge-source"><span>{memory.source_name}</span><div><button type="button" onClick={() => onInspect(memory)}>Inspect original</button><button type="button" onClick={() => onCorrect(memory)}>Correct note</button></div></div>}
+            {memory && <div className="ms-knowledge-source"><span>{sourceLabel}</span><div><button type="button" onClick={() => onInspect(memory)}>Inspect original</button><button type="button" onClick={() => onCorrect(memory)}>Correct note</button></div></div>}
           </div>;
         }) : <><p><strong>Supporting quote</strong></p><blockquote>{selected.quote}</blockquote></>}
         {onDismiss && <button type="button" onClick={() => void dismiss(selected.id)}>Dismiss this inferred relationship</button>}

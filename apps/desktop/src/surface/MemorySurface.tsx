@@ -341,6 +341,21 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
   }
 
+  async function rebuildKnowledge() {
+    if (!selected || !vault.knowledgeRebuild) return;
+    const vaultId = selected.vault_id;
+    setKnowledgeBusy(true); setError("");
+    try {
+      const service = await vault.knowledgeRebuild(vaultId);
+      if (!inScope(vaultId)) return;
+      setKnowledgeStatus(current => current ? { ...current, service } : current);
+      setKnowledgeResultStatus(service);
+      setNotice(service.message);
+    } catch (rebuildError) {
+      if (inScope(vaultId)) setError(message(rebuildError));
+    } finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
+  }
+
   async function dismissKnowledge(factId: string) {
     if (!selected || !vault.knowledgeDismiss) throw new Error("Connected knowledge dismissal is unavailable.");
     const vaultId = selected.vault_id;
@@ -668,6 +683,57 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const vaultMemories = projectFocus ? kept.filter(memory => memory.id === projectFocus.id) : kept;
   const evidenceMemory = kept.find((memory) => memory.id === evidenceId) ?? null;
   const demoEvidence = demo ? fixtureMemory(evidenceId ?? "") : undefined;
+  const activeKnowledgeKey = selected && vault.knowledgeSearch
+    ? section === "ask" && sourceAnswer?.knowledge_status ? `ask:${selected.vault_identity}:${sourceAnswer.question}`
+      : section === "evidence" && evidenceMemory ? `evidence:${selected.vault_identity}:${evidenceMemory.id}`
+        : (panel === "related" || panel === "timeline") && section !== "capture" && section !== "ask" ? `${section}:${panel}:${selected.vault_identity}` : null
+    : null;
+  const activeKnowledgeStatus = section === "ask" ? sourceAnswer?.knowledge_status : knowledgeResultStatus;
+  const knowledgePollable = Boolean(activeKnowledgeStatus && activeKnowledgeStatus.pending > 0 && activeKnowledgeStatus.failed === 0
+    && !["failed", "error", "unavailable", "disabled"].includes(activeKnowledgeStatus.state.toLowerCase()));
+  const activeKnowledgeRef = useRef<string | null>(null);
+  activeKnowledgeRef.current = activeKnowledgeKey;
+  useEffect(() => {
+    if (!activeKnowledgeKey || !selected || !vault.knowledgeSearch || !knowledgePollable || !activeKnowledgeStatus) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const vaultId = selected.vault_id;
+    const viewKey = activeKnowledgeKey;
+    const queryText = section === "ask" ? sourceAnswer?.question ?? "" : "";
+    const startedAt = Date.now();
+    const current = () => !cancelled && inScope(vaultId) && activeKnowledgeRef.current === viewKey;
+    const publish = (service: KnowledgeServiceStatus, relationships: KnowledgeRelationship[]) => {
+      if (!current()) return;
+      if (section === "ask") setSourceAnswer(value => value?.question === queryText ? { ...value, knowledge_status: service, graph_relationships: relationships } : value);
+      else {
+        const relevant = section === "evidence" && evidenceMemory
+          ? relationships.filter(row => row.source_id === evidenceMemory.id || row.supports.some(support => support.source_id === evidenceMemory.id))
+          : relationships;
+        setKnowledgeRows(relevant); setKnowledgeResultStatus(service);
+      }
+    };
+    const poll = async () => {
+      if (!current()) return;
+      if (Date.now() - startedAt >= 60_000) {
+        const timeoutStatus = { ...activeKnowledgeStatus, message: "Indexing is still pending. Reopen this view later to check its status." };
+        publish(timeoutStatus, section === "ask" ? sourceAnswer?.graph_relationships ?? [] : knowledgeRows);
+        return;
+      }
+      try {
+        const result = await vault.knowledgeSearch!(vaultId, queryText);
+        if (!current()) return;
+        publish(result.status, result.relationships);
+        const next = result.status;
+        const canContinue = next.pending > 0 && next.failed === 0 && !["failed", "error", "unavailable", "disabled"].includes(next.state.toLowerCase());
+        if (canContinue && Date.now() - startedAt < 60_000) timer = window.setTimeout(() => void poll(), 2_000);
+      } catch (pollError) {
+        const unavailable: KnowledgeServiceStatus = { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: message(pollError) };
+        publish(unavailable, []);
+      }
+    };
+    timer = window.setTimeout(() => void poll(), 2_000);
+    return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };
+  }, [activeKnowledgeKey, activeKnowledgeStatus?.pending, activeKnowledgeStatus?.failed, activeKnowledgeStatus?.state, knowledgePollable, section, sourceAnswer?.question, selected?.vault_id, vault.knowledgeSearch]);
   const ticks: TimelineTick[] = demo ? board.months.map((month) => ({ id: month, label: month })) : vaultTicks(vaultMemories);
   const activeMonth = focusMonth && ticks.some((tick) => tick.id === focusMonth) ? focusMonth : (demo ? board.marker : ticks[ticks.length - 1]?.id ?? "");
   const activeLabel = ticks.find((tick) => tick.id === activeMonth)?.label ?? activeMonth;
@@ -845,7 +911,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
           {vaultSettings && <div className="ms-modal-backdrop" onClick={closeSettings}><div data-vault-dialog className="ms-vault-settings" role="dialog" aria-modal="true" aria-label="Vault settings" onClick={event => event.stopPropagation()}><header><h2>Your Obsidian vault</h2><button type="button" onClick={closeSettings} aria-label="Close vault settings">Close</button></header><p>Memory stays in the folder you choose. Originals and history stay with it.</p><p className="ms-root">{selected?.root || "No vault selected"}</p><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("select")}>Choose a vault folder</button><button type="button" disabled={!vault.available || busy || checking} onClick={() => void choose("default")}>Use default vault</button>
             {selected && vault.knowledgeStatus && vault.knowledgeConsent && <section className="ms-knowledge-settings" aria-label="Connected knowledge settings"><h3>Connected knowledge</h3>{knowledgeStatus ? <><p>{knowledgeStatus.provider_disclosure}</p><p role="status">{knowledgeStatus.enabled ? "Enabled" : "Disabled"} · {knowledgeStatus.service.message} {knowledgeStatus.service.pending ? `${knowledgeStatus.service.pending} pending.` : ""}</p>{knowledgeStatus.providers && <p>Configured providers: extraction {knowledgeStatus.providers.extraction}; embeddings {knowledgeStatus.providers.embedding}; reranking {knowledgeStatus.providers.reranking}.</p>}{!knowledgeStatus.enabled && <><label className="ms-check"><input type="checkbox" checked={knowledgeConsentChecked} onChange={event => setKnowledgeConsentChecked(event.target.checked)} /> I understand that graph processing may send notes and Ask questions to the configured providers above.</label><label className="ms-check"><input type="checkbox" checked={knowledgeIncludeExisting} onChange={event => setKnowledgeIncludeExisting(event.target.checked)} /> Also process existing notes (optional; off by default).</label></>}
               {!knowledgeStatus.enabled && !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim()) && <p role="status">Providers are unavailable or not configured. Keyword search still works; connected knowledge cannot be enabled yet.</p>}
-              <button type="button" disabled={knowledgeBusy || (!knowledgeStatus.enabled && (!knowledgeConsentChecked || !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim())))} onClick={() => void updateKnowledgeConsent(!knowledgeStatus.enabled)}>{knowledgeStatus.enabled ? "Disable connected knowledge" : "Enable connected knowledge"}</button></> : <p role="status">Loading connected knowledge configuration…</p>}
+              <button type="button" disabled={knowledgeBusy || (!knowledgeStatus.enabled && (!knowledgeConsentChecked || !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim())))} onClick={() => void updateKnowledgeConsent(!knowledgeStatus.enabled)}>{knowledgeStatus.enabled ? "Disable connected knowledge" : "Enable connected knowledge"}</button>
+              {knowledgeStatus.enabled && vault.knowledgeRebuild && <><p>Rebuild reprocesses only notes already allowed by your current consent. Provider charges may apply.</p><button type="button" disabled={knowledgeBusy} onClick={() => void rebuildKnowledge()}>Rebuild connected knowledge</button></>}</> : <p role="status">Loading connected knowledge configuration…</p>}
             </section>}
           </div></div>}
         </div>

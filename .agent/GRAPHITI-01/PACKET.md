@@ -1,7 +1,7 @@
 # GRAPHITI-01 — owner-authorized integration
 
 Base: 8f90e5a5ead9dd05b58beaecb6811b2b197088e2, integrate/graphiti, isolated worktree. Original dirty checkout preserved.
-Owner mission governs: Recall-owned Markdown/originals, Obsidian optional, Graphiti derived/rebuildable, existing UI preserved. No paid calls, private disclosure, deployment or merge. PR creation requested and authorized.
+Owner mission governs: Recall-owned Markdown/originals, Obsidian optional, Graphiti derived/rebuildable, existing UI preserved. Owner subsequently authorized up to USD2 total model verification, synthetic notes only. No private disclosure, deployment or merge. PR creation requested and authorized.
 
 ## Opening Tribunal (one only)
 Luna simplifier: use existing native vault/source and Memory Surface, not another app.

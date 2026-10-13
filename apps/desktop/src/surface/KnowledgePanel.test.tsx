@@ -50,6 +50,13 @@ it("keeps a relationship visible when native dismissal fails", async () => {
   expect(screen.getByText("Site 1 opens in May")).toBeTruthy();
 });
 
+it("labels captured notes without an original attachment name", () => {
+  const captured = { ...note, source_name: "", note_path: "notes/captured-note.md" };
+  const { container } = render(<KnowledgePanel relationships={[relation(1)]} memories={[captured]} onInspect={vi.fn()} onCorrect={vi.fn()} />);
+  expect(screen.getByText((_, element) => element?.tagName === "P" && Boolean(element.textContent?.includes("Supporting quote 1 · captured-note.md · revision 2")))).toBeTruthy();
+  expect(container.querySelector(".ms-knowledge-source span")?.textContent).toBe("captured-note.md");
+});
+
 it("offers an honest empty state when providers or the graph are unavailable", () => {
   render(<KnowledgePanel relationships={[]} status={{ state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Local graph service is not configured." }} memories={[]} onInspect={vi.fn()} onCorrect={vi.fn()} />);
   expect(screen.getByRole("status").textContent).toContain("unavailable");
