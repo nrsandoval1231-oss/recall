@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import hashlib
 import sqlite3
 import sys
@@ -12,6 +13,8 @@ from types import ModuleType, SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+import recall.knowledge.providers as knowledge_providers
+import recall.knowledge.store as knowledge_store
 from recall.knowledge.app import create_app
 from recall.knowledge.graph import (
     GraphAdapter,
@@ -419,6 +422,77 @@ def test_budget_reservations_settlement_and_unknown(tmp_path) -> None:
     assert status[0][0] == "settled" and status[0][1] == 0.75
     assert status[1][0] == "unknown" and status[1][1] == 0.5
     assert budget == pytest.approx((0.1, 0.03))
+
+
+def _track_sqlite_connections(monkeypatch, module):
+    original_connect = sqlite3.connect
+    connections = []
+    fail_statement = {"value": None}
+
+    class TrackingConnection(sqlite3.Connection):
+        was_closed = False
+
+        def execute(self, sql, parameters=(), /):
+            if fail_statement["value"] and fail_statement["value"] in sql:
+                raise sqlite3.OperationalError("injected sqlite failure")
+            return super().execute(sql, parameters)
+
+        def close(self):
+            self.was_closed = True
+            return super().close()
+
+    def connect(*args, **kwargs):
+        kwargs["factory"] = TrackingConnection
+        connection = original_connect(*args, **kwargs)
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(module.sqlite3, "connect", connect)
+    return connections, fail_statement, original_connect
+
+
+def test_snapshot_store_closes_connections_with_gc_disabled_and_on_setup_failure(tmp_path, monkeypatch) -> None:
+    connections, fail_statement, _original_connect = _track_sqlite_connections(monkeypatch, knowledge_store)
+    was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        store = SnapshotStore(tmp_path / "queue.sqlite")
+        for _ in range(100):
+            store.status(SCOPE)
+        assert connections
+        assert all(connection.was_closed for connection in connections)
+    finally:
+        if was_enabled:
+            gc.enable()
+        else:
+            gc.disable()
+
+    fail_statement["value"] = "PRAGMA secure_delete=ON"
+    with pytest.raises(sqlite3.OperationalError, match="injected sqlite failure"):
+        SnapshotStore(tmp_path / "broken.sqlite")
+    assert connections[-1].was_closed
+
+
+def test_budget_ledger_closes_connections_after_success_and_sql_error(tmp_path, monkeypatch) -> None:
+    connections, fail_statement, original_connect = _track_sqlite_connections(monkeypatch, knowledge_providers)
+    ledger = tmp_path / "budget.sqlite"
+    first = _reserve_budget(ledger, 0.1, 1.0)
+    assert first is not None
+    _settle_budget(ledger, first, 0.02, 10, 5, 0.1)
+    _mark_budget_unknown(ledger, first, 0.2)
+    assert len(connections) == 3
+    assert all(connection.was_closed for connection in connections)
+
+    fail_statement["value"] = "CREATE TABLE IF NOT EXISTS provider_calls"
+    with pytest.raises(sqlite3.OperationalError, match="injected sqlite failure"):
+        _reserve_budget(tmp_path / "broken-budget.sqlite", 0.1, 1.0)
+    assert connections[-1].was_closed
+    db = original_connect(tmp_path / "broken-budget.sqlite")
+    try:
+        tables = db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    finally:
+        db.close()
+    assert tables == []
 
 
 class FakeGraph:

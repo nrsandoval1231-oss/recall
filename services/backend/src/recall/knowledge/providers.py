@@ -10,6 +10,8 @@ import re
 import sqlite3
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -20,6 +22,16 @@ _budget_lock = threading.Lock()
 EMBED_REPO = "Qdrant/bge-small-en-v1.5-onnx-Q"
 EMBED_REVISION = "aa8f8b060edb00e03bfdd08813a2949946c8ba55"
 EMBED_ONNX_SHA256 = "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431"
+
+
+@contextmanager
+def _budget_connection(path: Path) -> Iterator[sqlite3.Connection]:
+    db = sqlite3.connect(path, timeout=15, isolation_level=None)
+    try:
+        with db:
+            yield db
+    finally:
+        db.close()
 
 
 def configure_budget_path(path: str | Path) -> None:
@@ -209,7 +221,7 @@ class LocalFastEmbedder:
 
 def _reserve_budget(path: Path, amount: float, limit: float) -> int | None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with _budget_lock, sqlite3.connect(path, timeout=15, isolation_level=None) as db:
+    with _budget_lock, _budget_connection(path) as db:
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("BEGIN IMMEDIATE")
         db.execute(
@@ -247,7 +259,7 @@ def _reserve_budget(path: Path, amount: float, limit: float) -> int | None:
 def _settle_budget(
     path: Path, call_id: int, actual: float, input_tokens: int, output_tokens: int, latency: float
 ) -> None:
-    with _budget_lock, sqlite3.connect(path, timeout=15, isolation_level=None) as db:
+    with _budget_lock, _budget_connection(path) as db:
         db.execute("BEGIN IMMEDIATE")
         call = db.execute("SELECT reserved_usd FROM provider_calls WHERE id=?", (call_id,)).fetchone()
         if call is None:
@@ -267,7 +279,7 @@ def _settle_budget(
 
 
 def _mark_budget_unknown(path: Path, call_id: int, latency: float) -> None:
-    with _budget_lock, sqlite3.connect(path, timeout=15, isolation_level=None) as db:
+    with _budget_lock, _budget_connection(path) as db:
         db.execute(
             "UPDATE provider_calls SET status='unknown',finished_at=?,latency_seconds=? WHERE id=?",
             (datetime.now(UTC).isoformat(), latency, call_id),

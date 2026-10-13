@@ -4,8 +4,11 @@ import hashlib
 import json
 import sqlite3
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
 from .models import AnswerRequest, Snapshot, Source, Status
 
@@ -35,7 +38,7 @@ class SnapshotStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
-        with self._connect() as db:
+        with self._connection() as db:
             db.executescript(
                 """
                 PRAGMA journal_mode=WAL;
@@ -94,20 +97,37 @@ class SnapshotStore:
                 (datetime.now(UTC).isoformat(),),
             )
 
-    def _connect(self) -> sqlite3.Connection:
-        db = sqlite3.connect(self.path, timeout=15, isolation_level="IMMEDIATE")
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys=ON")
-        db.execute("PRAGMA busy_timeout=15000")
-        db.execute("PRAGMA secure_delete=ON")
+    def _connect(
+        self, *, isolation_level: Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None = "IMMEDIATE"
+    ) -> sqlite3.Connection:
+        db = sqlite3.connect(self.path, timeout=15, isolation_level=isolation_level)
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA foreign_keys=ON")
+            db.execute("PRAGMA busy_timeout=15000")
+            db.execute("PRAGMA secure_delete=ON")
+        except BaseException:
+            db.close()
+            raise
         return db
+
+    @contextmanager
+    def _connection(
+        self, *, isolation_level: Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None = "IMMEDIATE"
+    ) -> Iterator[sqlite3.Connection]:
+        db = self._connect(isolation_level=isolation_level)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def submit(self, snapshot: Snapshot) -> Status:
         status = self._submit(snapshot)
         # Queue snapshots contain authorized source text while processing. Once a
         # newer snapshot replaces it (especially revocation/deletion), remove old
         # WAL frames so stale note bytes are not left in the durable queue files.
-        with sqlite3.connect(self.path, timeout=15, isolation_level=None) as db:
+        with self._connection(isolation_level=None) as db:
             db.execute("PRAGMA busy_timeout=15000")
             busy, _log_frames, _checkpointed = db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
         if busy:
@@ -121,7 +141,7 @@ class SnapshotStore:
             else snapshot.model_copy(update={"rebuild": False})
         )
         serialized = stored_snapshot.model_dump_json()
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute(
                 "SELECT generation,state,snapshot_json FROM scopes WHERE scope=?", (snapshot.scope,)
             ).fetchone()
@@ -234,7 +254,7 @@ class SnapshotStore:
             return self._status(db, snapshot.scope)
 
     def next_job(self) -> tuple[Snapshot, int, str, set[str]] | None:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute(
                 "SELECT scope,generation,kind,work_ids_json FROM queue WHERE state='queued' ORDER BY scope LIMIT 1"
             ).fetchone()
@@ -251,7 +271,7 @@ class SnapshotStore:
             return snap, row["generation"], str(row["kind"]), set(json.loads(row["work_ids_json"]))
 
     def commit(self, scope: str, generation: int, sources: list[Source]) -> bool:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute("SELECT generation,processing_allowed FROM scopes WHERE scope=?", (scope,)).fetchone()
             if row is None or row["generation"] != generation:
                 return False
@@ -284,14 +304,14 @@ class SnapshotStore:
             return True
 
     def failed(self, scope: str, generation: int, message: str) -> None:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute(
                 "UPDATE scopes SET state='failed',pending=0,failed=1,message=? WHERE scope=? AND generation=?",
                 (message[:200], scope, generation),
             )
 
     def status(self, scope: str) -> Status:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             return self._status(db, scope)
 
     @staticmethod
@@ -308,7 +328,7 @@ class SnapshotStore:
         return Status(**values, providers=provider_disclosures())
 
     def generation(self, scope: str) -> tuple[int, bool, Snapshot] | None:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute(
                 "SELECT generation,processing_allowed,snapshot_json FROM scopes WHERE scope=?", (scope,)
             ).fetchone()
@@ -321,7 +341,7 @@ class SnapshotStore:
             )
 
     def current_sources(self, scope: str) -> dict[str, Source]:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute("SELECT snapshot_json FROM scopes WHERE scope=?", (scope,)).fetchone()
             if row is None:
                 return {}
@@ -330,7 +350,7 @@ class SnapshotStore:
 
     def requeue_rebuild(self, scope: str, generation: int) -> Status:
         """Queue a same-generation rebuild when persistent graph data is missing."""
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute(
                 "SELECT generation,processing_allowed,snapshot_json,state FROM scopes WHERE scope=?", (scope,)
             ).fetchone()
@@ -355,7 +375,7 @@ class SnapshotStore:
 
     def begin_answer(self, request: AnswerRequest, provider_identity: str) -> tuple[list[Source], str]:
         """Commit request ID + exact consent/source fingerprint before a billable dispatch."""
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             duplicate = db.execute(
                 "SELECT 1 FROM answer_attempts WHERE scope=? AND request_id=?",
@@ -410,7 +430,7 @@ class SnapshotStore:
         provider_identity: str,
         fingerprint: str,
     ) -> bool:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute(
                 "SELECT generation,processing_allowed,snapshot_json FROM scopes WHERE scope=?", (request.scope,)
             ).fetchone()
@@ -429,7 +449,7 @@ class SnapshotStore:
     def finish_answer(self, scope: str, request_id: str, state: str) -> None:
         if state not in {"supported", "insufficient", "unavailable", "cancelled", "stale", "unknown"}:
             raise ValueError("invalid answer attempt state")
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute(
                 "UPDATE answer_attempts SET state=?,updated_at=? WHERE scope=? AND request_id=? "
                 "AND state='dispatching'",
@@ -437,7 +457,7 @@ class SnapshotStore:
             )
 
     def answer_state(self, scope: str, request_id: str) -> str | None:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             row = db.execute(
                 "SELECT state FROM answer_attempts WHERE scope=? AND request_id=?", (scope, request_id)
             ).fetchone()
@@ -445,7 +465,7 @@ class SnapshotStore:
 
     def cancel_answer(self, scope: str, generation: int, request_id: str) -> bool:
         """Persist a cancellation tombstone, including when cancel arrives before dispatch."""
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
                 "SELECT generation,processing_allowed,snapshot_json FROM scopes WHERE scope=?", (scope,)
@@ -484,7 +504,7 @@ class SnapshotStore:
             return True
 
     def all_scopes(self) -> list[str]:
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             return [row[0] for row in db.execute("SELECT scope FROM scopes ORDER BY scope")]
 
 
