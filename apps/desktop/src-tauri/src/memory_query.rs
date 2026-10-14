@@ -435,6 +435,14 @@ mod native_retrieval_tests {
         assert!(quote.chars().count() <= 1200);
     }
     #[test]
+    fn two_character_unicode_names_remain_retrievable() {
+        let (_temp, vault, _, _) = crate::librarian::organization_tests::setup();
+        let id = Uuid::new_v4().to_string();
+        vault.capture_note(&id, "Synthetic: 東京 meeting remains tentative.").unwrap();
+        assert!(ask(&vault, "東京").unwrap().hits.iter().any(|hit| hit.memory_id == id));
+    }
+
+    #[test]
     fn short_names_units_and_numbers_remain_searchable_without_filler_matches() {
         let (_temp, vault, _, _) = crate::librarian::organization_tests::setup();
         let id = Uuid::new_v4().to_string();

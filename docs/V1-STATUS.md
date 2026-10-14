@@ -1,5 +1,7 @@
 # Recall V1 implementation and acceptance
 
+Current native-library/editor review status: see [canonical acceptance](ACCEPTANCE.md#native-libraryeditor-review-repair--2026-10-13). PR #54 remains unmerged and requires independent final-head clearance; standalone Recall and the approved ivory graph field are authoritative under PR #53. Historical device/provider evidence below does not certify the new packet.
+
 > **2026-10-10 PRODUCT CENTER.** The [pilot amendment](PILOT-CONTRACT.md) supersedes the 2026-10-09 PWA-only direction. The desktop Memory Surface and an Obsidian vault are the product center. The phone is the capture/ask companion. No login or email-auth UX. PR #16, recorded below, remains the installable web companion and enrollment transport. The October 6 email-link deployment notes and the 23:35 CDT email-rate-limit incident stay historical; they are not instructions to restore email sign-in. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg), credited as owner-supplied on 2026-10-10. The earlier sentence that the image had not been provided is false as of that date.
 
 

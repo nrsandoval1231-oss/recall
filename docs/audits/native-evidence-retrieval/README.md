@@ -40,3 +40,7 @@ All candidates must remain active and conflict-free. Each returned source is rec
 | 13. Phone offline/sync | #55 implemented and 7 browser/native tests pass; receipt scope/identity and originals verified | Physical iPhone, HTTPS/Tailscale/denied-peer acceptance; no offline library replica |
 
 The inherited evidence is at `../native-library-editor/ACCEPTANCE.md`; this ledger does not relabel it as newly performed. No independent reviewer or Windows/iPhone acceptance is claimed for these continuations. Full native-memory mission remains incomplete at the explicit gaps above.
+
+### Formal review repair
+
+#57's short-term retrieval correction is backported here, including its names/units/numbers regression. A new ordinary native regression for `東京` fails before the backport and passes after it; this PR no longer requires #57 to repair that landing regression. The #54 and #55 repaired bases are merged with ancestry intact. Provider, installed Windows and physical iPhone acceptance remain open; lexical retrieval is not semantic/generative completion.
