@@ -1971,9 +1971,9 @@ export function MemorySurface({
                   )}
                 </section>
               )}
-              {section === "ask" && sourceAnswer?.knowledge_status && <KnowledgePanel relationships={sourceAnswer.graph_relationships ?? []} status={sourceAnswer.knowledge_status} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
+              {section === "ask" && sourceAnswer?.knowledge_status && <KnowledgePanel key={`${selected?.vault_identity}:ask:${sourceAnswer.question}`} relationships={sourceAnswer.graph_relationships ?? []} status={sourceAnswer.knowledge_status} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
               {section === "ask" && quotedAnswerPanel}
-              {(section === "evidence" || section === "recent") && vault.knowledgeSearch && <KnowledgePanel relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
+              {(section === "evidence" || section === "recent") && vault.knowledgeSearch && <KnowledgePanel key={`${selected?.vault_identity}:${section}:${evidenceMemory?.id ?? "all"}`} relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
             </aside>
           )}
           {section === "timeline" && (
@@ -2008,7 +2008,7 @@ export function MemorySurface({
               ))}
             </section>
           )}
-          {section === "timeline" && vault.knowledgeSearch && <div className="adaptive-timeline glass"><KnowledgePanel temporalOnly relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} /></div>}
+          {section === "timeline" && vault.knowledgeSearch && <div className="adaptive-timeline glass"><KnowledgePanel key={`${selected?.vault_identity}:timeline`} temporalOnly relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} /></div>}
           {vaultSettings && (
             <div className="ms-modal-backdrop" onClick={closeSettings}>
               <div
