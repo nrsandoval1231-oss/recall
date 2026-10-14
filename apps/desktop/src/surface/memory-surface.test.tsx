@@ -2,7 +2,7 @@
 import { webcrypto } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { LocalVault, VaultMemory, VaultStatus } from "../platform/local-vault";
@@ -377,4 +377,53 @@ describe("Memory Surface", () => {
     await user.click(await screen.findByRole("button", { name: "Open original: north-lot" }));
     expect((await screen.findByTestId("integrity")).textContent).toMatch(/does not match/);
   });
+});
+
+it('retains unsaved Memories text when returning from the list', async () => {
+  const user = userEvent.setup();
+  render(<MemorySurface vault={vault({}, [memory()])} />);
+  await user.click(await screen.findByRole('button', { name: 'Memories' }));
+  await user.click(screen.getByRole('button', { name: /Aug 21, 2026 · north-lot/ }));
+  const field = screen.getByRole('textbox', { name: 'Edit note' });
+  await user.clear(field);
+  await user.type(field, 'Unsaved synthetic correction');
+  await user.click(screen.getByRole('button', { name: 'Back to memories' }));
+  await user.click(screen.getByRole('button', { name: /Aug 21, 2026 · north-lot/ }));
+  expect((screen.getByRole('textbox', { name: 'Edit note' }) as HTMLTextAreaElement).value).toBe('Unsaved synthetic correction');
+});
+
+it('does not put a delayed save into another note draft', async () => {
+  const user = userEvent.setup();
+  const a = memory();
+  const b = memory({ id: '22222222-2222-4222-8222-222222222222', note_path: 'b.md', source_name: 'second.png', note: 'Second note' });
+  let finish!: (m: VaultMemory) => void;
+  const correct = vi.fn(() => new Promise<VaultMemory>(resolve => { finish = resolve; }));
+  render(<MemorySurface vault={vault({ correct }, [a, b])} />);
+  await user.click(await screen.findByRole('button', { name: 'Memories' }));
+  await user.click(screen.getByRole('button', { name: /Aug 21, 2026 · north-lot/ }));
+  await user.type(screen.getByRole('textbox', { name: 'Edit note' }), ' Edited');
+  await user.click(screen.getByRole('button', { name: 'Save note' }));
+  await user.click(screen.getByRole('button', { name: 'Back to memories' }));
+  await user.click(screen.getByRole('button', { name: /Aug 21, 2026 · second/ }));
+  await act(async () => finish({ ...a, revision: 2, note: a.note + ' Edited' }));
+  expect((screen.getByRole('textbox', { name: 'Edit note' }) as HTMLTextAreaElement).value).toBe(b.note);
+});
+
+it('binds a retained dirty draft to its original revision after another correction', async () => {
+  const user = userEvent.setup();
+  const a = memory();
+  const client = vault({}, [a]);
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole('button', { name: 'Memories' }));
+  await user.click(screen.getByRole('button', { name: /Aug 21, 2026 · north-lot/ }));
+  await user.type(screen.getByRole('textbox', { name: 'Edit note' }), ' draft');
+  await user.click(screen.getByRole('button', { name: 'Open original: north-lot' }));
+  const correction = await screen.findByRole('textbox', { name: 'Your correction' });
+  await user.clear(correction);
+  await user.type(correction, 'New correction');
+  await user.click(screen.getByRole('button', { name: 'Save correction' }));
+  await screen.findByText(/original photo is unchanged/);
+  await user.click(screen.getByRole('button', { name: 'Memories' }));
+  await user.click(screen.getByRole('button', { name: 'Save note' }));
+  expect(client.correct).toHaveBeenLastCalledWith('session-token', a.id, 1, expect.any(String), a.note + ' draft');
 });

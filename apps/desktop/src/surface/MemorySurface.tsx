@@ -155,12 +155,16 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
   const [browserId, setBrowserId] = useState<string | null>(null);
   const [browserDraft, setBrowserDraft] = useState("");
+  const browserDrafts = useRef(new Map<string, { body: string; base: string; revision: number }>());
+  const browserKey = useRef<string | null>(null);
   const askRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
   const previewRef = useRef<Preview | null>(null);
   previewRef.current = preview;
 
   const selected = selectedFrom(status);
+  const activeVault = useRef(selected?.vault_id);
+  activeVault.current = selected?.vault_id;
   const kept = items.filter(keptMemory);
   const active = kept.filter((memory) => memory.state === "active" && memory.revision > 0 && !memory.conflict);
   const demo = !selected || kept.length === 0;
@@ -249,6 +253,8 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
       const chosen = selectedFrom(next);
       setItems(chosen ? await vault.list(chosen.vault_id, "") : []);
       setNotice(kind === "default" ? "Opened the default vault folder." : "Opened the folder you chose.");
+      browserKey.current = null;
+      setBrowserId(null);
       setSection("home");
       setFocusMonth(null);
     } catch (chooseError) {
@@ -481,13 +487,19 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     if (!selected || !browserId) return;
     const memory = kept.find((row) => row.id === browserId);
     if (!memory || memory.state !== "active" || memory.conflict) return;
+    const key = `${selected.vault_identity}:${memory.id}`;
+    const draft = browserDrafts.current.get(key);
+    if (!draft || draft.body === draft.base) return;
     setBusy(true); setError("");
     try {
-      const saved = await vault.correct(selected.vault_id, memory.id, memory.revision, operationId(), browserDraft);
-      if (!alive.current) return;
+      const saved = await vault.correct(selected.vault_id, memory.id, draft.revision, operationId(), draft.body);
+      if (!alive.current || activeVault.current !== selected.vault_id) return;
       setItems((rows) => rows.map((row) => row.id === saved.id ? saved : row));
-      setBrowserDraft(saved.note);
-      setCorrection(saved.note);
+      // Navigation and newer typing must not be overwritten by this completion.
+      if (browserDrafts.current.get(key) === draft) {
+        browserDrafts.current.set(key, { body: saved.note, base: saved.note, revision: saved.revision });
+        if (browserKey.current === key) setBrowserDraft(saved.note);
+      }
       setNotice("Note saved in the vault. The original photo is unchanged. This is your note, not a verified fact.");
     } catch (saveError) {
       if (alive.current) setError(`${message(saveError)} The draft is still here. Reload the note before saving again.`);
@@ -504,8 +516,15 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
     }
     const memory = kept.find((row) => row.id === id);
     if (!memory) return;
+    const key = `${selected?.vault_identity}:${memory.id}`;
+    let draft = browserDrafts.current.get(key);
+    if (!draft || draft.body === draft.base) {
+      draft = { body: memory.note, base: memory.note, revision: memory.revision };
+      browserDrafts.current.set(key, draft);
+    }
+    browserKey.current = key;
     setBrowserId(memory.id);
-    setBrowserDraft(memory.note);
+    setBrowserDraft(draft.body);
     setSection("memories");
     setEvidenceId(null);
     setAnswer(null);
@@ -631,10 +650,15 @@ export function MemorySurface({ vault, librarian = unavailableLibrarian }: { vau
                       busy={busy}
                       editable={!demo}
                       onSelect={openInBrowser}
-                      onDraft={setBrowserDraft}
+                      onDraft={(body) => {
+                        const key = browserKey.current;
+                        const draft = key && browserDrafts.current.get(key);
+                        if (key && draft) browserDrafts.current.set(key, { ...draft, body });
+                        setBrowserDraft(body);
+                      }}
                       onSave={() => void saveBrowserNote()}
                       onOpenOriginal={() => { const memory = kept.find((row) => row.id === browserId); if (memory) void openVaultMemory(memory); }}
-                      onBack={() => setBrowserId(null)}
+                      onBack={() => { browserKey.current = null; setBrowserId(null); }}
                     />
                   ) : (
                     <>

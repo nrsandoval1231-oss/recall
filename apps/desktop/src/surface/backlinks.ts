@@ -56,15 +56,14 @@ function linkTargets(text: string): string[] {
   }
   for (const match of text.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
     const href = match[1]?.trim() ?? "";
-    if (!href || /\/sources\//i.test(href) || /^sources\//i.test(href)) continue;
-    if (/\.(png|jpe?g|webp|gif)$/i.test(href)) continue;
-    const file = href.split("/").pop()?.replace(/\.md$/i, "") ?? "";
-    if (file) {
-      try {
-        targets.push(decodeURIComponent(file));
-      } catch {
-        targets.push(file);
-      }
+    // Only supported relative Markdown memory paths are authored local links.
+    if (!/^(?:\.\.\/Memories\/|Recall\/Memories\/|Memories\/|\.\/)?[^/\\?#:]+\.md(?:#[^?]*)?$/i.test(href)) continue;
+    const file = href.split("#")[0]!.split("/").pop()!.replace(/\.md$/i, "");
+    try {
+      const decoded = decodeURIComponent(file);
+      if (!/[/:\\]/.test(decoded)) targets.push(decoded);
+    } catch {
+      // An invalid encoded target is not a resolved local relationship.
     }
   }
   return targets;

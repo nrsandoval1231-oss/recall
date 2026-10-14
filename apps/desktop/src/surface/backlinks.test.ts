@@ -43,3 +43,10 @@ describe("backlinks", () => {
     expect(relatedTo("missing", notes)).toEqual({ linked: [], mentioned: [] });
   });
 });
+
+it.each(['https://vendor.example/b.md', '//vendor.example/b.md', 'mailto:b.md'])('does not label external URL %s as a local relationship', href => {
+  expect(relatedTo('a', [{ id: 'a', title: 'alpha', text: `[manual](${href})` }, { id: 'b', title: 'beta', text: 'Local note' }]).linked).toEqual([]);
+});
+it('resolves local Markdown headings', () => {
+  expect(relatedTo('a', [{ id: 'a', title: 'alpha', text: '[note](../Memories/b.md#details)' }, { id: 'b', title: 'beta', text: 'Local note' }]).linked.map(n => n.id)).toEqual(['b']);
+});
