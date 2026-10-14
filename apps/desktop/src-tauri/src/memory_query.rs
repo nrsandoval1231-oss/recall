@@ -46,12 +46,16 @@ fn terms(question: &str) -> BTreeSet<String> {
         "what", "that", "with", "about", "going", "there", "this", "were", "when", "have", "does",
         "which", "would", "could", "please", "recall", "tell", "from", "happened", "can", "you",
         "the", "for", "and", "was", "who", "how", "did", "are", "remember", "notes", "note",
-        "memory", "memories",
+        "memory", "memories", "on", "in", "of", "is", "it", "to", "do", "we", "be", "by", "an",
+        "as", "at", "if", "or", "so", "up", "me", "my", "he", "she", "her", "his", "our",
     ];
     let mut terms: BTreeSet<_> = words(question)
         .into_iter()
         .map(|(_, word)| word)
-        .filter(|word| word.chars().count() >= 3 && !ignored.contains(&word.as_str()))
+        .filter(|word| {
+            (word.chars().count() >= 2 || word.chars().all(char::is_numeric))
+                && !ignored.contains(&word.as_str())
+        })
         .collect();
     if terms
         .iter()
@@ -429,5 +433,32 @@ mod native_retrieval_tests {
         assert!(quote.contains("needle: uncertain."));
         assert_eq!(&text[start..end], quote);
         assert!(quote.chars().count() <= 1200);
+    }
+    #[test]
+    fn two_character_unicode_names_remain_retrievable() {
+        let (_temp, vault, _, _) = crate::librarian::organization_tests::setup();
+        let id = Uuid::new_v4().to_string();
+        vault.capture_note(&id, "Synthetic: 東京 meeting remains tentative.").unwrap();
+        assert!(ask(&vault, "東京").unwrap().hits.iter().any(|hit| hit.memory_id == id));
+    }
+
+    #[test]
+    fn short_names_units_and_numbers_remain_searchable_without_filler_matches() {
+        let (_temp, vault, _, _) = crate::librarian::organization_tests::setup();
+        let id = Uuid::new_v4().to_string();
+        vault
+            .capture_note(&id, "Synthetic: Li asked whether 2 MW was enough?")
+            .unwrap();
+        for question in ["What did Li ask?", "What about 2 MW?"] {
+            assert!(ask(&vault, question)
+                .unwrap()
+                .hits
+                .iter()
+                .any(|hit| hit.memory_id == id));
+        }
+        assert!(ask(&vault, "Can you tell me what it is?")
+            .unwrap()
+            .hits
+            .is_empty());
     }
 }
