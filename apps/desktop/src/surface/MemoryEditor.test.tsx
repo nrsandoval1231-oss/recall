@@ -26,6 +26,19 @@ afterEach(() => {
   localStorage.clear();
   vi.useRealTimers();
 });
+it.each([
+  { ...memory, state: "missing" as const },
+  { ...memory, conflict: "The note changed outside Recall." },
+])("disables unsaveable editing for $state / $conflict", async (unavailable) => {
+  const save = vi.fn(async () => unavailable);
+  render(<MemoryEditor identity="library" memory={unavailable} value={unavailable.note}
+    onChange={() => {}} commit={save} memories={[unavailable]} onOpen={() => {}} disabled={false} />);
+  expect((screen.getByLabelText("Your correction") as HTMLTextAreaElement).disabled).toBe(true);
+  const button = screen.getByRole("button", { name: "Save correction" }) as HTMLButtonElement;
+  expect(button.disabled).toBe(true);
+  await act(async () => fireEvent.click(button));
+  expect(save).not.toHaveBeenCalled();
+});
 it("autosaves through a revision-safe commit without provider calls", async () => {
   vi.useFakeTimers();
   const save = vi.fn(async (intent) => ({

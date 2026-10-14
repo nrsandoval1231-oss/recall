@@ -141,7 +141,13 @@ fn hit(
         current_excerpt: excerpt(body(&memory), weights).0, original_excerpt,
         source_sha256: snapshot.source.sha256, mime_type: snapshot.source.mime_type,
         match_reason: linked_from.map(|source| format!("Linked context, not a direct wording match. Explicit saved link in {} at revision {}; relationship requires review.", source.note_path.as_deref().unwrap_or("source note"), source.revision))
-            .unwrap_or_else(|| "Wording match in the current saved note. Review original evidence and corrections.".into()),
+            .unwrap_or_else(|| {
+                if words(body(&memory)).iter().any(|(_, word)| weights.contains_key(word)) {
+                    "Wording match in the current saved note. Review original evidence and corrections.".into()
+                } else {
+                    "Filename match in the saved source or note name. Filename metadata is not original evidence text; inspect the original and current note.".into()
+                }
+            }),
         linked_from_memory_id: linked_from.map(|source| source.id.clone()),
         original_start_byte, original_end_byte,
         captured_at: memory.captured_at.clone(), updated_at: memory.updated_at.clone(),
@@ -161,7 +167,12 @@ pub fn ask(vault: &Vault, question: &str) -> Result<Answer, String> {
         .collect();
     // This projection is rebuilt from eligible portable records on every request;
     // edits, corrections and deletion cannot leave a stale persisted search index.
-    let documents: Vec<Vec<_>> = records.iter().map(|memory| words(body(memory))).collect();
+    let documents: Vec<Vec<_>> = records.iter().map(|memory| {
+        let mut document = words(body(memory));
+        document.extend(words(&memory.source_name));
+        document.extend(words(memory.note_path.as_deref().unwrap_or("")));
+        document
+    }).collect();
     let count = documents.len() as f64;
     let average = (documents.iter().map(Vec::len).sum::<usize>() as f64 / count.max(1.0)).max(1.0);
     let weights: BTreeMap<_, _> = terms
@@ -325,6 +336,40 @@ mod tests {
 mod native_retrieval_tests {
     use super::*;
     use uuid::Uuid;
+
+    #[test]
+    fn source_filename_lookup_survives_restart_without_inventing_source_text() {
+        let (temp, vault, _, _) = crate::librarian::organization_tests::setup();
+        let id = Uuid::new_v4().to_string();
+        let bytes = b"\x89PNG\r\n\x1a\nSYNTHETIC-TEST-ONLY";
+        vault.capture(&id, "orchidledger.png", bytes, "Synthetic ordinary handwritten note.").unwrap();
+        let reopened = Vault::open(&temp.0).unwrap();
+        assert!(reopened.list("orchidledger.png").unwrap().iter().any(|m| m.id == id));
+        let answer = ask(&reopened, "orchidledger.png").unwrap();
+        let hit = answer.hits.first().expect("filename lookup should find the original");
+        assert_eq!(hit.memory_id, id);
+        assert!(hit.match_reason.contains("Filename match"));
+        assert!(!hit.original_excerpt.contains("orchidledger"));
+        assert!(hit.original_start_byte.is_none());
+        assert_eq!(reopened.source(&id).unwrap().bytes, bytes);
+    }
+
+    #[test]
+    fn note_basename_lookup_preserves_verbatim_original_after_restart() {
+        let (temp, vault, _, _) = crate::librarian::organization_tests::setup();
+        let id = Uuid::new_v4().to_string();
+        let original = "Synthetic ordinary text with no filename in its content.";
+        let memory = vault.capture_note(&id, original).unwrap();
+        let basename = memory.note_path.unwrap();
+        let reopened = Vault::open(&temp.0).unwrap();
+        let answer = ask(&reopened, &basename).unwrap();
+        let hit = answer.hits.first().expect("note basename should remain searchable");
+        assert_eq!(hit.memory_id, id);
+        assert!(hit.match_reason.contains("Filename match"));
+        assert_eq!(hit.original_excerpt, original);
+        assert_eq!(hit.original_start_byte, Some(0));
+        assert_eq!(hit.original_end_byte, Some(original.len()));
+    }
 
     #[test]
     fn matching_passage_is_visible_beyond_the_first_twelve_hundred_characters() {
