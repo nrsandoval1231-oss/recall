@@ -6,7 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{fs, path::PathBuf};
+use std::{collections::BTreeSet, fs, path::PathBuf, sync::Mutex};
 use uuid::Uuid;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -100,6 +100,85 @@ pub fn run(vault: &Vault, intent: &Intent) -> Result<Outcome, String> {
         &librarian::ClaudeTransport,
     )
 }
+
+/// Reload existing source-specific consent; this cannot grant new authorization.
+pub fn recoverable(vault: &Vault, memory: &str) -> Result<Intent, String> {
+    let _lock = vault.lock()?;
+    let bytes = local_vault::read(&path(vault, memory, "consent")?, 16 * 1024)
+        .map_err(|_| "No readable prior processing consent; review on desktop")?;
+    let intent: Intent =
+        serde_json::from_slice(&bytes).map_err(|_| "Invalid prior processing consent")?;
+    if intent.format != "recall-phone-consent-v1"
+        || intent.vault_id != vault.id
+        || intent.memory_id != memory
+        || intent.revision != 1
+    {
+        return Err("Prior processing consent scope mismatch".into());
+    }
+    let snapshot = vault.processing_snapshot_while_locked(memory, intent.revision)?;
+    if snapshot.human_corrected || snapshot.source.sha256 != intent.source_sha256 {
+        return Err("Source changed; review processing on desktop".into());
+    }
+    Ok(intent)
+}
+
+static ACTIVE: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+struct ActiveJob(String);
+impl Drop for ActiveJob {
+    fn drop(&mut self) {
+        if let Ok(mut active) = ACTIVE.lock() {
+            active.remove(&self.0);
+        }
+    }
+}
+fn reserve(key: String) -> Result<Option<ActiveJob>, String> {
+    let mut active = ACTIVE
+        .lock()
+        .map_err(|_| "Processing worker state unavailable")?;
+    if active.contains(&key) {
+        return Ok(None);
+    }
+    if active.len() >= 4 {
+        return Err(
+            "Processing busy. Your original is saved; resume from its saved page later.".into(),
+        );
+    }
+    active.insert(key.clone());
+    Ok(Some(ActiveJob(key)))
+}
+/// Bounded workers reuse deterministic parser/librarian/publication IDs. Those
+/// durable operations, not this in-process set, prevent duplicate provider calls.
+pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
+    let Some(guard) = reserve(format!("{}:{}", intent.vault_id, intent.memory_id))? else {
+        return Ok(());
+    };
+    let requested = Outcome {
+        state: "pending".into(),
+        message: "Processing requested using existing authorization. Refresh for native status."
+            .into(),
+        memory_id: intent.memory_id.clone(),
+        revision: intent.revision,
+    };
+    record(vault, &requested)?;
+    let worker = vault.clone();
+    std::thread::Builder::new()
+        .name("recall-phone-processing".into())
+        .spawn(move || {
+            let _guard = guard;
+            let outcome = run(&worker, &intent).unwrap_or_else(|error| Outcome {
+                state: "error".into(),
+                message: error,
+                memory_id: requested.memory_id,
+                revision: requested.revision,
+            });
+            let _ = record(&worker, &outcome);
+        })
+        .map_err(|_| {
+            "Processing worker unavailable. Original and authorization retained; resume later"
+                .to_string()
+        })?;
+    Ok(())
+}
 fn run_with(
     vault: &Vault,
     intent: &Intent,
@@ -163,7 +242,7 @@ fn run_with(
     let memory = vault.publish_meeting(&parse, &organize, &publish)?;
     Ok(Outcome {
         state: "published".into(),
-        message: "Organized in Obsidian; uncertainty and original evidence preserved".into(),
+        message: "Organized in Recall; uncertainty and original evidence preserved".into(),
         memory_id: memory.id,
         revision: memory.revision,
     })
@@ -386,5 +465,86 @@ mod tests {
         v.correct(&memory, 1, &Uuid::new_v4().to_string(), "Human correction")
             .unwrap();
         assert!(run(&v, &intent).is_err());
+    }
+    #[test]
+    fn recovery_uses_original_consent_and_does_not_repeat_uncertain_provider_delivery() {
+        struct LostResponse(AtomicUsize);
+        impl processing::ParserTransport for LostResponse {
+            fn parse(
+                &self,
+                _: &jev::JevConfig,
+                _: &str,
+                _: &str,
+                _: &str,
+            ) -> Result<jev::ParsedSource, String> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Err("Synthetic lost provider response".into())
+            }
+        }
+        let (temp, vault, _, memory_id) = crate::librarian::organization_tests::setup();
+        let memory = vault
+            .list_with_deleted("", false)
+            .unwrap()
+            .into_iter()
+            .find(|m| m.id == memory_id)
+            .unwrap();
+        let intent = consent(&vault, &memory, true).unwrap().unwrap();
+        let parser = LostResponse(AtomicUsize::new(0));
+        let config = crate::librarian::organization_tests::config();
+        let organizer = crate::librarian::organization_tests::claude();
+        let first = run_with(
+            &vault,
+            &intent,
+            &processing::Config::synthetic_test_config(),
+            &config,
+            &parser,
+            &librarian::ClaudeTransport,
+            &organizer,
+        )
+        .unwrap();
+        assert_eq!(first.state, "uncertain");
+        let reopened = Vault::open(&temp.0).unwrap();
+        let recovered = recoverable(&reopened, &memory_id).unwrap();
+        assert_eq!(
+            serde_json::to_vec(&recovered).unwrap(),
+            serde_json::to_vec(&intent).unwrap()
+        );
+        let second = run_with(
+            &reopened,
+            &recovered,
+            &processing::Config::synthetic_test_config(),
+            &config,
+            &parser,
+            &librarian::ClaudeTransport,
+            &organizer,
+        )
+        .unwrap();
+        assert_eq!(second.state, "uncertain");
+        assert_eq!(parser.0.load(Ordering::SeqCst), 1);
+        assert_eq!(reopened.history(&memory_id).unwrap().len(), 1);
+        reopened
+            .correct(
+                &memory_id,
+                1,
+                &Uuid::new_v4().to_string(),
+                "User correction",
+            )
+            .unwrap();
+        assert!(recoverable(&reopened, &memory_id).is_err());
+    }
+
+    #[test]
+    fn workers_are_bounded_deduplicated_and_release_capacity() {
+        let first_id = Uuid::new_v4().to_string();
+        let first = reserve(first_id.clone()).unwrap().unwrap();
+        assert!(reserve(first_id).unwrap().is_none());
+        let others: Vec<_> = (0..3)
+            .map(|_| reserve(Uuid::new_v4().to_string()).unwrap().unwrap())
+            .collect();
+        assert!(reserve(Uuid::new_v4().to_string()).is_err());
+        drop(first);
+        let replacement = reserve(Uuid::new_v4().to_string()).unwrap().unwrap();
+        drop(replacement);
+        drop(others);
     }
 }

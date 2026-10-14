@@ -9,7 +9,7 @@ let root: string;
 let server: ChildProcess;
 async function start(directory: string) {
   server = spawn(resolve("apps/desktop/src-tauri/target/debug/recall-phone"), [], {
-    env: { ...process.env, RECALL_VAULT_DIR: directory, RECALL_PHONE_BIND: "127.0.0.1", RECALL_PHONE_PORT: "18787" },
+    env: { ...process.env, TYPESAFE_API_KEY: "", RECALL_CLAUDE_API_KEY: "", RECALL_VAULT_DIR: directory, RECALL_PHONE_BIND: "127.0.0.1", RECALL_PHONE_PORT: "18787" },
     stdio: "pipe",
   });
   await new Promise<void>((done, reject) => {
@@ -159,6 +159,48 @@ test('native Ask locates late evidence and distinguishes linked context', async 
   await expect(page.locator('body')).toContainText('not a generated answer');
 });
 
+test('previously authorized pending processing can resume after desktop restart without providers', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('connection-state')).toContainText('Connected to library');
+  await page.getByLabel('Note, in your words').fill('Synthetic pending interpretation: 5–10 MW?');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Save capture', exact: true }).click();
+  await expect(page.getByTestId('outbox')).toContainText('Received by library');
+  await page.getByRole('link', { name: '· Inspect in library' }).click();
+  await expect(page.getByRole('button', { name: 'Resume previously authorized processing' })).toBeVisible();
+  const savedUrl = page.url();
+  await stop(); await start(root);
+  await page.goto(savedUrl);
+  await page.getByRole('button', { name: 'Resume previously authorized processing' }).click();
+  await expect(page).toHaveURL(savedUrl);
+  await expect(page.locator('body')).toContainText('Processing: pending');
+  await expect(page.locator('body')).toContainText('5–10 MW?');
+  const originals = await readdir(join(root, 'Recall/Sources'));
+  expect(originals).toHaveLength(1);
+  const id = originals[0]!.replace(/\.txt$/, '');
+  const histories = await readdir(join(root, 'Recall/History', id));
+  expect(histories).toHaveLength(1);
+  expect(await readFile(join(root, 'Recall/Sources', originals[0]!), 'utf8')).toBe('Synthetic pending interpretation: 5–10 MW?');
+});
+
+test('a library switch removes inspection links for already received copies', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('connection-state')).toContainText('Connected to library');
+  await page.getByLabel('Note, in your words').fill('Synthetic received in original library');
+  await page.getByRole('button', { name: 'Save capture', exact: true }).click();
+  await expect(page.getByTestId('outbox')).toContainText('Received by library');
+  await expect(page.getByRole('link', { name: '· Inspect in library' })).toBeVisible();
+  await stop();
+  const second = await mkdtemp(join(tmpdir(), 'recall-switch-synthetic-'));
+  try {
+    await start(second);
+    await page.getByRole('button', { name: 'Retry queued captures' }).click();
+    await expect(page.getByRole('link', { name: '· Inspect in library' })).toHaveCount(0);
+    await expect(page.getByTestId('outbox')).toContainText('Synthetic received in original library');
+    await expect(page.getByRole('link', { name: 'Save original copy' })).toBeVisible();
+  } finally { await stop(); await rm(second, { recursive: true, force: true }); }
+});
+
 for (const failFirst of [false, true]) {
   test(`capture queued during upload drains automatically (first fails: ${failFirst})`, async ({ page }) => {
     await page.goto('/');
@@ -193,20 +235,3 @@ for (const failFirst of [false, true]) {
   });
 }
 
-test('a library switch removes inspection links for already received copies', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('connection-state')).toContainText('Connected to library');
-  await page.getByLabel('Note, in your words').fill('Synthetic received in original library');
-  await page.getByRole('button', { name: 'Save capture', exact: true }).click();
-  await expect(page.getByTestId('outbox')).toContainText('Received by library');
-  await expect(page.getByRole('link', { name: '· Inspect in library' })).toBeVisible();
-  await stop();
-  const second = await mkdtemp(join(tmpdir(), 'recall-switch-synthetic-'));
-  try {
-    await start(second);
-    await page.getByRole('button', { name: 'Retry queued captures' }).click();
-    await expect(page.getByRole('link', { name: '· Inspect in library' })).toHaveCount(0);
-    await expect(page.getByTestId('outbox')).toContainText('Synthetic received in original library');
-    await expect(page.getByRole('link', { name: 'Save original copy' })).toBeVisible();
-  } finally { await stop(); await rm(second, { recursive: true, force: true }); }
-});

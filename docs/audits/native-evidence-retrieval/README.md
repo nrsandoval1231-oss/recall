@@ -29,7 +29,7 @@ All candidates must remain active and conflict-free. Each returned source is rec
 | 2. Create/open library | Existing #54 non-destructive controls, native tests retained | Installed Windows acceptance |
 | 3. Capture handwriting/document | Existing photo/document intake; new real browser→native synthetic photo transfer | Physical handwriting and live reading quality |
 | 4. Preserve original | 263-test native suite; exact photo bytes after offline replay; quote byte-range assertions | Real-device capture transformations |
-| 5. Process/organize | Existing consented Jev→Claude→deterministic publication preserved | No provider credentials configured here; current live-provider verification blocked |
+| 5. Process/organize | Existing pipeline preserved; [bounded restart recovery continuation](../native-processing-recovery/README.md) implemented and locally verified | No provider credentials configured here; current live-provider verification blocked |
 | 6. Edit inside Recall | Existing #54 editor/revision/draft recovery retained; 115 desktop tests pass | Installed Windows/editor acceptance |
 | 7. Vague question | Improved lexical ranking and explicit-link context implemented and locally verified | Broad semantic recall remains incomplete; #50 stays isolated |
 | 8. Evidence-backed answer | Exact source excerpts, offsets/hash, revision and correction distinction verified | Generative synthesis and held-out live-provider quality incomplete |
