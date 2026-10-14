@@ -76,7 +76,17 @@ jobs:
         run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin recall-phone
       - run: npx playwright install --with-deps chromium
       - name: Real native companion and browser offline recovery (synthetic data)
+        id: phone_recovery
+        env: { TYPESAFE_API_KEY: "", RECALL_CLAUDE_API_KEY: "" }
         run: npm run test:phone
+      - name: Retain synthetic phone workflow failure evidence
+        if: ${{ failure() && steps.phone_recovery.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: phone-recovery-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
   windows-native:
     runs-on: windows-latest
     steps:

@@ -60,7 +60,9 @@ test("uncertain network delivery retries the same capture without duplication", 
   await page.getByRole("button", { name: "Save capture", exact: true }).click();
   await expect(page.getByTestId("outbox")).toContainText("Saved on this device");
   await expect.poll(async () => (await readdir(join(root, "Recall/Sources"))).length).toBe(1);
-  await page.unroute("**/capture");
+  // The original can exist before fetch/abort finishes; keep interception until it does.
+  await page.unrouteAll({ behavior: "wait" });
+  await expect(page.getByTestId("outbox")).toContainText("Original retained");
   await page.reload();
   await page.getByRole("button", { name: "Retry queued captures" }).click();
   await expect(page.getByTestId("outbox")).toContainText("Received by library");
