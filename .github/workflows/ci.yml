@@ -72,6 +72,21 @@ jobs:
       - run: npm ci
       - working-directory: apps/desktop/src-tauri
         run: cargo test --lib -- --nocapture && cargo check
+      - name: Build native phone companion
+        run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin recall-phone
+      - run: npx playwright install --with-deps chromium
+      - name: Real native companion and browser offline recovery (synthetic data)
+        id: phone_recovery
+        env: { TYPESAFE_API_KEY: "", RECALL_CLAUDE_API_KEY: "" }
+        run: npm run test:phone
+      - name: Retain synthetic phone workflow failure evidence
+        if: ${{ failure() && steps.phone_recovery.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: phone-recovery-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
   windows-native:
     runs-on: windows-latest
     steps:
@@ -92,4 +107,24 @@ jobs:
           name: recall-windows-desktop
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
+          retention-days: 7
+  adaptive-desktop-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build -w @recall/desktop
+      - run: npx playwright install --with-deps chromium
+      - name: Canonical adaptive UI, accessibility and synthetic IPC walkthroughs
+        run: |
+          npm exec -w @recall/desktop -- vite preview --host 127.0.0.1 --port 4173 &
+          node --input-type=module -e 'const url="http://127.0.0.1:4173"; for(let i=0;i<50;i++){try{await fetch(url);process.exit(0)}catch{await new Promise(r=>setTimeout(r,200))}}process.exit(1)'
+          npm run test:visual -w @recall/desktop
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: recall-adaptive-ui-synthetic-evidence
+          path: docs/audits/adaptive/
           retention-days: 7

@@ -1,4 +1,4 @@
-//! Phone capture and ask for the desktop Obsidian vault.
+//! Phone capture and ask for the native Recall library.
 //!
 //! This process is the Tailscale companion. It serves one mobile page and writes
 //! through the same vault the desktop app uses. Provider processing requires
@@ -133,7 +133,9 @@ fn serve_one(
         .unwrap_or(target.as_str())
         .to_string();
     let limited = match (method.as_str(), path.as_str()) {
-        ("POST", "/capture") => !captures.allow(Instant::now()),
+        ("POST", path) if path == "/capture" || path.starts_with("/processing/") => {
+            !captures.allow(Instant::now())
+        }
         ("POST", "/ask" | "/answer") => !asks.allow(Instant::now()),
         _ => false,
     };
@@ -208,7 +210,7 @@ fn respond(
     output = output.with_header(ascii_header("X-Frame-Options", "DENY")?);
     output = output.with_header(ascii_header(
         "Content-Security-Policy",
-        "default-src 'self'; img-src 'self'; style-src 'unsafe-inline'; script-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'self'; img-src 'self' blob:; style-src 'unsafe-inline'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     )?);
     for (name, value) in &response.extra {
         output = output.with_header(ascii_header(name, value)?);
@@ -259,6 +261,23 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
     }
     match (request.method, path) {
         ("GET" | "HEAD", "/" | "/index.html") => html(200, home_page()),
+        ("GET" | "HEAD", "/companion.js") => bytes(
+            200,
+            "text/javascript; charset=utf-8",
+            include_bytes!("phone/companion.js").to_vec(),
+        ),
+        ("GET" | "HEAD", "/companion-sw.js") => bytes(
+            200,
+            "text/javascript; charset=utf-8",
+            include_bytes!("phone/companion-sw.js").to_vec(),
+        ),
+        ("GET" | "HEAD", "/companion/library") => match Vault::open(root) {
+            Ok(vault) => json(
+                200,
+                serde_json::json!({"library_id": vault.id, "format": "recall-companion-v1"}),
+            ),
+            Err(error) => vault_page(error),
+        },
         ("GET" | "HEAD", "/ask" | "/capture" | "/answer") => html(
             405,
             page(
@@ -277,6 +296,16 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                 return response;
             }
             capture(root, request)
+        }
+        ("POST", path) if path.starts_with("/processing/") && path.ends_with("/resume") => {
+            if let Err(response) = same_origin(request.headers) {
+                return response;
+            }
+            resume_processing(
+                root,
+                request,
+                &path["/processing/".len()..path.len() - "/resume".len()],
+            )
         }
         ("POST", "/ask") => {
             if query_contains_question(query) {
@@ -335,6 +364,17 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
         Ok(vault) => vault,
         Err(err) => return vault_page(err),
     };
+    let receipt_requested = header(request.headers, "accept") == Some("application/json");
+    // A queued request is bound to the library acknowledged when it was saved
+    // on the phone. Never retarget it when the desktop selects another library.
+    if receipt_requested
+        && header(request.headers, "x-recall-library-id") != Some(vault.id.as_str())
+    {
+        return json(
+            409,
+            serde_json::json!({"error": "Different library; capture remains on this device"}),
+        );
+    }
     let form = match read_capture(request) {
         Ok(form) => form,
         Err(err) => {
@@ -357,38 +397,42 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                 return saved_processing_error(&memory.id, &error);
             }
             crate::knowledge::best_effort_refresh(&vault);
+            // A durable source receipt is independent of provider availability.
+            let receipt = || match vault.source(&memory.id) {
+                Ok(source) => json(
+                    200,
+                    serde_json::json!({"format": "recall-capture-receipt-v1",
+                    "library_id": vault.id, "memory_id": memory.id, "revision": memory.revision,
+                    "source_sha256": source.sha256, "state": "received"}),
+                ),
+                Err(error) => vault_page(error),
+            };
             if form.process_consent {
                 match crate::companion_processing::consent(&vault, &memory, true) {
                     Ok(Some(intent)) => {
-                        let requested = crate::companion_processing::Outcome {
-                            state: "pending".into(),
-                            message:
-                                "Processing requested. Refresh this saved page for native status."
-                                    .into(),
-                            memory_id: memory.id.clone(),
-                            revision: memory.revision,
-                        };
-                        if let Err(error) = crate::companion_processing::record(&vault, &requested)
-                        {
-                            return saved_processing_error(&memory.id, &error);
+                        if let Err(error) = crate::companion_processing::enqueue(&vault, intent) {
+                            return if receipt_requested {
+                                receipt()
+                            } else {
+                                saved_processing_error(&memory.id, &error)
+                            };
                         }
-                        let worker = vault.clone();
-                        std::thread::spawn(move || {
-                            let outcome = crate::companion_processing::run(&worker, &intent)
-                                .unwrap_or_else(|error| crate::companion_processing::Outcome {
-                                    state: "error".into(),
-                                    message: error,
-                                    memory_id: requested.memory_id,
-                                    revision: requested.revision,
-                                });
-                            let _ = crate::companion_processing::record(&worker, &outcome);
-                        });
                     }
                     Ok(None) => {}
-                    Err(error) => return saved_processing_error(&memory.id, &error),
+                    Err(error) => {
+                        return if receipt_requested {
+                            receipt()
+                        } else {
+                            saved_processing_error(&memory.id, &error)
+                        }
+                    }
                 }
             }
-            redirect(&format!("/saved/{}", memory.id))
+            if receipt_requested {
+                receipt()
+            } else {
+                redirect(&format!("/saved/{}", memory.id))
+            }
         }
         Err(err) => not_saved(
             vault_status(&err),
@@ -397,6 +441,29 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             &form.note,
             form.photo.is_some(),
         ),
+    }
+}
+
+fn resume_processing(root: &Path, request: &PhoneRequest<'_>, memory_id: &str) -> PhoneResponse {
+    let memory_id = match canonical_id(memory_id) {
+        Ok(id) => id,
+        Err(_) => return json(400, serde_json::json!({"error":"Invalid memory"})),
+    };
+    let vault = match Vault::open(root) {
+        Ok(vault) => vault,
+        Err(error) => return vault_page(error),
+    };
+    let body = std::str::from_utf8(request.body).unwrap_or("");
+    if form_value(body, "library_id").ok().as_deref() != Some(vault.id.as_str()) {
+        return html(409, page("Different library", "<h1>Different library</h1><p>Nothing was sent. Return to the saved memory in its original library.</p>"));
+    }
+    let intent = match crate::companion_processing::recoverable(&vault, &memory_id) {
+        Ok(intent) => intent,
+        Err(error) => return html(403, page("Processing needs review", &format!("<h1>Processing needs review</h1><p>{}</p><p>Nothing new was sent. Inspect the saved source and authorization on desktop.</p>", esc(&error)))),
+    };
+    match crate::companion_processing::enqueue(&vault, intent) {
+        Ok(()) => redirect(&format!("/saved/{memory_id}")),
+        Err(error) => saved_processing_error(&memory_id, &error),
     }
 }
 
@@ -847,7 +914,18 @@ fn render_source_answer(answer: crate::memory_query::Answer) -> String {
             "Recall/Memories/{} · Recall/Sources/{}.{extension}",
             hit.note_basename, hit.memory_id
         );
-        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><h3>Original evidence</h3><p>{}</p><p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id)));
+        let range = match (hit.original_start_byte, hit.original_end_byte) {
+            (Some(start), Some(end)) => {
+                format!("<p class=\"fine\">Original excerpt: bytes {start}–{end}</p>")
+            }
+            _ => String::new(),
+        };
+        let correction = if hit.human_corrected {
+            " · Includes user corrections; the original below is unchanged."
+        } else {
+            ""
+        };
+        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><p>Current note · revision {}{correction}</p><p class=\"fine\">Captured {} · Note revised {}</p><p>{}</p><h3>Original evidence</h3><p>{}</p>{range}<p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a> · <a href=\"/saved/{}\">Inspect memory</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.match_reason),hit.revision,esc(&hit.captured_at),esc(&hit.updated_at),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id),esc(&hit.memory_id)));
     }
     let mut graph_cards = String::new();
     for relationship in &answer.graph_relationships {
@@ -867,6 +945,20 @@ fn render_source_answer(answer: crate::memory_query::Answer) -> String {
     format!("<h1>{heading}</h1><p>{}</p><p class=\"fine\">{}</p>{cards}{graph_cards}",esc(&answer.message),esc(&disclosure))
 }
 
+// Only retry inspection on brief native writer contention. Never retry a model
+// invocation, mutation request or integrity failure here.
+fn read_retry<T>(mut inspect: impl FnMut() -> Result<T, String>) -> Result<T, String> {
+    for attempt in 0..5 {
+        match inspect() {
+            Err(error) if error == "Vault is busy in another Recall process" && attempt < 4 => {
+                std::thread::sleep(Duration::from_millis(25));
+            }
+            result => return result,
+        }
+    }
+    unreachable!()
+}
+
 fn saved(root: &Path, id: &str) -> PhoneResponse {
     let id = match canonical_id(id) {
         Ok(id) => id,
@@ -884,9 +976,9 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         Ok(vault) => vault,
         Err(err) => return vault_page(err),
     };
-    let memories = match vault.list_with_deleted("", false) {
+    let memories = match read_retry(|| vault.list_with_deleted("", false)) {
         Ok(memories) => memories,
-        Err(err) => return vault_page(err),
+        Err(err) => return html(vault_status(&err), page("Memory temporarily unavailable", &format!("<h1>Memory temporarily unavailable</h1><p>{}</p><p>Processing may already be running. <a href=\"/saved/{}\">Refresh this memory</a> to inspect its current status.</p>", esc(&err), esc(&id)))),
     };
     let Some(memory) = memories.into_iter().find(|memory| memory.id == id) else {
         return html(
@@ -907,8 +999,17 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         );
     }
     let note_path = note_rel(&memory);
-    let processing=match crate::companion_processing::status(&vault,&memory.id){Ok(Some(status))=>format!("<section><h2>Processing: {}</h2><p>{}</p><a href=\"/saved/{}\">Refresh processing status</a></section>",esc(&status.state),esc(&status.message),esc(&memory.id)),Ok(None)=>"<p>No source-specific processing consent is recorded for this phone capture.</p>".into(),Err(_)=>format!("<p>Native processing is busy or needs review. <a href=\"/saved/{}\">Refresh status</a></p>",esc(&memory.id))};
-    let source_card=match vault.source(&memory.id){Ok(source)=>format!("<p class=\"path\">Original SHA-256: {}</p><a href=\"/sources/{}\">Open original evidence</a>",esc(&source.sha256),esc(&memory.id)),Err(_)=>"<p>Original evidence unavailable; resolve on desktop.</p>".into()};
+    let recovery = match read_retry(|| crate::companion_processing::recoverable(&vault, &memory.id)) {
+        Ok(_) => format!("<form method=\"post\" action=\"/processing/{}/resume\"><input type=\"hidden\" name=\"library_id\" value=\"{}\"><button class=\"secondary\" type=\"submit\">Resume previously authorized processing</button><p class=\"fine\">Uses the same saved authorization and operation IDs. Unknown provider delivery or changed sources still require desktop review; this does not authorize a new attempt.</p></form>", esc(&memory.id), esc(&vault.id)),
+        Err(_) => String::new(),
+    };
+    let processing = match read_retry(|| crate::companion_processing::status(&vault, &memory.id)) {
+        Ok(Some(status)) => format!("<section><h2>Processing: {}</h2><p>{}</p><a href=\"/saved/{}\">Refresh processing status</a>{recovery}</section>", esc(&status.state), esc(&status.message), esc(&memory.id)),
+        Ok(None) if !recovery.is_empty() => format!("<section><h2>Processing pending</h2><p>Prior authorization is saved. No completed organization receipt is available.</p>{recovery}</section>"),
+        Ok(None) => "<p>No resumable source-specific processing authorization is available. Review on desktop.</p>".into(),
+        Err(_) => format!("<p>Native processing is busy or needs review. <a href=\"/saved/{}\">Refresh status</a></p>{recovery}", esc(&memory.id)),
+    };
+    let source_card=match read_retry(|| vault.source(&memory.id)){Ok(source)=>format!("<p class=\"path\">Original SHA-256: {}</p><a href=\"/sources/{}\">Open original evidence</a>",esc(&source.sha256),esc(&memory.id)),Err(_)=>"<p>Original evidence unavailable; resolve on desktop.</p>".into()};
     let body = if let Some(source_path) = source_rel(&memory) {
         format!(
             "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. Provider processing status is shown below; nothing is sent without source-specific consent.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>",
@@ -933,7 +1034,7 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
             &format!(
                 "{body}{source_card}{processing}{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
                 capture_form(&Uuid::new_v4().to_string(), ""),
-                ask_form("")
+                format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
             ),
         ),
     )
@@ -990,9 +1091,12 @@ fn same_origin(headers: &[(&str, &str)]) -> Result<(), PhoneResponse> {
         .map(|value| value.trim_end_matches('/'));
     let host = header(headers, "host").unwrap_or("");
     let expected = format!("http://{host}");
+    let secure_expected = format!("https://{host}");
     let site_ok = site.is_none_or(|value| value.eq_ignore_ascii_case("same-origin"));
     let origin_ok = origin.is_none_or(|value| {
-        value.eq_ignore_ascii_case("null") || value.eq_ignore_ascii_case(&expected)
+        value.eq_ignore_ascii_case("null")
+            || value.eq_ignore_ascii_case(&expected)
+            || value.eq_ignore_ascii_case(&secure_expected)
     });
     if site_ok && origin_ok {
         return Ok(());
@@ -1015,16 +1119,16 @@ fn home_page() -> String {
     page(
         "Recall",
         &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} This retrieves sources; it does not create a generated answer. Enabled graph processing may send the question to disclosed providers. Quoted answers require separate approval in desktop Settings; this phone cannot enable that consent.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>Capture to your Recall library on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer. Optional connected knowledge is inferred and unverified. Quoted answers require separate approval in desktop Settings; this phone cannot enable that consent.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. Offline reopening requires HTTPS and a completed first visit. On HTTP, keep this page open to queue captures. Browser storage can be cleared by your device; a library receipt is your confirmation of transfer.</p><p>Use your authorized Tailscale connection. Recall does not install a certificate; HTTPS can be supplied by Tailscale Serve. Do not forward this port to the public internet.</p></footer>",
             capture_form(&Uuid::new_v4().to_string(), ""),
-            ask_form("")
+            format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
         ),
     )
 }
 
 fn capture_form(operation_id: &str, note: &str) -> String {
     format!(
-        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save to the vault</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save capture</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
         esc(operation_id),
         esc(note)
     )
@@ -1092,6 +1196,10 @@ fn bytes(status: u16, content_type: &str, body: Vec<u8>) -> PhoneResponse {
         extra: Vec::new(),
         body,
     }
+}
+
+fn json(status: u16, value: serde_json::Value) -> PhoneResponse {
+    bytes(status, "application/json", value.to_string().into_bytes())
 }
 
 fn redirect(location: &str) -> PhoneResponse {
@@ -1761,6 +1869,123 @@ mod tests {
     }
 
     #[test]
+    fn queued_capture_requires_matching_library_and_returns_durable_receipt() {
+        let dir = TempDir::new();
+        let vault = Vault::open(&dir.0).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let body = format!("operation_id={id}&note=Synthetic+offline+memory");
+        let headers = [
+            ("content-type", "application/x-www-form-urlencoded"),
+            ("accept", "application/json"),
+            ("x-recall-library-id", "wrong-library"),
+        ];
+        assert_eq!(
+            call(&dir.0, "POST", "/capture", &headers, body.as_bytes()).status,
+            409
+        );
+        assert!(vault.list_with_deleted("", false).unwrap().is_empty());
+        let headers = [
+            ("content-type", "application/x-www-form-urlencoded"),
+            ("accept", "application/json"),
+            ("x-recall-library-id", vault.id.as_str()),
+        ];
+        for _ in 0..2 {
+            let response = call(&dir.0, "POST", "/capture", &headers, body.as_bytes());
+            assert_eq!(response.status, 200);
+            let receipt: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+            assert_eq!(receipt["memory_id"], id);
+            assert_eq!(receipt["library_id"], vault.id);
+            assert_eq!(receipt["state"], "received");
+            assert_eq!(receipt["source_sha256"], vault.source(&id).unwrap().sha256);
+        }
+        assert_eq!(
+            Vault::open(&dir.0)
+                .unwrap()
+                .list_with_deleted("", false)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn companion_scope_and_assets_are_available_without_private_cache() {
+        let dir = TempDir::new();
+        let vault = Vault::open(&dir.0).unwrap();
+        let response = call(&dir.0, "GET", "/companion/library", &[], b"");
+        assert_eq!(response.status, 200);
+        let identity: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+        assert_eq!(identity["library_id"], vault.id);
+        for path in ["/companion.js", "/companion-sw.js"] {
+            let response = call(&dir.0, "GET", path, &[], b"");
+            assert_eq!(response.status, 200);
+            assert!(response.content_type.contains("javascript"));
+        }
+    }
+    #[test]
+    fn processing_recovery_requires_existing_consent_and_the_same_library() {
+        let dir = TempDir::new();
+        let vault = Vault::open(&dir.0).unwrap();
+        let memory = vault
+            .capture_note(
+                &Uuid::new_v4().to_string(),
+                "Synthetic pending interpretation?",
+            )
+            .unwrap();
+        let url = format!("/processing/{}/resume", memory.id);
+        let headers = [("content-type", "application/x-www-form-urlencoded")];
+        let body = format!("library_id={}", vault.id);
+        assert_eq!(
+            call(&dir.0, "POST", &url, &headers, body.as_bytes()).status,
+            403
+        );
+        crate::companion_processing::consent(&vault, &memory, true).unwrap();
+        assert_eq!(
+            call(&dir.0, "POST", &url, &headers, b"library_id=another").status,
+            409
+        );
+        let page = text(&call(
+            &dir.0,
+            "GET",
+            &format!("/saved/{}", memory.id),
+            &[],
+            b"",
+        ));
+        assert!(page.contains("Resume previously authorized processing"));
+        vault
+            .correct(
+                &memory.id,
+                1,
+                &Uuid::new_v4().to_string(),
+                "Human correction",
+            )
+            .unwrap();
+        assert_eq!(
+            call(&dir.0, "POST", &url, &headers, body.as_bytes()).status,
+            403
+        );
+        assert_eq!(vault.history(&memory.id).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn saved_view_recovers_from_brief_processing_writer_contention() {
+        let dir = TempDir::new();
+        let vault = Vault::open(&dir.0).unwrap();
+        let memory = vault
+            .capture_note(&Uuid::new_v4().to_string(), "Synthetic recoverable view")
+            .unwrap();
+        let lock = vault.lock().unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            drop(lock);
+        });
+        let response = call(&dir.0, "GET", &format!("/saved/{}", memory.id), &[], b"");
+        release.join().unwrap();
+        assert_eq!(response.status, 200);
+        assert!(text(&response).contains("Synthetic recoverable view"));
+    }
+
+    #[test]
     fn bind_defaults_to_loopback_and_refuses_every_interface() {
         let choice = decide_bind(None, false, 8787, None).unwrap();
         assert_eq!(choice.addr, "127.0.0.1:8787".parse().unwrap());
@@ -1844,7 +2069,7 @@ mod tests {
         assert!(!page.contains("type=\"email\""));
         assert!(!page.contains("Brooks Campus"));
         assert!(!page.contains("300MW"));
-        assert!(page.contains("script-src 'none'") || !page.contains("<script"));
+        assert!(page.contains("<script src=\"/companion.js\" defer></script>"));
     }
 
     #[test]
@@ -1893,7 +2118,7 @@ mod tests {
             question: "synthetic query".into(), message: "Local source matches remain available.".into(),
             hits: vec![crate::memory_query::Hit { memory_id: Uuid::new_v4().to_string(), revision: 1,
                 note_basename: "synthetic.md".into(), current_excerpt: "<b>Local evidence</b>".into(),
-                original_excerpt: "Synthetic original".into(), source_sha256: "c".repeat(64), mime_type: "text/plain".into() }],
+                original_excerpt: "Synthetic original".into(), source_sha256: "c".repeat(64), mime_type: "text/plain".into(), match_reason: "Synthetic match".into(), linked_from_memory_id: None, original_start_byte: Some(0), original_end_byte: Some(18), captured_at: "2026-10-14".into(), updated_at: "2026-10-14".into(), human_corrected: false }],
             knowledge_status: Some(crate::knowledge::ServiceStatus { state:"unavailable".into(),pending:0,indexed:0,failed:0,message:"temporarily unavailable".into(),providers:None }),
             graph_relationships: Vec::new(),
         };
@@ -2424,7 +2649,7 @@ mod tests {
             .into_string()
             .unwrap();
         assert!(page.contains("Saved in the desktop vault"));
-        assert!(page.contains("No source-specific processing consent"));
+        assert!(page.contains("No resumable source-specific processing authorization"));
         let response = ureq::get(&format!("http://{}/sources/{id}", running.addr))
             .call()
             .unwrap();

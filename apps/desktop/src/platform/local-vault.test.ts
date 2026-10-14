@@ -63,3 +63,9 @@ it("uses only the frozen native knowledge commands and selected-vault scope", as
     ["memory_answer_cancel", { expectedVaultId: "vault-a", requestId: "00000000-0000-4000-8000-000000000001" }],
   ]);
 });
+
+it("creates a library through a native picker and imports Markdown with a scoped operation",async()=>{
+ Object.defineProperty(window,"__TAURI_INTERNALS__",{value:{},configurable:true});
+ const library=new NativeLocalVault();await library.create();await library.importMarkdown("session","import-op");
+ expect(vi.mocked(invoke).mock.calls).toEqual([["library_create",undefined],["library_import_markdown",{expectedVaultId:"session",operationId:"import-op"}]]);
+});

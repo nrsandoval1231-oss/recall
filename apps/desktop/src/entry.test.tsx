@@ -24,7 +24,7 @@ const preview: LocalVault = {
 describe("desktop entry", () => {
   it("opens the Memory Surface without an email sign-in", () => {
     render(<DesktopEntry vault={preview} search="" />);
-    expect(screen.getByRole("heading", { name: "Brooks Campus" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Capture" })).toBeTruthy();
     expect(screen.queryByText("Email me a sign-in link")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Email" })).toBeNull();
   });

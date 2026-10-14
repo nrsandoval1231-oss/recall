@@ -1,3 +1,7 @@
+> **CURRENT PRODUCT AUTHORITY — 2026-10-13:** [Native Memory Product Contract](NATIVE-MEMORY-PRODUCT-CONTRACT.md) supersedes Obsidian-as-required-application, Obsidian-only editing/opening, and previous dashboard/UI directions. Obsidian references below describe **historical pilot implementation or optional Markdown compatibility**, not the intended required user workflow. The user-owned local-first Markdown/source library stays; **no storage migration or PR #26 merge is authorized**. The approved photo-free ivory graph-field Camera/Speak/Write UI remains canonical. Preserve evidence and implementation status; do not assume new product behavior is already built.
+
+> Current desktop UI authority: [Adaptive Memory Surface PRD](ADAPTIVE-MEMORY-SURFACE-PRD.md) and [S0–S10 screens](ADAPTIVE-MEMORY-SURFACE-SCREENS.md) from PR #51. The exact approved photo-free PNG supersedes the dashboard compositions below.
+
 # Recall — Canonical Experience & Visual System
 
 > **CURRENT PRODUCT CENTER — 2026-10-10.** The [pilot amendment](PILOT-CONTRACT.md) governs this document wherever older text conflicts. The desktop Memory Surface is the primary shell. The phone is the capture/ask companion. No login or email-auth UX. PR #16 remains an optional web companion and enrollment transport. The 2026-10-09 PWA-only pilot note is historical.

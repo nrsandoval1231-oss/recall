@@ -1,3 +1,7 @@
+# Current integration state — 2026-10-14
+
+Reconciled PR #50 with native-memory main e382ada3. The native product contract and ivory adaptive graph surface are authoritative. Graphiti remains optional, disabled without separate consent and configured providers. This reconciliation uses synthetic tests only; earlier operator/device/provider statements below are historical evidence, not validation of this head. No deployment or live-provider work is part of the reconciliation.
+
 # Current state
 Active owner mission Graphiti. Dedicated branch integrate/graphiti at base8f90e5a; original dirty checkout preserved. Real synthetic capture, extraction, persistent FalkorDB, temporal invalidation, deletion/revocation, restart retrieval and companion source-linked UI have run. See GRAPHITI-01/ACCEPTANCE.md for exact commands/failures/limits.
 

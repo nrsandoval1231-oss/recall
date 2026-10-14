@@ -1,8 +1,8 @@
+> **CURRENT PRODUCT AUTHORITY — 2026-10-13:** [Native Memory Product Contract](NATIVE-MEMORY-PRODUCT-CONTRACT.md) supersedes Obsidian-as-required-application, Obsidian-only editing/opening, and previous dashboard/UI directions. Obsidian references below describe **historical pilot implementation or optional Markdown compatibility**, not the intended required user workflow. The user-owned local-first Markdown/source library stays; **no storage migration or PR #26 merge is authorized**. The approved photo-free ivory graph-field Camera/Speak/Write UI remains canonical. Preserve evidence and implementation status; do not assume new product behavior is already built.
+
 # Recall — Product Requirements Document
 
-## Graphiti mission amendment (2026-10-12)
-
-The owner's Graphiti integration mission supersedes earlier Obsidian-required and no-graph restrictions below. Recall owns its portable Markdown notes, original attachments and correction history; Obsidian is optional. Graphiti is an optional, derived, rebuildable relationship index. Saving, reading, editing and local keyword retrieval must work without it or any model provider. Preserve the canonical desktop UI and existing Jev/Claude processing; do not import PR #26 wholesale. Graph processing requires its own explicit purpose consent and configured providers. Implementation and acceptance are tracked in `.agent/GRAPHITI-01/`; no production readiness, provider compatibility or device claim follows from this amendment.
+Desktop UI authority: [Adaptive Memory Surface](ADAPTIVE-MEMORY-SURFACE-PRD.md) from PR #51, with the exact approved four-panel PNG. Earlier dashboard compositions are historical.
 
 ## Next product milestone — Meeting to Memory
 

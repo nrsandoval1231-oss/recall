@@ -197,6 +197,7 @@ pub struct Vault {
 }
 impl Vault {
     pub(crate) fn validate_for_processing(&self) -> Result<()> { self.validate() }
+    pub(crate) fn identity(&self) -> &str { &self.id }
     pub(crate) fn root(&self) -> &Path {
         &self.root
     }
@@ -334,7 +335,7 @@ fn identity_prefix(path: &Path, len: usize) -> Result<Vec<u8>> {
         .map_err(fail)?;
     Ok(bytes)
 }
-fn sync_dir(path: &Path) -> Result<()> {
+pub(crate) fn sync_dir(path: &Path) -> Result<()> {
     safe(path)?;
     #[cfg(unix)]
     {
@@ -358,7 +359,7 @@ pub(crate) fn create(path: &Path, bytes: &[u8]) -> Result<()> {
     boundary!("sync_after", path);
     sync_dir(path.parent().ok_or("No parent")?)
 }
-fn immutable(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn immutable(path: &Path, bytes: &[u8]) -> Result<()> {
     if path.try_exists().map_err(fail)? {
         if read(path, bytes.len() as u64)? != bytes {
             return Err("Immutable file mismatch; recovery required".into());
@@ -368,7 +369,7 @@ fn immutable(path: &Path, bytes: &[u8]) -> Result<()> {
         atomic_new(path, bytes)
     }
 }
-fn rename(from: &Path, to: &Path) -> Result<()> {
+pub(crate) fn rename(from: &Path, to: &Path) -> Result<()> {
     boundary!("rename_before", from);
     safe(from)?;
     safe(to)?;
@@ -466,7 +467,7 @@ fn entries(path: &Path) -> Result<Vec<PathBuf>> {
     out.sort();
     Ok(out)
 }
-fn image_type(bytes: &[u8]) -> Result<&'static str> {
+pub(crate) fn image_type(bytes: &[u8]) -> Result<&'static str> {
     if bytes.len() as u64 > MAX_PHOTO {
         return Err("Photo exceeds 25 MiB limit".into());
     }
@@ -762,7 +763,7 @@ impl Vault {
             || e.memory.revision > MAX_RECORDS as u64
             || e.expected_revision.checked_add(1) != Some(e.memory.revision)
             || e.memory.conflict.is_some()
-            || !["capture", "correct", "external", "restore", "remove", "organize"].contains(&e.kind.as_str())
+            || !["capture", "correct", "external", "restore", "restore_deleted", "remove", "organize"].contains(&e.kind.as_str())
             || e.origin
                 != if e.kind == "external" {
                     "human:obsidian"
@@ -794,7 +795,7 @@ impl Vault {
             || e.expected_state
                 .as_deref()
                 .is_some_and(|state| !["active", "missing"].contains(&state))
-            || (["capture", "restore"].contains(&e.kind.as_str()) && e.previous_markdown.is_some())
+            || (["capture", "restore", "restore_deleted"].contains(&e.kind.as_str()) && e.previous_markdown.is_some())
             || (["correct", "external", "organize"].contains(&e.kind.as_str()) && e.previous_markdown.is_none())
             || (e.kind == "capture" && e.operation_id != e.memory.id)
             || (e.kind == "remove"
@@ -901,9 +902,10 @@ impl Vault {
                     || e.memory.source_sha256 != prev.memory.source_sha256
                     || e.memory.source_name != prev.memory.source_name
                     || e.memory.captured_at != prev.memory.captured_at
-                    || prev.kind == "remove"
+                    || (prev.kind == "remove" && e.kind != "restore_deleted")
+                    || (e.kind == "restore_deleted" && prev.kind != "remove")
                     || (prev.format != FORMAT && e.format == FORMAT) || (prev.format==FORMAT_V3 && e.format!=FORMAT_V3)
-                    || (["restore", "remove"].contains(&e.kind.as_str())
+                    || (["restore", "restore_deleted", "remove"].contains(&e.kind.as_str())
                         && e.memory.note != prev.memory.note)
                     || (e.previous_markdown.is_some()
                         && e.previous_markdown.as_ref() != Some(&prev.markdown))
@@ -1157,14 +1159,15 @@ impl Vault {
         if e.expected_revision > 0 {
             let records = self.records(&e.memory.id)?;
             let last = records.last().ok_or("Missing parent")?;
-            if last.kind == "remove"
+            if (last.kind == "remove" && e.kind != "restore_deleted")
+                || (e.kind == "restore_deleted" && last.kind != "remove")
                 || last.memory.revision != e.expected_revision
                 || e.parent_sha256 != Some(self.parent_hash(&e.memory.id, e.expected_revision)?)
                 || last.memory.source_sha256 != e.memory.source_sha256
                 || last.memory.source_name != e.memory.source_name
                 || last.memory.captured_at != e.memory.captured_at
                 || (last.format != FORMAT && e.format == FORMAT) || (last.format==FORMAT_V3 && e.format!=FORMAT_V3)
-                || (["remove", "restore"].contains(&e.kind.as_str())
+                || (["remove", "restore", "restore_deleted"].contains(&e.kind.as_str())
                     && last.memory.note != e.memory.note)
                 || (e.previous_markdown.is_some()
                     && e.previous_markdown.as_ref() != Some(&last.markdown))
@@ -1218,7 +1221,7 @@ impl Vault {
             Err(_) if !np.exists() => None,
             Err(err) => return Err(err),
         };
-        if e.kind == "restore" && current.is_some() {
+        if (e.kind == "restore" && current.is_some()) || (e.kind == "restore_deleted" && current.as_deref().is_some_and(|disk| disk != e.markdown)) {
             return Err(
                 "Restore target reappeared; retained journal needs explicit resolution".into(),
             );
@@ -1348,6 +1351,41 @@ impl Vault {
             return self.current(&e.memory.id, &pending).map(Some);
         }
         Ok(None)
+    }
+    pub(crate) fn validate_backup_integrity(&self) -> Result<()> {
+        let _lock=self.lock()?;
+        if !self.recover()?.is_empty(){return Err("Resolve pending library recovery before exporting".into());}
+        for item in fs::read_dir(self.path("History")).map_err(fail)? {
+            let item=item.map_err(fail)?;let memory_id=item.file_name().into_string().map_err(|_|"Invalid history identity")?;
+            let records=self.records(&memory_id)?;let original=&records.first().ok_or("Missing original history")?.memory;
+            if absent_original(original) {
+                let source=self.path(&format!("Sources/{memory_id}.txt"));
+                if source.exists() && read(&source,MAX_NOTE as u64)? != original.note.as_bytes(){return Err("Original text differs from immutable capture".into());}
+            } else {self.verify_source(original)?;}
+        }
+        Ok(())
+    }
+    pub fn resume_import(&self, operation_id: &str) -> Result<Option<VaultMemory>> {
+        let _lock = self.lock()?;
+        id(operation_id)?;
+        let pending = self.recover()?;
+        if let Some(error)=pending.get(operation_id){return Err(error.clone());}
+        if let Some(event)=self.receipt(operation_id)? {
+            if event.kind != "capture" || !event.memory.source_name.is_empty(){return Err("Import receipt does not match a text import".into());}
+            return self.current(&event.memory.id,&pending).map(Some);
+        }
+        Ok(None)
+    }
+    pub fn import_markdown_path(&self, operation_id: &str, path: &Path) -> Result<VaultMemory> {
+        safe(path)?;
+        if !matches!(path.extension().and_then(|s| s.to_str()).map(str::to_ascii_lowercase).as_deref(), Some("md" | "markdown" | "txt")) {
+            return Err("Choose a Markdown or text document".into());
+        }
+        let bytes = read(path, MAX_NOTE as u64)?;
+        let note = std::str::from_utf8(&bytes).map_err(|_| "Document must be UTF-8; original was not changed")?;
+        let memory = self.capture_note(operation_id, note)?;
+        self.processing_snapshot(&memory.id, memory.revision)?;
+        Ok(memory)
     }
     pub fn capture_path(&self, operation_id: &str, note: &str, path: &Path) -> Result<VaultMemory> {
         let bytes = read(path, MAX_PHOTO)?;
@@ -1763,6 +1801,9 @@ impl Vault {
     ) -> Result<VaultMemory> {
         self.lifecycle(memory_id, expected_revision, operation_id, "restore", None)
     }
+    pub fn restore_deleted(&self, memory_id: &str, expected_revision: u64, operation_id: &str) -> Result<VaultMemory> {
+        self.lifecycle(memory_id, expected_revision, operation_id, "restore_deleted", None)
+    }
     pub fn remove(
         &self,
         memory_id: &str,
@@ -1807,7 +1848,7 @@ impl Vault {
             return Err(error.clone());
         }
         let mut m = self.reconciled(memory_id)?;
-        let required_state = expected_state.unwrap_or("missing");
+        let required_state = expected_state.unwrap_or(if kind == "restore_deleted" { "deleted" } else { "missing" });
         if m.revision != expected_revision || m.state != required_state {
             return Err("Memory revision or state changed; refresh and confirm again".into());
         }
@@ -1912,8 +1953,8 @@ impl Vault {
         }
         if absent_original(&m) {
             let path=self.path(&format!("Sources/{memory_id}.txt"));
-            if !path.exists(){return Err("This note has no original photo.".into());}
             let original=self.records(memory_id)?.first().ok_or("Missing original capture")?.memory.note.clone();
+            if !path.exists(){immutable(&path, original.as_bytes())?;}
             let bytes=read(&path,MAX_NOTE as u64)?;
             if bytes!=original.as_bytes(){return Err("Original text hash mismatch".into());}
             return Ok(VaultSource{sha256:hash(&bytes),bytes,mime_type:"text/plain".into()});
@@ -2052,6 +2093,19 @@ pub fn default_vault_directory(override_dir: Option<&str>, documents: &Path) -> 
     Ok(documents.join("Recall"))
 }
 
+/// Prefer an explicit native setting; otherwise tolerate an unconfigured Documents directory.
+pub fn default_library_directory(
+    override_dir: Option<&str>,
+    documents: impl FnOnce() -> Result<PathBuf>,
+    home: impl FnOnce() -> Result<PathBuf>,
+) -> Result<PathBuf> {
+    if let Some(value) = override_dir.map(str::trim).filter(|value| !value.is_empty()) {
+        return default_vault_directory(Some(value), Path::new(""));
+    }
+    let documents = documents().or_else(|_| home().map(|path| path.join("Documents")))?;
+    default_vault_directory(None, &documents)
+}
+
 /// Native-selected scope only. Commands hold this mutex throughout each operation,
 /// including pickers, so switching cannot redirect an in-flight capture.
 struct Selected {
@@ -2110,6 +2164,13 @@ impl LocalVaultState {
         }
         s.vault.validate()?;
         action(&s.vault)
+    }
+    /// Creating a library never initializes over an existing user directory.
+    pub fn create_path(&self, root: &Path) -> Result<VaultStatus> {
+        if !root.is_absolute() { return Err("Library location must be absolute".into()); }
+        safe(root)?;
+        fs::create_dir(root).map_err(|error| format!("Cannot create library here; choose a new folder name: {error}"))?;
+        self.select_path(root)
     }
     pub fn select_path(&self, root: &Path) -> Result<VaultStatus> {
         let mut selected = self.selected.lock().map_err(fail)?;

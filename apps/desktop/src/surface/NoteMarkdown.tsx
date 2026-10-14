@@ -1,17 +1,75 @@
 import ReactMarkdown from "react-markdown";
+import type { VaultMemory } from "../platform/local-vault";
 
 /** Vault Markdown is untrusted: no HTML, images, remote navigation, or executable links. */
-export function NoteMarkdown({ children }: { children: string }) {
+export function NoteMarkdown({
+  children,
+  memories = [],
+  onOpen,
+  onAttachment,
+}: {
+  children: string;
+  memories?: VaultMemory[];
+  onOpen?: (memory: VaultMemory) => void;
+  onAttachment?: (fileName: string) => void;
+}) {
+  const links = new Map<string, VaultMemory>();
+  const content = children.replace(
+    /\[\[([^|\]\n]+)(?:\|([^\]\n]+))?\]\]/g,
+    (original, target: string, alias: string | undefined) => {
+      const path = target
+        .replace(/^Recall\/Memories\//, "")
+        .replace(/\.md$/, "");
+      const memory = memories.find(
+        (m) =>
+          m.state === "active" &&
+          !m.conflict &&
+          (m.id === path || m.note_path === path + ".md"),
+      );
+      if (!memory || !onOpen) return original;
+      const key = `#recall-memory-${memory.id}`;
+      links.set(key, memory);
+      return `[${(alias || path).replaceAll("[", " ").replaceAll("]", " ").replaceAll("\\", " ")}](${key})`;
+    },
+  );
   return (
     <div className="ms-markdown">
       <ReactMarkdown
         skipHtml
         components={{
-          a: ({ children }) => <span className="ms-note-link">{children}</span>,
+          a: ({ children, href }) => {
+            const memory = href && links.get(href);
+            const attachment =
+              href &&
+              /^\.\.\/Sources\/([0-9a-f-]{36}\.(png|jpg|jpeg|webp|pdf|md|txt))$/.exec(
+                href,
+              )?.[1];
+            if (attachment && onAttachment)
+              return (
+                <button
+                  type="button"
+                  className="ms-internal-link"
+                  onClick={() => onAttachment(attachment)}
+                >
+                  {children}
+                </button>
+              );
+            return memory ? (
+              <button
+                type="button"
+                className="ms-internal-link"
+                onClick={() => onOpen?.(memory)}
+              >
+                {children}
+              </button>
+            ) : (
+              <span className="ms-note-link">{children}</span>
+            );
+          },
           img: () => null,
         }}
       >
-        {children}
+        {content}
       </ReactMarkdown>
     </div>
   );

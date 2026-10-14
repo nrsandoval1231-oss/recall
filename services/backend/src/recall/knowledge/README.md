@@ -85,10 +85,11 @@ identity, and human cross-note identity approval is not implemented. Other
 ontology node types retain their scoped Graphiti IDs. All relationships remain
 inferred proposals.
 
-This is a bounded local pilot: each graph append/rebuild accepts at most 100
-sources, and each source is limited to 32 KiB of text. Larger work fails
-explicitly rather than being silently truncated or skipped. The wire can carry
-larger snapshots, but that does not raise these extraction limits.
+This is a bounded local pilot: each graph append batch accepts at most 100
+sources, and each source is limited to 32 KiB of UTF-8 text. A full rebuild
+validates every eligible source before clearing the derived graph, then ingests
+batches of at most 100. Oversized individual sources fail explicitly without
+clearing the previous graph or silently truncating saved originals.
 
 The HTTP contract is versioned under `/v1`; requests require the bearer and a
 loopback Host/client with no browser Origin. Snapshot and search requests carry

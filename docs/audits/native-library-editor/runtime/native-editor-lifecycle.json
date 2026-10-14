@@ -1,0 +1,12 @@
+{
+  "kind": "Actual Linux Tauri UI, native writer and filesystem; synthetic authored notes; no IPC mocks",
+  "memory_id": "3d440fd1-a0b2-4c37-a593-9a61101fe267",
+  "original_sha256": "c0fecde257dc3f13a43c2d2f7cc2c360d2f2ed82f2e957344ce2ed10174a2e21",
+  "authored_link_autosaved": true,
+  "two_real_graph_nodes": true,
+  "one_authored_tentative_relationship": true,
+  "removed_node_hidden": true,
+  "restored_same_memory_id": true,
+  "source_unchanged_through_remove_restore": true,
+  "history_records": 4
+}

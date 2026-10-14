@@ -52,6 +52,6 @@ export function noteBody(memory: Pick<VaultMemory, "id" | "note">): string {
 }
 export function noteWithBody(memory: Pick<VaultMemory, "id" | "note">, body: string): string {
   const parts = noteParts(memory);
-  if (!parts && memory.note.startsWith(`---\nrecall_id: "${memory.id}"\n`)) throw new Error("Note properties need review in Obsidian before saving a body correction.");
+  if (!parts && memory.note.startsWith(`---\nrecall_id: "${memory.id}"\n`)) throw new Error("Note properties need review in Recall before saving a body correction.");
   return parts ? parts.prefix + body : body;
 }
