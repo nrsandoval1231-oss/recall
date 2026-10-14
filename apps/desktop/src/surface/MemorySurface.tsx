@@ -1,3 +1,7 @@
+import { graphTitle } from "./adaptive-graph";
+import { attachmentIntent, clearAttachmentIntent } from "./attachment-intent";
+import { MemoryEditor } from "./MemoryEditor";
+import type { EditorIntent } from "./editor-session";
 import { AdaptiveGraph } from "./AdaptiveGraph";
 import {
   ArrowRightIcon,
@@ -19,13 +23,8 @@ import {
 } from "@phosphor-icons/react";
 
 import { NoteMarkdown } from "./NoteMarkdown";
-import {
-  vaultContext,
-  noteBody,
-  noteWithBody,
-  type SourceRow,
-} from "./vault-context";
-import { useEffect, useRef, useState } from "react";
+import { vaultContext, noteBody, type SourceRow } from "./vault-context";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   LocalVault,
   VaultMemory,
@@ -134,6 +133,17 @@ function openable(memory: VaultMemory): boolean {
 }
 function captureKey(identity: string): string {
   return `recall.desktop.capture.v1:${identity}`;
+}
+function writeDraftKey(identity: string) {
+  return `recall.write.v1:${identity}`;
+}
+function savedWriteDraft(identity: string) {
+  const value = localStorage.getItem(writeDraftKey(identity));
+  if (value && value.length > 262144)
+    throw new Error(
+      "Saved writing draft needs recovery; it was not discarded.",
+    );
+  return value ?? "";
 }
 function operationId(): string {
   const id = globalThis.crypto?.randomUUID?.();
@@ -252,6 +262,8 @@ export function MemorySurface({
   librarian?: Librarian;
 }) {
   const [vaultSettings, setVaultSettings] = useState(false);
+  const [removed, setRemoved] = useState<VaultMemory[]>([]);
+  const [importOperation, setImportOperation] = useState<string | null>(null);
   const [status, setStatus] = useState<VaultStatus | null>(null);
   const [items, setItems] = useState<VaultMemory[]>([]);
   const [checking, setChecking] = useState(vault.available);
@@ -273,6 +285,11 @@ export function MemorySurface({
     null,
   );
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
+  const [attachmentView, setAttachmentView] = useState<Preview | null>(null);
+  const attachmentRequest = useRef(0);
+  const [attachmentFile, setAttachmentFile] = useState<string | null>(null);
+  const attachmentRef = useRef<Preview | null>(null);
+  attachmentRef.current = attachmentView;
   const [preview, setPreview] = useState<Preview | null>(null);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<PendingCapture | null>(null);
@@ -305,7 +322,15 @@ export function MemorySurface({
       selected?.vault_id && organizationRequests.current.get(selected.vault_id),
     );
   }
+  function closeAttachment() {
+    attachmentRequest.current++;
+    if (attachmentRef.current) URL.revokeObjectURL(attachmentRef.current.url);
+    attachmentRef.current = null;
+    setAttachmentView(null);
+    setAttachmentFile(null);
+  }
   function clearPreview() {
+    closeAttachment();
     if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
     previewRef.current = null;
     setPreview(null);
@@ -313,7 +338,7 @@ export function MemorySurface({
   function inScope(vaultId: string) {
     return alive.current && scopeRef.current === vaultId;
   }
-  const kept = items.filter(keptMemory);
+  const kept = useMemo(() => items.filter(keptMemory), [items]);
   const demo = !vault.available;
 
   useEffect(() => {
@@ -321,6 +346,7 @@ export function MemorySurface({
     return () => {
       alive.current = false;
       if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
+      if (attachmentRef.current) URL.revokeObjectURL(attachmentRef.current.url);
     };
   }, []);
 
@@ -338,6 +364,7 @@ export function MemorySurface({
           if (cancel) return;
           try {
             const restored = readPending(chosen.vault_identity);
+            if (!restored) setDraft(savedWriteDraft(chosen.vault_identity));
             if (restored) {
               setPending(restored);
               setCaptureMode(restored.kind === "photo" ? "photo" : "text");
@@ -417,6 +444,7 @@ export function MemorySurface({
   }, [vaultSettings]);
 
   function go(next: Section) {
+    closeAttachment();
     if (
       (section === "evidence" || section === "capture") &&
       next !== "evidence" &&
@@ -473,12 +501,18 @@ export function MemorySurface({
       setPanel(panelFor(next));
   }
 
-  async function choose(kind: "select" | "default") {
+  async function choose(kind: "select" | "default" | "create" | "restore") {
     setBusy(true);
     setError("");
     try {
       const next =
-        kind === "select" ? await vault.select() : await vault.openDefault();
+        kind === "select"
+          ? await vault.select()
+          : kind === "restore"
+            ? await vault.restoreLibrary?.()
+            : kind === "create"
+              ? await vault.create?.()
+              : await vault.openDefault();
       if (!alive.current) return;
       if (!next) {
         setNotice("Folder choice cancelled. Nothing was written.");
@@ -494,6 +528,8 @@ export function MemorySurface({
       sourceRequest.current += 1;
       setPending(null);
       setDraft("");
+      setRemoved([]);
+      setImportOperation(null);
       setAnswer(null);
       setVaultHits(null);
       setEvidenceId(null);
@@ -513,11 +549,14 @@ export function MemorySurface({
       setItems(rows);
       const restored = chosen ? readPending(chosen.vault_identity) : null;
       setPending(restored);
-      setDraft(restored?.note ?? "");
+      setDraft(
+        restored?.note ??
+          (chosen ? savedWriteDraft(chosen.vault_identity) : ""),
+      );
       setNotice(
         kind === "default"
-          ? "Opened the default vault folder."
-          : "Opened the folder you chose.",
+          ? "Opened your default Recall library."
+          : "Opened your Recall library.",
       );
       setExploring(false);
       setSection(restored ? "capture" : "home");
@@ -667,6 +706,7 @@ export function MemorySurface({
       );
       if (!inScope(scope.vault_id)) return;
       sessionStorage.removeItem(captureKey(scope.vault_identity));
+      localStorage.removeItem(writeDraftKey(scope.vault_identity));
       setPending(null);
       setDraft("");
       setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
@@ -693,7 +733,7 @@ export function MemorySurface({
     }
     if (!selected) {
       setError(
-        "Choose a vault folder, or use the default vault, before importing a photo.",
+        "Open existing library, or use the default vault, before importing a photo.",
       );
       return;
     }
@@ -727,11 +767,12 @@ export function MemorySurface({
         return;
       }
       sessionStorage.removeItem(captureKey(selected.vault_identity));
+      localStorage.removeItem(writeDraftKey(selected.vault_identity));
       setPending(null);
       setDraft("");
       setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
       setNotice(
-        "Saved in your vault. The original photo and a Markdown note are on this device.",
+        "Saved in your library. The original photo and a Markdown note are on this device.",
       );
       setSection("evidence");
       evidenceRef.current = saved.id;
@@ -824,44 +865,257 @@ export function MemorySurface({
     }
   }
 
-  async function saveCorrection(memory: VaultMemory) {
-    if (!selected) return;
+  async function commitEdit(
+    memory: VaultMemory,
+    intent: EditorIntent,
+  ): Promise<VaultMemory> {
+    if (!selected) throw new Error("Open a library before editing.");
+    const scope = selected;
+    const saved = await vault.correct(
+      scope.vault_id,
+      memory.id,
+      intent.expectedRevision,
+      intent.operationId,
+      intent.note,
+    );
+    if (!inScope(scope.vault_id))
+      throw new Error(
+        "Library changed while saving. Your draft stays with its original library.",
+      );
+    setItems((rows) => rows.map((row) => (row.id === saved.id ? saved : row)));
+    if (evidenceRef.current === memory.id) {
+      setHistory(null);
+      setReading(null);
+    }
+    setNotice(
+      "Correction saved in the library. The original source is unchanged. This is your note, not a verified fact.",
+    );
+    return saved;
+  }
+  async function importMarkdown() {
+    if (!selected || !vault.importMarkdown) return;
+    const scope = selected;
+    const key = `recall.import.v1:${scope.vault_identity ?? scope.vault_id}`;
     setBusy(true);
     setError("");
     try {
-      const intent = {
-        operationId: operationId(),
-        note: noteWithBody(memory, correction),
-        expectedRevision: memory.revision,
-      };
-      const saved = await vault.correct(
-        selected.vault_id,
-        memory.id,
-        intent.expectedRevision,
-        intent.operationId,
-        intent.note,
+      const operation = localStorage.getItem(key) ?? operationId();
+      if (!/^[0-9a-f-]{36}$/.test(operation))
+        throw new Error(
+          "Import recovery identity needs review; it was preserved.",
+        );
+      localStorage.setItem(key, operation);
+      setImportOperation(operation);
+      const saved = await vault.importMarkdown(scope.vault_id, operation);
+      if (!inScope(scope.vault_id)) return;
+      if (!saved) {
+        localStorage.removeItem(key);
+        setImportOperation(null);
+        return;
+      }
+      localStorage.removeItem(key);
+      setImportOperation(null);
+      setItems((rows) => [saved, ...rows.filter((row) => row.id !== saved.id)]);
+      closeSettings();
+      await openVaultMemory(saved);
+      setNotice(
+        "Imported into your library. The original file was not changed.",
       );
-      if (!inScope(selected.vault_id)) return;
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function attachFile(memory: VaultMemory) {
+    if (!selected || !vault.attach) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const intent = attachmentIntent(
+        localStorage,
+        scope.vault_identity ?? scope.vault_id,
+        memory.id,
+        memory.revision,
+      );
+      const saved = await vault.attach(
+        scope.vault_id,
+        memory.id,
+        intent.revision,
+        intent.operation,
+      );
+      if (!inScope(scope.vault_id)) return;
+      intent.acknowledge();
+      if (!saved) return;
       setItems((rows) =>
         rows.map((row) => (row.id === saved.id ? saved : row)),
       );
-      if (evidenceRef.current === memory.id) {
-        setEvidenceId(saved.id);
+      if (evidenceRef.current === saved.id) {
         setCorrection(noteBody(saved));
         setHistory(null);
-        setReading(null);
       }
-      if (!organizationActive()) setProcessingState("");
       setNotice(
-        "Correction saved in the vault. The original source is unchanged. This is your note, not a verified fact.",
+        "Attachment saved in your library. Original evidence was not changed.",
       );
-    } catch (correctError) {
-      if (inScope(selected.vault_id))
-        setError(
-          `${message(correctError)} The draft is still here. Reload the note before saving again.`,
-        );
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
     } finally {
-      if (inScope(selected.vault_id)) setBusy(false);
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  function resetAttachment(memory: VaultMemory) {
+    if (!selected) return;
+    try {
+      clearAttachmentIntent(
+        localStorage,
+        selected.vault_identity ?? selected.vault_id,
+        memory.id,
+      );
+      setError("");
+      setNotice(
+        "Pending attachment attempt cleared. Previously stored attachment bytes and receipts remain in your library; a new attachment will use a new operation.",
+      );
+    } catch (error) {
+      setError(message(error));
+    }
+  }
+  async function inspectAttachment(memory: VaultMemory, fileName: string) {
+    if (!selected || !vault.attachment) return;
+    const scope = selected;
+    const request = ++attachmentRequest.current;
+    setBusy(true);
+    setError("");
+    try {
+      const source = await vault.attachment(
+        scope.vault_id,
+        memory.id,
+        fileName,
+      );
+      if (
+        !inScope(scope.vault_id) ||
+        evidenceRef.current !== memory.id ||
+        request !== attachmentRequest.current
+      )
+        return;
+      if (attachmentRef.current) URL.revokeObjectURL(attachmentRef.current.url);
+      const text =
+        source.mime_type === "text/plain"
+          ? new TextDecoder("utf-8", { fatal: true }).decode(
+              Uint8Array.from(source.bytes),
+            )
+          : undefined;
+      const actual = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest("SHA-256", Uint8Array.from(source.bytes)),
+        ),
+        (byte) => byte.toString(16).padStart(2, "0"),
+      ).join("");
+      if (
+        !inScope(scope.vault_id) ||
+        evidenceRef.current !== memory.id ||
+        request !== attachmentRequest.current
+      )
+        return;
+      if (actual !== source.sha256)
+        throw new Error("Attachment bytes did not match the native receipt.");
+      const url = URL.createObjectURL(
+        new Blob([Uint8Array.from(source.bytes)], { type: source.mime_type }),
+      );
+      setAttachmentFile(fileName);
+      setAttachmentView({
+        url,
+        text,
+        name: source.name,
+        mime: source.mime_type,
+        sha256: source.sha256,
+        matches: true,
+      });
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function saveAttachmentCopy(memory: VaultMemory, fileName: string) {
+    if (!selected || !vault.saveAttachment) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await vault.saveAttachment(
+        scope.vault_id,
+        memory.id,
+        fileName,
+      );
+      if (saved && inScope(scope.vault_id))
+        setNotice("Attachment copy saved. Library evidence is unchanged.");
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function exportLibrary() {
+    if (!selected || !vault.exportLibrary) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const backup = await vault.exportLibrary(scope.vault_id);
+      if (backup && inScope(scope.vault_id))
+        setNotice(
+          `Exported ${backup.files} library files with originals and history. Backup SHA-256: ${backup.sha256}. Unsaved editor drafts are device-local; save them before restoring on another device.`,
+        );
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function recoverLibrary() {
+    if (!selected) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const rows = await vault.rebuild(scope.vault_id, true);
+      if (!inScope(scope.vault_id)) return;
+      setItems(rows);
+      setRemoved(rows.filter((row) => row.state === "deleted"));
+      setNotice(
+        "Library refreshed. Saved originals, pending journals and revision history were checked.",
+      );
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
+    }
+  }
+  async function recoverRemoved(memory: VaultMemory) {
+    if (!selected || !vault.restoreDeleted) return;
+    const scope = selected;
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await vault.restoreDeleted(
+        scope.vault_id,
+        memory.id,
+        memory.revision,
+        operationId(),
+      );
+      if (!inScope(scope.vault_id)) return;
+      setItems((rows) =>
+        rows.map((row) => (row.id === saved.id ? saved : row)),
+      );
+      setRemoved((rows) => rows.filter((row) => row.id !== saved.id));
+      setNotice(
+        "Memory restored with its original identifier, source and revision history.",
+      );
+    } catch (error) {
+      if (inScope(scope.vault_id)) setError(message(error));
+    } finally {
+      if (inScope(scope.vault_id)) setBusy(false);
     }
   }
 
@@ -874,7 +1128,7 @@ export function MemorySurface({
       if (!inScope(selected.vault_id)) return;
       setItems(rows.filter(keptMemory));
       const latest = rows.find((row) => row.id === memory.id);
-      if (!latest) throw new Error("That memory is no longer in the vault.");
+      if (!latest) throw new Error("That memory is no longer in the library.");
       if (evidenceRef.current === memory.id) {
         setCorrection(noteBody(latest));
         setEvidenceId(latest.id);
@@ -910,7 +1164,7 @@ export function MemorySurface({
       setEvidenceId(null);
       setConfirmRemove(false);
       setNotice(
-        "Removed from Recall. The original source and history remain in the vault.",
+        "Removed from Recall. The original source and history remain in the library.",
       );
     } catch (removeError) {
       if (inScope(selected.vault_id)) setError(message(removeError));
@@ -934,7 +1188,7 @@ export function MemorySurface({
       setItems((rows) =>
         rows.map((row) => (row.id === saved.id ? saved : row)),
       );
-      setNotice("Note restored in the vault.");
+      setNotice("Note restored in the library.");
       setEvidenceId(saved.id);
     } catch (restoreError) {
       if (inScope(selected.vault_id)) setError(message(restoreError));
@@ -989,9 +1243,13 @@ export function MemorySurface({
   const evidenceMemory =
     kept.find((memory) => memory.id === evidenceId) ?? null;
   const ticks = vaultTicks(kept);
-  const visibleMemories = focusMonth
-    ? kept.filter((m) => memoryTickId(m.captured_at) === focusMonth)
-    : kept;
+  const visibleMemories = useMemo(
+    () =>
+      focusMonth
+        ? kept.filter((m) => memoryTickId(m.captured_at) === focusMonth)
+        : kept,
+    [kept, focusMonth],
+  );
   const inspector =
     section === "evidence" ||
     section === "capture" ||
@@ -1004,7 +1262,7 @@ export function MemorySurface({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    setCaptureMode(kind);
+    setCaptureMode(pending?.kind ?? kind);
     go("capture");
   }
   useEffect(() => {
@@ -1017,8 +1275,10 @@ export function MemorySurface({
   }, [section]);
   useEffect(() => {
     function escape(event: KeyboardEvent) {
-      if (event.key === "Escape" && !vaultSettings)
-        go(exploring ? "graph" : "home");
+      if (event.key === "Escape" && !vaultSettings) {
+        if (attachmentRef.current) closeAttachment();
+        else go(exploring ? "graph" : "home");
+      }
     }
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
@@ -1160,12 +1420,12 @@ export function MemorySurface({
               </div>
               {demo && (
                 <p className="ms-fine">
-                  Open the Recall desktop app to save to your Obsidian vault.
+                  Open the Recall desktop app to save to your Recall library.
                 </p>
               )}
               {!demo && !selected && !checking && (
                 <button onClick={openSettings}>
-                  Choose your Obsidian vault
+                  Create or open your Recall library
                 </button>
               )}
             </section>
@@ -1210,9 +1470,27 @@ export function MemorySurface({
                       correctionVersion.current += 1;
                       setCorrection(value);
                     }}
-                    onSave={() =>
-                      evidenceMemory && void saveCorrection(evidenceMemory)
+                    onResetAttachment={
+                      evidenceMemory
+                        ? () => resetAttachment(evidenceMemory)
+                        : undefined
                     }
+                    onAttach={
+                      vault.attach && evidenceMemory
+                        ? () => void attachFile(evidenceMemory)
+                        : undefined
+                    }
+                    onAttachment={(fileName) => {
+                      if (evidenceMemory)
+                        void inspectAttachment(evidenceMemory, fileName);
+                    }}
+                    editorIdentity={selected?.vault_identity ?? "unavailable"}
+                    editorMemories={kept}
+                    commitEdit={(intent) => {
+                      if (!evidenceMemory)
+                        return Promise.reject(new Error("Memory unavailable"));
+                      return commitEdit(evidenceMemory, intent);
+                    }}
                     onReload={() =>
                       evidenceMemory && void reload(evidenceMemory)
                     }
@@ -1302,9 +1580,23 @@ export function MemorySurface({
                     <textarea
                       id="capture-note"
                       autoFocus
-                      disabled={busy}
+                      disabled={busy || Boolean(pending)}
                       value={draft}
-                      onChange={(event) => setDraft(event.target.value)}
+                      onChange={(event) => {
+                        setDraft(event.target.value);
+                        if (selected) {
+                          try {
+                            localStorage.setItem(
+                              writeDraftKey(selected.vault_identity),
+                              event.target.value,
+                            );
+                          } catch (error) {
+                            setError(
+                              `Draft storage unavailable. Keep this window open: ${message(error)}`,
+                            );
+                          }
+                        }
+                      }}
                     />
                     <label className="ms-check">
                       <input
@@ -1472,15 +1764,15 @@ export function MemorySurface({
                 className="ms-vault-settings"
                 role="dialog"
                 aria-modal="true"
-                aria-label="Vault settings"
+                aria-label="Library settings"
                 onClick={(event) => event.stopPropagation()}
               >
                 <header>
-                  <h2>Your Obsidian vault</h2>
+                  <h2>Your Recall library</h2>
                   <button
                     type="button"
                     onClick={closeSettings}
-                    aria-label="Close vault settings"
+                    aria-label="Close library settings"
                   >
                     Close
                   </button>
@@ -1490,23 +1782,135 @@ export function MemorySurface({
                   stay with it.
                 </p>
                 <p className="ms-root">
-                  {selected?.root || "No vault selected"}
+                  {selected?.root || "No library selected"}
                 </p>
+                <button
+                  type="button"
+                  disabled={
+                    !vault.available || busy || checking || !vault.create
+                  }
+                  onClick={() => void choose("create")}
+                >
+                  Create library
+                </button>
                 <button
                   type="button"
                   disabled={!vault.available || busy || checking}
                   onClick={() => void choose("select")}
                 >
-                  Choose a vault folder
+                  Open existing library
                 </button>
                 <button
                   type="button"
                   disabled={!vault.available || busy || checking}
                   onClick={() => void choose("default")}
                 >
-                  Use default vault
+                  Use default library
                 </button>
+                <button
+                  disabled={busy || !vault.restoreLibrary}
+                  onClick={() => void choose("restore")}
+                >
+                  Restore library backup
+                </button>
+                {selected && (
+                  <section aria-label="Library management">
+                    <p>
+                      Portable Markdown, originals and history stay in this
+                      library. Other Markdown applications are optional.
+                    </p>
+                    <button
+                      disabled={busy || !vault.importMarkdown}
+                      onClick={() => void importMarkdown()}
+                    >
+                      {importOperation
+                        ? "Retry Markdown import"
+                        : "Import Markdown or text"}
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => void recoverLibrary()}
+                    >
+                      Refresh and recover library
+                    </button>
+                    <button
+                      disabled={busy || !vault.exportLibrary}
+                      onClick={() => void exportLibrary()}
+                    >
+                      Export library backup
+                    </button>
+                    <p className="ms-fine">
+                      Backups contain this library’s Recall Markdown, original
+                      sources, attachments and revision history. Restore always
+                      creates a new folder and preserves existing libraries.
+                      Save any editor drafts before exporting.
+                    </p>
+                    {removed.map((memory) => (
+                      <article key={memory.id}>
+                        <p>
+                          {titleOf(memory)} · removed · revision{" "}
+                          {memory.revision}
+                        </p>
+                        <button
+                          disabled={busy || !vault.restoreDeleted}
+                          onClick={() => void recoverRemoved(memory)}
+                        >
+                          Restore {titleOf(memory)}
+                        </button>
+                      </article>
+                    ))}
+                  </section>
+                )}
               </div>
+            </div>
+          )}
+          {attachmentView && (
+            <div
+              className="attachment-sheet glass"
+              role="region"
+              aria-label="Attachment inspection"
+            >
+              <header>
+                <h2>{attachmentView.name}</h2>
+                <button
+                  onClick={() => {
+                    attachmentRequest.current++;
+                    setAttachmentFile(null);
+                    if (attachmentRef.current)
+                      URL.revokeObjectURL(attachmentRef.current.url);
+                    attachmentRef.current = null;
+                    setAttachmentView(null);
+                  }}
+                >
+                  Close attachment
+                </button>
+              </header>
+              {attachmentView.text !== undefined ? (
+                <pre>{attachmentView.text}</pre>
+              ) : attachmentView.mime?.startsWith("image/") ? (
+                <img
+                  src={attachmentView.url}
+                  alt={`Attachment ${attachmentView.name}`}
+                />
+              ) : (
+                <p>
+                  Original PDF retained. Download to inspect with a PDF viewer.
+                </p>
+              )}
+              <p className="ms-fine">
+                Native receipt and byte hash match. SHA-256:{" "}
+                {attachmentView.sha256}
+              </p>
+              {vault.saveAttachment && attachmentFile && evidenceMemory && (
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void saveAttachmentCopy(evidenceMemory, attachmentFile)
+                  }
+                >
+                  Save attachment copy
+                </button>
+              )}
             </div>
           )}
           {section === "evidence" && (
@@ -1532,18 +1936,9 @@ export function MemorySurface({
 }
 
 function titleOf(memory: VaultMemory): string {
-  const title = /^title: (".*")$/m.exec(memory.note)?.[1];
-  if (memory.note.startsWith("---\nrecall_id:") && title) {
-    try {
-      const parsed: unknown = JSON.parse(title);
-      if (typeof parsed === "string") return parsed;
-    } catch {
-      /* User-owned YAML can differ from the generated subset. */
-    }
-  }
-  const name = memory.source_name.replace(/\.[a-z0-9]+$/i, "");
-  return name || "Meeting capture";
+  return graphTitle(memory);
 }
+
 function RailIcon({ id }: { id: Section }) {
   const Icon = {
     graph: GraphIcon,
@@ -1677,7 +2072,12 @@ function Evidence(props: {
   librarian: Librarian;
   onBack: () => void;
   onCorrection: (value: string) => void;
-  onSave: () => void;
+  onResetAttachment?: () => void;
+  onAttach?: () => void;
+  onAttachment?: (fileName: string) => void;
+  editorIdentity: string;
+  editorMemories: VaultMemory[];
+  commitEdit: (intent: EditorIntent) => Promise<VaultMemory>;
   onReload: () => void;
   onHistory: () => void;
   related: SourceRow[];
@@ -1827,45 +2227,41 @@ function Evidence(props: {
             <>
               <p className="ms-fine">
                 {memory.state === "missing"
-                  ? "Markdown note missing. The original is still in the vault."
+                  ? "Markdown note missing. The original is still in the library."
                   : memory.note.startsWith("---\nrecall_id:")
                     ? "Organized from source statements. Uncertain items require review; edits remain yours."
-                    : "Saved in your vault. The note below is human text, not a verified reading."}
+                    : "Saved in your library. The note below is human text, not a verified reading."}
               </p>
               {memory.conflict && <p role="alert">{memory.conflict}</p>}
-              <NoteMarkdown>
+              <NoteMarkdown
+                memories={props.editorMemories}
+                onOpen={props.onRelated}
+                onAttachment={props.onAttachment}
+              >
                 {noteBody(memory) || "No note added."}
               </NoteMarkdown>
-              <form
-                className="ms-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  props.onSave();
-                }}
-              >
-                <label htmlFor="correction">Your correction</label>
-                <textarea
-                  id="correction"
-                  value={props.correction}
-                  onChange={(event) => props.onCorrection(event.target.value)}
-                />
-                <button
-                  className="ms-primary"
-                  type="submit"
-                  disabled={
-                    props.busy ||
-                    memory.state !== "active" ||
-                    Boolean(memory.conflict)
-                  }
-                >
-                  Save correction
-                </button>
-              </form>
+              <MemoryEditor
+                key={`${props.editorIdentity}:${memory.id}`}
+                identity={props.editorIdentity}
+                memory={memory}
+                value={props.correction}
+                onChange={props.onCorrection}
+                commit={props.commitEdit}
+                memories={props.editorMemories}
+                onOpen={props.onRelated}
+                onResetAttachment={props.onResetAttachment}
+                onAttach={props.onAttach}
+                onAttachment={props.onAttachment}
+                disabled={props.busy}
+              />
               <div className="ms-actions">
                 {props.onOpenObsidian && (
-                  <button type="button" onClick={props.onOpenObsidian}>
-                    Open in Obsidian
-                  </button>
+                  <details>
+                    <summary>Optional Markdown compatibility</summary>
+                    <button type="button" onClick={props.onOpenObsidian}>
+                      Open in Obsidian (optional)
+                    </button>
+                  </details>
                 )}
 
                 <button
@@ -1894,6 +2290,21 @@ function Evidence(props: {
                         {noteBody({ id: memory.id, note: revision.note }) ||
                           "No note added."}
                       </NoteMarkdown>
+                      <button
+                        type="button"
+                        disabled={
+                          props.busy ||
+                          memory.state !== "active" ||
+                          Boolean(memory.conflict)
+                        }
+                        onClick={() =>
+                          props.onCorrection(
+                            noteBody({ id: memory.id, note: revision.note }),
+                          )
+                        }
+                      >
+                        Use revision {revision.revision} as draft
+                      </button>
                       <small>
                         {revision.kind} · {revision.origin} ·{" "}
                         {revision.recorded_at}
@@ -1922,7 +2333,7 @@ function Evidence(props: {
               </button>
               {props.canProcess && (
                 <section aria-label="Meeting processing">
-                  <h2>Organize in Obsidian</h2>
+                  <h2>Organize in Recall</h2>
                   <label className="ms-check">
                     <input
                       type="checkbox"

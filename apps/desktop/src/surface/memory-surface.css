@@ -793,3 +793,120 @@ body {
   top: auto;
   bottom: 55px;
 }
+.memory-editor {
+  margin: 20px 0;
+}
+.editor-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 20px;
+}
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 12px 0;
+}
+.editor-toolbar button {
+  font-size: 12px;
+  padding: 6px 9px;
+}
+.editor-toolbar label {
+  font-size: 13px;
+  width: 100%;
+}
+.editor-toolbar select {
+  max-width: 100%;
+  padding: 7px;
+  border: 1px solid #d8cbb8;
+  border-radius: 9px;
+  background: #fffaf1;
+}
+.memory-editor textarea {
+  min-height: 240px;
+  line-height: 1.65;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14px;
+}
+.editor-save {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.editor-save [role="status"] {
+  font-size: 12px;
+  color: #665a47;
+}
+.editor-conflict {
+  border: 1px solid #b18c5d;
+  background: #fff5e3;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.editor-conflict pre {
+  white-space: pre-wrap;
+  font-size: 13px;
+  max-height: 160px;
+  overflow: auto;
+}
+.editor-conflict button {
+  margin: 5px;
+}
+.ms-internal-link {
+  border: 0 !important;
+  border-bottom: 1px solid #99723f !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  color: #725024 !important;
+  text-align: left;
+}
+.ms-vault-settings {
+  max-height: 90dvh;
+  overflow: auto;
+}
+.ms-vault-settings button {
+  margin: 6px 4px;
+}
+.ms-vault-settings article {
+  border-top: 1px solid #e1d5c3;
+  padding: 10px 0;
+}
+.ms-evidence[data-tab="history"] .memory-editor {
+  display: none;
+}
+.attachment-sheet {
+  position: absolute;
+  z-index: 8;
+  left: 4%;
+  right: 4%;
+  top: 70px;
+  max-height: 80dvh;
+  overflow: auto;
+  padding: 25px;
+}
+.attachment-sheet header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+.attachment-sheet img {
+  max-width: 100%;
+  max-height: 60dvh;
+  object-fit: contain;
+}
+.attachment-sheet pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f3ebdf;
+  padding: 18px;
+  border-radius: 12px;
+}
+.attachment-sheet h2 {
+  font-size: 24px;
+  font-weight: 400;
+}

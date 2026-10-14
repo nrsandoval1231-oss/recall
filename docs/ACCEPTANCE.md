@@ -1,5 +1,16 @@
 # Recall acceptance and evaluation
 
+## Native library/editor review repair — 2026-10-13
+
+Authority: [Native Memory Product Contract](NATIVE-MEMORY-PRODUCT-CONTRACT.md); the ivory Adaptive Memory Surface remains unchanged. PR #54 is **not independently cleared for merge**.
+
+- Packet head `04d2990e5b3249558dbd859e2a1e9530c4655e10`, base `0d2a692b809f586b1c2efba1823b345e79618d30`: [packet evidence](audits/native-library-editor/README.md), [13-step ledger](audits/native-library-editor/ACCEPTANCE.md), and its linked runtime JSON/screenshots record Linux Tauri IPC/filesystem checks with synthetic content. Historical intermediate counts (245/111 and 255/115 native/desktop tests) are stage-specific, not proof for later heads. Artifact files do not all embed their generating commit; retain that provenance limitation rather than retroactively certifying them.
+- [CI run 38457525519](https://github.com/nrsandoval1231-oss/recall/actions/runs/38457525519) passed six jobs for that candidate, checking out synthetic merge `a040e53a6c675dab2120a7f84934928bce9428e8`, not detached-head independent validation.
+- Clean-save repair `c2f7fa5`: ordinary unchanged submission makes no native correction call, so cannot add history/revisions or change processing eligibility. Reviewed proposals retain explicit forced submission; uncertain retries retain their operation identity; conflict review retains the latest expected revision. The new component regression failed before repair (one unexpected native-boundary call) and passed afterward. Editor/session suite: 13 passed; repository lint/typechecks and desktop production build passed; native Rust library: 255 passed. The first full workspace run exposed an older organization test that expected an unchanged correction; its follow-up now asserts no-op first, then a real edit preserving metadata. Final full-suite results must be read against the follow-up head, not inferred from the earlier focused pass. These are builder-run synthetic regressions, not independent clearance.
+- The existing native `resume_import` guard executes before opening the import picker. The prior import-cancellation finding was already repaired in the packet; this repair does not alter that path. Existing native import/restart tests remain passing.
+
+Remaining gates: independent review of each final head/actual base and refreshed CI; installed Windows native workflow, physical iPhone/Tailscale, live Jev/Claude handwriting/organization and correction/reprocessing quality remain unverified for this packet. Prior owner-observed Windows/provider evidence below is historical and is not acceptance of this candidate. No completed broader security audit is claimed.
+
 ## RCL-INT-001 current native status — 2026-10-12
 
 Implemented: selected-vault text/photo capture → native consent/configuration/budgets → text-only Jev classification (Claude visual adapter for photos) → closed Claude librarian → deterministic source-linked YAML/Markdown publication → desktop/phone source-backed local retrieval. Source-focused project boards and an explicitly unscheduled agenda use persisted notes. No active PostgreSQL/login dependency. PR26 remains isolated. The owner-uploaded canonical PNG is now available in UX-SPEC. Asset handoff is verified; implemented UI fidelity is not accepted.

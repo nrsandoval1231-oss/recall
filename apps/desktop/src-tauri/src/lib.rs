@@ -1,3 +1,4 @@
+mod library_backup;
 #[allow(dead_code)]
 mod jev;
 mod processing;
@@ -13,6 +14,7 @@ mod persistence;
 pub mod phone;
 mod secrets;
 mod obsidian;
+mod attachments;
 
 use managed_export::ManagedExportState;
 use persistence::{NativeStore, PendingCommand, Scope, Snapshot, SyncEvent};
@@ -207,7 +209,7 @@ fn vault_select(
     state: tauri::State<'_, local_vault::LocalVaultState>,
 ) -> Result<Option<local_vault::VaultStatus>, String> {
     let Some(root) = rfd::FileDialog::new()
-        .set_title("Choose your Obsidian vault folder")
+        .set_title("Open a Recall library or compatible Markdown folder")
         .pick_folder()
     else {
         return Ok(None);
@@ -215,16 +217,72 @@ fn vault_select(
     state.select_path(&root).map(Some)
 }
 #[tauri::command]
+fn library_create(state: tauri::State<'_, local_vault::LocalVaultState>) -> Result<Option<local_vault::VaultStatus>, String> {
+    let Some(root) = rfd::FileDialog::new().set_title("Create a new Recall library folder").set_file_name("Recall Library").save_file() else { return Ok(None); };
+    state.create_path(&root).map(Some)
+}
+#[tauri::command]
+fn library_import_markdown(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, operation_id: String) -> Result<Option<local_vault::VaultMemory>, String> {
+    state.with(&expected_vault_id, |vault| {
+        if let Some(memory)=vault.resume_import(&operation_id)? {return Ok(Some(memory));}
+        let Some(path) = rfd::FileDialog::new().set_title("Import Markdown or text without changing the original").add_filter("Markdown and text", &["md", "markdown", "txt"]).pick_file() else { return Ok(None); };
+        vault.import_markdown_path(&operation_id, &path).map(Some)
+    })
+}
+#[tauri::command]
+fn library_restore_deleted(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, expected_revision: u64, operation_id: String) -> Result<local_vault::VaultMemory, String> {
+    state.with(&expected_vault_id, |vault| vault.restore_deleted(&memory_id, expected_revision, &operation_id))
+}
+
+#[tauri::command]
+fn library_attach(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, expected_revision: u64, operation_id: String) -> Result<Option<local_vault::VaultMemory>, String> {
+    state.with(&expected_vault_id, |vault| {
+        if let Some(saved)=attachments::resume(vault,&memory_id,expected_revision,&operation_id)? { return Ok(Some(saved)); }
+        let Some(path)=rfd::FileDialog::new().set_title("Attach a document or image").add_filter("Supported attachments", &["png","jpg","jpeg","webp","pdf","md","txt"]).pick_file() else {return Ok(None);};
+        attachments::add_from_path(vault,&memory_id,expected_revision,&operation_id,&path).map(Some)
+    })
+}
+#[tauri::command]
+fn library_attachment(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, file_name: String) -> Result<attachments::Attachment, String> {
+    state.with(&expected_vault_id, |vault| attachments::inspect(vault,&memory_id,&file_name))
+}
+
+#[tauri::command]
+fn library_attachment_save(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, file_name: String) -> Result<bool, String> {
+    state.with(&expected_vault_id, |vault| {
+        let attachment = attachments::inspect(vault, &memory_id, &file_name)?;
+        let Some(path) = rfd::FileDialog::new().set_title("Save a copy of the original attachment").set_file_name(&attachment.name).save_file() else { return Ok(false); };
+        attachments::save_copy(&path, &attachment.bytes)?;
+        Ok(true)
+    })
+}
+
+#[tauri::command]
+fn library_export(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String) -> Result<Option<library_backup::BackupResult>, String> {
+    state.with(&expected_vault_id, |vault| {
+        let Some(path)=rfd::FileDialog::new().set_title("Export Recall library with originals and history").set_file_name("Recall Library.zip").add_filter("Recall library backup", &["zip"]).save_file() else {return Ok(None);};
+        library_backup::export(vault,&path).map(Some)
+    })
+}
+#[tauri::command]
+fn library_restore(state: tauri::State<'_, local_vault::LocalVaultState>) -> Result<Option<local_vault::VaultStatus>, String> {
+    let Some(archive)=rfd::FileDialog::new().set_title("Restore a Recall library backup").add_filter("Recall library backup", &["zip"]).pick_file() else {return Ok(None);};
+    let Some(destination)=rfd::FileDialog::new().set_title("Choose a new folder for the restored library").set_file_name("Restored Recall Library").save_file() else {return Ok(None);};
+    library_backup::restore(&archive,&destination)?;
+    state.select_path(&destination).map(Some)
+}
+
+#[tauri::command]
 fn vault_open_default(
     app: tauri::AppHandle,
     state: tauri::State<'_, local_vault::LocalVaultState>,
 ) -> Result<local_vault::VaultStatus, String> {
     // The webview cannot pass a folder. RECALL_VAULT_DIR is a process setting
     // for local development; otherwise the folder is Documents/Recall.
-    let documents = app.path().document_dir().map_err(fail)?;
-    let root = local_vault::default_vault_directory(
+    let root = local_vault::default_library_directory(
         std::env::var("RECALL_VAULT_DIR").ok().as_deref(),
-        &documents,
+        || app.path().document_dir().map_err(fail),
+        || app.path().home_dir().map_err(fail),
     )?;
     std::fs::create_dir_all(&root).map_err(fail)?;
     state.select_path(&root)
@@ -516,6 +574,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             vault_status,
+            library_create,
+            library_attach,
+            library_attachment,
+            library_attachment_save,
+            library_export,
+            library_restore,
+            library_import_markdown,
+            library_restore_deleted,
             vault_select,
             vault_open_default,
             vault_capture,

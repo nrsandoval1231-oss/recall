@@ -27,7 +27,14 @@ export interface VaultRevision {
   note: string;
   recorded_at: string;
   origin: "human:recall" | "human:obsidian" | "model:claude";
-  kind: "capture" | "correct" | "external" | "restore" | "remove" | "organize";
+  kind:
+    | "capture"
+    | "correct"
+    | "external"
+    | "restore"
+    | "remove"
+    | "organize"
+    | "restore_deleted";
 }
 export interface ParserJob {
   operation_id: string;
@@ -54,8 +61,46 @@ export interface SourceAnswer {
     mime_type: string;
   }[];
 }
+export interface LibraryAttachment extends VaultSource {
+  name: string;
+}
+export interface LibraryBackup {
+  path: string;
+  sha256: string;
+  files: number;
+  bytes: number;
+}
 export interface LocalVault {
+  exportLibrary?(expectedVaultId: string): Promise<LibraryBackup | null>;
+  restoreLibrary?(): Promise<VaultStatus | null>;
   readonly available: boolean;
+  attach?(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ): Promise<VaultMemory | null>;
+  attachment?(
+    expectedVaultId: string,
+    memoryId: string,
+    fileName: string,
+  ): Promise<LibraryAttachment>;
+  saveAttachment?(
+    expectedVaultId: string,
+    memoryId: string,
+    fileName: string,
+  ): Promise<boolean>;
+  create?(): Promise<VaultStatus | null>;
+  importMarkdown?(
+    expectedVaultId: string,
+    operationId: string,
+  ): Promise<VaultMemory | null>;
+  restoreDeleted?(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ): Promise<VaultMemory>;
   captureNote?(
     expectedVaultId: string,
     operationId: string,
@@ -150,6 +195,63 @@ export class NativeLocalVault implements LocalVault {
     return this.call<void>("vault_open_obsidian", {
       expectedVaultId,
       memoryId,
+    });
+  }
+  exportLibrary(expectedVaultId: string) {
+    return this.call<LibraryBackup | null>("library_export", {
+      expectedVaultId,
+    });
+  }
+  restoreLibrary() {
+    return this.call<VaultStatus | null>("library_restore", {});
+  }
+  saveAttachment(expectedVaultId: string, memoryId: string, fileName: string) {
+    return this.call<boolean>("library_attachment_save", {
+      expectedVaultId,
+      memoryId,
+      fileName,
+    });
+  }
+  attach(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ) {
+    return this.call<VaultMemory | null>("library_attach", {
+      expectedVaultId,
+      memoryId,
+      expectedRevision,
+      operationId,
+    });
+  }
+  attachment(expectedVaultId: string, memoryId: string, fileName: string) {
+    return this.call<LibraryAttachment>("library_attachment", {
+      expectedVaultId,
+      memoryId,
+      fileName,
+    });
+  }
+  create() {
+    return this.call<VaultStatus | null>("library_create");
+  }
+  importMarkdown(expectedVaultId: string, operationId: string) {
+    return this.call<VaultMemory | null>("library_import_markdown", {
+      expectedVaultId,
+      operationId,
+    });
+  }
+  restoreDeleted(
+    expectedVaultId: string,
+    memoryId: string,
+    expectedRevision: number,
+    operationId: string,
+  ) {
+    return this.call<VaultMemory>("library_restore_deleted", {
+      expectedVaultId,
+      memoryId,
+      expectedRevision,
+      operationId,
     });
   }
   status() {

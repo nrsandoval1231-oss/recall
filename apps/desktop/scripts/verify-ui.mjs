@@ -223,7 +223,7 @@ for (const [w, h] of [
   await page.evaluate(() => window.__finishOrganization());
   await page
     .getByText(
-      "Organized in Obsidian. Uncertainty and original evidence preserved.",
+      "Organized in Recall. Uncertainty and original evidence preserved.",
     )
     .waitFor();
   await shot("ready");
@@ -255,7 +255,7 @@ for (const [w, h] of [
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Zoom in" }).waitFor();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("dialog", { name: "Vault settings" }).waitFor();
+  await page.getByRole("dialog", { name: "Library settings" }).waitFor();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Timeline", exact: true }).click();
   await page.getByLabel("Source capture month").selectOption("2026-10");

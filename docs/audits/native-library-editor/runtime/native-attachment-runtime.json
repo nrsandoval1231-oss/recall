@@ -1,0 +1,10 @@
+{
+  "kind": "Actual Linux Tauri native picker and attachment inspection; desktop input via X11 after modal WebDriver timeout; no IPC mocks",
+  "memory_id": "462a202b-4b0b-489f-9a94-4e6beda92f5f",
+  "attachment_id": "ee612f2e-5cfc-4142-a22a-44d64d47b432",
+  "sha256": "25a6415e3b396521a226835eaa73d231af44758e06b13caf5de91916b2b56269",
+  "attached": true,
+  "inspected_in_recall": true,
+  "native_copy_byte_identical": true,
+  "original_capture_unchanged": true
+}

@@ -67,11 +67,11 @@ export async function processMeeting(vault: LocalVault, selected: { vault_id: st
       await vault.reviewedOrganize(selected.vault_id, intent.parser, intent.reviewedFrom, intent.organizer, true, Boolean(options?.reviewRetry && options.acknowledgeUncertainty));
     } else await vault.organize(selected.vault_id, intent.parser, intent.organizer, true);
   } catch (error) { onState("Claude organization stopped. Original retained; previous reservations stay recorded."); throw error; }
-  onState("Validating and publishing to your Obsidian vault…");
+  onState("Validating and publishing to your Recall library…");
   const published = await vault.publish(selected.vault_id, intent.parser, intent.organizer, intent.publisher);
   if (published.id !== memory.id || published.revision < intent.revision + 1 || published.state !== "active" || published.conflict) throw new Error("Publication did not match this memory.");
   intent.published = true;
   localStorage.setItem(key, JSON.stringify(intent));
-  onState("Organized in Obsidian. Uncertainty and original evidence preserved.");
+  onState("Organized in Recall. Uncertainty and original evidence preserved.");
   return published;
 }

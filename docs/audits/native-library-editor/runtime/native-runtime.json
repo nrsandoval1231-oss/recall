@@ -1,0 +1,13 @@
+{
+  "kind": "Actual Linux Tauri debug runtime + production frontend, real native filesystem; synthetic content; no Obsidian installed, no IPC mocks, no live providers",
+  "library_id": "4eb78282-43bd-4887-a4ae-b6043dc85b7e",
+  "memory_id": "462a202b-4b0b-489f-9a94-4e6beda92f5f",
+  "original_sha256": "27496f1710e14ff9d52d6e76eb2ffee52689a3106325736712dc5c38180a55de",
+  "native_history_records": 2,
+  "created_library": true,
+  "captured_original": true,
+  "autosaved_edit": true,
+  "retrieved_original_quote": true,
+  "restart_retrieval": true,
+  "original_unchanged_after_restart": true
+}
