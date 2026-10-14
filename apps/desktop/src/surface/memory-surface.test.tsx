@@ -908,13 +908,16 @@ it("organization completion fills body-only editing without duplicating native p
   }) as HTMLTextAreaElement;
   expect(editor.value).toBe("Utility late.");
   await user.click(screen.getByRole("button", { name: "Save correction" }));
+  expect(client.correct).not.toHaveBeenCalled();
+  await user.type(editor, " Confirm date.");
+  await user.click(screen.getByRole("button", { name: "Save correction" }));
   await screen.findByText(/Correction saved in the library/);
   expect(client.correct).toHaveBeenCalledWith(
     "session-token",
     initial.id,
     2,
     expect.any(String),
-    published.note,
+    published.note + " Confirm date.",
   );
 });
 
