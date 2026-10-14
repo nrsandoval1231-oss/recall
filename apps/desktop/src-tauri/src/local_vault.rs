@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Component, Path, PathBuf},
@@ -29,6 +29,32 @@ pub struct VaultStatus {
     pub vault_id: Option<String>,
     #[serde(default)]
     pub vault_identity: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KnowledgeControl {
+    pub version: u32,
+    pub vault_id: String,
+    pub enabled: bool,
+    pub include_existing: bool,
+    pub generation: u64,
+    pub snapshot_sha256: String,
+    pub existing_fence: BTreeSet<String>,
+    pub dismissed_facts: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub answer_allowed: bool,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub answer_consent_version: u32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub approved_answer_provider: String,
+}
+fn is_zero_u32(value: &u32) -> bool { *value == 0 }
+impl KnowledgeControl {
+    fn disabled(vault_id: &str) -> Self {
+        Self { version: 1, vault_id: vault_id.into(), enabled: false, include_existing: false,
+            generation: 0, snapshot_sha256: String::new(), existing_fence: BTreeSet::new(), dismissed_facts: BTreeSet::new(),
+            answer_allowed: false, answer_consent_version: 0, approved_answer_provider: String::new() }
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -195,6 +221,9 @@ fn fail(e: impl std::fmt::Display) -> String {
 }
 fn hash(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
+}
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 fn id(value: &str) -> Result<()> {
     if Uuid::parse_str(value).map_err(fail)?.to_string() != value {
@@ -1951,6 +1980,98 @@ impl Vault {
                 kind: e.kind,
             })
             .collect())
+    }
+    fn knowledge_path(&self) -> PathBuf { self.path("_meta/knowledge/control.json") }
+    fn ensure_knowledge_dir(&self) -> Result<PathBuf> {
+        let dir = self.path("_meta/knowledge");
+        safe(&dir)?;
+        if !dir.exists() { fs::create_dir(&dir).map_err(fail)?; sync_dir(dir.parent().ok_or("Missing metadata parent")?)?; }
+        safe(&dir)?;
+        if !dir.is_dir() { return Err("Knowledge control path is not a directory".into()); }
+        Ok(dir)
+    }
+    fn load_knowledge_control(&self) -> Result<KnowledgeControl> {
+        let path = self.knowledge_path(); safe(&path)?;
+        if !path.exists() { return Ok(KnowledgeControl::disabled(&self.id)); }
+        let control: KnowledgeControl = decode(&path)?;
+        if ![1, 2].contains(&control.version) || control.vault_id != self.id || control.generation > u64::MAX - 1
+            || (control.version == 1 && (control.answer_allowed || control.answer_consent_version != 0 || !control.approved_answer_provider.is_empty()))
+            || (control.version == 2 && control.answer_allowed && (control.answer_consent_version != 1 || control.approved_answer_provider.trim().is_empty()))
+            || (control.version == 2 && !control.answer_allowed && (control.answer_consent_version != 0 || !control.approved_answer_provider.is_empty()))
+            || (!control.snapshot_sha256.is_empty() && !valid_sha256(&control.snapshot_sha256))
+            || control.existing_fence.len() > MAX_RECORDS || control.dismissed_facts.len() > MAX_RECORDS {
+            return Err("Invalid local knowledge controls".into());
+        }
+        for value in &control.existing_fence { id(value)?; }
+        for value in &control.dismissed_facts { if value.is_empty() || value.len() > 256 || value.chars().any(char::is_control) { return Err("Invalid dismissed knowledge fact ID".into()); } }
+        Ok(control)
+    }
+    fn save_knowledge_control(&self, control: &KnowledgeControl) -> Result<()> {
+        let dir = self.ensure_knowledge_dir()?; let path = self.knowledge_path();
+        let bytes = json(control)?; if bytes.len() > 2 * 1024 * 1024 { return Err("Knowledge controls exceed their limit".into()); }
+        let stage = path.with_extension(format!("stage-{}", Uuid::new_v4())); create(&stage, &bytes)?;
+        if path.exists() { replace(&stage, &path)?; } else { rename(&stage, &path)?; }
+        sync_dir(&dir)
+    }
+    /// Native-owned knowledge consent and future-capture fence, independent of
+    /// vault manifest versions and Graphiti operational state.
+    pub fn knowledge_control(&self) -> Result<KnowledgeControl> {
+        let _lock = self.lock()?; self.load_knowledge_control()
+    }
+    pub fn set_knowledge_consent(&self, enabled: bool, include_existing: bool, current_ids: &BTreeSet<String>) -> Result<KnowledgeControl> {
+        if current_ids.len() > MAX_RECORDS { return Err("Knowledge consent fence exceeds its limit".into()); }
+        for value in current_ids { id(value)?; }
+        let _lock = self.lock()?; let _ = self.recover()?; let mut control = self.load_knowledge_control()?;
+        let disable_answer = !enabled && control.answer_allowed;
+        if control.enabled != enabled || control.include_existing != (enabled && include_existing) || disable_answer {
+            control.generation = control.generation.checked_add(1).ok_or("Knowledge generation exhausted")?;
+            control.snapshot_sha256.clear();
+        }
+        if disable_answer {
+            control.answer_allowed = false;
+            control.answer_consent_version = 0;
+            control.approved_answer_provider.clear();
+        }
+        control.version = 2;
+        control.enabled = enabled; control.include_existing = enabled && include_existing;
+        control.existing_fence = if enabled && !include_existing { current_ids.clone() } else { BTreeSet::new() };
+        self.save_knowledge_control(&control)?; Ok(control)
+    }
+    pub fn set_knowledge_answer_consent(&self, enabled: bool, provider: &str) -> Result<KnowledgeControl> {
+        if enabled && (provider.trim().is_empty() || provider.len() > 128 || provider.chars().any(char::is_control)) {
+            return Err("Configured answer provider identity is invalid".into());
+        }
+        let _lock = self.lock()?; let _ = self.recover()?; let mut control = self.load_knowledge_control()?;
+        if enabled && !control.enabled { return Err("Enable connected knowledge before answer consent".into()); }
+        let next_provider = if enabled { provider.to_owned() } else { String::new() };
+        if control.answer_allowed != enabled || control.approved_answer_provider != next_provider
+            || control.answer_consent_version != if enabled { 1 } else { 0 } {
+            control.generation = control.generation.checked_add(1).ok_or("Knowledge generation exhausted")?;
+            control.snapshot_sha256.clear();
+        }
+        control.version = 2;
+        control.answer_allowed = enabled;
+        control.answer_consent_version = if enabled { 1 } else { 0 };
+        control.approved_answer_provider = next_provider;
+        self.save_knowledge_control(&control)?;
+        Ok(control)
+    }
+    pub fn dismiss_knowledge_fact(&self, fact_id: &str) -> Result<KnowledgeControl> {
+        if fact_id.is_empty() || fact_id.len() > 256 || fact_id.chars().any(char::is_control) { return Err("Invalid knowledge fact ID".into()); }
+        let _lock = self.lock()?; let _ = self.recover()?; let mut control = self.load_knowledge_control()?;
+        control.dismissed_facts.insert(fact_id.into());
+        if control.dismissed_facts.len() > MAX_RECORDS { return Err("Dismissed knowledge fact retention limit reached".into()); }
+        control.generation = control.generation.checked_add(1).ok_or("Knowledge generation exhausted")?;
+        control.snapshot_sha256.clear(); self.save_knowledge_control(&control)?; Ok(control)
+    }
+    pub fn set_knowledge_snapshot_hash(&self, digest: &str) -> Result<KnowledgeControl> {
+        if !valid_sha256(digest) { return Err("Invalid knowledge snapshot digest".into()); }
+        let _lock = self.lock()?; let mut control = self.load_knowledge_control()?;
+        if control.snapshot_sha256 != digest {
+            control.generation = control.generation.checked_add(1).ok_or("Knowledge generation exhausted")?;
+            control.snapshot_sha256 = digest.into(); self.save_knowledge_control(&control)?;
+        }
+        Ok(control)
     }
 }
 

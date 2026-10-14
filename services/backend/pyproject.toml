@@ -9,11 +9,17 @@ dependencies = [
   "psycopg[binary,pool]",
   "pydantic-settings",
   "PyJWT[crypto]",
-  "httpx",
+  "httpx==0.28.1",
   "pillow",
   "jsonschema[format]",
   "anthropic>=1.11.0",
   "pillow-heif>=1.8.0",
+]
+
+[project.optional-dependencies]
+graphiti = [
+  "graphiti-core[falkordblite,anthropic]==0.30.2",
+  "fastembed==0.9.0",
 ]
 
 [dependency-groups]
@@ -31,6 +37,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/recall"]
+
+[project.scripts]
+recall-knowledge = "recall.knowledge.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -55,7 +64,18 @@ python_version = "3.12"
 strict = true
 plugins = []
 mypy_path = "src"
+warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
 module = ["psycopg_pool.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+  "anthropic.*",
+  "fastembed.*",
+  "graphiti_core.*",
+  "huggingface_hub.*",
+  "redislite.*",
+]
 ignore_missing_imports = true

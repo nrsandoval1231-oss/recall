@@ -41,6 +41,29 @@ it("lifecycle commands preserve exact revision, state, operation identity and in
   ]);
 });
 
+it("uses only the frozen native knowledge commands and selected-vault scope", async () => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+  const vault = new NativeLocalVault();
+  await vault.knowledgeStatus("vault-a");
+  await vault.knowledgeConsent("vault-a", true, false);
+  await vault.knowledgeSearch("vault-a", "May opening", false);
+  await vault.knowledgeDismiss("vault-a", "fact-id");
+  await vault.knowledgeRebuild("vault-a");
+  await vault.knowledgeAnswerConsent("vault-a", true);
+  await vault.memoryAnswer("vault-a", "What happened?", "00000000-0000-4000-8000-000000000001");
+  await vault.memoryAnswerCancel("vault-a", "00000000-0000-4000-8000-000000000001");
+  expect(vi.mocked(invoke).mock.calls).toEqual([
+    ["knowledge_status", { expectedVaultId: "vault-a" }],
+    ["knowledge_consent", { expectedVaultId: "vault-a", enabled: true, includeExisting: false }],
+    ["knowledge_search", { expectedVaultId: "vault-a", query: "May opening", includeHistory: false }],
+    ["knowledge_dismiss", { expectedVaultId: "vault-a", factId: "fact-id" }],
+    ["knowledge_rebuild", { expectedVaultId: "vault-a" }],
+    ["knowledge_answer_consent", { expectedVaultId: "vault-a", enabled: true }],
+    ["memory_answer", { expectedVaultId: "vault-a", question: "What happened?", requestId: "00000000-0000-4000-8000-000000000001" }],
+    ["memory_answer_cancel", { expectedVaultId: "vault-a", requestId: "00000000-0000-4000-8000-000000000001" }],
+  ]);
+});
+
 it("creates a library through a native picker and imports Markdown with a scoped operation",async()=>{
  Object.defineProperty(window,"__TAURI_INTERNALS__",{value:{},configurable:true});
  const library=new NativeLocalVault();await library.create();await library.importMarkdown("session","import-op");

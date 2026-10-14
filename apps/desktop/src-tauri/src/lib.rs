@@ -4,6 +4,7 @@ mod jev;
 mod processing;
 mod meeting;
 mod memory_query;
+mod knowledge;
 mod companion_processing;
 mod librarian;
 #[allow(dead_code)]
@@ -294,7 +295,7 @@ fn vault_capture(
     operation_id: String,
     note: String,
 ) -> Result<Option<local_vault::VaultMemory>, String> {
-    state.with(&expected_vault_id, |vault| {
+    let saved = state.with(&expected_vault_id, |vault| {
         if let Some(saved) = vault.capture_receipt(&operation_id, &note)? {
             return Ok(Some(saved));
         }
@@ -306,7 +307,11 @@ fn vault_capture(
             return Ok(None);
         };
         vault.capture_path(&operation_id, &note, &path).map(Some)
-    })
+    })?;
+    if saved.is_some() {
+        if let Ok(vault) = state.with(&expected_vault_id, |vault| Ok(vault.clone())) { knowledge::best_effort_refresh(&vault); }
+    }
+    Ok(saved)
 }
 #[tauri::command]
 fn vault_capture_note(
@@ -315,11 +320,13 @@ fn vault_capture_note(
     operation_id: String,
     note: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| {
+    let memory = state.with(&expected_vault_id, |vault| {
         let memory=vault.capture_note(&operation_id, &note)?;
         vault.processing_snapshot(&memory.id, memory.revision)?;
         Ok(memory)
-    })
+    })?;
+    if let Ok(vault) = state.with(&expected_vault_id, |vault| Ok(vault.clone())) { knowledge::best_effort_refresh(&vault); }
+    Ok(memory)
 }
 
 #[tauri::command]
@@ -329,9 +336,11 @@ fn vault_list(
     query: String,
     include_deleted: Option<bool>,
 ) -> Result<Vec<local_vault::VaultMemory>, String> {
-    state.with(&expected_vault_id, |vault| {
+    let rows = state.with(&expected_vault_id, |vault| {
         vault.list_with_deleted(&query, include_deleted.unwrap_or(false))
-    })
+    })?;
+    if let Ok(vault) = state.with(&expected_vault_id, |vault| Ok(vault.clone())) { knowledge::best_effort_refresh(&vault); }
+    Ok(rows)
 }
 #[tauri::command]
 fn vault_correct(
@@ -342,9 +351,12 @@ fn vault_correct(
     operation_id: String,
     note: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| {
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
         vault.correct(&memory_id, expected_revision, &operation_id, &note)
-    })
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 #[tauri::command]
 fn vault_restore_note(
@@ -354,9 +366,12 @@ fn vault_restore_note(
     expected_revision: u64,
     operation_id: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| {
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
         vault.restore_note(&memory_id, expected_revision, &operation_id)
-    })
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 #[tauri::command]
 fn vault_remove(
@@ -367,14 +382,17 @@ fn vault_remove(
     operation_id: String,
     expected_state: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| {
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
         vault.remove(
             &memory_id,
             expected_revision,
             &operation_id,
             &expected_state,
         )
-    })
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 #[tauri::command]
 fn vault_rebuild(
@@ -539,8 +557,12 @@ fn meeting_publish(
     organization_operation_id: String,
     operation_id: String,
 ) -> Result<local_vault::VaultMemory, String> {
-    state.with(&expected_vault_id, |vault| vault.publish_meeting(
-        &parser_operation_id, &organization_operation_id, &operation_id))
+    let (memory, vault) = state.with(&expected_vault_id, |vault| {
+        vault.publish_meeting(&parser_operation_id, &organization_operation_id, &operation_id)
+            .map(|memory| (memory, vault.clone()))
+    })?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(memory)
 }
 
 #[tauri::command]
@@ -549,7 +571,78 @@ fn memory_ask(
     expected_vault_id: String,
     question: String,
 ) -> Result<memory_query::Answer, String> {
-    state.with(&expected_vault_id, |vault| memory_query::ask(vault, &question))
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    let answer = memory_query::ask_with_knowledge(&vault, &question)?;
+    state.with(&expected_vault_id, |current| if current.id == vault.id { Ok(()) } else { Err("Vault selection changed".into()) })?;
+    Ok(answer)
+}
+
+#[tauri::command]
+async fn memory_answer(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    question: String,
+    request_id: String,
+) -> Result<knowledge::MemoryAnswer, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    // Register before the blocking retrieval starts so an immediate cancel
+    // can persist its request tombstone before any model dispatch.
+    let start = knowledge::begin_answer(&vault, &request_id)?;
+    let response = tauri::async_runtime::spawn_blocking(move ||
+        memory_query::answer_with_knowledge(&vault, &question, &request_id, start)
+    ).await.map_err(|_| "Answer worker stopped; local source matches remain available".to_string())??;
+    state.with(&expected_vault_id, |current| if current.id == expected_vault_id { Ok(()) } else { Err("Vault selection changed".into()) })?;
+    Ok(response)
+}
+
+#[tauri::command]
+fn knowledge_status(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String) -> Result<knowledge::KnowledgeStatus, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    // A status refresh is also the bounded reconnect retry for any pending
+    // revocation; disabled snapshots contain no sources.
+    knowledge::best_effort_refresh(&vault);
+    knowledge::status(&vault)
+}
+#[tauri::command]
+fn knowledge_consent(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, enabled: bool, include_existing: bool) -> Result<local_vault::KnowledgeControl, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    let control = knowledge::consent(&vault, enabled, include_existing)?;
+    if enabled {
+        knowledge::best_effort_refresh(&vault);
+    } else {
+        knowledge::refresh(&vault).map_err(|_| "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects.".to_string())?;
+    }
+    Ok(control)
+}
+#[tauri::command]
+fn knowledge_answer_consent(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, enabled: bool) -> Result<local_vault::KnowledgeControl, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    let control = knowledge::answer_consent(&vault, enabled)?;
+    knowledge::best_effort_refresh(&vault);
+    Ok(control)
+}
+#[tauri::command]
+fn memory_answer_cancel(expected_vault_id: String, request_id: String) -> Result<bool, String> {
+    knowledge::cancel_answer(&expected_vault_id, &request_id)
+}
+#[tauri::command]
+fn knowledge_search(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, query: String, include_history: Option<bool>) -> Result<knowledge::SearchReply, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    let result = knowledge::search(&vault, &query, include_history.unwrap_or(false))?;
+    state.with(&expected_vault_id, |current| if current.id == vault.id { Ok(()) } else { Err("Vault selection changed".into()) })?;
+    Ok(result)
+}
+#[tauri::command]
+fn knowledge_dismiss(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, fact_id: String) -> Result<local_vault::KnowledgeControl, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    let control = knowledge::dismiss(&vault, &fact_id)?;
+    let _ = knowledge::refresh(&vault);
+    Ok(control)
+}
+#[tauri::command]
+fn knowledge_rebuild(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String) -> Result<knowledge::ServiceStatus, String> {
+    let vault = state.with(&expected_vault_id, |vault| Ok(vault.clone()))?;
+    knowledge::rebuild(&vault)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -603,6 +696,14 @@ pub fn run() {
             meeting_review_status,
             meeting_publish,
             memory_ask,
+            memory_answer,
+            memory_answer_cancel,
+            knowledge_status,
+            knowledge_consent,
+            knowledge_answer_consent,
+            knowledge_search,
+            knowledge_dismiss,
+            knowledge_rebuild,
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,

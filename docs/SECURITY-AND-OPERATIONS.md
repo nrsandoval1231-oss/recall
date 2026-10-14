@@ -1,5 +1,15 @@
 # Security, privacy, and operations
 
+## Optional Graphiti service boundary (2026-10-13)
+
+The integration candidate keeps private graph storage and its queue/budget ledgers outside the repository. The Python service binds only to loopback and requires a separate bearer token; it rejects browser-origin requests and oversized payloads. Do not publish this port through Tailscale, a reverse proxy or a cloud endpoint. Windows currently requires an operator-started WSL service. Graphiti telemetry is disabled, embedding inference stays local, and explicitly configured Anthropic extraction requires separate vault purpose consent. Existing processing consent does not enroll a vault or its backlog in graph processing.
+
+Native snapshots bind each eligible source to vault identity, current revision, original hash, note hash and a monotonic generation. The service fences stale generations and source deletion/revocation before retrieval; the native coordinator checks every support again after transport. Model-created names require a textual anchor in their supporting note but remain inferred, never identity verification. Human corrections and dismissals survive graph rebuilding in native controls. Disabling is persisted locally even if source enumeration or the service fails; a disconnected service's cancellation/removal is explicitly unconfirmed until it reconnects. An accepted purge request does not prove completed deletion.
+
+Quoted Ask answers require a separate versioned consent bound to the disclosed provider/model. Only bounded current source excerpts are sent. Returned quotations must be exact substrings and pass native revision/hash checks again; stale fallback cards are refreshed or removed. Requests have durable UUIDs, cancellation fences and conservative cost reservations. Cancelling suppresses local results but cannot promise remote cancellation or a refund. Person endpoints remain source-local mentions; cross-note identity approval is not implemented.
+
+Back up the complete canonical vault including originals, Markdown, history and native control metadata. The graph is derived; stop its service before copying its database and SQLite ledgers. Do not reset the budget ledger to retry an uncertain provider call. Provider failures and cancellation retain conservative unknown-cost reservations. Current tests use synthetic notes only; no private source disclosure or production activation is authorized by the build. See [the exact evidence and open device gates](../.agent/GRAPHITI-01/ACCEPTANCE.md).
+
 ## Meeting to Memory security gate
 
 The active [Meeting to Memory](MEETING-TO-MEMORY.md) pipeline must preserve original bytes before provider calls, require explicit consent/configuration for external Jev/Claude processing, bound model context, validate all proposed paths and YAML, and prevent silent overwrites of edited Obsidian notes. Local-first is not a license for unrestricted model filesystem access. PR #26 remains isolated.

@@ -2,7 +2,19 @@
 
 # Recall architecture
 
+## Graphiti mission amendment (2026-10-12)
+
+The owner's Graphiti integration mission supersedes earlier Obsidian-required and no-graph restrictions below. Recall owns its portable Markdown notes, original attachments and correction history; Obsidian is optional. Graphiti is an optional, derived, rebuildable relationship index. Saving, reading, editing and local keyword retrieval must work without it or any model provider. Preserve the canonical desktop UI and existing Jev/Claude processing; do not import PR #26 wholesale. Graph processing requires its own explicit purpose consent and configured providers. Implementation and acceptance are tracked in `.agent/GRAPHITI-01/`; no production readiness, provider compatibility or device claim follows from this amendment.
+
 ## Implementation packet: local Meeting to Memory
+
+### Optional local Graphiti service (integration candidate)
+
+The native vault coordinator sends authorized current Markdown snapshots to an authenticated loopback service in the existing Python backend package. Its SQLite ledger records source revisions, hashes, consent generation and interrupted work. Append-only sources use Graphiti episode ingestion; revised, deleted or revoked sources fence retrieval and rebuild the affected scope. Graphiti owns extraction, entity resolution, temporal edges and hybrid retrieval. Recall validates every returned supporting source against the current vault before displaying an inferred relationship.
+
+The selected storage is persistent embedded FalkorDB through Graphiti 0.30.2. On Windows the service runs in WSL; it is not bundled into the desktop installer. FastEmbed computes 384-dimensional embeddings locally from a pinned model. Explicitly configured Anthropic extraction is separate from existing Jev/Claude capture processing and requires separate purpose consent. No graph or provider is required for the authoritative save, read, edit or keyword-search path.
+
+Current runtime evidence, failures, limits and exact validation commands are in [the Graphiti acceptance ledger](../.agent/GRAPHITI-01/ACCEPTANCE.md). This candidate does not establish production or physical-phone acceptance.
 
 Follow [Meeting to Memory](MEETING-TO-MEMORY.md). Keep the native vault writer authoritative and put model proposals behind versioned validation and revision checks. Jev parses source candidates; Claude proposes Obsidian organization; deterministic code commits safe Markdown/YAML. SQLite may index or track jobs locally but must not become a second canonical memory. No PostgreSQL, cloud service or autonomous swarm is required for this pilot. Provider outages must leave durable pending captures, never fake organized states.
 

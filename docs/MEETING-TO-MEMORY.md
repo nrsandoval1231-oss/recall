@@ -2,6 +2,10 @@
 
 # Recall — Meeting to Memory (RCL-INT-001)
 
+## Graphiti mission amendment (2026-10-12)
+
+The owner's Graphiti integration mission supersedes earlier Obsidian-required and no-graph restrictions below. Recall owns its portable Markdown notes, original attachments and correction history; Obsidian is optional. Graphiti is an optional, derived, rebuildable relationship index. Saving, reading, editing and local keyword retrieval must work without it or any model provider. Preserve the canonical desktop UI and existing Jev/Claude processing; do not import PR #26 wholesale. Graph processing requires its own explicit purpose consent and configured providers. Implementation and acceptance are tracked in `.agent/GRAPHITI-01/`; no production readiness, provider compatibility or device claim follows from this amendment.
+
 Status: **canonical implementation packet; native text pipeline implemented and owner-observed live Windows text acceptance recorded. Photo, phone and visual fidelity gates remain OPEN.** Owner decision: 2026-10-11. This packet extends the merged local-first foundation and the latest warm-glass desktop design. PR #26 is deliberately isolated and must not be merged, rebased, copied, or used as authority for this packet.
 
 ## Outcome
