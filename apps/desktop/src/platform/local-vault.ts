@@ -59,6 +59,13 @@ export interface SourceAnswer {
     original_excerpt: string;
     source_sha256: string;
     mime_type: string;
+    match_reason?: string;
+    linked_from_memory_id?: string | null;
+    original_start_byte?: number | null;
+    original_end_byte?: number | null;
+    captured_at?: string;
+    updated_at?: string;
+    human_corrected?: boolean;
   }[];
 }
 export interface LibraryAttachment extends VaultSource {

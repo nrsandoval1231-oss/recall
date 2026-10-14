@@ -772,7 +772,18 @@ fn source_answer(vault: &Vault, question: &str) -> Result<String, String> {
             "Recall/Memories/{} · Recall/Sources/{}.{extension}",
             hit.note_basename, hit.memory_id
         );
-        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><h3>Original evidence</h3><p>{}</p><p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id)));
+        let range = match (hit.original_start_byte, hit.original_end_byte) {
+            (Some(start), Some(end)) => {
+                format!("<p class=\"fine\">Original excerpt: bytes {start}–{end}</p>")
+            }
+            _ => String::new(),
+        };
+        let correction = if hit.human_corrected {
+            " · Includes user corrections; the original below is unchanged."
+        } else {
+            ""
+        };
+        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><p>Current note · revision {}{correction}</p><p class=\"fine\">Captured {} · Note revised {}</p><p>{}</p><h3>Original evidence</h3><p>{}</p>{range}<p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a> · <a href=\"/saved/{}\">Inspect memory</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.match_reason),hit.revision,esc(&hit.captured_at),esc(&hit.updated_at),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id),esc(&hit.memory_id)));
     }
     Ok(format!("<h1>Source-backed matches</h1><p>{}</p><p class=\"fine\">{KEYWORD_LABEL} Retrieved local quotes and evidence; nothing was sent to Claude.</p>{cards}",esc(&answer.message)))
 }

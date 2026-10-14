@@ -1652,6 +1652,9 @@ export function MemorySurface({
                               )
                             : hit.note_basename}
                         </h2>
+                        {hit.match_reason && <p>{hit.match_reason}</p>}
+                        <p>Current note · revision {hit.revision}{hit.human_corrected ? " · Includes user corrections; the original below is unchanged." : ""}</p>
+                        {hit.captured_at && <small>Captured {hit.captured_at} · Note revised {hit.updated_at}</small>}
                         <NoteMarkdown>
                           {noteBody({
                             id: hit.memory_id,
@@ -1660,6 +1663,9 @@ export function MemorySurface({
                         </NoteMarkdown>
                         <h2>Original evidence</h2>
                         <p>{hit.original_excerpt}</p>
+                        {hit.original_start_byte != null && hit.original_end_byte != null && (
+                          <small>Original excerpt: bytes {hit.original_start_byte}–{hit.original_end_byte}</small>
+                        )}
                         <small>SHA-256: {hit.source_sha256}</small>
                         <button
                           onClick={() => {

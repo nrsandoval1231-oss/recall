@@ -37,13 +37,13 @@ test("offline capture survives page and desktop restart, then receives one nativ
   await page.reload();
   await expect(page.getByTestId("outbox")).toContainText("Synthetic: Sarah");
   await expect(page.getByTestId("outbox")).not.toContainText("Received by library");
-  await page.screenshot({ path: "docs/audits/native-phone-recovery/offline-device-copy.png", fullPage: true });
+  if (process.env.RECALL_PHONE_EVIDENCE_DIR) await page.screenshot({ path: join(process.env.RECALL_PHONE_EVIDENCE_DIR, "offline-device-copy.png"), fullPage: true });
   await start(root);
   await context.setOffline(false);
   await page.getByRole("button", { name: "Retry queued captures" }).click();
   await expect(page.getByTestId("outbox")).toContainText("Received by library");
   await page.getByRole("button", { name: "Retry queued captures" }).click();
-  await page.screenshot({ path: "docs/audits/native-phone-recovery/received-by-library.png", fullPage: true });
+  if (process.env.RECALL_PHONE_EVIDENCE_DIR) await page.screenshot({ path: join(process.env.RECALL_PHONE_EVIDENCE_DIR, "received-by-library.png"), fullPage: true });
   const originals = await readdir(join(root, "Recall/Sources"));
   expect(originals).toHaveLength(1);
   expect(await readFile(join(root, "Recall/Sources", originals[0]!), "utf8")).toContain("schedule is uncertain?");
@@ -60,7 +60,9 @@ test("uncertain network delivery retries the same capture without duplication", 
   await page.getByRole("button", { name: "Save capture", exact: true }).click();
   await expect(page.getByTestId("outbox")).toContainText("Saved on this device");
   await expect.poll(async () => (await readdir(join(root, "Recall/Sources"))).length).toBe(1);
-  await page.unroute("**/capture");
+  // The original can exist before fetch/abort finishes; keep interception until it does.
+  await page.unrouteAll({ behavior: "wait" });
+  await expect(page.getByTestId("outbox")).toContainText("Original retained");
   await page.reload();
   await page.getByRole("button", { name: "Retry queued captures" }).click();
   await expect(page.getByTestId("outbox")).toContainText("Received by library");
@@ -135,6 +137,26 @@ test("device storage failure retains the form and never sends its original", asy
   await expect(page.locator('#local-status')).toContainText('quota failure');
   await expect(page.getByLabel('Note, in your words')).toHaveValue('Synthetic unsaved draft');
   expect(await readdir(join(root, 'Recall/Sources'))).toHaveLength(0);
+});
+
+test('native Ask locates late evidence and distinguishes linked context', async ({ page, request }) => {
+  const scope = await (await request.get('/companion/library')).json() as { library_id: string };
+  const headers = { accept: 'application/json', 'x-recall-library-id': scope.library_id };
+  const target = '11111111-1111-4111-8111-111111111111';
+  const source = '22222222-2222-4222-8222-222222222222';
+  expect((await request.post('/capture', { headers, form: { operation_id: target, note: 'Synthetic earlier context: the proposed departure was withdrawn.' } })).ok()).toBeTruthy();
+  const original = 'Synthetic unrelated preamble. '.repeat(100) + `\nThe ceramic ferry booking is tentative; do not assume it is confirmed.\n[[Recall/Memories/${target}|Earlier context]]`;
+  expect((await request.post('/capture', { headers, form: { operation_id: source, note: original } })).ok()).toBeTruthy();
+  await page.goto('/');
+  await page.getByLabel('Ask the notes').fill('What did we decide about that ceramic ferry?');
+  await page.getByRole('button', { name: 'Search notes' }).click();
+  const direct = page.locator(`article[data-memory="${source}"]`);
+  await expect(direct).toContainText('booking is tentative; do not assume it is confirmed.');
+  await expect(direct).toContainText('Original excerpt: bytes');
+  const linked = page.locator(`article[data-memory="${target}"]`);
+  await expect(linked).toContainText('Linked context, not a direct wording match.');
+  await expect(linked).toContainText('proposed departure was withdrawn.');
+  await expect(page.locator('body')).toContainText('not a generated answer');
 });
 
 for (const failFirst of [false, true]) {
