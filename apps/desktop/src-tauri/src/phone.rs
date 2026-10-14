@@ -1,4 +1,4 @@
-//! Phone capture and ask for the desktop Obsidian vault.
+//! Phone capture and ask for the native Recall library.
 //!
 //! This process is the Tailscale companion. It serves one mobile page and writes
 //! through the same vault the desktop app uses. Provider processing requires
@@ -207,7 +207,7 @@ fn respond(
     output = output.with_header(ascii_header("X-Frame-Options", "DENY")?);
     output = output.with_header(ascii_header(
         "Content-Security-Policy",
-        "default-src 'self'; img-src 'self'; style-src 'unsafe-inline'; script-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'self'; img-src 'self' blob:; style-src 'unsafe-inline'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     )?);
     for (name, value) in &response.extra {
         output = output.with_header(ascii_header(name, value)?);
@@ -258,6 +258,23 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
     }
     match (request.method, path) {
         ("GET" | "HEAD", "/" | "/index.html") => html(200, home_page()),
+        ("GET" | "HEAD", "/companion.js") => bytes(
+            200,
+            "text/javascript; charset=utf-8",
+            include_bytes!("phone/companion.js").to_vec(),
+        ),
+        ("GET" | "HEAD", "/companion-sw.js") => bytes(
+            200,
+            "text/javascript; charset=utf-8",
+            include_bytes!("phone/companion-sw.js").to_vec(),
+        ),
+        ("GET" | "HEAD", "/companion/library") => match Vault::open(root) {
+            Ok(vault) => json(
+                200,
+                serde_json::json!({"library_id": vault.id, "format": "recall-companion-v1"}),
+            ),
+            Err(error) => vault_page(error),
+        },
         ("GET" | "HEAD", "/ask" | "/capture") => html(
             405,
             page(
@@ -327,6 +344,17 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
         Ok(vault) => vault,
         Err(err) => return vault_page(err),
     };
+    let receipt_requested = header(request.headers, "accept") == Some("application/json");
+    // A queued request is bound to the library acknowledged when it was saved
+    // on the phone. Never retarget it when the desktop selects another library.
+    if receipt_requested
+        && header(request.headers, "x-recall-library-id") != Some(vault.id.as_str())
+    {
+        return json(
+            409,
+            serde_json::json!({"error": "Different library; capture remains on this device"}),
+        );
+    }
     let form = match read_capture(request) {
         Ok(form) => form,
         Err(err) => {
@@ -348,6 +376,16 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             if let Err(error) = vault.processing_snapshot(&memory.id, memory.revision) {
                 return saved_processing_error(&memory.id, &error);
             }
+            // A durable source receipt is independent of provider availability.
+            let receipt = || match vault.source(&memory.id) {
+                Ok(source) => json(
+                    200,
+                    serde_json::json!({"format": "recall-capture-receipt-v1",
+                    "library_id": vault.id, "memory_id": memory.id, "revision": memory.revision,
+                    "source_sha256": source.sha256, "state": "received"}),
+                ),
+                Err(error) => vault_page(error),
+            };
             if form.process_consent {
                 match crate::companion_processing::consent(&vault, &memory, true) {
                     Ok(Some(intent)) => {
@@ -361,7 +399,11 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                         };
                         if let Err(error) = crate::companion_processing::record(&vault, &requested)
                         {
-                            return saved_processing_error(&memory.id, &error);
+                            return if receipt_requested {
+                                receipt()
+                            } else {
+                                saved_processing_error(&memory.id, &error)
+                            };
                         }
                         let worker = vault.clone();
                         std::thread::spawn(move || {
@@ -376,10 +418,20 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                         });
                     }
                     Ok(None) => {}
-                    Err(error) => return saved_processing_error(&memory.id, &error),
+                    Err(error) => {
+                        return if receipt_requested {
+                            receipt()
+                        } else {
+                            saved_processing_error(&memory.id, &error)
+                        }
+                    }
                 }
             }
-            redirect(&format!("/saved/{}", memory.id))
+            if receipt_requested {
+                receipt()
+            } else {
+                redirect(&format!("/saved/{}", memory.id))
+            }
         }
         Err(err) => not_saved(
             vault_status(&err),
@@ -791,7 +843,7 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
             &format!(
                 "{body}{source_card}{processing}{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
                 capture_form(&Uuid::new_v4().to_string(), ""),
-                ask_form("")
+                format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
             ),
         ),
     )
@@ -848,9 +900,12 @@ fn same_origin(headers: &[(&str, &str)]) -> Result<(), PhoneResponse> {
         .map(|value| value.trim_end_matches('/'));
     let host = header(headers, "host").unwrap_or("");
     let expected = format!("http://{host}");
+    let secure_expected = format!("https://{host}");
     let site_ok = site.is_none_or(|value| value.eq_ignore_ascii_case("same-origin"));
     let origin_ok = origin.is_none_or(|value| {
-        value.eq_ignore_ascii_case("null") || value.eq_ignore_ascii_case(&expected)
+        value.eq_ignore_ascii_case("null")
+            || value.eq_ignore_ascii_case(&expected)
+            || value.eq_ignore_ascii_case(&secure_expected)
     });
     if site_ok && origin_ok {
         return Ok(());
@@ -873,16 +928,16 @@ fn home_page() -> String {
     page(
         "Recall",
         &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>This phone writes the Obsidian vault on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. That icon does not work offline. If this page does not load, nothing was saved.</p><p>This page is HTTP on your tailnet. Recall does not install a certificate. Do not forward this port to the public internet.</p></footer>",
+            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>Capture to your Recall library on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. Offline reopening requires HTTPS and a completed first visit. On HTTP, keep this page open to queue captures. Browser storage can be cleared by your device; a library receipt is your confirmation of transfer.</p><p>Use your authorized Tailscale connection. Recall does not install a certificate; HTTPS can be supplied by Tailscale Serve. Do not forward this port to the public internet.</p></footer>",
             capture_form(&Uuid::new_v4().to_string(), ""),
-            ask_form("")
+            format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
         ),
     )
 }
 
 fn capture_form(operation_id: &str, note: &str) -> String {
     format!(
-        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save to the vault</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save capture</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
         esc(operation_id),
         esc(note)
     )
@@ -950,6 +1005,10 @@ fn bytes(status: u16, content_type: &str, body: Vec<u8>) -> PhoneResponse {
         extra: Vec::new(),
         body,
     }
+}
+
+fn json(status: u16, value: serde_json::Value) -> PhoneResponse {
+    bytes(status, "application/json", value.to_string().into_bytes())
 }
 
 fn redirect(location: &str) -> PhoneResponse {
@@ -1520,6 +1579,60 @@ mod tests {
         assert!(!body.contains("Nothing new was written"));
     }
     #[test]
+    fn queued_capture_requires_matching_library_and_returns_durable_receipt() {
+        let dir = TempDir::new();
+        let vault = Vault::open(&dir.0).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let body = format!("operation_id={id}&note=Synthetic+offline+memory");
+        let headers = [
+            ("content-type", "application/x-www-form-urlencoded"),
+            ("accept", "application/json"),
+            ("x-recall-library-id", "wrong-library"),
+        ];
+        assert_eq!(
+            call(&dir.0, "POST", "/capture", &headers, body.as_bytes()).status,
+            409
+        );
+        assert!(vault.list_with_deleted("", false).unwrap().is_empty());
+        let headers = [
+            ("content-type", "application/x-www-form-urlencoded"),
+            ("accept", "application/json"),
+            ("x-recall-library-id", vault.id.as_str()),
+        ];
+        for _ in 0..2 {
+            let response = call(&dir.0, "POST", "/capture", &headers, body.as_bytes());
+            assert_eq!(response.status, 200);
+            let receipt: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+            assert_eq!(receipt["memory_id"], id);
+            assert_eq!(receipt["library_id"], vault.id);
+            assert_eq!(receipt["state"], "received");
+            assert_eq!(receipt["source_sha256"], vault.source(&id).unwrap().sha256);
+        }
+        assert_eq!(
+            Vault::open(&dir.0)
+                .unwrap()
+                .list_with_deleted("", false)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn companion_scope_and_assets_are_available_without_private_cache() {
+        let dir = TempDir::new();
+        let vault = Vault::open(&dir.0).unwrap();
+        let response = call(&dir.0, "GET", "/companion/library", &[], b"");
+        assert_eq!(response.status, 200);
+        let identity: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+        assert_eq!(identity["library_id"], vault.id);
+        for path in ["/companion.js", "/companion-sw.js"] {
+            let response = call(&dir.0, "GET", path, &[], b"");
+            assert_eq!(response.status, 200);
+            assert!(response.content_type.contains("javascript"));
+        }
+    }
+    #[test]
     fn bind_defaults_to_loopback_and_refuses_every_interface() {
         let choice = decide_bind(None, false, 8787, None).unwrap();
         assert_eq!(choice.addr, "127.0.0.1:8787".parse().unwrap());
@@ -1603,7 +1716,7 @@ mod tests {
         assert!(!page.contains("type=\"email\""));
         assert!(!page.contains("Brooks Campus"));
         assert!(!page.contains("300MW"));
-        assert!(page.contains("script-src 'none'") || !page.contains("<script"));
+        assert!(page.contains("<script src=\"/companion.js\" defer></script>"));
     }
 
     #[test]

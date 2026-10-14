@@ -16,7 +16,8 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "test:ui": "playwright test -c tests/ui/playwright.config.ts"
+    "test:ui": "playwright test -c tests/ui/playwright.config.ts",
+    "test:phone": "playwright test -c tests/phone/playwright.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
