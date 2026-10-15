@@ -1,0 +1,21 @@
+{
+  "source": "6decc918a68b23340cd3514c654ebea477eca5ea",
+  "viewport": [
+    900,
+    640
+  ],
+  "graph": {
+    "x": 153,
+    "y": 253.53125,
+    "width": 492,
+    "height": 201.1875
+  },
+  "message": {
+    "x": 177,
+    "y": 377.265625,
+    "width": 444,
+    "height": 62.234375
+  },
+  "overlap": true,
+  "taskWidth": 230
+}

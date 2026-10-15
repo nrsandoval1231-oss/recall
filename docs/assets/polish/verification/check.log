@@ -1,0 +1,123 @@
+
+> recall@0.1.0 check
+> npm run lint && npm run typecheck && npm run test
+
+
+> recall@0.1.0 lint
+> eslint .
+
+
+> recall@0.1.0 typecheck
+> npm run typecheck --workspaces --if-present && tsc -p tests/e2e/tsconfig.json && tsc -p tests/ui/tsconfig.json
+
+
+> @recall/api-client@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+> @recall/design-tokens@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+> @recall/sync@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+> @recall/desktop@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+> @recall/mobile@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+> @recall/web@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+> recall@0.1.0 test
+> npm run test --workspaces --if-present
+
+
+> @recall/api-client@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 /workspace/recall/packages/api-client
+
+
+ Test Files  2 passed (2)
+      Tests  26 passed (26)
+   Start at  19:28:39
+   Duration  413ms (transform 53%, import 26%, tests 19%, worker 3%)
+
+
+> @recall/design-tokens@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 /workspace/recall/packages/design-tokens
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  19:28:40
+   Duration  201ms (transform 73%, import 14%, tests 10%, worker 4%)
+
+
+> @recall/sync@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 /workspace/recall/packages/sync
+
+
+ Test Files  4 passed (4)
+      Tests  64 passed (64)
+   Start at  19:28:40
+   Duration  489ms (tests 45%, transform 40%, import 12%, worker 2%)
+
+
+> @recall/desktop@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 /workspace/recall/apps/desktop
+
+
+ Test Files  18 passed (18)
+      Tests  143 passed (143)
+   Start at  19:28:41
+   Duration  12.85s (tests 53%, environment 24%, import 18%, transform 5%)
+
+    Isolate  18 workers spawned · ~449ms startup each (spawn + environment, per file)
+             at least ~2.25s faster with isolate: false — reuses workers across files instead of one per file
+
+
+> @recall/mobile@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 /workspace/recall/apps/mobile
+
+
+ Test Files  2 passed (2)
+      Tests  9 passed (9)
+   Start at  19:28:54
+   Duration  269ms (transform 68%, import 27%, tests 3%, worker 2%)
+
+
+> @recall/web@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 /workspace/recall/apps/web
+
+
+ Test Files  6 passed (6)
+      Tests  55 passed (55)
+   Start at  19:28:55
+   Duration  2.62s (tests 53%, environment 24%, transform 15%, import 8%, worker 1%)
+
+    Isolate  6 workers spawned · ~279ms startup each (spawn + environment, per file)
+             at least ~279ms faster with isolate: false — reuses workers across files instead of one per file
