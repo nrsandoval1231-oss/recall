@@ -314,4 +314,3 @@ test processing::tests::validated_parser_result_is_durable_and_identical_replay_
 test persistence::tests::snapshot_payload_limit_rolls_back_cursor_and_preserves_outbox ... ok
 
 test result: ok. 294 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 6.98s
-
