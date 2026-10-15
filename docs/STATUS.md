@@ -16,6 +16,8 @@ _Last updated: 2026-10-15. Initial UI-authority audit baseline: `8423206fa683d48
 
 ### Source audit and implementation debt
 
+- Automated UI verification (`apps/desktop/scripts/verify-ui.mjs`, CI `adaptive-desktop-ui`) no longer compares against the retired four-panel image, which the lock removed and the script had required. It still captures four viewports and runs the axe, console-error and synthetic IPC walkthrough checks. **There is no visual comparison against the approved boards yet**; add one when their PNGs are imported.
+
 - `docs/DESIGN.md` previously required the older exact four-panel PNG. That design authority is replaced, not retained as an option.
 - Shared token documentation and `packages/design-tokens/src/index.ts` said no brand had been approved. That claim is corrected; exported runtime token values remain unchanged and need a tested migration.
 - `apps/desktop/src/surface/memory-surface.css` still uses Georgia/Times, brown/cognac accents and its previous composition. It has not been migrated to Playfair Display / Inter and the approved palette.
@@ -53,7 +55,7 @@ The authority lock changes documentation and the token source header comment onl
 
 ## Friend testing (approved 2026-10-15)
 
-Friends install the Windows build and use their own keys (option 1; no shared/hosted instance). PR #59 merged the Settings → AI providers source, tag-triggered pre-release workflow and [TESTING.md](TESTING.md). Those changes are preserved by this design lock; merge is not proof of an installed-Windows credential-store round trip. First beta tag still waits on owner sign-off after acceptance sections A–E.
+Friends install the Windows build and use their own Claude key (option 1; no shared/hosted instance). The owner provides Jev access. PR #59 merged the Settings → AI providers source, tag-triggered pre-release workflow and [TESTING.md](TESTING.md); PR #60 prefills the model, budgets and (for Claude Sonnet 5.5 only) published prices. Merge is not proof of an installed-Windows credential-store round trip. The first tester tag (`v0.1.0`) still waits on owner sign-off after acceptance sections A–E.
 
 ## Next steps
 
@@ -71,4 +73,4 @@ The existing v1 acceptance sequence remains required:
 
 ## Concurrent work and PR history
 
-PR #59, **Configure Jev and Claude in Settings; tester pre-release workflow**, merged during this audit at `07e79bfeb5141632b1ae0ddebd09ea534de88375`. The visual-lock update is based on that commit and preserves its provider code, Settings component, release workflow, development guidance and tester guide. No release/tag approval is granted by this UI lock. PR #26 was closed 2026-10-15; its branch is historical, not a design reference. Recheck live PR state before acting.
+PR #60, **Prefill provider model, prices and budgets in Settings**, is open. PR #59 merged at `07e79bfeb5141632b1ae0ddebd09ea534de88375`; the UI lock `e5f6be0` preserves its provider code, Settings component, release workflow, development guidance and tester guide. No release/tag approval is granted by the UI lock. PR #26 was closed 2026-10-15; its branch is historical, not a design reference. Recheck live PR state before acting.

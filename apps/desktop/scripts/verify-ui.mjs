@@ -12,22 +12,10 @@ const output = path.resolve(
 );
 fs.mkdirSync(output, { recursive: true });
 const uiUrl = process.env.RECALL_UI_URL || "http://127.0.0.1:4173/";
-const reference = path.join(
-  repo,
-  "docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png",
-);
-const referenceBytes = fs.readFileSync(reference);
-if (
-  createHash("sha1")
-    .update(
-      Buffer.concat([
-        Buffer.from(`blob ${referenceBytes.length}\0`),
-        referenceBytes,
-      ]),
-    )
-    .digest("hex") !== "6abf5192ab4ee96708984174ed15e3648c668bf0"
-)
-  throw Error("Approved reference changed");
+// The 2026-10-15 UI lock retired the old four-panel reference image; no visual
+// comparison runs until the approved boards are imported (docs/DESIGN.md).
+// Remove a comparison left by an older run so it never sits beside fresh evidence.
+fs.rmSync(path.join(output, "approved-comparison.jpg"), { force: true });
 const browser = await chromium.launch(
   process.env.RECALL_CHROMIUM
     ? { executablePath: process.env.RECALL_CHROMIUM }
@@ -278,24 +266,11 @@ for (const [w, h] of [
   });
   await context.close();
 }
-const comparison = await browser.newPage({
-  viewport: { width: 1536, height: 1548 },
-});
-await comparison.setContent(
-  `<style>body{margin:0;background:#eee9e0}h2{font:18px Georgia;margin:12px}img{width:1536px;display:block}</style><h2>Unchanged owner-approved reference · illustrative content</h2><img src="data:image/png;base64,${referenceBytes.toString("base64")}"><h2>Implemented empty native-mode UI · synthetic browser IPC evidence</h2><img src="data:image/jpeg;base64,${fs.readFileSync(path.join(output, "empty-1536.jpg")).toString("base64")}">`,
-);
-await comparison.screenshot({
-  path: path.join(output, "approved-comparison.jpg"),
-  type: "jpeg",
-  quality: 90,
-  fullPage: true,
-});
 fs.writeFileSync(
   path.join(output, "browser-verification.json"),
   JSON.stringify(
     {
       kind: "Synthetic browser IPC checks; not native persistence, installed Windows, or live-provider acceptance",
-      referenceBlob: "6abf5192ab4ee96708984174ed15e3648c668bf0",
       results,
       errors,
     },
