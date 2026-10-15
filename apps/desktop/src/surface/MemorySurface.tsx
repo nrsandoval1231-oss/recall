@@ -893,7 +893,7 @@ export function MemorySurface({
       clearPreview();
       evidenceRef.current = null;
       askRequest.current += 1;
-    setSearching(false);
+      setSearching(false);
       setSourceAnswer(null);
       setProcessingState("");
       setProcessingConsent(false);
