@@ -97,7 +97,7 @@ pub fn validate(
         return Err("invalid note body".into());
     }
     // Only native, explicitly declared wikilinks are permitted. Arbitrary HTML,
-    // Markdown destinations and embeds can load remote content in Obsidian.
+    // Markdown destinations and embeds can load remote content in a renderer.
     let body_links = p.body.replace("- [ ] ", "- ").replace("- [x] ", "- ");
     let mut remaining = body_links.as_str();
     while let Some(start) = remaining.find("[[") {

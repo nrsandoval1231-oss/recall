@@ -1,7 +1,7 @@
 """Supabase Storage adapter (private bucket, server-side service-role key only).
 
 NOT live-verified in RCL-001: it is exercised only against a stub HTTP server. The live gate
-(real project + private bucket) is recorded in docs/ACCEPTANCE.md ("RCL-001 evidence").
+(real project + private bucket) is recorded in docs/history/ACCEPTANCE-LOG-2026-10.md ("RCL-001 evidence").
 """
 
 from __future__ import annotations

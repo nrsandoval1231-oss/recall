@@ -1,6 +1,6 @@
 # Recall web companion (PR #16)
 
-Historical as product center under the [2026-10-10 amendment](../../docs/PILOT-CONTRACT.md). This app is an optional browser companion and enrollment transport. It is not the desktop Memory Surface and not the way to start using Recall.
+**Frozen legacy cloud code, not the product.** See [docs/legacy-cloud](../../docs/legacy-cloud/README.md) and [VISION.md](../../docs/VISION.md).
 
 The Cloudflare Worker serves the Vite app and proxies only `/api/v1/*` to the Recall API. A provisioned browser opens Recall directly. There is no sign-in screen.
 
@@ -16,6 +16,6 @@ npx wrangler@4 dev --config apps/web/wrangler.toml --port 8787
 
 Set ignored local `.dev.vars` beside `wrangler.toml`: `API_ORIGIN`, `SITE_ORIGIN`, and a fresh random 32-byte base64url `SESSION_KEY`. Production `SESSION_KEY` must be supplied with `wrangler secret put SESSION_KEY`, never Vite, Git, or a browser setting. Rotating it ends existing web sessions. The operator token stays on the API, not in the Worker or the client.
 
-Historical note: an earlier pilot path used Supabase email links and `/auth/callback`. That dependency is retired for this web app. The October 2026 email-provider incident records remain in `docs/V1-STATUS.md`.
+Historical note: an earlier pilot path used Supabase email links and `/auth/callback`. That dependency is retired for this web app. The October 2026 email-provider incident records remain in `docs/history/ACCEPTANCE-LOG-2026-10.md`.
 
 iPhone Add to Home Screen and Windows browser use of this URL are still manual acceptance gates. A green build is not that proof.

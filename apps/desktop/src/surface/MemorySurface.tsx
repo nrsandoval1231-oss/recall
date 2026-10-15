@@ -1742,26 +1742,6 @@ export function MemorySurface({
                         ? vaultContext(kept, evidenceMemory.id).related
                         : []
                     }
-                    onOpenObsidian={
-                      vault.openObsidian && selected
-                        ? () => {
-                            void vault.openObsidian!(
-                              selected.vault_id,
-                              evidenceMemory!.id,
-                            )
-                              .then(() => {
-                                if (inScope(selected.vault_id))
-                                  setNotice(
-                                    "Requested Obsidian to open this note. Obsidian must be installed with this vault registered.",
-                                  );
-                              })
-                              .catch((error) => {
-                                if (inScope(selected.vault_id))
-                                  setError(message(error));
-                              });
-                          }
-                        : undefined
-                    }
                     onHistory={() =>
                       evidenceMemory && void showHistory(evidenceMemory)
                     }
@@ -2355,7 +2335,6 @@ function Evidence(props: {
   onHistory: () => void;
   related: SourceRow[];
   onRelated: (memory: VaultMemory) => void;
-  onOpenObsidian?: () => void;
   onConfirmRemove: (value: boolean) => void;
   onRemove: () => void;
   onRestore: () => void;
@@ -2528,14 +2507,6 @@ function Evidence(props: {
                 disabled={props.busy}
               />
               <div className="ms-actions">
-                {props.onOpenObsidian && (
-                  <details>
-                    <summary>Optional Markdown compatibility</summary>
-                    <button type="button" onClick={props.onOpenObsidian}>
-                      Open in Obsidian (optional)
-                    </button>
-                  </details>
-                )}
 
                 <button
                   type="button"

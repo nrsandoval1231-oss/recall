@@ -1,4 +1,4 @@
-/** Wire types for the RCL-001 API. Mirrors docs/API-CONTRACT.md; verified against a live server by tests/e2e. */
+/** Wire types for the RCL-001 API. Mirrors docs/legacy-cloud/API-CONTRACT.md; verified against a live server by tests/e2e. */
 
 export type MediaType = "image/jpeg" | "image/png" | "image/heic" | "image/heif";
 export type SourceKind = "handwritten_note" | "photo_document";

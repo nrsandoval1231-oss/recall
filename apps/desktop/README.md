@@ -1,11 +1,9 @@
 # Recall desktop
 
-The product path is the Memory Surface. It opens without an email, password, or sign-in link and keeps memory in a local Obsidian vault. Run it from [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
+The product: React Memory Surface (`src/`) plus the Rust core and `recall-phone` binary (`src-tauri/`). No login. Memory lives in a local Recall library folder.
 
-`npm run dev` is a browser preview of that surface. It shows the synthetic Brooks Campus fixture and cannot write files. `npx tauri dev` chooses a vault folder, or creates `Documents/Recall`, then imports a photo into `Recall/Sources` and a Markdown note into `Recall/Memories`.
+- `npm run dev`: browser preview with a labelled synthetic fixture; cannot write files.
+- `npx tauri dev`: the real app.
+- `npm run phone`: phone Capture/Ask server for the same library.
 
-Ask searches note text and opens the original. It is keyword search, not a Claude answer. Claude reading stays off unless the desktop process has `RECALL_CLAUDE_API_KEY`, a model, prices, and budgets. A consented read stores an unreviewed proposal and does not replace the note until you save a correction. Tests use a fake provider and do not make a network call.
-
-`cargo run --bin recall-phone` from `src-tauri` serves the phone Capture and Ask page for the same vault. It is meant for the Tailscale address of this computer. Steps and the HTTPS, offline, and Claude gaps are in [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md).
-
-`?mode=legacy-cloud` keeps the older cloud desktop, including its email sign-in. It is not the happy path. The Windows NSIS build is unsigned. An Actions artifact is not an installed-app acceptance.
+See [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md) for setup, model configuration and the phone, and [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) for how it fits together. `?mode=legacy-cloud` opens the frozen cloud-era client and is not the product path. The Windows NSIS build is unsigned.

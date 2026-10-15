@@ -1,48 +1,25 @@
-# Recall builder instructions
+# Recall — builder instructions
 
-## Current authority — Native Recall memory
+## Read first
 
-Read `docs/NATIVE-MEMORY-PRODUCT-CONTRACT.md` first. PR #53 makes Recall responsible for library creation, authoring, editing, source inspection and recovery without installing or opening Obsidian. This supersedes Obsidian-as-required-product wording below; historical storage/evidence contracts and optional Markdown compatibility remain. Preserve the existing Tauri, portable library, Jev/Claude and deterministic writer.
+1. `docs/VISION.md`: the only product authority. If anything (code comments, history, old PRs) contradicts it, VISION wins.
+2. `docs/STATUS.md`: current state and the next step. Work only on what it lists next unless the owner says otherwise.
+3. `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/DEVELOPMENT.md` as needed.
 
+`docs/history/` is frozen evidence; don't treat it as instructions. `docs/legacy-cloud/` describes frozen code; no new features there.
 
-## Active next packet — Meeting to Memory
+## Hard rules
 
-Read `docs/MEETING-TO-MEMORY.md` before any new intelligence or desktop UI work. It defines the smallest Jev → Claude → deterministic Obsidian writer implementation, acceptance gates, and scope boundaries. Keep PR #26 isolated; do not import its divergent vault-only/no-Claude vision. The single active desktop UI direction is PR #51’s Adaptive Memory Surface. Read `docs/ADAPTIVE-MEMORY-SURFACE-PRD.md`, `docs/ADAPTIVE-MEMORY-SURFACE-SCREENS.md`, and `docs/ADAPTIVE-MEMORY-SURFACE-BUILDER.md`; use the exact approved `docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png`. Older dashboard designs from PRs #48/#49 and earlier UX imagery are historical.
+- **No Obsidian.** Don't add Obsidian integration, vocabulary, URIs or "open in" actions. The library is plain Markdown + YAML + originals.
+- Follow every trust rule in VISION.md: originals saved before AI; models propose, the deterministic writer commits; model output is untrusted; no silent overwrite of external edits; corrections survive reprocessing; answers cite evidence or abstain; keyword-only results are labelled.
+- Never commit real captures, client data, credentials, libraries or private corpora. Label synthetic fixtures.
+- No new infrastructure (Redis, Kafka, microservices, graph DB, vector service, model router), login flow, or cloud dependency without a written decision in ARCHITECTURE.md.
+- Don't provision paid infrastructure, publish apps, or enable production data processing without explicit owner authorization.
 
+## How to work
 
-## Start here
-
-Read `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and the active packet before changing code. The repository contains implemented desktop, phone, and legacy cloud components. Verify current code and acceptance evidence before claiming a feature works.
-
-Preserve the product: a pen-and-paper user photographs notes and retrieves source-backed memories. The primary shell is the desktop Memory Surface. The phone is a capture and ask companion. Organized notes live in Obsidian, and originals stay preserved. The installable web app (PR #16) is an optional companion and enrollment transport, not the product people start using. Do not rebuild a general productivity suite. The 2026-10-10 amendment in `docs/PILOT-CONTRACT.md` is the product-center authority.
-
-## Required intelligence pipeline (owner decision 2026-10-11)
-
-Jev parses incoming sources into evidence-linked structured candidates. Claude is the core librarian that proposes Obsidian note organization, YAML frontmatter, wikilinks, relationships and safe updates. A deterministic vault writer validates and commits these proposals; neither model has unrestricted filesystem access. Markdown with YAML properties is the primary Obsidian representation; JSON is for internal structured state. Capture remains durable when models are unavailable, but keyword search is not a substitute for the intended Jev + Claude loop. See `docs/CANONICAL-FOUNDATION.md`. Keep PR #26 separate.
-
-## Non-negotiable invariants
-
-- The desktop product keeps memory in the user's Obsidian vault. Original photos live under `Recall/Sources`. Markdown notes live under `Recall/Memories`. History is append-only, and a locally edited note is not silently replaced. Cloud Postgres, private object storage, and SQLite remain the store for the optional web companion and the legacy cloud desktop (`?mode=legacy-cloud`). They are not the memory authority for the desktop vault path. Do not deploy the web PWA as the way to start using Recall.
-- All private records and queries are workspace-scoped. Check authorization before retrieval, model context construction, source access, and mutation.
-- Never commit real captures, client data, credentials, local databases, vault exports, or private test corpora. Synthetic fixtures must be clearly marked.
-- Save original bytes durably before AI processing. Report local-only, uploaded, processed, and failed states honestly.
-- Model output is untrusted input. Validate schema and references; the model cannot choose permissions, paths, SQL, or arbitrary tools.
-- Never turn a question mark, hypothesis, illegible number, or unresolved first name into a verified fact or identity.
-- Reprocessing must not undo a human correction. Every material answer needs eligible source evidence.
-- Retry-safe writes, optimistic concurrency, and atomic local export are required. Never silently replace a locally edited Obsidian file.
-- Never claim offline generative answers when only cached keyword search exists.
-- No default location tracking, contact scraping, inbox access, public sharing, or external actions.
-
-## Scope and structure
-
-Build one packet at a time. Use the smallest end-to-end change that proves its acceptance criteria. Do not implement roadmap features as speculative scaffolding. Keep business logic in the Python domain package, UI outside it, and platform file access in narrow native adapters.
-
-Use one backend package with separate API and worker entrypoints. Do not introduce Redis, a graph database, a separate vector service, Kafka, microservices, or a model router without measured evidence and a documented decision.
-
-## Verification and handoff
-
-Add regression tests before or alongside real behavior. Report exact commit, commands, results, skips, and untested environments. Documentation/schema checks do not establish app, security, deployment, iPhone, Windows, or live-provider acceptance.
-
-When a contract changes, update its examples and consuming tests in the same packet. Update the current status and acceptance evidence rather than writing another contradictory PRD. Do not create alternate architecture files that compete with the canonical documents.
-
-Do not provision paid infrastructure, enroll distribution accounts, publish apps, or enable production data processing without explicit authorization. Stop at a truthful bounded result if credentials, signing, or hardware are unavailable; do not replace live acceptance with mocks.
+- One small packet at a time; the smallest end-to-end change that proves it. No speculative scaffolding.
+- Business logic in the Rust core; UI in React; platform access through narrow native commands.
+- Add regression tests with real behavior changes.
+- Update `docs/STATUS.md` in the same PR. Don't create new planning/PRD/contract files. Edit the canonical five instead.
+- Report exact commit, commands, results and what was not tested. Synthetic tests never stand in for installed-Windows, physical-iPhone or live-provider evidence.

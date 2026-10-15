@@ -1,33 +1,34 @@
 # Recall
 
-**Your life remembers itself.**
+A private, local-first external memory. Photograph your notes or type a brain-dump; later, ask a vague question and get the answer with the original source to prove it. Your memories live in a plain folder you own: originals, Markdown notes and append-only history.
 
-Recall is a private, local-first external memory. Capture anything, recover information and context, inspect original evidence, make corrections that stick, and own your knowledge.
+- **Desktop** (Tauri, Windows first): the adaptive Memory Surface, with Camera / Speak / Write, Ask, inspect, correct and graph.
+- **Phone**: Capture and Ask over your private Tailscale network. No login.
+- **Intelligence**: Jev parses → Claude proposes organization → a deterministic writer validates and commits. Consent-gated and budget-capped. Everything except interpretation keeps working offline.
 
-## Authoritative direction — 2026-10-13
+## Docs (read in this order)
 
-**[Native Memory Product Contract](docs/NATIVE-MEMORY-PRODUCT-CONTRACT.md)** defines the product end-state and overrides dated Obsidian-first product instructions. The [Adaptive Memory Surface PRD](docs/ADAPTIVE-MEMORY-SURFACE-PRD.md) and the existing approved photo-free four-panel PNG define the UI: a calm ivory graph field with Camera, Speak and Write at the center. Do not redesign or replace the canonical asset.
+1. [VISION.md](docs/VISION.md): what we're building and the rules. **The one authority.**
+2. [STATUS.md](docs/STATUS.md): what works, what's unproven, what's next.
+3. [ARCHITECTURE.md](docs/ARCHITECTURE.md): how the code is organized.
+4. [DESIGN.md](docs/DESIGN.md): the desktop UI.
+5. [DEVELOPMENT.md](docs/DEVELOPMENT.md): build, run, test.
 
-**Recall is the application. Obsidian is optional compatibility, not a required application.** People must eventually be able to create/open their Recall library, write and edit memories, inspect sources, ask evidence-backed questions, correct interpretations, explore relationships and export or restore their information without opening Obsidian.
+`docs/history/` is frozen evidence. `docs/legacy-cloud/` documents the retired cloud stack.
 
-This decision **does not authorize a storage rewrite**. Preserve the established Tauri desktop / Tailscale phone companion, user-owned portable Markdown/source vault, local offline behavior, deterministic writer and consent-gated Jev → Claude pipeline. PostgreSQL/cloud-first material is legacy or optional, not the active authority. Keep PR #26 isolated pending independent review.
+## Quick start
 
-## Current implementation vs approved end-state
+```bash
+npm ci
+cd apps/desktop && npx tauri dev
+```
 
-The implementation still contains an Obsidian-vault-centered pilot with an installed Windows text flow; that is **existing code/evidence, not the approved final dependency model**. Handwriting, real phone acceptance, complete native editing, full independence, and native graph runtime must be verified rather than asserted. See [Acceptance](docs/ACCEPTANCE.md), [V1 status](docs/V1-STATUS.md) and [Canonical Foundation](docs/CANONICAL-FOUNDATION.md).
+## Repository
 
-## Next build
-
-Make the existing source-first memory loop fully usable **inside Recall**: save source → parse and organize with evidence → validated native Markdown/metadata write → read/edit/inspect in Recall → grounded Ask → correction and restart recovery. Then connect the approved adaptive graph to real vault evidence and verify phone/sync/export behavior. No fabricated visual data, no unnecessary authentication, no destructive migrations.
-
-## Documents
-
-- [Normative native-memory contract](docs/NATIVE-MEMORY-PRODUCT-CONTRACT.md)
-- [Canonical adaptive UI](docs/ADAPTIVE-MEMORY-SURFACE-PRD.md)
-- [Architecture and implementation history](docs/ARCHITECTURE.md)
-- [Product requirements](docs/PRD.md)
-- [Acceptance evidence](docs/ACCEPTANCE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Developer setup](docs/DEVELOPMENT.md)
-
-This repository is public. Never commit private notes, customer records, credentials, or real private evaluation data.
+```text
+apps/desktop/          product: React UI + Rust core (src-tauri), includes recall-phone
+packages/design-tokens shared UI tokens
+tests/                 phone, ui, native runtime checks
+apps/web, apps/mobile, services/backend, packages/{api-client,sync,contracts}
+                       legacy cloud stack (frozen, not the product)
+```

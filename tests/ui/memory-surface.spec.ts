@@ -16,7 +16,7 @@ async function snapshot(page: Page, name: string, project: string) {
   if (process.env.RECALL_SCREENSHOTS === "1" && project !== "reduced-motion") {
     await page.screenshot({
       path: resolve(
-        `docs/implementation/memory-surface/${project}-${name}.jpg`,
+        `test-results/memory-surface/${project}-${name}.jpg`,
       ),
       fullPage: true,
       type: "jpeg",

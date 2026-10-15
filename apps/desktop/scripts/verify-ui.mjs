@@ -8,7 +8,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { createHash } from "node:crypto";
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const output = path.resolve(
-  process.env.RECALL_UI_EVIDENCE_DIR || path.join(repo, "docs/audits/adaptive"),
+  process.env.RECALL_UI_EVIDENCE_DIR || path.join(repo, "docs/history/audits/adaptive"),
 );
 fs.mkdirSync(output, { recursive: true });
 const uiUrl = process.env.RECALL_UI_URL || "http://127.0.0.1:4173/";

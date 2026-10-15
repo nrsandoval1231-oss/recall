@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str | None = Field(None, validation_alias="SUPABASE_SERVICE_ROLE_KEY")
     storage_bucket: str = Field("recall-originals-private", validation_alias="RECALL_STORAGE_BUCKET")
 
-    # Limits (docs/API-CONTRACT.md).
+    # Limits (docs/legacy-cloud/API-CONTRACT.md).
     max_pages_per_capture: int = Field(10, validation_alias="RECALL_MAX_PAGES_PER_CAPTURE")
     max_page_bytes: int = Field(25 * MIB, validation_alias="RECALL_MAX_PAGE_BYTES")
     max_capture_bytes: int = Field(100 * MIB, validation_alias="RECALL_MAX_CAPTURE_BYTES")

@@ -1,7 +1,7 @@
 /**
  * Platform-neutral tokens and user-facing language shared by mobile (React Native) and
  * desktop (DOM). PROVISIONAL: no final palette, logo, or brand system has been approved
- * (see docs/UX-SPEC.md). Values here are deliberately plain and accessible, not a brand.
+ * (see docs/DESIGN.md). Values here are deliberately plain and accessible, not a brand.
  */
 
 export const color = {

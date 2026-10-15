@@ -1,3 +1,5 @@
+> **FROZEN HISTORY (through 2026-10-14).** Not instructions. Current state lives in [STATUS.md](../STATUS.md); authority in [VISION.md](../VISION.md).
+
 # Recall acceptance and evaluation
 
 ## Native library/editor review repair — 2026-10-13
