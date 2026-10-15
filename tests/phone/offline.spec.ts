@@ -310,7 +310,7 @@ test("device storage failure retains the form and never sends its original", asy
   });
   await page.getByLabel("Note, in your words").fill("Synthetic unsaved draft");
   await page.getByRole("button", { name: "Save capture", exact: true }).click();
-  await expect(page.locator("#local-status")).toContainText("quota failure");
+  await expect(page.locator("#capture-error")).toContainText("quota failure");
   await expect(page.getByLabel("Note, in your words")).toHaveValue(
     "Synthetic unsaved draft",
   );
@@ -669,4 +669,71 @@ test("receipt and original evidence links have separated 48px touch targets", as
       .getByRole("link", { name: "Open original source", exact: true })
       .boundingBox())!.height,
   ).toBeGreaterThanOrEqual(48);
+});
+
+test("capture keeps Save above navigation and validates beside the field", async ({ page }) => {
+  await page.goto("/#write");
+  await expect(page.getByTestId("connection-state")).toContainText("Connected to library");
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const save = page.getByRole("button", { name: "Save capture", exact: true });
+    const nav = page.getByRole("navigation", { name: "Recall" });
+    const saveBox = (await save.boundingBox())!;
+    const navBox = (await nav.boundingBox())!;
+    expect(saveBox.height).toBeGreaterThanOrEqual(48);
+    expect(saveBox.y + saveBox.height).toBeLessThanOrEqual(navBox.y);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  }
+  await page.getByRole("button", { name: "Save capture", exact: true }).click();
+  await expect(page.locator("#note-error")).toHaveText("Write a note or choose a photo.");
+  await expect(page.getByLabel("Note, in your words")).toBeFocused();
+  await expect(page.getByLabel("Note, in your words")).toHaveAttribute("aria-invalid", "true");
+  await page.getByLabel("Note, in your words").fill("Synthetic field validation recovery");
+  await page.getByRole("button", { name: "Save capture", exact: true }).click();
+  await expect(page.getByTestId("outbox")).toContainText("Received by library");
+});
+
+test("phone results use source titles and retain original offsets and verification", async ({ page }) => {
+  await page.goto("/#write");
+  await expect(page.getByTestId("connection-state")).toContainText("Connected to library");
+  await page.getByLabel("Note, in your words").fill("Synthetic afternoon journal\nAn uncertain meeting date.");
+  await page.getByRole("button", { name: "Save capture", exact: true }).click();
+  await expect(page.getByTestId("outbox")).toContainText("Received by library");
+  await page.getByRole("link", { name: "Ask", exact: true }).click();
+  await page.getByLabel("Ask the notes").fill("afternoon journal");
+  await page.getByRole("button", { name: "Search notes", exact: true }).click();
+  await expect(page.locator("article[data-memory] h2").first()).toHaveText("Synthetic afternoon journal");
+  await expect(page.getByText(/Original excerpt: bytes/).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open original", exact: true }).first()).toBeVisible();
+  await page.getByText("Source verification", { exact: true }).first().click();
+  await expect(page.getByText(/SHA-256:/).first()).toBeVisible();
+});
+
+test("reduced visual viewport keeps the focused draft usable without nav covering it", async ({ page }) => {
+  await page.goto("/#write");
+  const note = page.getByLabel("Note, in your words");
+  await note.fill("Synthetic keyboard draft");
+  await page.evaluate(() => {
+    // A browser contract check, not an iPhone keyboard simulation or acceptance claim.
+    Object.defineProperty(window.visualViewport!, "height", { configurable: true, value: 400 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expect(page.locator("body")).toHaveClass(/keyboard-open/);
+  await expect(page.getByRole("navigation", { name: "Recall" })).toBeHidden();
+  await expect(note).toHaveValue("Synthetic keyboard draft");
+  await page.getByRole("button", { name: "Save capture", exact: true }).focus();
+  await expect(page.getByRole("navigation", { name: "Recall" })).toBeVisible();
+});
+
+
+test("phone capture reflows at twice the default text size", async ({ page }) => {
+  await page.goto("/#write");
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await page.getByLabel("Note, in your words").fill("Synthetic enlarged-text draft");
+  await expect(page.getByLabel("Note, in your words")).toHaveCSS("font-size", "32px");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await page.getByRole("button", { name: "Save capture", exact: true }).scrollIntoViewIfNeeded();
+  const save = (await page.getByRole("button", { name: "Save capture", exact: true }).boundingBox())!;
+  const nav = (await page.getByRole("navigation", { name: "Recall" }).boundingBox())!;
+  expect(save.y + save.height).toBeLessThanOrEqual(nav.y);
 });

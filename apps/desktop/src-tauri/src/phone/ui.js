@@ -7,11 +7,30 @@
   const photo = document.querySelector('input[name="photo"]');
   const preview = document.querySelector("#photo-preview");
   let previewUrl;
+  const navigation = document.querySelector('.phone-nav');
+  const measureNavigation = () => {
+    if (navigation && !document.body.classList.contains('keyboard-open')) {
+      document.body.style.setProperty('--nav-height', `${navigation.getBoundingClientRect().height + 8}px`);
+    }
+  };
+  if (navigation) new ResizeObserver(measureNavigation).observe(navigation);
+  measureNavigation();
+  // Only tuck navigation away when a text field has reduced the visual viewport.
+  // Focus alone (hardware keyboard/desktop) does not hide navigation.
+  const keyboardLayout = () => {
+    const editing = document.activeElement?.matches('textarea, input:not([type="checkbox"]):not([type="file"])');
+    const reduced = window.visualViewport && window.visualViewport.height < document.documentElement.clientHeight - 120;
+    document.body.classList.toggle('keyboard-open', Boolean(editing && reduced));
+  };
+  window.visualViewport?.addEventListener('resize', keyboardLayout);
+  document.addEventListener('focusin', keyboardLayout);
+  document.addEventListener('focusout', () => requestAnimationFrame(keyboardLayout));
   const show = (event) => {
     const hash = location.hash.slice(1);
     const name = ["camera", "write", "ask", "receipts"].includes(hash)
       ? hash
       : "home";
+    document.body.dataset.view = name;
     const view = name === "camera" || name === "write" ? "capture" : name;
     views.forEach((el) => {
       el.hidden = el.dataset.view !== view;

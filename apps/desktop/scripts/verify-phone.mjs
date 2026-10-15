@@ -15,6 +15,7 @@ const browser = await chromium.launch({
 const results = [];
 try {
   for (const [width, height] of [
+    [320, 844],
     [390, 844],
     [430, 932],
   ]) {
@@ -65,6 +66,9 @@ try {
         "A quiet afternoon.\n\nSYNTHETIC TEST DATA: The meeting date is uncertain.",
       );
     await shot("write");
+    const saveBox = await page.getByRole("button", {name:"Save capture",exact:true}).boundingBox();
+    const navBox = await page.getByRole("navigation", {name:"Recall"}).boundingBox();
+    if (saveBox.y + saveBox.height > navBox.y) throw Error(`Save covered at ${width}`);
     await page.getByRole("link", { name: "Home", exact: true }).click();
     await page.getByRole("link", { name: /Camera Keep an original/ }).click();
     if (

@@ -18,7 +18,7 @@ body {
   margin: 0;
   padding: calc(16px + env(safe-area-inset-top)) 24px
     calc(100px + env(safe-area-inset-bottom));
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.6;
   max-width: 620px;
   margin-inline: auto;
@@ -32,14 +32,14 @@ h3 {
   margin: 0 0 16px;
 }
 h1 {
-  font-size: 34px;
+  font-size: 1.875rem;
   letter-spacing: -0.8px;
 }
 h2 {
-  font-size: 28px;
+  font-size: 1.75rem;
 }
 h3 {
-  font-size: 23px;
+  font-size: 1.4375rem;
 }
 p {
   margin: 0 0 16px;
@@ -103,18 +103,18 @@ input[type="checkbox"] {
   accent-color: var(--recall-focus);
 }
 label:has([type="checkbox"]) {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   min-height: 48px;
 }
 textarea {
-  min-height: 240px;
+  min-height: 160px;
   resize: vertical;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.65;
 }
 input[type="file"] {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 input[type="file"]::file-selector-button {
   background: var(--ivory);
@@ -125,12 +125,12 @@ input[type="file"]::file-selector-button {
   margin-right: 8px;
 }
 input[type="search"] {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .fine,
 footer,
 .connection-info {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 section,
@@ -155,13 +155,13 @@ main > img,
 pre {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 details {
   border-top: 1px solid var(--line);
   padding-top: 12px;
   margin-top: 24px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 summary {
@@ -193,8 +193,8 @@ svg {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 16px;
-  margin-bottom: 32px;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
   gap: 16px;
 }
 .phone-brand a {
@@ -210,26 +210,26 @@ svg {
 }
 .phone-brand a span {
   font:
-    32px "Playfair Display",
+    2rem "Playfair Display",
     Georgia,
     serif;
   letter-spacing: -1px;
 }
 .brand-signature {
-  font-size: 10px;
+  font-size: 0.625rem;
   max-width: 100px;
   letter-spacing: 1px;
   line-height: 1.6;
   text-align: right;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 0.625rem;
   letter-spacing: 2px;
   color: var(--muted);
   margin-bottom: 12px;
 }
 .intro {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
   max-width: 250px;
 }
@@ -238,7 +238,7 @@ svg {
   align-items: center;
   gap: 12px;
   text-decoration: none;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
   min-height: 48px;
   border-radius: 24px;
@@ -264,7 +264,7 @@ svg {
   justify-content: center;
   gap: 8px;
   text-decoration: none;
-  font-size: 14px;
+  font-size: 0.875rem;
   padding: 16px 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -274,7 +274,7 @@ svg {
   margin: 0;
 }
 .capture-actions small {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--muted);
 }
 .capture-actions svg {
@@ -288,7 +288,7 @@ svg {
   display: none;
 }
 #speak-status {
-  font-size: 13px;
+  font-size: 0.8125rem;
   border-left: 2px solid var(--copper);
   padding: 12px;
   margin: 16px 0;
@@ -308,14 +308,14 @@ svg {
 .home-signature {
   text-align: center;
   font:
-    italic 19px "Playfair Display",
+    italic 1.1875rem "Playfair Display",
     Georgia,
     serif;
 }
 .receipt-link {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 0.8125rem;
   min-height: 48px;
   padding: 12px 0;
   text-decoration: none;
@@ -326,22 +326,22 @@ svg {
   display: inline-flex;
   align-items: center;
   min-height: 48px;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-decoration: none;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 .capture-form {
   margin-top: 8px;
 }
 .capture-form > .fine {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .ask-greeting {
   background: var(--surface);
   padding: 20px;
   border-radius: 16px;
   font:
-    24px/1.3 "Playfair Display",
+    1.5rem/1.3 "Playfair Display",
     Georgia,
     serif;
   margin: 24px 0 32px;
@@ -381,7 +381,7 @@ svg {
   min-width: 56px;
   min-height: 52px;
   text-decoration: none;
-  font-size: 11px;
+  font-size: 0.6875rem;
   gap: 4px;
   color: var(--muted);
 }
@@ -397,7 +397,7 @@ svg {
   height: 32px;
   background: var(--recall-focus);
   color: var(--ivory);
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 300;
   line-height: 1;
 }
@@ -412,7 +412,7 @@ svg {
   display: block;
   color: var(--muted);
   padding: 32px 0;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .phone-nav a,
 .capture-actions a,
@@ -453,7 +453,7 @@ article > a + a {
 }
 article[data-memory] h2 {
   font:
-    500 18px/1.5 Inter,
+    500 1.125rem/1.5 Inter,
     sans-serif;
   overflow-wrap: anywhere;
 }
@@ -461,3 +461,38 @@ article[data-memory] h2 {
 .memory-text {
   white-space: pre-wrap;
 }
+
+/* Focused capture: a single form, unchanged outbox and source-specific consent. */
+body { --nav-height: calc(76px + env(safe-area-inset-bottom)); }
+body[data-view="write"] .phone-brand,
+body[data-view="camera"] .phone-brand { margin-bottom: 4px; }
+.capture-form { margin: 8px 0 16px; }
+.capture-form h1 { font-size: 1.75rem; margin-bottom: 16px; }
+.capture-form label { margin: 12px 0; font-size: 0.875rem; }
+.capture-form textarea { height: clamp(160px, 23dvh, 240px); scroll-margin-block: 24px; }
+.capture-form input[type="file"] { background: transparent; padding: 4px; font-size: 0.75rem; }
+.capture-form input[type="file"]::file-selector-button { min-height: 48px; padding: 8px 12px; border-radius: 8px; }
+.capture-form label.capture-consent { display: flex; align-items: flex-start; gap: 10px; font-size: 0.75rem; }
+.capture-consent input { flex: none; margin: 2px 0; }
+.capture-save {
+  position: sticky;
+  bottom: var(--nav-height);
+  z-index: 3;
+  background: var(--ivory);
+  padding: 8px 0;
+}
+.capture-save button { margin: 0; }
+.capture-form > .fine { margin-top: 8px; }
+.field-error { color: #843625; font-size: 0.8125rem; margin: 4px 0 12px; }
+.field-error:empty { display: none; }
+[aria-invalid="true"] { border-color: #843625 !important; }
+.keyboard-open .phone-nav { display: none; }
+.keyboard-open .capture-save { bottom: 0; }
+.keyboard-open { padding-bottom: 24px; }
+article[data-memory] h2 { font: 400 1.5rem/1.3 "Playfair Display", serif; margin-bottom: 12px; }
+article[data-memory] h3 { font: 500 0.875rem/1.5 Inter, sans-serif; margin-top: 24px; }
+article[data-memory] > p { line-height: 1.65; }
+article[data-memory] details { margin-top: 16px; padding-top: 4px; }
+body:has(.phone-app) { padding-bottom: calc(var(--nav-height) + 24px); }
+body.keyboard-open:has(.phone-app) { padding-bottom: 24px; }
+body:not(:has(.phone-app)) { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }

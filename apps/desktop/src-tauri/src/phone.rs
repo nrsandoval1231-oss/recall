@@ -848,7 +848,7 @@ fn render_memory_answer(mut answer: crate::knowledge::MemoryAnswer, current: &[V
         let Some(source) = source else { continue };
         let memory = &source.memory;
         cards.push_str(&format!("<article><h2>Exact passage from {}</h2><blockquote>{}</blockquote><p class=\"path\">Note revision {} · {}</p><p class=\"path\">SHA-256: {}</p><p><a href=\"/saved/{}\">Inspect supporting note and original</a></p></article>",
-            esc(memory.note_path.as_deref().unwrap_or("Captured note")), esc(&selection.quote), selection.revision,
+            esc(&title_for(memory)), esc(&selection.quote), selection.revision,
             esc(memory.note_path.as_deref().unwrap_or("Captured note")), esc(&source.source_sha256), esc(&memory.id)));
     }
     if answer.status == "supported" && cards.is_empty() {
@@ -930,7 +930,9 @@ fn render_source_answer(answer: crate::memory_query::Answer) -> String {
         } else {
             ""
         };
-        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><p>Current note · revision {}{correction}</p><p class=\"fine\">Captured {} · Note revised {}</p><p>{}</p><h3>Original evidence</h3><p>{}</p>{range}<p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a> · <a href=\"/saved/{}\">Inspect memory</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.match_reason),hit.revision,esc(&hit.captured_at),esc(&hit.updated_at),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id),esc(&hit.memory_id)));
+        let fallback = format!("Memory captured {}", hit.captured_at.chars().take(10).collect::<String>());
+        let title = title_from_note(if hit.current_excerpt.trim().is_empty() { &hit.original_excerpt } else { &hit.current_excerpt }, &fallback);
+        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><p>Current note · revision {}{correction}</p><p class=\"fine\">Captured {} · Note revised {}</p><p>{}</p><h3>Original evidence</h3><p>{}</p>{range}<details><summary>Source verification</summary><p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p></details><p><a href=\"/sources/{}\">Open original</a> · <a href=\"/saved/{}\">Inspect memory</a></p></article>",esc(&hit.memory_id),esc(&title),esc(&hit.match_reason),hit.revision,esc(&hit.captured_at),esc(&hit.updated_at),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id),esc(&hit.memory_id)));
     }
     let mut graph_cards = String::new();
     for relationship in &answer.graph_relationships {
@@ -943,11 +945,11 @@ fn render_source_answer(answer: crate::memory_query::Answer) -> String {
     }
     let heading = if answer.hits.is_empty() { "Related inferred knowledge" } else { "Source-backed matches" };
     let disclosure = if answer.graph_relationships.is_empty() {
-        format!("{KEYWORD_LABEL} Retrieved local note quotes and original evidence.")
+        KEYWORD_LABEL.to_owned()
     } else {
         "Graph relationships are inferred and unverified. When enabled, the question and eligible notes may be processed by the configured, disclosed providers. This is retrieval, not a generated answer.".to_owned()
     };
-    format!("<h1>{heading}</h1><p>{}</p><p class=\"fine\">{}</p>{cards}{graph_cards}",esc(&answer.message),esc(&disclosure))
+    format!("<h1>{heading}</h1><p class=\"fine\">{}</p><details class=\"retrieval-details\"><summary>How these matches were found</summary><p>{}</p></details>{cards}{graph_cards}",esc(&disclosure),esc(&answer.message))
 }
 
 // Only retry inspection on brief native writer contention. Never retry a model
@@ -1121,7 +1123,7 @@ fn home_page() -> String {
 
 fn capture_form(operation_id: &str, note: &str) -> String {
     format!(
-        "<section class=\"capture-form\"><h1 id=\"capture-heading\">Write a memory</h1><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Jot down a moment, a thought, or something you never want to forget.\">{}</textarea></label><div id=\"photo-preview\" hidden></div><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save capture</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        "<section class=\"capture-form\"><h1 id=\"capture-heading\">Write a memory</h1><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" aria-describedby=\"note-error\" maxlength=\"262144\" placeholder=\"Jot down a moment, a thought, or something you never want to forget.\">{}</textarea></label><p id=\"note-error\" class=\"field-error\" role=\"alert\"></p><div id=\"photo-preview\" hidden></div><label>Photo or file, optional<input type=\"file\" name=\"photo\" aria-describedby=\"photo-error\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\"></label><p id=\"photo-error\" class=\"field-error\" role=\"alert\"></p><label class=\"capture-consent\"><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><div class=\"capture-save\"><p id=\"capture-error\" class=\"field-error\" role=\"alert\"></p><button type=\"submit\">Save capture</button></div></form><p class=\"fine\">Your original is saved first. Processing is optional.</p></section>",
         esc(operation_id),
         esc(note)
     )
@@ -1129,7 +1131,7 @@ fn capture_form(operation_id: &str, note: &str) -> String {
 
 fn ask_form(question: &str) -> String {
     format!(
-        "<form method=\"post\" action=\"/ask\"><label>Ask the notes<input type=\"search\" placeholder=\"What are you trying to remember?\" name=\"q\" maxlength=\"4096\" value=\"{}\" autocomplete=\"off\" required></label><button class=\"secondary\" type=\"submit\">Search notes</button></form>",
+        "<form method=\"post\" action=\"/ask\"><label>Ask the notes<input type=\"search\" placeholder=\"What are you trying to remember?\" name=\"q\" aria-describedby=\"ask-error\" maxlength=\"4096\" value=\"{}\" autocomplete=\"off\" required></label><p id=\"ask-error\" class=\"field-error\" role=\"alert\"></p><button class=\"secondary\" type=\"submit\">Search notes</button></form>",
         esc(question)
     )
 }
@@ -1264,7 +1266,11 @@ fn utf8_field(bytes: &[u8]) -> Result<String, FormError> {
 }
 
 fn title_for(memory: &VaultMemory) -> String {
-    let note = memory.note.trim();
+    title_from_note(&memory.note, "Untitled memory")
+}
+
+fn title_from_note(note: &str, fallback: &str) -> String {
+    let note = note.trim();
     let (frontmatter, body) = if let Some(rest) = note.strip_prefix("---\n") {
         rest.split_once("\n---").unwrap_or(("", note))
     } else { ("", note) };
@@ -1275,7 +1281,7 @@ fn title_for(memory: &VaultMemory) -> String {
     }
     let line = body.lines().find(|line| !line.trim().is_empty()).unwrap_or("").trim().trim_start_matches('#').trim();
     if line.is_empty() {
-        return if memory.source_name.is_empty() { "Untitled memory".into() } else { memory.source_name.clone() };
+        return fallback.to_owned();
     }
     let mut title: String = line.chars().take(80).collect();
     if line.chars().count() > 80 { title.push('…'); }
@@ -2076,6 +2082,13 @@ mod tests {
     }
 
     #[test]
+    fn result_titles_use_source_text_and_readable_fallback() {
+        assert_eq!(title_from_note("---\ntitle: \"A quiet afternoon\"\n---\nBody", "Fallback"), "A quiet afternoon");
+        assert_eq!(title_from_note("# A human heading\nMore", "Fallback"), "A human heading");
+        assert_eq!(title_from_note("  ", "Memory captured 2026-10-15"), "Memory captured 2026-10-15");
+    }
+
+    #[test]
     fn phone_ask_keeps_keyword_evidence_when_graph_search_is_unavailable() {
         let answer = crate::memory_query::Answer {
             question: "synthetic query".into(), message: "Local source matches remain available.".into(),
@@ -2087,6 +2100,10 @@ mod tests {
         };
         let rendered = render_source_answer(answer);
         assert!(rendered.contains("Source-backed matches"));
+        assert!(rendered.contains("<h2>&lt;b&gt;Local evidence&lt;/b&gt;</h2>"));
+        assert!(!rendered.contains("<h2>synthetic.md</h2>"));
+        assert!(rendered.contains("Original excerpt: bytes 0–18"));
+        assert!(rendered.contains("Source verification"));
         assert!(rendered.contains("&lt;b&gt;Local evidence&lt;/b&gt;"));
         assert!(rendered.contains("Local keyword retrieval"));
         assert!(!rendered.contains("Related knowledge (inferred)"));
@@ -2247,12 +2264,13 @@ mod tests {
         let dir = TempDir::new();
         Vault::open(&dir.0).unwrap();
         let home = text(&call(&dir.0, "GET", "/", &[], b""));
-        assert!(home.contains("A photo is optional."));
         assert!(home.contains("Photo or file, optional"));
-        assert!(
-            !home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\" required")
-        );
-        assert!(home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\""));
+        let photo_input = home.split("<input").find(|tag| tag.starts_with(" type=\"file\""))
+            .unwrap().split('>').next().unwrap();
+        assert!(photo_input.contains("name=\"photo\""));
+        assert!(photo_input.contains("accept=\"image/png,image/jpeg,image/webp\""));
+        assert!(photo_input.contains("capture=\"environment\""));
+        assert!(!photo_input.contains("required"));
 
         let id = Uuid::new_v4().to_string();
         let boundary = "RecallSyntheticBoundary";

@@ -138,6 +138,10 @@
     event.preventDefault();
     if (saving) return;
     saving = true;
+    form.querySelectorAll('.field-error').forEach(el => { el.textContent = ''; });
+    form.querySelectorAll('[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid'));
+    let invalidField;
+    const invalid = (name, message) => { invalidField = name; throw Error(message); };
     const button = form.querySelector('button[type="submit"]'); button.disabled = true;
     try {
       if (!db) throw Error('Device storage unavailable. Keep your original; nothing was sent.');
@@ -145,23 +149,37 @@
       const data = new FormData(form);
       const note = String(data.get('note') || '');
       const file = data.get('photo'); const photo = file && file.size ? file : null;
-      if (!note.trim() && !photo) throw Error('Write a note or choose a photo.');
-      if (new TextEncoder().encode(note).length > 262144 || (photo && photo.size > 20 * 1024 * 1024)) throw Error('Use a note under 256 KiB and a photo under 20 MiB. Original remains selected.');
-      if (photo && !['image/png','image/jpeg','image/webp'].includes(photo.type)) throw Error('Choose a PNG, JPEG or WebP photo.');
+      if (!note.trim() && !photo) invalid('note', 'Write a note or choose a photo.');
+      if (new TextEncoder().encode(note).length > 262144) invalid('note', 'Use a note under 256 KiB. Your draft is still here.');
+      if (photo && photo.size > 20 * 1024 * 1024) invalid('photo', 'Use a photo under 20 MiB. Original remains selected.');
+      if (photo && !['image/png','image/jpeg','image/webp'].includes(photo.type)) invalid('photo', 'Choose a PNG, JPEG or WebP photo.');
       const row = { id: uuid(), library, note, photo, filename: photo?.name || '',
         consent: data.get('process_consent') === 'true', created: Date.now(), receipt: null, error: '' };
       await storage('captures', 'readwrite', s => s.add(row));
       form.reset(); if (document.querySelector('[data-view]')) location.hash = 'receipts'; status.textContent = 'Saved on this device. Waiting for a library receipt.';
       await render(); void flush();
-    } catch (error) { status.textContent = error.message || 'Save failed. Keep the original; nothing was sent.'; }
+    } catch (error) {
+      const target = form.querySelector(`#${invalidField || 'capture'}-error`) || status;
+      target.textContent = error.message || 'Save failed. Keep the original; nothing was sent.';
+      if (invalidField) {
+        const field = form.elements.namedItem(invalidField);
+        field.setAttribute('aria-invalid', 'true');
+        field.focus();
+      } else target.scrollIntoView({ block: 'nearest' });
+    }
     finally { saving = false; button.disabled = false; }
   });
   document.querySelector('#retry-queue').addEventListener('click', () => { if (db) void flush(); });
   const ask = document.querySelector('form[action="/ask"]');
   ask.addEventListener('submit', async event => {
     event.preventDefault();
+    const feedback = ask.querySelector('#ask-error') || status;
+    feedback.textContent = '';
     if (await connect()) ask.submit();
-    else status.textContent = 'Desktop retrieval unavailable. Your question is still here; retry when connected.';
+    else {
+      feedback.textContent = 'Desktop retrieval unavailable. Your question is still here; retry when connected.';
+      ask.elements.namedItem('q').focus();
+    }
   });
   window.addEventListener('online', () => { if (db) void flush(); });
   window.addEventListener('offline', () => { connection.textContent = 'Offline. Captures stay on this device; desktop retrieval is unavailable.'; });
