@@ -1,4 +1,6 @@
 import { graphTitle } from "./adaptive-graph";
+import { nativeProviderSettings } from "../platform/provider-settings";
+import { ProviderSettings } from "./ProviderSettings";
 import { attachmentIntent, clearAttachmentIntent } from "./attachment-intent";
 import { MemoryEditor } from "./MemoryEditor";
 import type { EditorIntent } from "./editor-session";
@@ -269,6 +271,7 @@ export function MemorySurface({
   const [status, setStatus] = useState<VaultStatus | null>(null);
   const [items, setItems] = useState<VaultMemory[]>([]);
   const [checking, setChecking] = useState(vault.available);
+  const [providerSettings] = useState(nativeProviderSettings);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2105,6 +2108,7 @@ export function MemorySurface({
                   : knowledgeStatus.answer_provider ? <><p>Configured answer model: {knowledgeStatus.answer_provider}. A changed provider identity requires fresh approval.</p><label className="ms-check"><input type="checkbox" checked={answerConsentChecked} onChange={event => setAnswerConsentChecked(event.target.checked)} /> I approve sending each asked question and its selected current note excerpts to {knowledgeStatus.answer_provider} for exact quotation selection.</label><button type="button" disabled={knowledgeBusy || !answerConsentChecked} onClick={() => void updateAnswerConsent(true)}>Enable quoted answers</button></>
                     : <p role="status">No configured answer model is available. Keyword Ask and relationship browsing remain available.</p>}
             </section>}
+            {providerSettings && <ProviderSettings api={providerSettings} />}
               </div>
             </div>
           )}

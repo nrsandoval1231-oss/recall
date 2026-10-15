@@ -33,6 +33,10 @@ _Last updated: 2026-10-15, main @ `5d185d9` + this cleanup._
 - 22 npm audit advisories, mostly in the legacy Expo stack.
 - Rust/Tauri tests need GTK/WebKit dev libraries locally; CI covers Linux and Windows.
 
+## Friend testing (approved 2026-10-15)
+
+Friends install the Windows build and use their own keys (option 1; no shared/hosted instance). In progress: Settings → AI providers screen, tag-triggered pre-release workflow, [TESTING.md](TESTING.md). First beta tag waits on owner sign-off after acceptance sections A–E.
+
 ## Next steps (in order)
 
 1. ~~Acceptance runbook~~ done: [ACCEPTANCE.md](ACCEPTANCE.md).

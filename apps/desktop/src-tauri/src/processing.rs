@@ -37,12 +37,7 @@ impl Config {
         }
     }
     pub fn from_env() -> Self {
-        let value = |name: &str| {
-            std::env::var(name)
-                .ok()
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-        };
+        let value = |name: &str| crate::provider_settings::lookup(name);
         let amount = |name: &str| {
             value(name)
                 .and_then(|v| librarian::usd_to_micros(&v).ok())

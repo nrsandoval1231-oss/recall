@@ -14,6 +14,7 @@ mod managed_export;
 mod persistence;
 pub mod phone;
 mod secrets;
+mod provider_settings;
 mod attachments;
 
 use managed_export::ManagedExportState;
@@ -693,6 +694,9 @@ pub fn run() {
             secrets::secret_get,
             secrets::secret_set,
             secrets::secret_remove,
+            provider_settings::provider_settings_status,
+            provider_settings::provider_settings_save,
+            provider_settings::provider_settings_clear,
             sync_apply_page,
             sync_replace_snapshot,
             sync_cursor,

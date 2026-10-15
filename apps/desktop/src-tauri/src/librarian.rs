@@ -184,12 +184,12 @@ struct LedgerEntry {
 
 pub fn config_from_env() -> LibrarianConfig {
     config_from_pairs([
-        ("RECALL_CLAUDE_API_KEY", std::env::var("RECALL_CLAUDE_API_KEY").ok()),
-        ("RECALL_CLAUDE_MODEL", std::env::var("RECALL_CLAUDE_MODEL").ok()),
-        ("RECALL_CLAUDE_INPUT_USD_PER_MTOK", std::env::var("RECALL_CLAUDE_INPUT_USD_PER_MTOK").ok()),
-        ("RECALL_CLAUDE_OUTPUT_USD_PER_MTOK", std::env::var("RECALL_CLAUDE_OUTPUT_USD_PER_MTOK").ok()),
-        ("RECALL_CLAUDE_DAILY_BUDGET_USD", std::env::var("RECALL_CLAUDE_DAILY_BUDGET_USD").ok()),
-        ("RECALL_CLAUDE_MONTHLY_BUDGET_USD", std::env::var("RECALL_CLAUDE_MONTHLY_BUDGET_USD").ok()),
+        ("RECALL_CLAUDE_API_KEY", crate::provider_settings::lookup("RECALL_CLAUDE_API_KEY")),
+        ("RECALL_CLAUDE_MODEL", crate::provider_settings::lookup("RECALL_CLAUDE_MODEL")),
+        ("RECALL_CLAUDE_INPUT_USD_PER_MTOK", crate::provider_settings::lookup("RECALL_CLAUDE_INPUT_USD_PER_MTOK")),
+        ("RECALL_CLAUDE_OUTPUT_USD_PER_MTOK", crate::provider_settings::lookup("RECALL_CLAUDE_OUTPUT_USD_PER_MTOK")),
+        ("RECALL_CLAUDE_DAILY_BUDGET_USD", crate::provider_settings::lookup("RECALL_CLAUDE_DAILY_BUDGET_USD")),
+        ("RECALL_CLAUDE_MONTHLY_BUDGET_USD", crate::provider_settings::lookup("RECALL_CLAUDE_MONTHLY_BUDGET_USD")),
     ])
 }
 
@@ -229,9 +229,9 @@ pub fn config_from_pairs<const N: usize>(pairs: [(&str, Option<String>); N]) -> 
     }
     let ready = key.is_some() && model.is_some() && input.is_some() && output.is_some() && daily.is_some() && monthly.is_some() && invalid.is_empty();
     let reason = if key.is_none() {
-        "Claude reading is off. Recall will not send this photo anywhere.".into()
+        "Claude reading is off. Add a Claude key in Settings → AI providers. Recall will not send this photo anywhere.".into()
     } else if !invalid.is_empty() || model.is_none() || input.is_none() || output.is_none() || daily.is_none() || monthly.is_none() {
-        "Claude reading is off because the model, a price, or a budget is missing or not a positive USD amount. Set RECALL_CLAUDE_MODEL, RECALL_CLAUDE_INPUT_USD_PER_MTOK, RECALL_CLAUDE_OUTPUT_USD_PER_MTOK, RECALL_CLAUDE_DAILY_BUDGET_USD, and RECALL_CLAUDE_MONTHLY_BUDGET_USD. Recall did not send this photo.".into()
+        "Claude reading is off because the model, a price, or a budget is missing or not a positive USD amount. Finish the Claude section in Settings → AI providers. Recall did not send this photo.".into()
     } else {
         "Claude can read one consented photo. The result stays an unreviewed proposal until you save a correction.".into()
     };

@@ -24,7 +24,7 @@ npx tauri build             # NSIS installer (unsigned)
 
 ### Turning on Jev + Claude
 
-Models are off until the **desktop process** has a key, model, prices and budget caps (via Settings, which uses the OS credential store, or via environment variables). Never put keys in `VITE_` variables, the webview or a committed file.
+Models are off until a key, model, prices and budget caps are configured. The normal way is **Settings → AI providers**, which saves them in the OS credential store (service `app.recall.desktop.providers`); the webview can save or clear them but only ever sees a masked key. Environment variables still work as a fallback, and a saved value wins over the environment. Never put keys in `VITE_` variables, the webview or a committed file.
 
 ```bash
 export RECALL_CLAUDE_API_KEY=...            # never commit
@@ -33,7 +33,7 @@ export RECALL_CLAUDE_INPUT_USD_PER_MTOK=... # use current published prices
 export RECALL_CLAUDE_OUTPUT_USD_PER_MTOK=...
 export RECALL_CLAUDE_DAILY_BUDGET_USD=2
 export RECALL_CLAUDE_MONTHLY_BUDGET_USD=20
-# Jev: RECALL_JEV_MODEL, RECALL_JEV_INPUT_USD_PER_MTOK, RECALL_JEV_DAILY_BUDGET_USD, RECALL_JEV_MONTHLY_BUDGET_USD
+# Jev: TYPESAFE_API_KEY, RECALL_JEV_MODEL, RECALL_JEV_INPUT_USD_PER_MTOK, RECALL_JEV_DAILY_BUDGET_USD, RECALL_JEV_MONTHLY_BUDGET_USD
 ```
 
 Processing runs only after per-source consent. A spent budget, missing price or uncertain provider outcome is shown as such and never silently retried. Optional Graphiti: `RECALL_GRAPH_URL`, `RECALL_GRAPH_TOKEN`.
@@ -66,3 +66,7 @@ Browser and visual tests use explicitly synthetic native IPC. They are not proof
 ## CI
 
 `.github/workflows/ci.yml` runs TS checks, Playwright, native Rust tests on Linux and Windows, the Windows installer artifact, and the legacy backend suite. An Actions artifact is not installed-app acceptance.
+
+## Tester releases
+
+Pushing a tag that exactly matches the app version (e.g. `v0.1.0`; bump `tauri.conf.json` and `Cargo.toml` together for each new tester build) runs `.github/workflows/release.yml`: native tests, then the unsigned NSIS installer attached to a public GitHub pre-release. Tag only builds the owner has approved for testers. Tester instructions: [TESTING.md](TESTING.md).

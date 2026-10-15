@@ -14,6 +14,7 @@ A private, local-first external memory. Photograph your notes or type a brain-du
 4. [DESIGN.md](docs/DESIGN.md): the desktop UI.
 5. [DEVELOPMENT.md](docs/DEVELOPMENT.md): build, run, test.
 6. [ACCEPTANCE.md](docs/ACCEPTANCE.md): the real-device v1 checklist.
+7. [TESTING.md](docs/TESTING.md): guide for friends testing a release.
 
 `docs/history/` is frozen evidence. `docs/legacy-cloud/` documents the retired cloud stack.
 
