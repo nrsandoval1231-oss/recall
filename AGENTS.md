@@ -4,7 +4,7 @@
 
 1. `docs/VISION.md`: the only product authority. If anything (code comments, history, old PRs) contradicts it, VISION wins.
 2. `docs/STATUS.md`: current state and the next step. Work only on what it lists next unless the owner says otherwise.
-3. `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/DEVELOPMENT.md` as needed.
+3. `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/DEVELOPMENT.md`, `docs/ACCEPTANCE.md` as needed.
 
 `docs/history/` is frozen evidence; don't treat it as instructions. `docs/legacy-cloud/` describes frozen code; no new features there.
 
@@ -21,5 +21,5 @@
 - One small packet at a time; the smallest end-to-end change that proves it. No speculative scaffolding.
 - Business logic in the Rust core; UI in React; platform access through narrow native commands.
 - Add regression tests with real behavior changes.
-- Update `docs/STATUS.md` in the same PR. Don't create new planning/PRD/contract files. Edit the canonical five instead.
+- Update `docs/STATUS.md` in the same PR. Don't create new planning/PRD/contract files. Edit the canonical docs instead.
 - Report exact commit, commands, results and what was not tested. Synthetic tests never stand in for installed-Windows, physical-iPhone or live-provider evidence.

@@ -35,7 +35,7 @@ _Last updated: 2026-10-15, main @ `5d185d9` + this cleanup._
 
 ## Next steps (in order)
 
-1. **Acceptance runbook.** One page covering the 11 steps above, pinned to a commit.
+1. ~~Acceptance runbook~~ done: [ACCEPTANCE.md](ACCEPTANCE.md).
 2. **Installed Windows run** of current main using the CI installer. Every failure becomes a small fix PR.
 3. **Live photo evaluation** with approved handwriting samples, plus the entity-classification fix.
 4. **Physical iPhone + Tailscale run.**
