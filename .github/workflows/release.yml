@@ -1,5 +1,5 @@
 name: release
-# Builds the unsigned Windows installer for a version tag (e.g. v0.1.0-beta.1) and attaches it
+# Builds the unsigned Windows installer for a version tag (e.g. v0.1.0) and attaches it
 # to a GitHub pre-release. Push a tag only when the owner has approved that build for testers.
 on:
   push:
@@ -11,6 +11,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Require the tag to match the app version
+        shell: bash
+        run: |
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          cargo_version=$(sed -n 's/^version = "\(.*\)"/\1/p' apps/desktop/src-tauri/Cargo.toml | head -1)
+          case "$GITHUB_REF_NAME" in
+            "v$version") ;;
+            *) echo "::error::Tag $GITHUB_REF_NAME must be exactly v$version. Bump tauri.conf.json and Cargo.toml first."; exit 1 ;;
+          esac
+          if [ "$cargo_version" != "$version" ]; then
+            echo "::error::Cargo.toml version $cargo_version differs from tauri.conf.json $version."; exit 1
+          fi
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci

@@ -69,4 +69,4 @@ Browser and visual tests use explicitly synthetic native IPC. They are not proof
 
 ## Tester releases
 
-Pushing a tag like `v0.1.0-beta.1` runs `.github/workflows/release.yml`: native tests, then the unsigned NSIS installer attached to a public GitHub pre-release. Tag only builds the owner has approved for testers. Tester instructions: [TESTING.md](TESTING.md).
+Pushing a tag that exactly matches the app version (e.g. `v0.1.0`; bump `tauri.conf.json` and `Cargo.toml` together for each new tester build) runs `.github/workflows/release.yml`: native tests, then the unsigned NSIS installer attached to a public GitHub pre-release. Tag only builds the owner has approved for testers. Tester instructions: [TESTING.md](TESTING.md).
