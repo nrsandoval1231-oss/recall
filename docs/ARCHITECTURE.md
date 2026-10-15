@@ -37,7 +37,7 @@ There is no server, no login and no cloud dependency on the product path. Model 
 
 - The **library is the authority.** Search indexes, the graph, and the optional Graphiti index are derived and rebuildable from it.
 - Notes are plain Markdown readable in any editor. Recall detects edits made outside it, records them as `human:obsidian` revisions (a legacy origin string kept for compatibility with existing libraries; it means "edited outside Recall"), and never silently overwrites them.
-- Default location: `Documents/Recall`, or `RECALL_VAULT_DIR`. ("Vault" in code identifiers means "library"; it's a naming leftover.)
+- Default location: `Documents/Recall`, or `RECALL_VAULT_DIR`. ("Vault" and "library" mean the same thing.)
 
 ## Capture → memory pipeline
 

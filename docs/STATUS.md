@@ -29,7 +29,7 @@ _Last updated: 2026-10-15, main @ `5d185d9` + this cleanup._
 - **Speak** is not implemented; the UI honestly says unavailable.
 - Ask returns quoted retrieval, not a written answer; Claude-synthesized answers are not built.
 - Phone page is plain HTTP over Tailscale (no TLS).
-- Code still says "vault" for the library (naming only), and external edits are recorded with the legacy origin string `human:obsidian`.
+- External edits are recorded with the legacy origin string `human:obsidian` (kept for compatibility).
 - 22 npm audit advisories, mostly in the legacy Expo stack.
 - Rust/Tauri tests need GTK/WebKit dev libraries locally; CI covers Linux and Windows.
 
@@ -41,7 +41,7 @@ _Last updated: 2026-10-15, main @ `5d185d9` + this cleanup._
 4. **Physical iPhone + Tailscale run.**
 5. **Clean-machine export/restore.**
 6. **Owner decision:** delete or keep the legacy cloud code (`services/backend`, `apps/web`, `apps/mobile`, `packages/api-client|sync|contracts`).
-7. After v1 acceptance: Speak, model-written Ask answers, rename "vault" → "library" in code.
+7. After v1 acceptance: Speak, model-written Ask answers.
 
 ## Open PRs
 
