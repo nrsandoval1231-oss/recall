@@ -451,14 +451,25 @@ button:hover,
   }
 }
 
-article p a {
+article p a,
+article > a,
+article li > a,
+main > a[href^="/sources/"],
+.source-action {
   display: inline-flex;
   align-items: center;
   min-height: 48px;
+}
+article > a + a {
+  margin-inline-start: 8px;
 }
 article[data-memory] h2 {
   font:
     500 18px/1.5 Inter,
     sans-serif;
   overflow-wrap: anywhere;
+}
+
+.memory-text {
+  white-space: pre-wrap;
 }

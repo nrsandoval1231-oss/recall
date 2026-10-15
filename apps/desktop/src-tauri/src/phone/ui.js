@@ -7,7 +7,7 @@
   const photo = document.querySelector('input[name="photo"]');
   const preview = document.querySelector("#photo-preview");
   let previewUrl;
-  const show = () => {
+  const show = (event) => {
     const hash = location.hash.slice(1);
     const name = ["camera", "write", "ask", "receipts"].includes(hash)
       ? hash
@@ -24,7 +24,20 @@
     });
     document.querySelector("#capture-heading").textContent =
       name === "camera" ? "Capture a moment" : "Write a memory";
-    // Navigation never clears the form or steals focus into the phone keyboard.
+    // Hash navigation includes save completion and browser back/forward.
+    // Focus a reading landmark, never an input that opens the phone keyboard.
+    if (event) {
+      const heading = views.find((el) => !el.hidden)?.querySelector("h1");
+      if (heading) {
+        heading.setAttribute("tabindex", "-1");
+        heading.addEventListener(
+          "blur",
+          () => heading.removeAttribute("tabindex"),
+          { once: true },
+        );
+        heading.focus({ preventScroll: true });
+      }
+    }
     window.scrollTo(0, 0);
   };
   window.addEventListener("hashchange", show);

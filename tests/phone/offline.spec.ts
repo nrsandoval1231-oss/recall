@@ -575,3 +575,98 @@ test("focused phone navigation preserves drafts and consent; Speak stays honest"
   await page.getByRole("button", { name: "Save capture", exact: true }).click();
   await expect(page.getByTestId("outbox")).toContainText("Received by library");
 });
+
+test("keyboard hash navigation focuses the visible heading through save and history", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const write = page.getByRole("link", { name: /Write In your words/ });
+  await write.focus();
+  await page.keyboard.press("Enter");
+  const captureHeading = page.getByRole("heading", {
+    name: "Write a memory",
+    exact: true,
+  });
+  await expect(captureHeading).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Note, in your words")).toBeFocused();
+  await expect(captureHeading).not.toHaveAttribute("tabindex");
+  await page
+    .getByLabel("Note, in your words")
+    .fill("Synthetic keyboard receipt");
+  await page.getByRole("button", { name: "Save capture", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "On this device" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: "Retry queued captures" }),
+  ).toBeFocused();
+  await page.goBack();
+  await expect(captureHeading).toBeFocused();
+  await page.goForward();
+  await expect(
+    page.getByRole("heading", { name: "On this device" }),
+  ).toBeFocused();
+  await page.getByRole("link", { name: "Ask", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Ask Recall" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Ask the notes")).toBeFocused();
+  await page.getByRole("link", { name: "← Home", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "Your memories belong here." }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("link", { name: "Search your memories…" }),
+  ).toBeFocused();
+});
+
+test("receipt and original evidence links have separated 48px touch targets", async ({
+  page,
+}) => {
+  await page.goto("/#write");
+  await page
+    .getByLabel("Note, in your words")
+    .fill("Synthetic touch target evidence");
+  await page.getByRole("button", { name: "Save capture", exact: true }).click();
+  const copy = page.getByRole("link", {
+    name: "Save original copy",
+    exact: true,
+  });
+  const inspect = page.getByRole("link", { name: "· Inspect in library" });
+  await expect(inspect).toBeVisible();
+  for (const link of [copy, inspect]) {
+    const box = await link.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(48);
+  }
+  const copyBox = (await copy.boundingBox())!;
+  const inspectBox = (await inspect.boundingBox())!;
+  expect(
+    inspectBox.y >= copyBox.y + copyBox.height ||
+      inspectBox.x >= copyBox.x + copyBox.width + 8,
+  ).toBeTruthy();
+  await inspect.click();
+  const original = page.getByRole("link", {
+    name: "Open original evidence",
+    exact: true,
+  });
+  await expect(original).toBeVisible();
+  expect((await original.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  // Synthetic inferred support uses the exact server-rendered structure; no provider is invoked.
+  await page.locator("main").evaluate((main) => {
+    const article = document.createElement("article");
+    article.className = "inferred";
+    article.innerHTML =
+      '<ul><li><a href="/sources/synthetic">Open original source</a><p>Synthetic support quote</p></li></ul>';
+    main.append(article);
+  });
+  expect(
+    (await page
+      .getByRole("link", { name: "Open original source", exact: true })
+      .boundingBox())!.height,
+  ).toBeGreaterThanOrEqual(48);
+});
