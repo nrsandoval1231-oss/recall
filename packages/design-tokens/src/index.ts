@@ -1,26 +1,27 @@
 /**
  * Platform-neutral tokens and user-facing language shared by mobile (React Native) and
  * desktop (DOM). The owner approved the sole UI/brand direction on 2026-10-15:
- * see docs/DESIGN.md. Existing exported values below are unmigrated implementation,
- * not an alternative brand authority. Migrate consumers with contrast/regression checks;
+ * see docs/DESIGN.md. Identity and semantic colors are distinct so consumers can
  * preserve semantic state labels, non-color indicators and capture behavior.
  */
 
+/** Approved identity colors; semantic shades below preserve text contrast. */
+export const palette = { ivory: "#FAF8F3", linen: "#EBE1D9", stone: "#D1CBC2", sage: "#8C9F8F", copper: "#C97F5B", graphite: "#2F2F2F", moss: "#B7C4B6", sand: "#E7DED4", blush: "#F3EBE6", mist: "#F7F5F2" } as const;
 export const color = {
-  ink: "#16181d",
-  inkMuted: "#4a5060",
-  paper: "#ffffff",
-  surface: "#f4f5f7",
-  border: "#c9cdd6",
-  accent: "#1f4fd8",
-  accentText: "#ffffff",
-  success: "#146c3a",
-  warning: "#8a5a00",
-  danger: "#a31d1d",
+  ink: palette.graphite,
+  inkMuted: "#62665e",
+  paper: palette.ivory,
+  surface: palette.mist,
+  border: palette.stone,
+  accent: "#526650",
+  accentText: palette.ivory,
+  success: "#426442",
+  warning: "#805329",
+  danger: "#963c30",
 } as const;
-
-export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 } as const;
-export const radius = { sm: 8, md: 14, lg: 22 } as const;
+export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
+export const radius = { xs: 4, sm: 8, md: 16, lg: 24 } as const;
+export const fontFamily = { display: "Playfair Display", body: "Inter" } as const;
 export const font = { body: 17, small: 14, title: 28, heading: 22 } as const;
 /** Minimum interactive target (points / px). Large capture targets are a UX requirement. */
 export const minTarget = 48;
