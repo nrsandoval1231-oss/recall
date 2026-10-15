@@ -14,7 +14,7 @@ const PROVIDERS: { id: ProviderId; title: string; purpose: string; fields: Field
   {
     id: "claude",
     title: "Claude",
-    purpose: "Reads photos and organizes notes. Get a key at console.anthropic.com. Prices are prefilled from Anthropic's published Claude Sonnet 5.5 rates (USD 2 in / 10 out per million tokens, checked 2026-10-15); update them if you change the model or the rates change.",
+    purpose: "Reads photos and organizes notes. Get a key at console.anthropic.com. With the Claude Sonnet 5.5 model, prices are prefilled from Anthropic's published rates (USD 2 in / 10 out per million tokens, checked 2026-10-15). For any other model, enter its prices yourself.",
     fields: [
       { name: "RECALL_CLAUDE_API_KEY", label: "API key", secret: true },
       { name: "RECALL_CLAUDE_MODEL", label: "Model", defaultValue: "claude-sonnet-5-5" },
@@ -38,6 +38,9 @@ const PROVIDERS: { id: ProviderId; title: string; purpose: string; fields: Field
   },
 ];
 
+// Published prices belong to one model; they are prefilled only while that model is selected.
+const PRICED_MODEL = { model: "RECALL_CLAUDE_MODEL", value: "claude-sonnet-5-5" };
+const MODEL_PRICES = new Set(["RECALL_CLAUDE_INPUT_USD_PER_MTOK", "RECALL_CLAUDE_OUTPUT_USD_PER_MTOK"]);
 const DEFAULTS = new Map(PROVIDERS.flatMap((p) => p.fields.filter((f) => f.defaultValue).map((f) => [f.name, f.defaultValue!] as const)));
 const SECRET_FIELDS = new Set(PROVIDERS.flatMap((p) => p.fields.filter((f) => f.secret).map((f) => f.name)));
 
@@ -49,6 +52,8 @@ function message(error: unknown) {
 export function ProviderSettings({ api }: { api: ProviderSettingsApi }) {
   const [views, setViews] = useState<ProviderView[] | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Price fields holding an untouched prefill, so a model change can withdraw them.
+  const [prefilledPrices, setPrefilledPrices] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<ProviderId | null>(null);
   const [notice, setNotice] = useState<{ provider: ProviderId; text: string; error?: boolean } | null>(null);
 
@@ -58,8 +63,19 @@ export function ProviderSettings({ api }: { api: ProviderSettingsApi }) {
     for (const view of next)
       for (const field of view.fields)
         if (field.source === "saved" && !SECRET_FIELDS.has(field.name)) values[field.name] = field.value ?? "";
-        else if (field.source === "missing" && DEFAULTS.has(field.name)) values[field.name] = DEFAULTS.get(field.name)!;
+        else if (field.source === "missing" && DEFAULTS.has(field.name) && !MODEL_PRICES.has(field.name))
+          values[field.name] = DEFAULTS.get(field.name)!;
+    const model = next.flatMap((v) => v.fields).find((f) => f.name === PRICED_MODEL.model);
+    const effectiveModel = values[PRICED_MODEL.model] ?? model?.value ?? "";
+    const prefilled = new Set<string>();
+    if (effectiveModel === PRICED_MODEL.value)
+      for (const field of next.flatMap((v) => v.fields))
+        if (MODEL_PRICES.has(field.name) && field.source === "missing") {
+          values[field.name] = DEFAULTS.get(field.name)!;
+          prefilled.add(field.name);
+        }
     setDrafts(values);
+    setPrefilledPrices(prefilled);
   }
 
   async function refresh() {
@@ -76,6 +92,21 @@ export function ProviderSettings({ api }: { api: ProviderSettingsApi }) {
       live = false;
     };
   }, [api]);
+
+  function edit(name: string, value: string) {
+    if (MODEL_PRICES.has(name)) {
+      setPrefilledPrices((p) => new Set([...p].filter((n) => n !== name)));
+      setDrafts((d) => ({ ...d, [name]: value }));
+      return;
+    }
+    setDrafts((d) => {
+      const next = { ...d, [name]: value };
+      if (name === PRICED_MODEL.model && value.trim() !== PRICED_MODEL.value)
+        for (const price of prefilledPrices) delete next[price];
+      return next;
+    });
+    if (name === PRICED_MODEL.model && value.trim() !== PRICED_MODEL.value) setPrefilledPrices(new Set());
+  }
 
   function current(provider: ProviderId, name: string) {
     return views?.find((v) => v.provider === provider)?.fields.find((f) => f.name === name);
@@ -146,7 +177,7 @@ export function ProviderSettings({ api }: { api: ProviderSettingsApi }) {
                           ? `${now?.value} (from environment)`
                           : field.placeholder
                     }
-                    onChange={(event) => setDrafts((d) => ({ ...d, [field.name]: event.target.value }))}
+                    onChange={(event) => edit(field.name, event.target.value)}
                     disabled={busy !== null || !views}
                   />
                 </label>

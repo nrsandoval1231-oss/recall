@@ -114,3 +114,30 @@ it("prefills missing fields with published defaults but never overrides saved or
   expect((within(jev).getByLabelText("Model") as HTMLInputElement).value).toBe("1"); // saved value wins
   expect(api.save).not.toHaveBeenCalled();
 });
+
+it("does not prefill Sonnet prices when another Claude model is configured", async () => {
+  const other = views();
+  other[0]!.fields[1] = { name: "RECALL_CLAUDE_MODEL", value: "claude-opus-5-5", source: "environment" };
+  render(<ProviderSettings api={fakeApi(other)} />);
+  const claude = await screen.findByRole("form", { name: "Claude settings" });
+  await waitFor(() => expect(within(claude).getByRole("status").textContent).toBe("Not configured"));
+  expect((within(claude).getByLabelText("Output price (USD per million tokens)") as HTMLInputElement).value).toBe("");
+  expect((within(claude).getByLabelText("Daily budget (USD)") as HTMLInputElement).value).toBe("2");
+});
+
+it("withdraws untouched prefilled prices when the model changes, keeping typed ones", async () => {
+  const api = fakeApi();
+  render(<ProviderSettings api={api} />);
+  const claude = await screen.findByRole("form", { name: "Claude settings" });
+  await waitFor(() => expect(within(claude).getByRole("status").textContent).toBe("Not configured"));
+  const field = (label: string) => within(claude).getByLabelText(label) as HTMLInputElement;
+  expect(field("Output price (USD per million tokens)").value).toBe("10");
+  fireEvent.change(field("Input price (USD per million tokens)"), { target: { value: "4" } });
+  fireEvent.change(field("Model"), { target: { value: "claude-opus-5-5" } });
+  expect(field("Output price (USD per million tokens)").value).toBe("");
+  expect(field("Input price (USD per million tokens)").value).toBe("4");
+  fireEvent.click(within(claude).getByRole("button", { name: "Save Claude" }));
+  await screen.findByText("Saved to this computer's credential store.");
+  expect(api.save.mock.calls[0]![1]).not.toHaveProperty("RECALL_CLAUDE_OUTPUT_USD_PER_MTOK");
+  expect(api.save.mock.calls[0]![1]).toMatchObject({ RECALL_CLAUDE_MODEL: "claude-opus-5-5", RECALL_CLAUDE_INPUT_USD_PER_MTOK: "4" });
+});
