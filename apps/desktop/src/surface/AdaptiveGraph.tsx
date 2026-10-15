@@ -201,8 +201,8 @@ export function AdaptiveGraph({
                   y={node.kind === "memories" ? 54 : 30}
                   textAnchor="middle"
                 >
-                  {node.label.length > 24
-                    ? node.label.slice(0, 23) + "…"
+                  {node.label.length > 18
+                    ? node.label.slice(0, 17) + "…"
                     : node.label}
                 </text>
               }

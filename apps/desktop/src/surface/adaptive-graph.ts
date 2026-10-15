@@ -34,7 +34,7 @@ function position(id: string) {
 function separateNodes(nodes: GraphNode[]) {
   const placed: GraphNode[] = [];
   const width = (node: { label: string }) =>
-    Math.max(70, Math.min(node.label.length, 24) * 3.8);
+    Math.max(70, Math.min(node.label.length, 18) * 8);
   // The view renders at most 200 nodes; larger libraries remain searchable in the list.
   for (const node of nodes.slice(0, 200)) {
     const origin = { x: node.x, y: node.y };
@@ -45,7 +45,7 @@ function separateNodes(nodes: GraphNode[]) {
       const angle = attempt * 2.399963229728653;
       const radius = 20 * Math.sqrt(attempt);
       const candidate = {
-        x: Math.max(125, Math.min(875, origin.x + Math.cos(angle) * radius)),
+        x: Math.max(160, Math.min(840, origin.x + Math.cos(angle) * radius)),
         y: Math.max(100, Math.min(590, origin.y + Math.sin(angle) * radius)),
       };
       let penalty = 0;

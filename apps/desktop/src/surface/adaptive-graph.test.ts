@@ -116,7 +116,10 @@ it("keeps multiple sources and their mentions apart independent of input orderin
   for (const [index, node] of graph.nodes.entries()) {
     for (const other of graph.nodes.slice(index + 1)) {
       expect(
-        Math.abs(node.x - other.x) >= 152 || Math.abs(node.y - other.y) >= 145,
+        Math.abs(node.x - other.x) >=
+          Math.max(70, Math.min(node.label.length, 18) * 8) +
+            Math.max(70, Math.min(other.label.length, 18) * 8) +
+            12 || Math.abs(node.y - other.y) >= 145,
       ).toBe(true);
     }
   }
