@@ -52,16 +52,16 @@ Uncertain provider delivery is never auto-resent; it waits for explicit review. 
 
 ## Desktop UI (`apps/desktop/src`)
 
-- `surface/MemorySurface.tsx`: the adaptive shell (capture bubbles, inspector, Ask, graph, history, settings).
+- `surface/MemorySurface.tsx`: the approved rail, global search, memory field, contextual inspector and capture bar, with Ask, history and Settings.
 - `surface/AdaptiveGraph.tsx`, `adaptive-graph.ts`, `vault-context.ts`: graph derived from library notes and links.
 - `surface/MemoryEditor.tsx`, `editor-session.ts`: native editor with autosave, conflict and revision handling.
 - `surface/meeting-workflow.ts`, `native-librarian.ts`: drives the pipeline over IPC and reports honest states.
 - `platform/local-vault.ts`: the only bridge to native commands.
-- `?design=canonical` and the Brooks fixture are labelled synthetic previews for browser-only development, never shown as user data.
+- `scripts/verify-ui.mjs` and `scripts/verify-populated.mjs` inject labelled synthetic browser IPC for regression screenshots; production opens the real local library. The old selectable legacy-cloud entry and unused dashboard fixture components are removed.
 
 ## Phone (`src-tauri/src/phone.rs`, `bin/recall-phone.rs`)
 
-A small HTTP server in the same crate. It binds the Tailscale IPv4 only (loopback fallback; all-interfaces needs two explicit env flags). It shares the library writer lock with the desktop. Cross-site requests are refused. It never calls a model or reads API keys; captured items queue for desktop processing. Setup: [DEVELOPMENT.md](DEVELOPMENT.md#phone-companion).
+A small HTTP server in the same crate. It binds the Tailscale IPv4 only (loopback fallback; all-interfaces needs two explicit env flags). It shares the library writer lock with the desktop. Cross-site requests are refused. It never calls a model or reads API keys; captured items queue for desktop processing. Its focused Home, Capture, Ask and device-receipt views use the shared brand CSS and fonts; `phone/ui.js` handles presentation only, while `phone/companion.js` retains durable outbox and delivery behavior. Source inspection and processing receipts remain native routes. Setup: [DEVELOPMENT.md](DEVELOPMENT.md#phone-companion).
 
 ## Backup and portability
 
@@ -70,11 +70,11 @@ A small HTTP server in the same crate. It binds the Tailscale IPv4 only (loopbac
 
 ## Shared packages
 
-`packages/design-tokens` is used by the desktop UI. `packages/api-client`, `packages/sync`, `packages/contracts` serve the legacy cloud stack only.
+`packages/design-tokens` supplies the approved palette and semantic tokens. Its `brand.css` is shared by desktop and the native phone renderer. `packages/api-client`, `packages/sync`, `packages/contracts` serve the legacy cloud stack only.
 
 ## Legacy (not the product)
 
-`services/backend` (FastAPI, Postgres/pgvector, worker), `apps/web` (PWA), `apps/mobile` (Expo), and the desktop's `?mode=legacy-cloud` entry. They are frozen; see [legacy-cloud/](legacy-cloud/README.md).
+`services/backend` (FastAPI, Postgres/pgvector, worker), `apps/web` (PWA), `apps/mobile` (Expo). The old desktop cloud entry module is unreachable from production. These sources are frozen; see [legacy-cloud/](legacy-cloud/README.md).
 
 ## Constraints
 
