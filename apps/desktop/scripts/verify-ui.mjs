@@ -14,6 +14,8 @@ fs.mkdirSync(output, { recursive: true });
 const uiUrl = process.env.RECALL_UI_URL || "http://127.0.0.1:4173/";
 // The 2026-10-15 UI lock retired the old four-panel reference image; no visual
 // comparison runs until the approved boards are imported (docs/DESIGN.md).
+// Remove a comparison left by an older run so it never sits beside fresh evidence.
+fs.rmSync(path.join(output, "approved-comparison.jpg"), { force: true });
 const browser = await chromium.launch(
   process.env.RECALL_CHROMIUM
     ? { executablePath: process.env.RECALL_CHROMIUM }

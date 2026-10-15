@@ -16,6 +16,8 @@ _Last updated: 2026-10-15. Initial UI-authority audit baseline: `8423206fa683d48
 
 ### Source audit and implementation debt
 
+- Automated UI verification (`apps/desktop/scripts/verify-ui.mjs`, CI `adaptive-desktop-ui`) no longer compares against the retired four-panel image, which the lock removed and the script had required. It still captures four viewports and runs the axe, console-error and synthetic IPC walkthrough checks. **There is no visual comparison against the approved boards yet**; add one when their PNGs are imported.
+
 - `docs/DESIGN.md` previously required the older exact four-panel PNG. That design authority is replaced, not retained as an option.
 - Shared token documentation and `packages/design-tokens/src/index.ts` said no brand had been approved. That claim is corrected; exported runtime token values remain unchanged and need a tested migration.
 - `apps/desktop/src/surface/memory-surface.css` still uses Georgia/Times, brown/cognac accents and its previous composition. It has not been migrated to Playfair Display / Inter and the approved palette.
