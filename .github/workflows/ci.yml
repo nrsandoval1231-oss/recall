@@ -126,5 +126,5 @@ jobs:
         if: always()
         with:
           name: recall-adaptive-ui-synthetic-evidence
-          path: docs/audits/adaptive/
+          path: test-results/adaptive/
           retention-days: 7

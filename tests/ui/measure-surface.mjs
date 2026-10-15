@@ -1,6 +1,6 @@
 /* global window, performance, requestAnimationFrame, PerformanceObserver */
 import process from "node:process";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 const browser = await chromium.launch({
   executablePath: process.env.RECALL_CHROMIUM || undefined,
@@ -59,8 +59,9 @@ const report = {
     "Headless system Chromium, 1440×1000, Vite development fixture; local automation, not device or production latency",
   ...results,
 };
+await mkdir("test-results/memory-surface", { recursive: true });
 await writeFile(
-  "docs/implementation/memory-surface/performance.json",
+  "test-results/memory-surface/performance.json",
   JSON.stringify(report, null, 2) + "\n",
 );
 process.stdout.write(JSON.stringify(report) + "\n");

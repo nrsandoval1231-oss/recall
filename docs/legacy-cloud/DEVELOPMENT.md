@@ -1,0 +1,289 @@
+> **FROZEN, legacy cloud stack. Not the product.** Current authority: [VISION.md](../VISION.md). See [legacy-cloud/README.md](README.md).
+
+# Developer setup and real-device acceptance (RCL-001)
+
+## Active next engineering slice
+
+Follow [Meeting to Memory](MEETING-TO-MEMORY.md): the native text pipeline and vault-bound UI are implemented; owner-observed Windows real-provider publication, restart retrieval and Obsidian original access are recorded in ACCEPTANCE. Next validate real handwriting, physical phone/Tailscale and canonical visual fidelity. Record exact commit, live-provider tests and hardware limitations in ACCEPTANCE. No PostgreSQL dependency or speculative feature expansion.
+
+
+## Current development path
+
+Use the desktop Memory Surface and local phone companion instructions for the active pilot. Cloud deployment and legacy clients are not launch requirements. Bounded installed Windows text acceptance is owner-verified; real iPhone, handwriting and broader device acceptance remain open.
+
+> **HISTORICAL — 2026-10-09 PWA pilot note.** Superseded by the [2026-10-10 amendment](PILOT-CONTRACT.md). The current product center is the desktop Memory Surface, with organized notes in Obsidian and the phone as a capture/ask companion. No login or email-auth UX still applies. PR #16 remains the installable web companion and enrollment transport. The owner visual reference is [memory-surface-reference-2026-10-10.jpg](assets/memory-surface-reference-2026-10-10.jpg).
+
+
+## Desktop Memory Surface (current product)
+
+The desktop app opens onto the Memory Surface. It does not ask for an email, password, or sign-in link. Memory for this path is a local Obsidian vault.
+
+```bash
+cd apps/desktop
+npm install                      # from the repo root, once
+npm run dev                      # browser preview. It cannot write a vault.
+npx tauri dev                    # native app. Choose a folder, or use the default vault.
+npm run typecheck && npm test
+cd src-tauri && cargo test --locked --lib
+```
+
+Linux native builds need `libwebkit2gtk-4.1-dev`, `libsoup-3.0-dev`, `librsvg2-dev`, `libxdo-dev`, `libssl-dev`, and `pkg-config`. Windows needs WebView2 and the MSVC build tools. On Windows, `npx tauri build` from `apps/desktop` produces an unsigned NSIS installer. The `windows-native` GitHub job runs that build and uploads `recall-windows-desktop` for seven days. Downloading the artifact is not an installed-Windows acceptance.
+
+**Use default vault** creates `Documents/Recall` and selects it. Set `RECALL_VAULT_DIR` to an absolute path to send that same command elsewhere. The webview cannot pass a folder. Inside the selected folder Recall creates:
+
+```text
+Recall/Sources/     original photo bytes, written once
+Recall/Memories/    Markdown note linking to the original
+Recall/History/     append-only revisions
+Recall/_meta/       manifest, journal, commit receipts, preserved local edits
+```
+
+Open that parent folder in Obsidian. A note edited there is not silently replaced. Import writes the original before the note. An optional note is your words, not a reading of the page. Ask searches those notes and can open the original. The result is labeled keyword search. It is not a Claude answer.
+
+### Enabling Claude reading
+
+Claude is off unless the **desktop process** has every value below. `npm run dev` cannot send a photo. Do not put the key in a `VITE_` variable, a checked-in file, or the webview.
+
+```bash
+export RECALL_CLAUDE_API_KEY=...                 # never commit this
+export RECALL_CLAUDE_MODEL=claude-opus-5-5       # the model you intend to pay for
+export RECALL_CLAUDE_INPUT_USD_PER_MTOK=3        # replace with that model's published input price
+export RECALL_CLAUDE_OUTPUT_USD_PER_MTOK=15      # replace with that model's published output price
+export RECALL_CLAUDE_DAILY_BUDGET_USD=2          # hard stop for this desktop
+export RECALL_CLAUDE_MONTHLY_BUDGET_USD=20
+cd apps/desktop && npx tauri dev
+```
+
+The prices above are a shape, not a quote. Use the provider's current published prices. The reservation assumes up to 8,000 input tokens and 1,024 output tokens and refuses the call when that estimate would pass the daily or monthly cap.
+
+Open one saved photo, check the consent box, then choose **Read this photo with Claude**. That sends only that photo. The result is stored under `Recall/_meta/readings/` as an unreviewed proposal, with a budget ledger at `Recall/_meta/librarian-budget.json`. The Markdown note does not change until you press **Save correction**. Ask searches that note, not the unreviewed proposal. A missing price or budget, a refused hash, a spent budget, or a provider error is shown and does not pretend the photo was unread when the outcome is unknown. No live call is part of the automated tests; those use a fake provider.
+
+When no vault is open, or the vault has no memories, the surface shows the synthetic Brooks Campus board and says so. It is the owner reference fixture, not your notes, and it leaves once a real memory is saved.
+
+`?mode=legacy-cloud` still opens the older cloud desktop. That view needs the public `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` values. It is not the product path. `apps/web` enrollment is unchanged and is not this journey.
+
+## Phone companion over Tailscale
+
+The phone is a capture and ask page served by a small process on the same computer as the desktop app. It writes the same Obsidian vault. It does not show a login, sign-up, password, or email field. It does not use Cloud Postgres, and it does not call Claude. A photo saved here stays in the vault until someone opens it in the desktop app and consents to a reading there. The Claude key, when set, stays in the desktop process. It is not in this page.
+
+Build and run it from the desktop crate:
+
+```bash
+cd apps/desktop/src-tauri
+cargo run --bin recall-phone
+```
+
+`npm run phone` from `apps/desktop` runs the same command. A release binary is `cargo build --release --bin recall-phone`, which writes `target/release/recall-phone` (`recall-phone.exe` on Windows). Leave the console open. It prints the vault folder and the URL. Closing it stops the phone page.
+
+### Which vault
+
+Set `RECALL_VAULT_DIR` to the same absolute folder the desktop uses. The folder must already exist. The process then uses the `Recall/Sources`, `Recall/Memories`, `Recall/History`, and `Recall/_meta` tree inside it, creating that tree only when the folder is empty of one.
+
+If `RECALL_VAULT_DIR` is unset, the process follows the folder the desktop app last selected:
+
+| System | Selection file |
+| --- | --- |
+| Windows | `%APPDATA%\com.example.recall.desktop\selected-vault.json` |
+| Linux | `$XDG_DATA_HOME` or `~/.local/share/com.example.recall.desktop/selected-vault.json` |
+| macOS | `~/Library/Application Support/com.example.recall.desktop/selected-vault.json` |
+
+If neither is available, it exits without creating a second vault. Open the folder in the desktop app first, or set `RECALL_VAULT_DIR`.
+
+The desktop app and this process share the vault writer lock. If one is mid-write, the other is told the vault is busy. A busy or failed save is not described as saved. A note edited in Obsidian is not replaced. Ask reads the current note text, including that edit, and says it is keyword search.
+
+### Reach the page from the iPhone
+
+1. Install Tailscale on the desktop and on the iPhone, and join the same tailnet.
+2. On the desktop, run `tailscale ip -4`. That is the address to open. Example shape: `100.64.1.5`.
+3. Start `recall-phone` on the desktop. When `tailscale ip -4` succeeds and `RECALL_PHONE_BIND` is unset, the process listens on that IPv4 and port `8787` only. It does not listen on `0.0.0.0`.
+4. On the iPhone, with Tailscale connected, open `http://<that-ipv4>:8787/` in Safari.
+5. Add to Home Screen is optional. The icon uses the page manifest. It does not cache notes or photos, and it does not answer while the desktop process is unreachable.
+
+Set `RECALL_PHONE_PORT` to use another port from 1 to 65535. Set `RECALL_PHONE_BIND` to a specific IP, or to `tailscale` to fail instead of falling back, or to `loopback` for this computer only. If Tailscale is not running and the bind is unset, the process listens on `127.0.0.1` and the banner says the phone cannot open it.
+
+`RECALL_PHONE_ALLOW_ALL_INTERFACES=1` together with `RECALL_PHONE_BIND=0.0.0.0` listens on every interface. That is off unless both are set. Do not set them on a machine with a public or untrusted LAN address. A Tailscale ACL does not apply to those other interfaces.
+
+Windows may ask for firewall permission. Allow the port on the Tailscale adapter only. Do not allow it on a Public profile, and do not forward the port from a router.
+
+### What the phone can do
+
+Capture can save a note alone. A photo or file is optional, and Save is not blocked when the file field is empty. The note is your words, not a reading of a page. A note with no photo is written under `Recall/Memories` and does not create a file in `Recall/Sources`. When a photo is included, Save writes those original bytes under `Recall/Sources` before the Markdown note. Ask requires every remaining word to occur in the note or the source name. Question words are ignored. Each hit shows an excerpt and the vault-relative note path. A hit that has a photo also shows that original. The page says keyword search, not a Claude answer.
+
+There is no token in the page, the URL, or browser storage. A browser on another site cannot submit the form: a cross-site `Origin` or `Sec-Fetch-Site` is refused. A file upload from this page is accepted when the browser marks it same-origin, including the `Origin: null` value Chrome sends on that upload. A program that can already open the address on the tailnet can read and write the vault, because there is no second login. Treat a Tailscale ACL as the access boundary. A starting shape, which this repository does not install, is to accept only the phone tag to the desktop tag on port 8787.
+
+### Honest gaps
+
+- **HTTPS and certificates.** The page is HTTP. Recall does not install a certificate, terminate TLS, or run Tailscale Serve. Safari may limit Add to Home Screen or camera APIs on plain HTTP. The file field still offers the camera and the photo library in Safari without a secure context. Do not describe this as an HTTPS site.
+- **Offline.** The phone does not queue a photo or a note. If the page does not load, nothing was saved. There is no service worker and no offline generative answer.
+- **Claude from the phone.** This process never calls Claude and never reads `RECALL_CLAUDE_API_KEY`. A saved photo is the queue: open it in the desktop app, check the consent box, and read it there. That desktop call still needs the key, model, prices, and budgets on the desktop process. A text-only note has no photo to send.
+- **Desktop evidence for a text note.** The Markdown note is in the vault. The desktop evidence view still asks for an original photo, so opening that note there reports that there is no original. Keyword search on the phone still finds the note.
+- **Not a public deployment.** Nothing here is hosted, published, or pointed at Cloud Postgres. A real iPhone on a real tailnet was not part of the automated tests. Those tests bind loopback and use synthetic image bytes.
+
+## V1 deployment, recovery and acceptance
+
+Apply all checksummed migrations with the owner connection; enable pgvector as administrator first. API and worker connections must be least privilege and cannot own tables or bypass RLS. Fill `infra/api.env.example` and `infra/worker.env.example` into ignored private `.env` files. `docker compose -f infra/pilot.compose.yml up --build` runs API and worker against external Supabase. Bind is local-only by default; place HTTPS/authenticated ingress in front of it. No external infrastructure is provisioned by these templates.
+
+For offline acceptance: installed Windows sign-in → sync → open/hash-check original → correct → disconnect → restart → local search/original → supported correction → reconnect → confirm outbox acknowledgment or visible version conflict. Delete on another client and resync; controlled originals must disappear. Export to a disposable selected root, edit a generated Markdown file, re-export and confirm conflict preservation. Run the backup/restore tests and perform a trusted operator restore into fresh staging before using recovery in production.
+
+Linux and Windows CI run native Rust tests; local Windows builds require MSVC/SDK and WebView2. Tests create real isolated PostgreSQL clusters; Windows requires PostgreSQL binaries on PATH. pgvector-specific tests skip honestly where unavailable and must pass in Linux CI. See [V1-STATUS](V1-STATUS.md) for current recorded evidence.
+
+
+Instructions only. Product scope lives in [PRD](PRD.md); evidence lives in [ACCEPTANCE](ACCEPTANCE.md) ("RCL-001 evidence").
+
+## Prerequisites
+
+| Tool | Version used | For |
+| --- | --- | --- |
+| Node + npm | 22 / 10 | all TypeScript packages (npm workspaces) |
+| Python + [uv](https://docs.astral.sh/uv/) | 3.12+ (tested 3.13) | backend |
+| PostgreSQL server binaries (`initdb`, `pg_ctl`) | 16 | backend tests start a throwaway cluster themselves |
+| Docker (optional) | any | `scripts/dev-db.sh` local database |
+| Rust + Tauri system libs | stable; Linux: `libwebkit2gtk-4.1-dev libsoup-3.0-dev librsvg2-dev libxdo-dev libssl-dev` | desktop native crate |
+| Xcode + Apple developer account (iPhone) / Windows + WebView2 + MSVC build tools | | real-device builds (not needed for tests) |
+| A Supabase project (Auth + private Storage) | | live acceptance only (not needed for tests) |
+
+## Install
+
+```bash
+npm install                       # workspaces: packages/*, apps/*
+cd services/backend && uv sync    # uses uv.lock
+```
+
+## Backend
+
+Environment variables are listed in `.env.example` (names only). Minimum for local development:
+
+```bash
+scripts/dev-db.sh up              # Docker PG16, roles, migrations; prints the exports below
+export DATABASE_URL=...           # recall_api role (NOT the owner)
+export RECALL_MIGRATION_DATABASE_URL=...   # recall_owner role
+export RECALL_SIGNING_SECRET=...  # >= 32 chars
+export RECALL_AUTH_ISSUER=https://<project>.supabase.co/auth/v1
+export RECALL_AUTH_JWKS_URL=https://<project>.supabase.co/auth/v1/.well-known/jwks.json
+export RECALL_STORAGE_BACKEND=local RECALL_LOCAL_STORAGE_DIR=.recall-storage
+cd services/backend
+uv run python -m recall.db.migrate                       # apply; add --check to verify nothing is pending
+uv run uvicorn recall.api.app:app_factory --factory --port 8000
+```
+
+Without Docker, create two login roles yourself in any PostgreSQL 16: an **owner** (`createrole`, owns the database) and an **API role** (`nosuperuser nobypassrls`); run migrations as the owner, then `grant recall_app to <api role>`. The API refuses to start if its role is a superuser, has `BYPASSRLS`, or owns the tables.
+
+Migrations are plain ordered SQL in `services/backend/migrations/`, checksummed in `schema_migrations`; editing an applied file is an error. If `RECALL_AUTO_PROVISION_WORKSPACES=false`, provision a user with `python -m recall.db.provision <auth-user-uuid>`.
+
+## Web companion (installable PWA, no login screen)
+
+`apps/web` is the optional companion from PR #16, not the product center. `npm run build --workspace @recall/web` emits the Vite app, `manifest.webmanifest`, icons, and `sw.js`. The same URL is what iPhone Safari uses for Add to Home Screen and what a Windows browser opens. That manual check is still open; the build does not perform it, and it is not the launch gate.
+
+Set `RECALL_OPERATOR_TOKEN` (at least 32 characters) only on the API. Unset, the operator routes respond 404. Issue a device with:
+
+```bash
+curl -s -X POST "$API/v1/operator/enrollments" \
+  -H "Authorization: Bearer $RECALL_OPERATOR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"label":"pilot phone"}'
+```
+
+The response contains `enrollment_token` once. On the device, open `https://<site>/#<enrollment_token>` and do not put that token in a query string, bookmark, or chat log after it has been used. The page strips the fragment and the Worker stores a revocable session cookie. `RECALL_SITE_ORIGINS` must include the site origin or an `Origin` header is rejected. Revoke one session with `POST /v1/operator/sessions/<id>/revoke`, one workspace with `POST /v1/operator/workspaces/<id>/revoke-sessions`, or every device with `POST /v1/operator/kill-switch`.
+
+Provider JWTs still authenticate the preserved native clients. The web Worker does not call the email identity provider. Supabase in this repository remains the private object-storage option and the historical email-login record, not the pilot sign-in path.
+
+### Local object storage
+
+`RECALL_STORAGE_BACKEND=local` writes originals under `RECALL_LOCAL_STORAGE_DIR` (private dir, write-once, server-assigned keys). For Supabase set `RECALL_STORAGE_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server only), and create a **private** bucket named `RECALL_STORAGE_BUCKET`. See [infra/supabase](../../infra/supabase/README.md).
+
+## AI processing (RCL-002, optional)
+
+Off unless every `AI_*`/budget variable in `.env.example` is set **and** a workspace turns it on in Settings. Calling a live provider costs money: get the owner's approval and set budgets first.
+
+```bash
+# server env (both API and worker): AI_PROVIDER=anthropic AI_MODEL_ID=claude-opus-5-5 AI_API_KEY=... \
+#   AI_INPUT_USD_PER_MTOK=... AI_OUTPUT_USD_PER_MTOK=... RECALL_AI_DAILY_BUDGET_USD=... RECALL_AI_MONTHLY_BUDGET_USD=...
+export RECALL_WORKER_DATABASE_URL=...   # login role that inherits recall_worker (scripts/dev-db.sh creates recall_worker_login)
+cd services/backend && uv run python -m recall.ingestion.worker
+```
+
+Prices must be the provider's current published prices for the configured model; they are only used to stop spending at the budget. The worker refuses to start with an owner, superuser, `BYPASSRLS`, or non-`recall_worker` role.
+
+## Mobile (Expo, iPhone)
+
+```bash
+cp .env.example apps/mobile/.env   # fill EXPO_PUBLIC_* only (public values)
+cd apps/mobile
+npx expo start                     # Expo Go cannot be used for the final acceptance; see below
+npm run typecheck && npm test
+npx expo export --platform ios     # JS bundle check, no device or signing needed
+```
+
+Camera, photo import, SecureStore, and the file adapter need a real iPhone build (`npx expo run:ios --device` or an EAS development build; requires an Apple developer account, which this repository does not provision). The app refuses to run without its three `EXPO_PUBLIC_*` values rather than falling back to a fake mode.
+
+## Desktop legacy cloud mode
+
+The commands in [Desktop Memory Surface](#desktop-memory-surface-current-product) are the product path. The block below is only for `?mode=legacy-cloud`.
+
+```bash
+cp .env.example apps/desktop/.env  # fill VITE_* only (public values)
+cd apps/desktop
+npm run dev          # then open /?mode=legacy-cloud
+npx tauri dev        # full app; Windows needs WebView2 and MSVC build tools
+npx tauri build      # NSIS installer (unsigned unless you configure signing)
+```
+
+Add the desktop origin to the API: `RECALL_CORS_ORIGINS=http://tauri.localhost` (Tauri 2 on Windows). Dev server: `http://localhost:1420`. The Windows installer job does not embed these public values; a vault build does not need them.
+
+## Tests
+
+```bash
+cd services/backend && uv run ruff check . && uv run mypy src && uv run pytest -q   # real PG cluster, incl. e2e
+npm run lint && npm run typecheck && npm test                                         # all TypeScript packages
+```
+
+`services/backend/tests/test_e2e_clients.py` launches a real uvicorn + Postgres and drives the TypeScript sync engine and API client (`tests/e2e/rcl001.e2e.ts`). It skips with a message if `npm install` has not been run.
+
+## Real-device acceptance procedure (web companion, not the launch gate)
+
+This is the open gate for the optional installable web app from PR #16. It is not the way to start using Recall, and it is not satisfied by CI. The host order is the unchecked list in [Real-device deploy checklist](audits/2026-10-10-real-device-deploy-checklist.md). That checklist does not record the gates as passed.
+
+Preconditions: deployed HTTPS API and web origin, `RECALL_OPERATOR_TOKEN` set only on the API, `RECALL_SITE_ORIGINS` set to that origin, private storage, and two provisioned workspaces. Use synthetic or personally owned pages kept outside the repository. Do not call a paid model for this gate.
+
+1. On an iPhone, open the site in Safari, use Add to Home Screen, and launch the icon. Confirm the name Recall, the icon, standalone display, and that the layout clears the notch and home indicator.
+2. On Windows, open the same URL in a desktop browser. Confirm it loads the Memory Surface without an install step.
+3. Before enrollment, confirm the phone and the Windows browser both stop at the unprovisioned state and do not show email, password, or a sign-in link.
+4. Enroll the phone from an operator-issued fragment. Confirm Recall opens into memory, the fragment is gone from the address bar, and refreshing still opens memory.
+5. Photograph a note, save it, and confirm the original is on the server with a matching SHA-256. Ask on the enrolled Windows browser and open that same original.
+6. Revoke the phone session from the operator API. Confirm the phone loses captures and originals, and the Windows session for the other workspace still cannot read them.
+7. Replay the used enrollment fragment and confirm it does not create a second session.
+
+Record device, OS, browser, commit, and every deviation in ACCEPTANCE. Anything not done stays **OPEN**.
+
+## Historical real-device procedure (RCL-001 native exit gate)
+
+The steps below describe the earlier native sign-in build. They are historical email-login steps, not the desktop vault slice.
+
+Preconditions: live Supabase project (signups restricted), deployed or tunneled HTTPS API with private storage, a signed iPhone build, an installed Windows build, and two test accounts. Use **synthetic or personally owned test pages kept outside the repository**.
+
+1. Sign in on the iPhone and on Windows with the same account; confirm the Windows list is honestly empty.
+2. On the iPhone, photograph 3 pages (retake one, reorder two, remove one then add it back), add a one-line hint, tap **Save**. Confirm **Saved on this device** appears immediately.
+3. Enable airplane mode before step 2 for one run; confirm the capture stays **Saved on this device** and never says Uploaded.
+4. Force-close the app right after Save; relaunch; confirm the capture is still there and resumes uploading.
+5. Interrupt an upload (toggle airplane mode mid-upload); confirm **Failed — retry available** with the capture intact, then retry to **Uploaded**.
+6. On Windows, open the capture: pages in order, **✓ Verified** per page, "Save exact copy" for each page.
+7. Compute SHA-256 of the files exported from the iPhone (Files/AirDrop of the original asset) and of the Windows "Save exact copy" outputs; record them next to the server hashes shown in the viewer. All three must match.
+8. Sign in as the second account on Windows; confirm none of the first account's captures or sources are visible.
+9. Record device models, OS versions, build identifiers, commit SHA, and every observed deviation in ACCEPTANCE.
+
+Report anything not performed as **OPEN**, never as passed.
+
+## Live AI acceptance procedure (RCL-002 exit gate)
+
+Preconditions: owner-approved budget and key, provider retention/training terms reviewed for the account, and a **consented private evaluation set kept outside the repository** (design-partner handwriting plus general-domain pages) with held-out questions written before any tuning.
+
+1. Turn on AI reading in Settings; confirm the explanation names the provider.
+2. Capture each evaluation set item; record status (`ready` / `needs_review` / `failed`) and per-capture cost from `ai_usage`.
+3. For each page, compare the machine reading with the original: count critical-field errors (numbers, units, names, dates) and any lost "?" or invented certainty (release blockers).
+4. Ask each held-out question; record answered/abstained, whether every material sentence is supported by the cited page (entailment), and whether the correct original is cited. Include deliberately unsupported questions; they must abstain.
+5. Revoke consent; confirm queued work stops and Ask returns `unavailable` with sources.
+6. Record model id, effort, prompt/processor version (`interpret-v1`), dataset version, and results in ACCEPTANCE. Do not tune prompts against the held-out answers.
+
+### Reproduce canonical desktop UI verification
+
+Install dependencies with `npm ci`, then run `npm run dev -w @recall/desktop -- --host 127.0.0.1 --port 4173 --strictPort`. In another terminal run `npm run test:visual -w @recall/desktop` with an installed Playwright Chromium browser. `RECALL_CHROMIUM` may select a local executable; `RECALL_UI_URL` overrides the development URL and `RECALL_UI_EVIDENCE_DIR` redirects generated artifacts. The script captures four viewports, tests an explicitly synthetic native IPC fixture through inspection/correction/Ask/settings/capture, rejects provider calls, scans accessibility and console errors, and saves a side-by-side canonical comparison. It does not establish live provider or Windows/Tauri acceptance. See `design-qa.md` for measured visual checks and remaining refinements.

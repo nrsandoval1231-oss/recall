@@ -1,4 +1,4 @@
-"""Deterministic validation of a model's extraction proposal (docs/AI-INGESTION.md "Validation").
+"""Deterministic validation of a model's extraction proposal (docs/legacy-cloud/AI-INGESTION.md "Validation").
 
 Hard failures (unparseable, schema-invalid, wrong capture/pages/ids) raise InvalidExtraction and the
 attempt may be repaired or retried. Soft failures never raise: the offending item is dropped or made

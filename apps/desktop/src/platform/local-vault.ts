@@ -162,7 +162,6 @@ export interface LocalVault {
     operationId: string,
   ): Promise<VaultMemory>;
   ask?(expectedVaultId: string, question: string): Promise<SourceAnswer>;
-  openObsidian?(expectedVaultId: string, memoryId: string): Promise<void>;
   status(): Promise<VaultStatus>;
   select(): Promise<VaultStatus | null>;
   openDefault(): Promise<VaultStatus>;
@@ -220,12 +219,6 @@ export class NativeLocalVault implements LocalVault {
         new Error("Open the Recall desktop app to use a local vault."),
       );
     return invoke<T>(command, args);
-  }
-  openObsidian(expectedVaultId: string, memoryId: string) {
-    return this.call<void>("vault_open_obsidian", {
-      expectedVaultId,
-      memoryId,
-    });
   }
   exportLibrary(expectedVaultId: string) {
     return this.call<LibraryBackup | null>("library_export", {

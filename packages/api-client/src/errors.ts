@@ -1,4 +1,4 @@
-/** Stable machine codes from docs/API-CONTRACT.md, plus the transport-level failure. */
+/** Stable machine codes from docs/legacy-cloud/API-CONTRACT.md, plus the transport-level failure. */
 
 export class ApiError extends Error {
   constructor(

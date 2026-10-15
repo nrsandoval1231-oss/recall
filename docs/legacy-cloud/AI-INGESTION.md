@@ -1,3 +1,5 @@
+> **FROZEN, legacy cloud stack. Not the product.** Current authority: [VISION.md](../VISION.md). See [legacy-cloud/README.md](README.md).
+
 # AI ingestion and grounded retrieval
 
 ## Jev capability discovery — 2026-10-12

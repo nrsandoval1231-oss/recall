@@ -1,3 +1,5 @@
+> **FROZEN, legacy cloud stack. Not the product.** Current authority: [VISION.md](../VISION.md). See [legacy-cloud/README.md](README.md).
+
 # Security, privacy, and operations
 
 ## Optional Graphiti service boundary (2026-10-13)

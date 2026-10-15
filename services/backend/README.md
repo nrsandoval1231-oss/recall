@@ -12,4 +12,4 @@ One FastAPI package (`src/recall`). RCL-001 implements the trusted-capture API; 
 | `retrieval` | RCL-002 keyword search and grounded Ask |
 | `sync`, `exports` | reserved for later packets |
 
-Run, migrate, and test: [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md). Contract: [docs/API-CONTRACT.md](../../docs/API-CONTRACT.md). The API connects as a non-owner role and refuses to start otherwise.
+Run, migrate, and test: [docs/legacy-cloud/DEVELOPMENT.md](../../docs/legacy-cloud/DEVELOPMENT.md). Contract: [docs/legacy-cloud/API-CONTRACT.md](../../docs/legacy-cloud/API-CONTRACT.md). The API connects as a non-owner role and refuses to start otherwise.

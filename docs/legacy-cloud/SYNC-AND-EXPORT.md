@@ -1,3 +1,5 @@
+> **FROZEN, legacy cloud stack. Not the product.** Current authority: [VISION.md](../VISION.md). See [legacy-cloud/README.md](README.md).
+
 # Sync, offline behavior, and Obsidian export
 
 ## Active pilot authority (2026-10-11)

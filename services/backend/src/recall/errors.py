@@ -1,4 +1,4 @@
-"""Stable machine-readable errors (docs/API-CONTRACT.md "Operational errors")."""
+"""Stable machine-readable errors (docs/legacy-cloud/API-CONTRACT.md "Operational errors")."""
 
 from __future__ import annotations
 

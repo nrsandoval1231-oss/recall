@@ -1,6 +1,6 @@
 /**
  * LocalFiles on expo-file-system (SDK 57 object API). Everything lives under the app's private
- * document directory. NOT verified on a physical device in RCL-001 (see docs/ACCEPTANCE.md ("RCL-001 evidence"), gate G3):
+ * document directory. NOT verified on a physical device in RCL-001 (see docs/history/ACCEPTANCE-LOG-2026-10.md ("RCL-001 evidence"), gate G3):
  * the durability *logic* is tested with a node:fs adapter; this adapter is the thin native layer.
  */
 import { Directory, File, FileMode, Paths } from "expo-file-system";

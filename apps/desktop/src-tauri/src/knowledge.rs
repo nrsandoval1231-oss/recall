@@ -1,5 +1,5 @@
 //! Native coordinator for the optional, derived local Graphiti index.
-//! The Obsidian vault remains authoritative; every returned citation is rebound
+//! The Recall library on disk remains authoritative; every returned citation is rebound
 //! to the current native note before it crosses the Tauri boundary.
 use crate::local_vault::{KnowledgeControl, Vault};
 use serde::{Deserialize, Serialize};

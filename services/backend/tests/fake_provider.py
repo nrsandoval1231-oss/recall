@@ -1,6 +1,6 @@
 """SYNTHETIC test double for the AI provider. Used only to test Recall's own deterministic machinery
 (gates, jobs, leases, validation, retrieval, citation checks). It proves nothing about real model
-quality; live-provider acceptance is a separate OPEN gate (docs/ACCEPTANCE.md)."""
+quality; live-provider acceptance is a separate OPEN gate (docs/history/ACCEPTANCE-LOG-2026-10.md)."""
 
 from __future__ import annotations
 

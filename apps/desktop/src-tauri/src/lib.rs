@@ -14,7 +14,6 @@ mod managed_export;
 mod persistence;
 pub mod phone;
 mod secrets;
-mod obsidian;
 mod attachments;
 
 use managed_export::ManagedExportState;
@@ -413,18 +412,6 @@ fn vault_source(
     state.with(&expected_vault_id, |vault| vault.source(&memory_id))
 }
 #[tauri::command]
-fn vault_open_obsidian(
-    state: tauri::State<'_, local_vault::LocalVaultState>,
-    expected_vault_id: String,
-    memory_id: String,
-) -> Result<(), String> {
-    state.with(&expected_vault_id, |vault| {
-        let uri = obsidian::note_uri(vault, &memory_id)?;
-        obsidian::open(&uri)
-    })
-}
-
-#[tauri::command]
 fn vault_history(
     state: tauri::State<'_, local_vault::LocalVaultState>,
     expected_vault_id: String,
@@ -685,7 +672,6 @@ pub fn run() {
             vault_remove,
             vault_rebuild,
             vault_source,
-            vault_open_obsidian,
             vault_history,
             librarian_status,
             librarian_read,

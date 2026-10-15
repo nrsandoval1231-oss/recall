@@ -15,7 +15,7 @@ from pathlib import Path
 DRIVER = os.environ.get("RECALL_WEBDRIVER_URL", "http://127.0.0.1:4444")
 SESSION_FILE = Path(os.environ.get("RECALL_WEBDRIVER_SESSION", "/tmp/recall-webdriver-session.json"))
 ROOT = Path(os.environ.get("RECALL_RUNTIME_LIBRARY", "/tmp/recall-native-runtime/library"))
-OUTPUT = Path(os.environ.get("RECALL_RUNTIME_EVIDENCE", "/src/docs/audits/native-library-editor/runtime"))
+OUTPUT = Path(os.environ.get("RECALL_RUNTIME_EVIDENCE", "/src/test-results/native-library-editor/runtime"))
 OUTPUT.mkdir(parents=True, exist_ok=True)
 sid = json.loads(SESSION_FILE.read_text())["value"]["sessionId"]
 

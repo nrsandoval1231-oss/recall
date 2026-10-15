@@ -1,3 +1,5 @@
+> **FROZEN, legacy cloud stack. Not the product.** Current authority: [VISION.md](../VISION.md). See [legacy-cloud/README.md](README.md).
+
 # Memory API — V1 contract
 
 ## V1 implemented routes (supersede older packet limitations)
@@ -58,7 +60,7 @@ Auth sign-in/token refresh use the selected provider, not custom password endpoi
 
 ## Capture manifest
 
-Authoritative draft shape: [capture.schema.json](../packages/contracts/capture.schema.json).
+Authoritative draft shape: [capture.schema.json](../../packages/contracts/capture.schema.json).
 
 The request includes a client capture UUID, registered device UUID, capture timestamp, timezone, optional context hint, and ordered pages. Each page has a client page UUID, ordinal, declared media type, byte size, client hash, and optional display filename. The server supplies canonical capture/source IDs and private storage keys.
 

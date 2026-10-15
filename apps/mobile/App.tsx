@@ -22,7 +22,7 @@ export default function App() {
     return (
       <SafeAreaView style={{ flex: 1, padding: 24, justifyContent: "center" }}>
         <Text style={text.heading}>Recall isn't configured</Text>
-        <Text style={text.body}>Missing: {loaded.missing.join(", ")}. See docs/DEVELOPMENT.md. Recall will not run in a pretend mode.</Text>
+        <Text style={text.body}>Missing: {loaded.missing.join(", ")}. See docs/legacy-cloud/DEVELOPMENT.md. Recall will not run in a pretend mode.</Text>
       </SafeAreaView>
     );
   }
