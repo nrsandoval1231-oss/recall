@@ -1402,6 +1402,9 @@ body,
   }
 }
 .ms-notices {
+  position: sticky;
+  top: 12px;
+  z-index: 6;
   grid-column: 1 / -1;
   grid-row: 2;
   display: grid;
