@@ -12,6 +12,7 @@ const output = path.resolve(
     path.join(repo, "test-results/adaptive"),
 );
 fs.mkdirSync(output, { recursive: true });
+fs.rmSync(path.join(output, "approved-comparison.jpg"), { force: true });
 const uiUrl = process.env.RECALL_UI_URL || "http://127.0.0.1:4173/";
 
 const approvedHashes = {

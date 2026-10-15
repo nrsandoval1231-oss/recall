@@ -55,7 +55,7 @@ it("shows configuration state, masks keys, and labels environment values", async
   expect(price.placeholder).toBe("3 (from environment)");
 });
 
-it("submits only edited fields, then clears the key draft and reports success", async () => {
+it("submits edited and prefilled fields, then clears the key draft and reports success", async () => {
   const api = fakeApi();
   render(<ProviderSettings api={api} />);
   const claude = await screen.findByRole("form", { name: "Claude settings" });
@@ -67,7 +67,9 @@ it("submits only edited fields, then clears the key draft and reports success", 
   expect(api.save).toHaveBeenCalledWith("claude", {
     RECALL_CLAUDE_API_KEY: "sk-synthetic-not-real",
     RECALL_CLAUDE_MODEL: "claude-sonnet-5-5",
+    RECALL_CLAUDE_OUTPUT_USD_PER_MTOK: "10",
     RECALL_CLAUDE_DAILY_BUDGET_USD: "2",
+    RECALL_CLAUDE_MONTHLY_BUDGET_USD: "20",
   });
   const key = within(claude).getByLabelText("API key") as HTMLInputElement;
   expect(key.value).toBe("");
@@ -95,4 +97,47 @@ it("removes saved settings for one provider", async () => {
   fireEvent.click(within(jev).getByRole("button", { name: "Remove saved Jev settings" }));
   await screen.findByText("Removed saved Jev settings.");
   expect(api.clear).toHaveBeenCalledWith("jev");
+});
+
+it("prefills missing fields with published defaults but never overrides saved or environment values", async () => {
+  const api = fakeApi();
+  render(<ProviderSettings api={api} />);
+  const claude = await screen.findByRole("form", { name: "Claude settings" });
+  await waitFor(() => expect(within(claude).getByRole("status").textContent).toBe("Not configured"));
+  const value = (label: string) => (within(claude).getByLabelText(label) as HTMLInputElement).value;
+  expect(value("Output price (USD per million tokens)")).toBe("10");
+  expect(value("Daily budget (USD)")).toBe("2");
+  expect(value("Monthly budget (USD)")).toBe("20");
+  expect(value("Input price (USD per million tokens)")).toBe(""); // set by environment: left alone
+  expect(value("API key")).toBe(""); // keys are never prefilled
+  const jev = screen.getByRole("form", { name: "Jev settings" });
+  expect((within(jev).getByLabelText("Model") as HTMLInputElement).value).toBe("1"); // saved value wins
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it("does not prefill Sonnet prices when another Claude model is configured", async () => {
+  const other = views();
+  other[0]!.fields[1] = { name: "RECALL_CLAUDE_MODEL", value: "claude-opus-5-5", source: "environment" };
+  render(<ProviderSettings api={fakeApi(other)} />);
+  const claude = await screen.findByRole("form", { name: "Claude settings" });
+  await waitFor(() => expect(within(claude).getByRole("status").textContent).toBe("Not configured"));
+  expect((within(claude).getByLabelText("Output price (USD per million tokens)") as HTMLInputElement).value).toBe("");
+  expect((within(claude).getByLabelText("Daily budget (USD)") as HTMLInputElement).value).toBe("2");
+});
+
+it("withdraws untouched prefilled prices when the model changes, keeping typed ones", async () => {
+  const api = fakeApi();
+  render(<ProviderSettings api={api} />);
+  const claude = await screen.findByRole("form", { name: "Claude settings" });
+  await waitFor(() => expect(within(claude).getByRole("status").textContent).toBe("Not configured"));
+  const field = (label: string) => within(claude).getByLabelText(label) as HTMLInputElement;
+  expect(field("Output price (USD per million tokens)").value).toBe("10");
+  fireEvent.change(field("Input price (USD per million tokens)"), { target: { value: "4" } });
+  fireEvent.change(field("Model"), { target: { value: "claude-opus-5-5" } });
+  expect(field("Output price (USD per million tokens)").value).toBe("");
+  expect(field("Input price (USD per million tokens)").value).toBe("4");
+  fireEvent.click(within(claude).getByRole("button", { name: "Save Claude" }));
+  await screen.findByText("Saved to this computer's credential store.");
+  expect(api.save.mock.calls[0]![1]).not.toHaveProperty("RECALL_CLAUDE_OUTPUT_USD_PER_MTOK");
+  expect(api.save.mock.calls[0]![1]).toMatchObject({ RECALL_CLAUDE_MODEL: "claude-opus-5-5", RECALL_CLAUDE_INPUT_USD_PER_MTOK: "4" });
 });

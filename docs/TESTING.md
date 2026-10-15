@@ -18,13 +18,10 @@ Recall uses **your own** API keys, billed to you. Budgets cap the spend.
 
 **Claude** (photo reading and organizing):
 1. Create an account at [console.anthropic.com](https://console.anthropic.com), add a few dollars of credit, and create an API key.
-2. In Recall: **Settings → AI providers → Claude**. Paste the key and fill in:
-   - **Model**: `claude-sonnet-5-5`
-   - **Input / output price**: copy from Anthropic's pricing page for that model
-   - **Daily budget** `1`, **Monthly budget** `5` (USD). Recall refuses calls past these.
+2. In Recall: **Settings → AI providers → Claude**. Paste the key. The model (`claude-sonnet-5-5`), prices and budgets are prefilled; lower the budgets if you like (Recall refuses calls past them).
 3. Click **Save Claude**.
 
-**Jev** (structured parsing): ask whoever invited you for Jev access details, then fill in the **Jev** section the same way. Without Jev, Recall still saves and searches everything, but captures stay "pending" instead of being organized.
+**Jev** (structured parsing): whoever invited you will send Jev access details (key and price). Paste them into the **Jev** section and click **Save Jev**. Until then Recall still saves and searches everything, but captures stay "pending" instead of being organized.
 
 Keys are stored in Windows Credential Manager and never shown again in the app.
 
