@@ -41,8 +41,8 @@ _Last updated: 2026-10-15, main @ `5d185d9` + this cleanup._
 4. **Physical iPhone + Tailscale run.**
 5. **Clean-machine export/restore.**
 6. **Owner decision:** delete or keep the legacy cloud code (`services/backend`, `apps/web`, `apps/mobile`, `packages/api-client|sync|contracts`).
-7. After v1 acceptance: Speak, model-written Ask answers.
+7. After v1 acceptance: Speak, model-written Ask answers, and a fresh port of PR #26's Linked / Mentioned panel (mentions labelled as unverified hints).
 
 ## Open PRs
 
-- **#26** "Recall owns the vault…": built on an older direction. Current main already covers its filename retrieval. Recommend closing.
+None besides this cleanup. PR #26 was closed 2026-10-15; its branch is kept for reference.
