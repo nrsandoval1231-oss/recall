@@ -77,3 +77,47 @@ it("bounds interpreted titles consistently without rewriting their metadata", ()
   expect(graphTitle(row("a", note)).length).toBe(80);
   expect(row("a", note).note).toBe(note);
 });
+
+it("separates a source and its saved utility topic without changing evidence", () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const source = row(
+    id,
+    `---\nrecall_id: "${id}"\ntags: [utility]\n---\nUtility delay?`,
+  );
+  const snapshot = structuredClone(source);
+  const graph = deriveGraph([source]);
+  const memory = graph.nodes.find((node) => node.kind === "memories")!;
+  const topic = graph.nodes.find((node) => node.kind === "topics")!;
+  // Account for the selected source's 65px radius, the topic and both labels.
+  expect(
+    Math.abs(memory.x - topic.x) >= 152 || Math.abs(memory.y - topic.y) >= 145,
+  ).toBe(true);
+  expect(Math.hypot(memory.x - topic.x, memory.y - topic.y)).toBeGreaterThan(
+    100,
+  );
+  expect(graph.edges).toEqual([
+    {
+      from: id,
+      to: topic.id,
+      tentative: false,
+      reason: "Saved note tag · source revision 1",
+    },
+  ]);
+  expect(source).toEqual(snapshot);
+  expect(deriveGraph([source])).toEqual(graph);
+});
+
+it("keeps multiple sources and their mentions apart independent of input ordering", () => {
+  const records = ["a", "b", "c"].map((id) =>
+    row(id, `---\nrecall_id: "${id}"\ntags: [utility]\n---\nSynthetic fixture`),
+  );
+  const graph = deriveGraph(records);
+  expect(deriveGraph([...records].reverse())).toEqual(graph);
+  for (const [index, node] of graph.nodes.entries()) {
+    for (const other of graph.nodes.slice(index + 1)) {
+      expect(
+        Math.abs(node.x - other.x) >= 152 || Math.abs(node.y - other.y) >= 145,
+      ).toBe(true);
+    }
+  }
+});
