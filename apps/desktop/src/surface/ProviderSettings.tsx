@@ -6,20 +6,22 @@ interface FieldSpec {
   label: string;
   secret?: boolean;
   placeholder?: string;
+  /** Prefilled into an empty field; nothing is saved until the user presses Save. */
+  defaultValue?: string;
 }
 
 const PROVIDERS: { id: ProviderId; title: string; purpose: string; fields: FieldSpec[] }[] = [
   {
     id: "claude",
     title: "Claude",
-    purpose: "Reads photos and organizes notes. Get a key at console.anthropic.com.",
+    purpose: "Reads photos and organizes notes. Get a key at console.anthropic.com. Prices are prefilled from Anthropic's published Claude Sonnet 5.5 rates (USD 2 in / 10 out per million tokens, checked 2026-10-15); update them if you change the model or the rates change.",
     fields: [
       { name: "RECALL_CLAUDE_API_KEY", label: "API key", secret: true },
-      { name: "RECALL_CLAUDE_MODEL", label: "Model", placeholder: "claude-sonnet-5-5" },
-      { name: "RECALL_CLAUDE_INPUT_USD_PER_MTOK", label: "Input price (USD per million tokens)", placeholder: "from the provider's pricing page" },
-      { name: "RECALL_CLAUDE_OUTPUT_USD_PER_MTOK", label: "Output price (USD per million tokens)", placeholder: "from the provider's pricing page" },
-      { name: "RECALL_CLAUDE_DAILY_BUDGET_USD", label: "Daily budget (USD)", placeholder: "2" },
-      { name: "RECALL_CLAUDE_MONTHLY_BUDGET_USD", label: "Monthly budget (USD)", placeholder: "20" },
+      { name: "RECALL_CLAUDE_MODEL", label: "Model", defaultValue: "claude-sonnet-5-5" },
+      { name: "RECALL_CLAUDE_INPUT_USD_PER_MTOK", label: "Input price (USD per million tokens)", defaultValue: "2" },
+      { name: "RECALL_CLAUDE_OUTPUT_USD_PER_MTOK", label: "Output price (USD per million tokens)", defaultValue: "10" },
+      { name: "RECALL_CLAUDE_DAILY_BUDGET_USD", label: "Daily budget (USD)", defaultValue: "2" },
+      { name: "RECALL_CLAUDE_MONTHLY_BUDGET_USD", label: "Monthly budget (USD)", defaultValue: "20" },
     ],
   },
   {
@@ -28,14 +30,15 @@ const PROVIDERS: { id: ProviderId; title: string; purpose: string; fields: Field
     purpose: "Parses captures into structured, source-linked notes before Claude organizes them.",
     fields: [
       { name: "TYPESAFE_API_KEY", label: "API key", secret: true },
-      { name: "RECALL_JEV_MODEL", label: "Model", placeholder: "jev-1.13.0" },
+      { name: "RECALL_JEV_MODEL", label: "Model", defaultValue: "jev-1.13.0" },
       { name: "RECALL_JEV_INPUT_USD_PER_MTOK", label: "Input price (USD per million tokens)", placeholder: "from the provider's pricing page" },
-      { name: "RECALL_JEV_DAILY_BUDGET_USD", label: "Daily budget (USD)", placeholder: "2" },
-      { name: "RECALL_JEV_MONTHLY_BUDGET_USD", label: "Monthly budget (USD)", placeholder: "20" },
+      { name: "RECALL_JEV_DAILY_BUDGET_USD", label: "Daily budget (USD)", defaultValue: "2" },
+      { name: "RECALL_JEV_MONTHLY_BUDGET_USD", label: "Monthly budget (USD)", defaultValue: "20" },
     ],
   },
 ];
 
+const DEFAULTS = new Map(PROVIDERS.flatMap((p) => p.fields.filter((f) => f.defaultValue).map((f) => [f.name, f.defaultValue!] as const)));
 const SECRET_FIELDS = new Set(PROVIDERS.flatMap((p) => p.fields.filter((f) => f.secret).map((f) => f.name)));
 
 function message(error: unknown) {
@@ -55,6 +58,7 @@ export function ProviderSettings({ api }: { api: ProviderSettingsApi }) {
     for (const view of next)
       for (const field of view.fields)
         if (field.source === "saved" && !SECRET_FIELDS.has(field.name)) values[field.name] = field.value ?? "";
+        else if (field.source === "missing" && DEFAULTS.has(field.name)) values[field.name] = DEFAULTS.get(field.name)!;
     setDrafts(values);
   }
 

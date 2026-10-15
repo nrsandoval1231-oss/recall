@@ -35,7 +35,7 @@ _Last updated: 2026-10-15, main @ `5d185d9` + this cleanup._
 
 ## Friend testing (approved 2026-10-15)
 
-Friends install the Windows build and use their own keys (option 1; no shared/hosted instance). In progress: Settings → AI providers screen, tag-triggered pre-release workflow, [TESTING.md](TESTING.md). First beta tag waits on owner sign-off after acceptance sections A–E.
+Friends install the Windows build and use their own Claude key (option 1; no shared/hosted instance). The owner provides Jev access. Done: Settings → AI providers (#59, Claude Sonnet 5.5 prices and budgets prefilled), tag-triggered pre-release workflow, [TESTING.md](TESTING.md). The first tester tag (`v0.1.0`) waits on owner sign-off after acceptance sections A–E.
 
 ## Next steps (in order)
 
@@ -49,4 +49,4 @@ Friends install the Windows build and use their own keys (option 1; no shared/ho
 
 ## Open PRs
 
-None besides this cleanup. PR #26 was closed 2026-10-15; its branch is kept for reference.
+None besides this change. PR #26 was closed 2026-10-15; its branch is kept for reference.
