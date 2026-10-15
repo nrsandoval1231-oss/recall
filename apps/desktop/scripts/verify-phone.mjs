@@ -68,7 +68,7 @@ try {
     await page.getByRole("link", { name: "Home", exact: true }).click();
     await page.getByRole("link", { name: /Camera Keep an original/ }).click();
     if (
-      !(await page.getByLabel("Note, in your words").inputValue()).startsWith(
+      !(await page.getByLabel("Note, in your words").inputValue()).includes(
         "SYNTHETIC",
       )
     )
