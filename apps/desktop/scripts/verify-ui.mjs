@@ -8,26 +8,24 @@ import AxeBuilder from "@axe-core/playwright";
 import { createHash } from "node:crypto";
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const output = path.resolve(
-  process.env.RECALL_UI_EVIDENCE_DIR || path.join(repo, "test-results/adaptive"),
+  process.env.RECALL_UI_EVIDENCE_DIR ||
+    path.join(repo, "test-results/adaptive"),
 );
 fs.mkdirSync(output, { recursive: true });
 const uiUrl = process.env.RECALL_UI_URL || "http://127.0.0.1:4173/";
-const reference = path.join(
-  repo,
-  "docs/assets/B4063AE0-31B8-4E1D-B9B2-48C3F181E423.png",
-);
-const referenceBytes = fs.readFileSync(reference);
-if (
-  createHash("sha1")
-    .update(
-      Buffer.concat([
-        Buffer.from(`blob ${referenceBytes.length}\0`),
-        referenceBytes,
-      ]),
-    )
-    .digest("hex") !== "6abf5192ab4ee96708984174ed15e3648c668bf0"
-)
-  throw Error("Approved reference changed");
+
+const approvedHashes = {
+  desktop: "dbbf2e64d7f57ec09b422a94fcf6a38b0b9a670d44ad98fec10746cad10c2739",
+  mobile: "e781f517c846f4cf20bc5ea623f9a4a522ead73bf81fde606b507d884cc189fe",
+  brand: "f3cac65230d5d7e19f989ed4bbdb99225eacb0c7b0b85f65e0d9842966e64a1e",
+};
+for (const [name, hash] of Object.entries(approvedHashes)) {
+  const bytes = fs.readFileSync(
+    path.join(repo, `docs/assets/approved/${name}.png`),
+  );
+  if (createHash("sha256").update(bytes).digest("hex") !== hash)
+    throw Error(`Canonical ${name} reference changed`);
+}
 const browser = await chromium.launch(
   process.env.RECALL_CHROMIUM
     ? { executablePath: process.env.RECALL_CHROMIUM }
@@ -50,6 +48,7 @@ for (const [w, h] of [
   [1182, 789],
   [900, 700],
   [390, 844],
+  [430, 932],
 ]) {
   const context = await browser.newContext({
     viewport: { width: w, height: h },
@@ -61,11 +60,16 @@ for (const [w, h] of [
     ({ id, source, sha, photoBytes, photoSha }) => {
       const saved = JSON.parse(localStorage.getItem("synthetic-row") || "null");
       let rows = saved ? [saved] : [];
-      window.__calls = JSON.parse(localStorage.getItem("synthetic-calls") || "[]");
+      window.__calls = JSON.parse(
+        localStorage.getItem("synthetic-calls") || "[]",
+      );
       window.__TAURI_INTERNALS__ = {
         invoke: async (cmd, args) => {
           window.__calls.push(cmd);
-        localStorage.setItem("synthetic-calls", JSON.stringify(window.__calls));
+          localStorage.setItem(
+            "synthetic-calls",
+            JSON.stringify(window.__calls),
+          );
           if (cmd === "vault_status")
             return {
               root: "Synthetic browser IPC vault",
@@ -178,11 +182,31 @@ for (const [w, h] of [
     { id, source, sha, photoBytes, photoSha },
   );
   await page.goto(uiUrl);
-  await page.getByRole("heading", { name: "Capture", exact: true }).waitFor();
+  await page
+    .getByRole("heading", { name: "Your memories belong here.", exact: true })
+    .waitFor();
   const shot = async (name) => {
-    await page.locator(".adaptive-inspector").evaluateAll(panes=>panes.forEach(pane=>{pane.scrollTop=0;}));
-    const accessibility=await new AxeBuilder({page}).analyze();
-    if(accessibility.violations.length)throw Error(JSON.stringify({state:name,width:w,violations:accessibility.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))}));
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      return document.fonts.ready;
+    });
+    await page.locator(".adaptive-inspector").evaluateAll((panes) =>
+      panes.forEach((pane) => {
+        pane.scrollTop = 0;
+      }),
+    );
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    if (accessibility.violations.length)
+      throw Error(
+        JSON.stringify({
+          state: name,
+          width: w,
+          violations: accessibility.violations.map((v) => ({
+            id: v.id,
+            nodes: v.nodes.map((n) => n.target),
+          })),
+        }),
+      );
     if (await page.evaluate(() => document.body.scrollWidth > innerWidth))
       throw Error(`Overflow ${w} ${name}`);
     await page.screenshot({
@@ -278,24 +302,12 @@ for (const [w, h] of [
   });
   await context.close();
 }
-const comparison = await browser.newPage({
-  viewport: { width: 1536, height: 1548 },
-});
-await comparison.setContent(
-  `<style>body{margin:0;background:#eee9e0}h2{font:18px Georgia;margin:12px}img{width:1536px;display:block}</style><h2>Unchanged owner-approved reference · illustrative content</h2><img src="data:image/png;base64,${referenceBytes.toString("base64")}"><h2>Implemented empty native-mode UI · synthetic browser IPC evidence</h2><img src="data:image/jpeg;base64,${fs.readFileSync(path.join(output, "empty-1536.jpg")).toString("base64")}">`,
-);
-await comparison.screenshot({
-  path: path.join(output, "approved-comparison.jpg"),
-  type: "jpeg",
-  quality: 90,
-  fullPage: true,
-});
 fs.writeFileSync(
   path.join(output, "browser-verification.json"),
   JSON.stringify(
     {
       kind: "Synthetic browser IPC checks; not native persistence, installed Windows, or live-provider acceptance",
-      referenceBlob: "6abf5192ab4ee96708984174ed15e3648c668bf0",
+      approvedHashes,
       results,
       errors,
     },

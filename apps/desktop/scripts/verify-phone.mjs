@@ -62,7 +62,7 @@ try {
     await page
       .getByLabel("Note, in your words")
       .fill(
-        "SYNTHETIC visual evidence: a quiet afternoon. The meeting date is uncertain.",
+        "A quiet afternoon.\n\nSYNTHETIC TEST DATA: The meeting date is uncertain.",
       );
     await shot("write");
     await page.getByRole("link", { name: "Home", exact: true }).click();
@@ -87,7 +87,7 @@ try {
       .last()
       .click();
     await page
-      .getByRole("heading", { name: "Saved in the desktop vault" })
+      .getByText("Saved in the desktop vault", { exact: true })
       .waitFor();
     await shot("detail");
     await page.getByRole("link", { name: "Recall home" }).click();
@@ -96,7 +96,7 @@ try {
     await page.getByLabel("Ask the notes").fill("quiet afternoon");
     await page.getByRole("button", { name: "Search notes" }).click();
     await page
-      .getByText(/SYNTHETIC visual evidence/)
+      .getByText(/SYNTHETIC TEST DATA/)
       .first()
       .waitFor();
     await shot("results");
