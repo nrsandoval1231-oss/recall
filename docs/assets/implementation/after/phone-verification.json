@@ -1,0 +1,103 @@
+{
+  "kind": "Synthetic browser against native Linux phone server. Not physical iPhone/Tailscale evidence.",
+  "results": [
+    {
+      "state": "home",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "write",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "camera",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "receipts",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "detail",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "ask",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "results",
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "home",
+      "width": 430,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "write",
+      "width": 430,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "camera",
+      "width": 430,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "receipts",
+      "width": 430,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "detail",
+      "width": 430,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "ask",
+      "width": 430,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    },
+    {
+      "state": "results",
+      "width": 430,
+      "overflow": false,
+      "violations": [],
+      "errors": []
+    }
+  ]
+}

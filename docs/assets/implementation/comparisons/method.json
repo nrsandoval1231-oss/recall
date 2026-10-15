@@ -1,0 +1,57 @@
+{
+  "method": "Board panel isolated by explicit bounds; each image uniformly scaled to the stated width, top-aligned on a neutral canvas. Different content and viewport ratios remain visible. Overlay is diagnostic only; no pixel-perfect or numerical similarity claim.",
+  "panels": {
+    "desktop-main": {
+      "board": "desktop",
+      "bounds_xyxy": [
+        180,
+        135,
+        1416,
+        709
+      ],
+      "actual": "populated-1182.png",
+      "uniform_width": 1182,
+      "reference_scaled_height": 549,
+      "actual_scaled_height": 789
+    },
+    "phone-home": {
+      "board": "mobile",
+      "bounds_xyxy": [
+        243,
+        216,
+        439,
+        550
+      ],
+      "actual": "phone-home-390.png",
+      "uniform_width": 390,
+      "reference_scaled_height": 665,
+      "actual_scaled_height": 844
+    },
+    "phone-write": {
+      "board": "mobile",
+      "bounds_xyxy": [
+        1013,
+        216,
+        1208,
+        550
+      ],
+      "actual": "phone-write-390.png",
+      "uniform_width": 390,
+      "reference_scaled_height": 668,
+      "actual_scaled_height": 844
+    },
+    "phone-ask": {
+      "board": "mobile",
+      "bounds_xyxy": [
+        504,
+        668,
+        695,
+        986
+      ],
+      "actual": "phone-ask-390.png",
+      "uniform_width": 390,
+      "reference_scaled_height": 649,
+      "actual_scaled_height": 844
+    }
+  }
+}

@@ -1,0 +1,25 @@
+
+> recall@0.1.0 test:phone
+> playwright test -c tests/phone/playwright.config.ts
+
+
+Running 14 tests using 1 worker
+
+(node:27726) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/phone/offline.spec.ts:50:1 › offline capture survives page and desktop restart, then receives one native receipt (1.8s)
+  ✓   2 tests/phone/offline.spec.ts:118:1 › uncertain network delivery retries the same capture without duplication (1.1s)
+  ✓   3 tests/phone/offline.spec.ts:154:1 › library switch cannot silently receive an older library's offline capture (960ms)
+  ✓   4 tests/phone/offline.spec.ts:191:1 › offline photo bytes survive reload and transfer; only public shell is cached (1.1s)
+  ✓   5 tests/phone/offline.spec.ts:261:1 › a mismatched receipt never turns a device copy into a received capture (592ms)
+  ✓   6 tests/phone/offline.spec.ts:296:1 › device storage failure retains the form and never sends its original (566ms)
+  ✓   7 tests/phone/offline.spec.ts:320:1 › native Ask locates late evidence and distinguishes linked context (670ms)
+  ✓   8 tests/phone/offline.spec.ts:376:1 › previously authorized pending processing can resume after desktop restart without providers (1.2s)
+  ✓   9 tests/phone/offline.spec.ts:418:1 › a library switch removes inspection links for already received copies (679ms)
+  ✓  10 tests/phone/offline.spec.ts:460:3 › capture queued during upload drains automatically (first fails: false) (1.2s)
+  ✓  11 tests/phone/offline.spec.ts:460:3 › capture queued during upload drains automatically (first fails: true) (1.1s)
+  ✓  12 tests/phone/offline.spec.ts:528:1 › focused phone navigation preserves drafts and consent; Speak stays honest (1.2s)
+  ✓  13 tests/phone/offline.spec.ts:579:1 › keyboard hash navigation focuses the visible heading through save and history (730ms)
+  ✓  14 tests/phone/offline.spec.ts:628:1 › receipt and original evidence links have separated 48px touch targets (861ms)
+
+  14 passed (14.8s)
