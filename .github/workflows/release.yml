@@ -1,0 +1,31 @@
+name: release
+# Builds the unsigned Windows installer for a version tag (e.g. v0.1.0-beta.1) and attaches it
+# to a GitHub pre-release. Push a tag only when the owner has approved that build for testers.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - working-directory: apps/desktop/src-tauri
+        run: cargo test --lib
+      - name: Build unsigned Windows installer
+        working-directory: apps/desktop
+        run: npx tauri build
+      - name: Publish pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --prerelease \
+            --title "Recall $GITHUB_REF_NAME (tester build)" \
+            --notes "Unsigned Windows tester build. Read the tester guide before installing: https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/docs/TESTING.md" \
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe

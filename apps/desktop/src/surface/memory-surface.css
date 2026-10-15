@@ -918,3 +918,8 @@ body {
 .ms-knowledge-list { display: grid; gap: 6px; max-height: 270px; overflow: auto; margin: 0; padding: 0; list-style: none; }.ms-knowledge-list button { width: 100%; height: auto; min-height: 44px; padding: 7px 10px; text-align: left; border-radius: 6px; background: rgba(255,255,255,.025); }.ms-knowledge-list button[aria-pressed="true"] { box-shadow: inset 2px 0 #e7d3b0; background: rgba(231,211,176,.08); }.ms-knowledge-list button > span { color: #6d573b; padding: 0 5px; }
 .ms-knowledge-evidence { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }.ms-knowledge-evidence blockquote { margin: 8px 0; padding: 9px 12px; color: var(--ink); border-left: 2px solid #e7d3b0; background: rgba(0,0,0,.14); }.ms-knowledge-source { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }.ms-knowledge-source button { min-height: 34px; text-decoration: underline; text-underline-offset: 3px; }
 .ms-knowledge-settings { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }.ms-knowledge-settings h3 { margin-top: 0; }.ms-knowledge-settings .ms-check { margin: 10px 0; }
+.ms-provider-settings form { margin: 14px 0 18px; }
+.ms-provider-settings h4 { margin: 0 0 4px; display: flex; gap: 8px; align-items: baseline; }
+.ms-provider-settings h4 small { font-weight: 400; color: var(--muted); }
+.ms-provider-field { display: grid; gap: 4px; margin: 8px 0; }
+.ms-provider-field input { width: 100%; box-sizing: border-box; }
