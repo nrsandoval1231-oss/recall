@@ -104,6 +104,11 @@ try {
       .first()
       .waitFor();
     await shot("results");
+    await page.goto((process.env.RECALL_PHONE_URL || "http://127.0.0.1:18788") + "/#write");
+    await page.getByTestId("connection-state").filter({hasText:"Connected to library"}).waitFor();
+    await page.getByRole("button", {name:"Save capture", exact:true}).click();
+    await page.locator("#note-error").filter({hasText:"Write a note or choose a photo."}).waitFor();
+    await shot("validation");
     await context.close();
   }
 } finally {
