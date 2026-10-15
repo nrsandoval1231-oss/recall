@@ -1,0 +1,115 @@
+<div class="phone-app">
+  <div data-view="home" class="home-view">
+    <p class="eyebrow">A PLACE TO BEGIN</p>
+    <h1>Your memories<br />belong here.</h1>
+    <p class="intro">Keep a moment. Find it when you need it.</p>
+    <a class="search-link" href="#ask"
+      ><svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="10" cy="10" r="6.5" />
+        <path d="m15 15 5 5" /></svg
+      >Search your memories…</a
+    >
+    <div class="capture-actions" aria-label="Capture actions">
+      <a href="#camera"
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 7h4l2-3h6l2 3h4v13H3Z" />
+          <circle cx="12" cy="13" r="4" /></svg
+        >Camera<small>Keep an original</small></a
+      >
+      <button type="button" id="speak" aria-disabled="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="9" y="2" width="6" height="13" rx="3" />
+          <path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4m-4 0h8" /></svg
+        >Speak<small>Unavailable</small>
+      </button>
+      <a href="#write"
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m4 15 12-12 5 5L9 20l-6 1Zm10-10 5 5" /></svg
+        >Write<small>In your words</small></a
+      >
+    </div>
+    <p id="speak-status" role="status"></p>
+    <div class="home-orbit" aria-hidden="true">
+      <img src="/brand/orbital-mark.svg" alt="" />
+    </div>
+    <p class="home-signature">A more human tomorrow.</p>
+    <a class="receipt-link" href="#receipts"
+      >View captures on this device <span aria-hidden="true">→</span></a
+    >
+  </div>
+  <div data-view="capture">
+    <a class="back" href="#home">← Home</a>
+    {{CAPTURE}}
+  </div>
+  <section data-view="ask" class="ask-view">
+    <a class="back" href="#home">← Home</a>
+    <h1>Ask Recall</h1>
+    <p class="ask-greeting">How can I help you remember?</p>
+    {{ASK}}
+    <p class="fine">
+      {{KEYWORD_LABEL}} Answers quote original evidence. Retrieval requires your
+      connected desktop.
+    </p>
+    <details>
+      <summary>How answers work</summary>
+      <p class="fine">
+        Optional connected knowledge is inferred and unverified. Quoted answers
+        require separate approval in desktop Settings; this phone cannot enable
+        that consent.
+      </p>
+    </details>
+  </section>
+  <section data-view="receipts" class="receipt-view">
+    <a class="back" href="#home">← Home</a>
+    <h1>On this device</h1>
+    <p class="fine">
+      Your capture receipts. Device copies and your desktop library are
+      separate.
+    </p>
+    <button id="retry-queue" type="button" class="secondary">
+      Retry queued captures
+    </button>
+    <div data-testid="outbox"></div>
+  </section>
+  <div class="connection-info">
+    <p data-testid="connection-state" role="status">Connecting to library…</p>
+    <p id="local-status" role="status"></p>
+  </div>
+  <details class="connection-help">
+    <summary>Connection &amp; privacy</summary>
+    <p>
+      There is no account. Capture to your own Recall library over your
+      authorized Tailscale connection. Processing runs on the desktop only after
+      per-capture consent and provider configuration.
+    </p>
+    <p>
+      Offline reopening requires HTTPS and a completed first visit. On HTTP,
+      keep this page open to queue captures. Browser storage can be cleared by
+      your device; a library receipt confirms transfer.
+    </p>
+    <p>
+      Recall does not install a certificate; HTTPS can be supplied by Tailscale
+      Serve. Do not forward this port to the public internet.
+    </p>
+  </details>
+  <nav class="phone-nav" aria-label="Recall">
+    <a href="#home" aria-current="page"
+      ><svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m3 10 9-7 9 7v11h-7v-7h-4v7H3Z" /></svg
+      >Home</a
+    ><a href="#ask"
+      ><svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="10" cy="10" r="6.5" />
+        <path d="m15 15 5 5" /></svg
+      >Ask</a
+    ><a class="nav-capture" href="#write" aria-label="Write a memory"
+      ><span aria-hidden="true">+</span>Capture</a
+    ><a href="#receipts"
+      ><svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 3h14v18l-3-2-4 2-4-2-3 2Zm4 5h6m-6 4h6" /></svg
+      >Device</a
+    >
+  </nav>
+</div>
+<script src="/phone-ui.js" defer></script>
+<script src="/companion.js" defer></script>

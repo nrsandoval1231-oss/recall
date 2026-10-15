@@ -210,7 +210,7 @@ fn respond(
     output = output.with_header(ascii_header("X-Frame-Options", "DENY")?);
     output = output.with_header(ascii_header(
         "Content-Security-Policy",
-        "default-src 'self'; img-src 'self' blob:; style-src 'unsafe-inline'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'self'; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     )?);
     for (name, value) in &response.extra {
         output = output.with_header(ascii_header(name, value)?);
@@ -266,6 +266,11 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             "text/javascript; charset=utf-8",
             include_bytes!("phone/companion.js").to_vec(),
         ),
+        ("GET" | "HEAD", "/phone-ui.js") => bytes(200, "text/javascript; charset=utf-8", include_bytes!("phone/ui.js").to_vec()),
+        ("GET" | "HEAD", "/brand/orbital-mark.svg") => bytes(200, "image/svg+xml", include_bytes!("../../public/brand/orbital-mark.svg").to_vec()),
+        ("GET" | "HEAD", "/brand/favicon.svg") => bytes(200, "image/svg+xml", include_bytes!("../../public/brand/favicon.svg").to_vec()),
+        ("GET" | "HEAD", "/fonts/Inter-Regular.ttf") => bytes(200, "font/ttf", include_bytes!("../../public/fonts/Inter-Regular.ttf").to_vec()),
+        ("GET" | "HEAD", "/fonts/PlayfairDisplay-Regular.ttf") => bytes(200, "font/ttf", include_bytes!("../../public/fonts/PlayfairDisplay-Regular.ttf").to_vec()),
         ("GET" | "HEAD", "/companion-sw.js") => bytes(
             200,
             "text/javascript; charset=utf-8",
@@ -936,7 +941,7 @@ fn render_source_answer(answer: crate::memory_query::Answer) -> String {
         }
         graph_cards.push_str("</ul></article>");
     }
-    let heading = if answer.hits.is_empty() { "Related inferred knowledge" } else { "Source-backed matches and related knowledge" };
+    let heading = if answer.hits.is_empty() { "Related inferred knowledge" } else { "Source-backed matches" };
     let disclosure = if answer.graph_relationships.is_empty() {
         format!("{KEYWORD_LABEL} Retrieved local note quotes and original evidence.")
     } else {
@@ -1116,19 +1121,16 @@ fn same_origin(headers: &[(&str, &str)]) -> Result<(), PhoneResponse> {
 }
 
 fn home_page() -> String {
-    page(
-        "Recall",
-        &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>Capture to your Recall library on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer. Optional connected knowledge is inferred and unverified. Quoted answers require separate approval in desktop Settings; this phone cannot enable that consent.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. Offline reopening requires HTTPS and a completed first visit. On HTTP, keep this page open to queue captures. Browser storage can be cleared by your device; a library receipt is your confirmation of transfer.</p><p>Use your authorized Tailscale connection. Recall does not install a certificate; HTTPS can be supplied by Tailscale Serve. Do not forward this port to the public internet.</p></footer>",
-            capture_form(&Uuid::new_v4().to_string(), ""),
-            format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
-        ),
-    )
+    let shell = include_str!("phone/home.html")
+        .replace("{{CAPTURE}}", &capture_form(&Uuid::new_v4().to_string(), ""))
+        .replace("{{ASK}}", &ask_form(""))
+        .replace("{{KEYWORD_LABEL}}", KEYWORD_LABEL);
+    page("Recall — Your memories belong here", &shell)
 }
 
 fn capture_form(operation_id: &str, note: &str) -> String {
     format!(
-        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save capture</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        "<section class=\"capture-form\"><h1 id=\"capture-heading\">Write a memory</h1><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Jot down a moment, a thought, or something you never want to forget.\">{}</textarea></label><div id=\"photo-preview\" hidden></div><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save capture</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
         esc(operation_id),
         esc(note)
     )
@@ -1136,52 +1138,29 @@ fn capture_form(operation_id: &str, note: &str) -> String {
 
 fn ask_form(question: &str) -> String {
     format!(
-        "<form method=\"post\" action=\"/ask\"><label>Ask the notes<input name=\"q\" maxlength=\"4096\" value=\"{}\" autocomplete=\"off\" required></label><button class=\"secondary\" type=\"submit\">Search notes</button></form>",
+        "<form method=\"post\" action=\"/ask\"><label>Ask the notes<input type=\"search\" placeholder=\"What are you trying to remember?\" name=\"q\" maxlength=\"4096\" value=\"{}\" autocomplete=\"off\" required></label><button class=\"secondary\" type=\"submit\">Search notes</button></form>",
         esc(question)
     )
 }
 
 fn page(title: &str, main: &str) -> String {
     format!(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-title\" content=\"Recall\"><meta name=\"theme-color\" content=\"#12141a\"><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" href=\"/icon.png\"><title>{}</title><style>{}</style></head><body>{}</body></html>",
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-title\" content=\"Recall\"><meta name=\"theme-color\" content=\"#FAF8F3\"><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" href=\"/brand/favicon.svg\"><title>{}</title><style>{}</style></head><body><header class=\"phone-brand\"><a href=\"/#home\" aria-label=\"Recall home\"><img src=\"/brand/orbital-mark.svg\" alt=\"\"><span>recall</span></a><span class=\"brand-signature\">A more human tomorrow.</span></header><main>{}</main></body></html>",
         esc(title),
         PAGE_CSS,
         main
     )
 }
 
-const PAGE_CSS: &str = "
-:root { color-scheme: dark; }
-* { box-sizing: border-box; }
-body { margin: 0; background: #12141a; color: #f6f1e8; font-family: \"Segoe UI\", \"Avenir Next\", system-ui, sans-serif; line-height: 1.45; padding: calc(20px + env(safe-area-inset-top)) 18px calc(32px + env(safe-area-inset-bottom)); }
-h1, h2, p { margin: 0 0 12px; }
-h1 { font-family: Palatino, Georgia, serif; font-weight: 500; font-size: 32px; }
-h2 { font-size: 18px; }
-a { color: #f2d7a2; }
-.mark { letter-spacing: 0.42em; font-size: 13px; margin-bottom: 6px; }
-.tag { font-family: Palatino, Georgia, serif; font-style: italic; color: rgba(246,241,232,0.72); }
-.fine, footer { color: rgba(246,241,232,0.72); font-size: 13px; }
-footer { margin-top: 18px; }
-section, article { background: rgba(22,24,30,0.72); border: 1px solid rgba(255,244,220,0.18); border-radius: 18px; padding: 16px; margin: 14px 0; }
-label { display: block; margin: 12px 0; }
-input, textarea, button { width: 100%; font: inherit; color: inherit; }
-input[type=text], input:not([type]), textarea { min-height: 48px; border-radius: 12px; border: 1px solid rgba(255,244,220,0.28); background: rgba(255,255,255,0.04); padding: 10px 12px; }
-textarea { min-height: 96px; resize: vertical; }
-input[type=file] { margin-top: 8px; }
-button { min-height: 48px; margin-top: 8px; border: 0; border-radius: 14px; background: #f2d7a2; color: #1a140c; font-weight: 650; }
-button.secondary { background: transparent; color: #f6f1e8; border: 1px solid rgba(255,244,220,0.35); }
-img { width: 100%; border-radius: 16px; background: #0e1014; margin: 8px 0 12px; }
-.path { font-family: ui-monospace, \"Cascadia Mono\", monospace; font-size: 12px; word-break: break-all; }
-:focus-visible { outline: 2px solid #f2d7a2; outline-offset: 2px; }
-";
+const PAGE_CSS: &str = include_str!("phone/phone.css");
 
 const MANIFEST: &str = r##"{
   "name": "Recall",
   "short_name": "Recall",
   "display": "standalone",
   "start_url": "/",
-  "background_color": "#12141a",
-  "theme_color": "#12141a",
+  "background_color": "#FAF8F3",
+  "theme_color": "#FAF8F3",
   "icons": [{ "src": "/icon.png", "sizes": "32x32", "type": "image/png", "purpose": "any" }]
 }"##;
 
@@ -2287,9 +2266,9 @@ mod tests {
         assert!(home.contains("A photo is optional."));
         assert!(home.contains("Photo or file, optional"));
         assert!(
-            !home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" required")
+            !home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\" required")
         );
-        assert!(home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\""));
+        assert!(home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\""));
 
         let id = Uuid::new_v4().to_string();
         let boundary = "RecallSyntheticBoundary";
@@ -2328,7 +2307,8 @@ mod tests {
         assert!(saved.contains("original text is preserved"));
         assert!(saved.contains("Meet Pat at the pump house, uncertain?"));
         assert!(saved.contains("Original SHA-256"));
-        assert!(!saved.contains("<img"));
+        assert!(!saved.contains("alt=\"Original page\""));
+        assert!(!saved.contains("src=\"/sources/"));
         assert_eq!(
             call(&dir.0, "GET", &format!("/sources/{id}"), &[], b"").status,
             200
@@ -2365,7 +2345,8 @@ mod tests {
         assert!(page.contains("Original evidence"));
         assert!(page.contains(&format!("Recall/Memories/{id}.md")));
         assert!(page.contains(&format!("Recall/Sources/{id}.txt")));
-        assert!(!page.contains("<img"));
+        assert!(!page.contains("alt=\"Original page\""));
+        assert!(!page.contains("<img src=\"/sources/"));
         assert!(page.contains(&format!("/sources/{id}")));
 
         let mut changed = Vec::new();

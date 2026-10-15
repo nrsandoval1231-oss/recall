@@ -1,6 +1,6 @@
 /* Cache only the public shell. Never cache library identities, Ask, receipts or sources. */
-const SHELL = 'recall-companion-shell-v1';
-const ASSETS = ['/', '/companion.js', '/manifest.webmanifest', '/icon.png'];
+const SHELL = 'recall-companion-shell-v2';
+const ASSETS = ['/', '/companion.js', '/manifest.webmanifest', '/icon.png', '/phone-ui.js', '/brand/orbital-mark.svg', '/brand/favicon.svg', '/fonts/Inter-Regular.ttf', '/fonts/PlayfairDisplay-Regular.ttf'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });

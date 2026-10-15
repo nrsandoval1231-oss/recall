@@ -151,7 +151,7 @@
       const row = { id: uuid(), library, note, photo, filename: photo?.name || '',
         consent: data.get('process_consent') === 'true', created: Date.now(), receipt: null, error: '' };
       await storage('captures', 'readwrite', s => s.add(row));
-      form.reset(); status.textContent = 'Saved on this device. Waiting for a library receipt.';
+      form.reset(); if (document.querySelector('[data-view]')) location.hash = 'receipts'; status.textContent = 'Saved on this device. Waiting for a library receipt.';
       await render(); void flush();
     } catch (error) { status.textContent = error.message || 'Save failed. Keep the original; nothing was sent.'; }
     finally { saving = false; button.disabled = false; }
