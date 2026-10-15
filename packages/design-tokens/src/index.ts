@@ -1,7 +1,9 @@
 /**
  * Platform-neutral tokens and user-facing language shared by mobile (React Native) and
- * desktop (DOM). PROVISIONAL: no final palette, logo, or brand system has been approved
- * (see docs/DESIGN.md). Values here are deliberately plain and accessible, not a brand.
+ * desktop (DOM). The owner approved the sole UI/brand direction on 2026-10-15:
+ * see docs/DESIGN.md. Existing exported values below are unmigrated implementation,
+ * not an alternative brand authority. Migrate consumers with contrast/regression checks;
+ * preserve semantic state labels, non-color indicators and capture behavior.
  */
 
 export const color = {
