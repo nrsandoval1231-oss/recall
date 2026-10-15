@@ -33,6 +33,10 @@ const browser = await chromium.launch(
     : {},
 );
 const results = [];
+const polishFailures = [];
+const check = (condition, message) => {
+  if (!condition) polishFailures.push(message);
+};
 const errors = [];
 const source =
   "SYNTHETIC UI FIXTURE: Utility late. Call Sarah? Deadline unknown.";
@@ -47,10 +51,10 @@ const id = "11111111-1111-4111-8111-111111111111";
 for (const [w, h] of [
   [1536, 1024],
   [1182, 789],
-  [900, 700],
+  [900, 640],
   [390, 844],
   [430, 932],
-]) {
+].filter(([width]) => !process.env.RECALL_UI_WIDTH || width === Number(process.env.RECALL_UI_WIDTH))) {
   const context = await browser.newContext({
     viewport: { width: w, height: h },
     reducedMotion: "reduce",
@@ -147,7 +151,8 @@ for (const [w, h] of [
               message: "Synthetic Jev fixture",
             };
           if (cmd === "meeting_organize")
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
+              window.__failOrganization = () => reject(new Error("Synthetic provider unavailable. Original retained."));
               window.__finishOrganization = () => resolve({});
             });
           if (cmd === "meeting_publish") {
@@ -161,12 +166,13 @@ for (const [w, h] of [
             localStorage.setItem("synthetic-row", JSON.stringify(rows[0]));
             return rows[0];
           }
-          if (cmd === "memory_ask")
+          if (cmd === "memory_ask") {
+            await new Promise((resolve, reject) => { window.__finishAsk = resolve; window.__failAsk = () => reject(new Error("Synthetic retrieval unavailable")); });
             return {
               question: args.question,
               message:
-                "Source-backed retrieved quotes; synthetic IPC, no generative answer.",
-              hits: rows.map((row) => ({
+                window.__emptyAsk ? "No source-backed matches. Try another question." : "Source-backed retrieved quotes; synthetic IPC, no generative answer.",
+              hits: (window.__emptyAsk ? [] : rows).map((row) => ({
                 memory_id: id,
                 revision: row.revision,
                 note_basename: id + ".md",
@@ -176,6 +182,7 @@ for (const [w, h] of [
                 mime_type: "text/plain",
               })),
             };
+          }
           throw Error("Forbidden synthetic IPC command: " + cmd);
         },
       };
@@ -217,6 +224,9 @@ for (const [w, h] of [
     });
   };
   await shot("empty");
+  const emptyBox = await page.locator(".ms-field-empty").boundingBox();
+  const orbBox = await page.locator(".adaptive-graph").boundingBox();
+  check(emptyBox.y >= orbBox.y + orbBox.height, `Empty message overlaps orb at ${w}×${h}`);
   let axe = await new AxeBuilder({ page }).analyze();
   if (axe.violations.length)
     throw Error(
@@ -231,10 +241,15 @@ for (const [w, h] of [
   await page.getByText(/Voice capture is unavailable/).waitFor();
   await page.getByRole("button", { name: /Write ·/ }).click();
   await page.getByLabel("Your note").fill(source);
+  await shot("write");
+  const taskBox = await page.locator(".adaptive-inspector").boundingBox();
+  check(w < 761 || taskBox.width >= Math.min(600, w * .65), `Task workspace too narrow at ${w}: ${taskBox.width}`);
   if (await page.getByLabel(/Send this saved source/).isChecked())
     throw Error("Preselected provider consent");
   await page.getByRole("button", { name: "Save note", exact: true }).click();
+  await page.getByRole("tab", {name:"Original", exact:true}).click();
   await page.getByTestId("integrity").waitFor();
+  await page.getByRole("tab", {name:"Note", exact:true}).click();
   await page
     .getByText(
       "Saved locally. Agree before sending this source to Jev and Claude.",
@@ -245,6 +260,11 @@ for (const [w, h] of [
   await page.getByRole("button", { name: "Organize this memory" }).click();
   await page.getByText("Claude is organizing source-linked memory…").waitFor();
   await shot("processing");
+  await page.evaluate(() => window.__failOrganization());
+  await page.getByText("Synthetic provider unavailable. Original retained.", {exact:true}).waitFor();
+  await shot("processing-failed");
+  await page.getByRole("button", {name:"Organize this memory", exact:true}).click();
+  await page.getByText("Claude is organizing source-linked memory…", {exact:true}).waitFor();
   await page.evaluate(() => window.__finishOrganization());
   await page
     .getByText(
@@ -252,6 +272,7 @@ for (const [w, h] of [
     )
     .waitFor();
   await shot("ready");
+  check(await page.getByRole("heading", {name:"Processing your memory", exact:true}).count() === 0, "Completed processing retains active heading");
   await page
     .getByLabel("Your correction")
     .fill("# Synthetic meeting\n\nDeadline remains uncertain.");
@@ -271,12 +292,38 @@ for (const [w, h] of [
   await page.getByRole("button", { name: "Relationship list" }).click();
   await page.getByRole("searchbox").fill("utility delay");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.getByText("Searching…", {exact:true}).waitFor();
+  await shot("searching");
+  await page.evaluate(() => window.__finishAsk());
   await page
     .getByRole("heading", { name: "Source-backed matches", exact: true })
     .waitFor();
   await shot("ask");
+  if (w === 900) {
+    await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+    await shot("ask-large-text");
+    await page.getByRole("button", {name:"Inspect original evidence", exact:true}).scrollIntoViewIfNeeded();
+    check(await page.getByRole("button", {name:"Inspect original evidence", exact:true}).isVisible(), "Evidence action unavailable with enlarged text");
+    await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+  }
+  await page.getByRole("button", {name:"Ask", exact:true}).click();
+  await page.getByText("Searching…", {exact:true}).waitFor();
+  await page.evaluate(() => window.__failAsk());
+  await page.getByText("Search could not finish. Your question is still here; try again.", {exact:true}).waitFor();
+  await shot("search-failed");
+  check(await page.getByRole("searchbox").inputValue() === "utility delay", "Failed search lost question");
+  await page.getByRole("button", {name:"Ask", exact:true}).click();
+  await page.getByText("Searching…", {exact:true}).waitFor();
+  await page.evaluate(() => { window.__emptyAsk = true; window.__finishAsk(); });
+  await page.getByText("No source-backed matches. Try another question.", {exact:true}).waitFor();
+  await shot("search-empty");
+  await page.getByRole("button", {name:"Ask", exact:true}).click();
+  await page.getByText("Searching…", {exact:true}).waitFor();
+  await page.evaluate(() => { window.__emptyAsk = false; window.__finishAsk(); });
   await page.getByRole("button", { name: "Inspect original evidence" }).click();
+  await page.getByRole("tab", {name:"Original", exact:true}).click();
   await page.getByTestId("integrity").waitFor();
+  await page.getByRole("tab", {name:"Note", exact:true}).click();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Zoom in" }).waitFor();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -287,6 +334,7 @@ for (const [w, h] of [
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: /Camera ·/ }).click();
   await page.getByRole("button", { name: "Import photo", exact: true }).click();
+  await page.getByRole("tab", {name:"Original", exact:true}).click();
   await page
     .getByRole("img", { name: "Original photo synthetic-photo.png" })
     .waitFor();
@@ -317,6 +365,8 @@ fs.writeFileSync(
   ),
 );
 await browser.close();
+fs.writeFileSync(path.join(output, "polish-checks.json"), JSON.stringify(polishFailures, null, 2));
+if (polishFailures.length && !process.env.RECALL_RECORD_BASELINE) throw Error(polishFailures.join("\n"));
 if (errors.length || results.some((r) => r.violations.length))
   throw Error("Browser verification failed");
 process.stdout.write(JSON.stringify({ results, errors }) + "\n");

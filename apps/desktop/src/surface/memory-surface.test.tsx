@@ -465,7 +465,7 @@ describe("Memory Surface", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(/budget/);
     expect(read).toHaveBeenCalledTimes(1);
     expect(client.correct).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: "Close inspector" }));
     await user.click(screen.getByRole("button", { name: "Search" }));
     await user.type(
       screen.getByRole("searchbox", { name: "Ask Recall" }),
@@ -1774,4 +1774,20 @@ it("shows native-verified quotations for text captures with the legacy no-attach
       name: "Inspect supporting note and original",
     }),
   ).toBeTruthy();
+});
+
+
+it("shows pending search truthfully and preserves the question after failure", async () => {
+  let fail!: (error: Error) => void;
+  const ask = vi.fn(() => new Promise<SourceAnswer>((_resolve, reject) => { fail = reject; }));
+  const user = userEvent.setup();
+  render(<MemorySurface vault={vault({ ask })} />);
+  await screen.findByRole("button", {name: "Search"});
+  await user.type(screen.getByRole("searchbox"), "utility delay");
+  await user.click(screen.getByRole("button", {name: "Ask"}));
+  expect(await screen.findByText("Searching…", {exact: true})).toBeTruthy();
+  expect(screen.queryByText("Type a question to search the notes.")).toBeNull();
+  await act(async () => fail(new Error("Synthetic retrieval unavailable")));
+  expect(await screen.findByText("Search could not finish. Your question is still here; try again.")).toBeTruthy();
+  expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("utility delay");
 });

@@ -287,6 +287,7 @@ export function MemorySurface({
   const [section, setSection] = useState<Section>("home");
   const [_panel, setPanel] = useState<Panel>("overview");
   const [answer, setAnswer] = useState<KeywordAnswer | null>(null);
+  const [searching, setSearching] = useState(false);
   const [sourceAnswer, setSourceAnswer] = useState<SourceAnswer | null>(null);
   const [quotedAnswer, setQuotedAnswer] = useState<{
     vaultId: string;
@@ -631,6 +632,7 @@ export function MemorySurface({
     evidenceRef.current = null;
     sourceRequest.current += 1;
     askRequest.current += 1;
+    setSearching(false);
     setEvidenceId(null);
     setError("");
     setNotice("");
@@ -891,6 +893,7 @@ export function MemorySurface({
       clearPreview();
       evidenceRef.current = null;
       askRequest.current += 1;
+    setSearching(false);
       setSourceAnswer(null);
       setProcessingState("");
       setProcessingConsent(false);
@@ -958,6 +961,8 @@ export function MemorySurface({
     setEvidenceId(null);
     setSection("ask");
     setSourceAnswer(null);
+    setVaultHits(null);
+    setAnswer(null);
     if (!selected) {
       setVaultHits(null);
       setAnswer({
@@ -968,6 +973,7 @@ export function MemorySurface({
       return;
     }
     setBusy(true);
+    setSearching(true);
     try {
       if (vault.ask) {
         const response = await vault.ask(selected.vault_id, query);
@@ -994,8 +1000,10 @@ export function MemorySurface({
       if (inScope(selected.vault_id) && request === askRequest.current)
         setError(message(askError));
     } finally {
-      if (inScope(selected.vault_id) && request === askRequest.current)
+      if (inScope(selected.vault_id) && request === askRequest.current) {
         setBusy(false);
+        setSearching(false);
+      }
     }
   }
 
@@ -1074,6 +1082,7 @@ export function MemorySurface({
     setReviewRetryAcknowledged(false);
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       const published = await processMeeting(
         vault,
@@ -1302,6 +1311,7 @@ export function MemorySurface({
     setCorrection(noteBody(memory));
     evidenceRef.current = memory.id;
     askRequest.current += 1;
+    setSearching(false);
     setEvidenceId(memory.id);
     setSection("evidence");
     void loadMemoryKnowledge(memory);
@@ -1945,6 +1955,7 @@ export function MemorySurface({
       className="ms adaptive"
       data-mode={demo ? "unavailable" : "vault"}
       data-inspector={inspector}
+      data-section={section}
     >
       <aside className="ms-rail" aria-label="Recall">
         <div className="ms-brand">
@@ -2215,9 +2226,7 @@ export function MemorySurface({
                 <>
                   {processingState && (
                     <section aria-label="Processing receipt">
-                      <h2>Processing your memory</h2>
                       <p role="status">{processingState}</p>
-                      <p>Saved · Original retained in your vault</p>
                     </section>
                   )}
                   <Evidence
@@ -2306,7 +2315,7 @@ export function MemorySurface({
                 </>
               ) : section === "capture" ? (
                 <section aria-label="Capture">
-                  <h2>{captureMode === "photo" ? "Camera" : "Write"}</h2>
+                  <h1>{captureMode === "photo" ? "Capture a moment" : "Write a memory"}</h1>
                   <p>
                     {captureMode === "photo"
                       ? "Select a photo using the native file picker. Original bytes are saved before processing."
@@ -2443,6 +2452,8 @@ export function MemorySurface({
                   </section>
                 ) : (
                   <AskResults
+                    pending={searching}
+                    failed={Boolean(error)}
                     demo={false}
                     answer={answer}
                     hits={vaultHits}
@@ -3005,23 +3016,26 @@ function SourceList({
 }
 
 function AskResults({
+  pending,
+  failed,
   demo,
   answer,
   hits,
   onOpenDemo,
   onOpenVault,
 }: {
+  pending: boolean;
+  failed: boolean;
   demo: boolean;
   answer: KeywordAnswer | null;
   hits: VaultMemory[] | null;
   onOpenDemo: (id: string) => void;
   onOpenVault: (memory: VaultMemory) => void;
 }) {
-  const empty = demo ? answer?.kind === "abstain" : hits?.length === 0;
   return (
     <div>
       <p className="ms-kicker">ASK</p>
-      <h1>Notes that match</h1>
+      <h1>Ask Recall</h1>
       <p className="ms-fine">
         {KEYWORD_LABEL}
         {demo
@@ -3067,8 +3081,8 @@ function AskResults({
           ))}
         </ul>
       )}
-      {empty === false && answer === null && hits === null && (
-        <p role="status">Type a question to search the notes.</p>
+      {answer === null && hits === null && (
+        <p role="status">{pending ? "Searching…" : failed ? "Search could not finish. Your question is still here; try again." : "Type a question to search the notes."}</p>
       )}
     </div>
   );
@@ -3121,8 +3135,9 @@ function Evidence(props: {
       aria-label="Original evidence"
       data-tab={tab}
     >
+      <h1 className="memory-title">{demoMemory?.title ?? (memory ? titleOf(memory) : "Memory")}</h1>
       <div className="inspector-tabs" role="tablist" aria-label="Memory layers">
-        {["overview", "original", "understanding", "related", "history"].map(
+        {["overview", "original", "related", "history"].map(
           (layer) => (
             <button
               type="button"
@@ -3135,7 +3150,6 @@ function Evidence(props: {
                 const layers = [
                   "overview",
                   "original",
-                  "understanding",
                   "related",
                   "history",
                 ];
@@ -3163,7 +3177,7 @@ function Evidence(props: {
                 if (layer === "history") props.onHistory();
               }}
             >
-              {layer[0]!.toUpperCase() + layer.slice(1)}
+              {layer === "overview" ? "Note" : layer[0]!.toUpperCase() + layer.slice(1)}
             </button>
           ),
         )}
@@ -3195,13 +3209,7 @@ function Evidence(props: {
           </section>
         )}
         <div className="glass evidence-original">
-          <button type="button" onClick={props.onBack}>
-            Back
-          </button>
-          <p className="ms-kicker">ORIGINAL</p>
-          <h1>
-            {demoMemory?.title ?? (memory ? titleOf(memory) : "Evidence")}
-          </h1>
+          <h2>Original evidence</h2>
           {demoMemory && (
             <>
               <article className="ms-paper-view">{demoMemory.text}</article>
@@ -3248,13 +3256,6 @@ function Evidence(props: {
                     : "Saved in your library. The note below is human text, not a verified reading."}
               </p>
               {memory.conflict && <p role="alert">{memory.conflict}</p>}
-              <NoteMarkdown
-                memories={props.editorMemories}
-                onOpen={props.onRelated}
-                onAttachment={props.onAttachment}
-              >
-                {noteBody(memory) || "No note added."}
-              </NoteMarkdown>
               <MemoryEditor
                 key={`${props.editorIdentity}:${memory.id}`}
                 identity={props.editorIdentity}

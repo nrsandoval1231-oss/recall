@@ -23,10 +23,10 @@ body,
   background: var(--recall-ivory);
   color: var(--ink);
   font:
-    14px/1.5 Inter,
+    0.875rem/1.5 Inter,
     sans-serif;
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-columns: clamp(176px, 11rem, 240px) minmax(0, 1fr);
 }
 .ms * {
   box-sizing: border-box;
@@ -89,7 +89,7 @@ body,
 }
 .ms-rail {
   border-right: 1px solid var(--line);
-  padding: 32px 16px 24px;
+  padding: 24px 12px;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
@@ -99,15 +99,15 @@ body,
   display: flex;
   align-items: center;
   flex-direction: column;
-  margin: 0 0 34px;
+  margin: 0 0 24px;
   gap: 0;
 }
 .ms-brand-logo {
-  width: 84px;
-  height: 84px;
+  width: 64px;
+  height: 64px;
 }
 .ms-mark {
-  font: 44px/1.1 var(--editorial);
+  font: 2.25rem/1.1 var(--editorial);
   letter-spacing: -2px;
 }
 .ms-nav {
@@ -123,7 +123,7 @@ body,
   background: transparent;
   text-align: left;
   width: 100%;
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 10px 16px;
   border-radius: 24px;
 }
@@ -145,7 +145,7 @@ body,
   content: "SMALL MOMENTS\A A BRIGHTER YOU";
   white-space: pre;
   letter-spacing: 3px;
-  font-size: 9px;
+  font-size: 0.5625rem;
   line-height: 2.1;
   color: var(--recall-muted);
   margin: 48px auto 0;
@@ -155,7 +155,7 @@ body,
 }
 .ms-ui {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 292px;
+  grid-template-columns: minmax(0, 1fr) 260px;
   grid-template-rows: auto auto auto;
   gap: 20px;
   padding: 28px 24px 20px;
@@ -181,7 +181,7 @@ body,
   min-width: 0;
   border: 0;
   background: transparent;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .ms-ask button {
   border: 0;
@@ -194,7 +194,7 @@ body,
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   margin: 0 0 4px;
 }
@@ -204,7 +204,7 @@ body,
 }
 .ms-greeting small {
   display: block;
-  font-size: 11px;
+  font-size: 0.6875rem;
   margin-top: 2px;
 }
 .ms-memory-field {
@@ -222,7 +222,7 @@ body,
   box-shadow: 0 3px 12px #2f2f2f03;
 }
 .ms-field-header {
-  padding: 24px 24px 0;
+  padding: 20px 24px 0;
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -231,19 +231,19 @@ body,
 }
 .ms-kicker {
   font:
-    10px/1.5 Inter,
+    0.625rem/1.5 Inter,
     sans-serif;
   letter-spacing: 2px;
   color: #575b55;
   margin: 0 0 8px;
 }
 .ms-field-header h1 {
-  font-size: 34px;
+  font-size: 1.875rem;
   letter-spacing: -1px;
   margin: 0 0 6px;
 }
 .ms-field-header > div > p:last-child {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
   margin: 0;
 }
@@ -256,7 +256,7 @@ body,
   align-items: center;
 }
 .ms-view-switch button {
-  font-size: 11px;
+  font-size: 0.6875rem;
   min-height: 48px;
   background: transparent;
   border: 0;
@@ -273,7 +273,7 @@ body,
   width: 100%;
   isolation: isolate;
 }
-.adaptive-graph > svg {
+.graph-canvas > svg {
   position: absolute;
   width: 100%;
   height: 100%;
@@ -282,11 +282,10 @@ body,
 .field-orbits {
   fill: none;
   stroke: #c7c3b9;
-  stroke-width: 0.8;
-  opacity: 0.75;
+  stroke-width: 1;
 }
 .adaptive-graph line {
-  stroke: #aaa99c;
+  stroke: #888c80;
   stroke-width: 1;
 }
 .adaptive-graph line.tentative {
@@ -319,7 +318,7 @@ body,
 .graph-node text {
   fill: var(--recall-graphite);
   font:
-    14px Inter,
+    0.875rem Inter,
     sans-serif;
   paint-order: stroke;
   stroke: #fbfaf6;
@@ -338,19 +337,17 @@ body,
   stroke-width: 1;
 }
 .ms-field-empty {
-  position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 85px;
+  position: relative;
+  flex: none;
+  padding: 8px 24px 16px;
   text-align: center;
-  pointer-events: none;
 }
 .ms-field-empty h2 {
-  font-size: 21px;
+  font-size: 1.3125rem;
   margin: 0 0 8px;
 }
 .ms-field-empty p {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   margin: 0;
 }
@@ -360,11 +357,11 @@ body,
   justify-content: space-between;
   padding: 14px 24px 20px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
   gap: 16px;
 }
 .ms-field-caption > span:last-child {
-  font-size: 9px;
+  font-size: 0.5625rem;
   letter-spacing: 2px;
   line-height: 1.8;
   border-left: 26px solid var(--recall-copper);
@@ -390,13 +387,13 @@ body,
   box-shadow: 0 3px 12px #2f2f2f03;
 }
 .ms-context h2 {
-  font-size: 27px;
+  font-size: 1.5rem;
   letter-spacing: -0.4px;
   margin: 12px 0 18px;
 }
 .ms-context > p:not(.ms-kicker),
 .ms-context-note p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
   line-height: 1.8;
 }
@@ -409,11 +406,11 @@ body,
   gap: 12px;
   padding: 16px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .ms-library-counts dd {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-family: var(--editorial);
 }
 .ms-context-note {
@@ -427,11 +424,11 @@ body,
   margin-bottom: 20px;
 }
 .ms-context-note h3 {
-  font-size: 24px;
+  font-size: 1.5rem;
   margin: 0 0 12px;
 }
 .ms-context > button {
-  font-size: 12px;
+  font-size: 0.75rem;
   width: 100%;
 }
 .capture-center {
@@ -450,11 +447,11 @@ body,
   margin-right: auto;
 }
 .ms-capture-heading h2 {
-  font-size: 21px;
+  font-size: 1.3125rem;
   margin: 0 0 4px;
 }
 .ms-capture-heading p {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--muted);
   margin: 0;
 }
@@ -487,11 +484,11 @@ body,
   height: 21px;
 }
 .capture-bubbles strong {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 .capture-bubbles small {
-  font-size: 9px;
+  font-size: 0.5625rem;
   color: var(--recall-muted);
 }
 .capture-bubbles button[data-active="true"] {
@@ -500,15 +497,15 @@ body,
 .capture-center > .ms-fine {
   margin: 0;
   flex-basis: 100%;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .capture-center > button {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .adaptive-signature {
   grid-column: 1 / -1;
   justify-self: end;
-  font-size: 9px;
+  font-size: 0.5625rem;
   letter-spacing: 3px;
   color: var(--recall-muted);
   padding-top: 8px;
@@ -523,7 +520,7 @@ body,
   background: #eff2e9;
   border-radius: 8px;
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 .ms-error {
@@ -548,30 +545,30 @@ body,
   border-radius: 16px;
 }
 .adaptive-inspector {
-  max-height: calc(100dvh - 140px);
+  max-height: 100%;
   overflow: auto;
   position: relative;
   z-index: 3;
 }
 .adaptive-inspector h1,
 .adaptive-inspector h2 {
-  font-size: 25px;
+  font-size: 1.5625rem;
   margin: 6px 0 18px;
 }
 .adaptive-inspector h3 {
-  font-size: 19px;
+  font-size: 1.1875rem;
 }
 .adaptive-inspector p {
   line-height: 1.65;
 }
 .inspector-close {
   float: right;
-  font-size: 22px;
+  font-size: 1.375rem;
   min-width: 48px;
 }
 .ms-fine,
 .ms-evidence small {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
@@ -596,7 +593,7 @@ body,
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font:
-    13px/1.7 Inter,
+    0.8125rem/1.7 Inter,
     sans-serif;
   max-height: 280px;
   overflow: auto;
@@ -618,7 +615,7 @@ body,
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   margin: 16px 0;
 }
@@ -669,8 +666,8 @@ body,
 }
 .inspector-tabs button {
   flex: 0 0 auto;
-  font-size: 11px;
-  padding: 8px 6px;
+  font-size: 0.8125rem;
+  padding: 8px 16px;
   border: 0;
   border-radius: 0;
   white-space: nowrap;
@@ -679,6 +676,7 @@ body,
 .inspector-tabs button[aria-selected="true"] {
   border-bottom: 2px solid var(--recall-focus);
 }
+.ms-evidence[data-tab="overview"] .evidence-original,
 .ms-evidence[data-tab="original"] .evidence-understanding,
 .ms-evidence[data-tab="understanding"] .evidence-original,
 .ms-evidence[data-tab="history"] .evidence-original,
@@ -698,7 +696,7 @@ body,
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  font-size: 11px;
+  font-size: 0.6875rem;
   pointer-events: none;
 }
 .graph-tools > * {
@@ -710,11 +708,11 @@ body,
   border-radius: 8px;
 }
 .graph-tools button {
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 6px 10px;
 }
 .graph-tools select {
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 6px;
 }
 .graph-tools input[type="checkbox"] {
@@ -727,7 +725,7 @@ body,
   bottom: 0;
   left: 20px;
   right: 20px;
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--recall-muted);
 }
 .graph-list {
@@ -751,10 +749,10 @@ body,
 .graph-list small {
   display: block;
   margin: 8px 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .graph-list p {
-  font-size: 11px;
+  font-size: 0.6875rem;
   overflow-wrap: anywhere;
 }
 .adaptive[data-inspector="true"] .graph-tools,
@@ -801,7 +799,7 @@ body,
   gap: 16px;
 }
 .ms-vault-settings h2 {
-  font-size: 28px;
+  font-size: 1.75rem;
 }
 .ms-vault-settings button {
   margin: 6px 4px;
@@ -820,7 +818,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .editor-toolbar {
   display: flex;
@@ -829,11 +827,11 @@ body,
   margin: 12px 0;
 }
 .editor-toolbar button {
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 6px 9px;
 }
 .editor-toolbar label {
-  font-size: 12px;
+  font-size: 0.75rem;
   width: 100%;
 }
 .editor-toolbar select {
@@ -842,7 +840,7 @@ body,
 .memory-editor textarea {
   min-height: 240px;
   font:
-    13px/1.7 ui-monospace,
+    0.8125rem/1.7 ui-monospace,
     Consolas,
     monospace;
 }
@@ -853,7 +851,7 @@ body,
   flex-wrap: wrap;
 }
 .editor-save [role="status"] {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--recall-muted);
 }
 .editor-conflict {
@@ -865,7 +863,7 @@ body,
 }
 .editor-conflict pre {
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: 0.75rem;
   max-height: 160px;
   overflow: auto;
 }
@@ -911,7 +909,7 @@ body,
   border-radius: 8px;
 }
 .attachment-sheet h2 {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 .ms-knowledge {
   margin-top: 24px;
@@ -927,10 +925,10 @@ body,
 }
 .ms-knowledge h2 {
   margin: 4px 0;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .ms-knowledge h3 {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .ms-knowledge-filters {
   display: flex;
@@ -942,7 +940,7 @@ body,
   display: grid;
   gap: 4px;
   color: var(--quiet);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .ms-knowledge-map {
   display: grid;
@@ -971,17 +969,17 @@ body,
 }
 .ms-knowledge-path > span {
   color: var(--recall-focus);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .ms-knowledge-map small,
 .ms-knowledge-list small {
   display: block;
   color: var(--quiet);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .ms-knowledge-map-count {
   color: var(--quiet);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .ms-knowledge-list {
   display: grid;
@@ -1052,439 +1050,171 @@ body,
 .ms-provider-field input {
   width: 100%;
 }
-@media (min-width: 1400px) {
-  .ms {
-    grid-template-columns: 220px minmax(0, 1fr);
-  }
-  .ms-ui {
-    grid-template-columns: minmax(0, 1fr) 330px;
-    padding: 32px;
-    gap: 24px;
-  }
-  .ms-memory-field {
-    min-height: 690px;
-  }
-  .ms-field-header h1 {
-    font-size: 40px;
-  }
-  .ms-context {
-    padding: 28px 24px;
-  }
-  .ms-context h2 {
-    font-size: 32px;
-  }
-  .adaptive-graph {
-    min-height: 480px;
-  }
-  .capture-center {
-    padding: 20px 24px;
-  }
-  .ms-rail {
-    padding-top: 40px;
-  }
+
+/* The library is the canvas. Opening a task gives it the primary workspace;
+   the mounted graph retains its viewport and selection behind the task. */
+.ms-ui {
+  height: 100dvh;
+  min-height: 640px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 20px 24px 16px;
 }
-@media (max-width: 1180px) {
-  .ms {
-    grid-template-columns: 164px minmax(0, 1fr);
-  }
-  .ms-ui {
-    grid-template-columns: minmax(0, 1fr) 250px;
-    padding: 20px 16px;
-    gap: 16px;
-  }
-  .ms-field-header {
-    flex-wrap: wrap;
-    padding: 20px 18px 0;
-  }
-  .ms-field-header h1 {
-    font-size: 29px;
-  }
-  .ms-view-switch {
-    margin-left: auto;
-  }
-  .ms-memory-field {
-    min-height: 555px;
-  }
-  .ms-context,
-  .adaptive-inspector {
-    padding: 20px 16px;
-  }
-  .ms-context h2 {
-    font-size: 25px;
-  }
-  .ms-brand-logo {
-    width: 72px;
-    height: 72px;
-  }
-  .ms-mark {
-    font-size: 39px;
-  }
-  .ms-nav button {
-    font-size: 12px;
-    padding: 10px 12px;
-  }
-  .capture-center {
-    padding: 12px;
-  }
-  .ms-capture-heading {
-    flex-basis: 100%;
-  }
-  .capture-bubbles {
-    width: 100%;
-    justify-content: space-between;
-    gap: 0;
-  }
-  .capture-bubbles button {
-    padding: 6px;
-  }
-  .capture-bubbles small {
-    font-size: 9px;
-  }
-  .adaptive-graph {
-    min-height: 350px;
-  }
-  .ms-field-caption {
-    padding: 12px 18px 18px;
-  }
-  .ms-field-caption > span:last-child {
-    font-size: 8px;
-    letter-spacing: 1px;
-  }
+.ms-memory-field { min-height: 0; }
+.adaptive-graph { min-height: 160px; }
+.adaptive-graph line, .field-orbits > *, .graph-node circle, .empty-motif circle {
+  vector-effect: non-scaling-stroke;
 }
-@media (max-width: 960px) {
-  .ms {
-    grid-template-columns: 140px minmax(0, 1fr);
-  }
-  .ms-ui {
-    grid-template-columns: minmax(0, 1fr) 230px;
-    gap: 12px;
-    padding: 16px 12px;
-  }
-  .ms-greeting {
-    font-size: 11px;
-    gap: 6px;
-  }
-  .ms-greeting small {
-    font-size: 10px;
-  }
-  .ms-greeting img {
-    width: 36px;
-    height: 36px;
-  }
-  .ms-rail {
-    padding: 24px 8px;
-  }
-  .ms-brand {
-    margin-bottom: 24px;
-  }
-  .ms-nav button {
-    gap: 8px;
-  }
-  .ms-memory-field {
-    min-height: 530px;
-  }
-  .ms-field-header h1 {
-    font-size: 26px;
-  }
-  .ms-field-header > div > p:last-child {
-    font-size: 11px;
-  }
-  .ms-context h2 {
-    font-size: 24px;
-  }
-  .capture-bubbles button {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-  }
-  .capture-bubbles button > span {
-    grid-row: auto;
-    margin-bottom: 4px;
-  }
-  .ms-context-note {
-    margin: 24px 0;
-  }
-  .ms-library-counts {
-    margin: 20px 0;
-  }
-  .ms-rail:after {
-    font-size: 8px;
-    letter-spacing: 2px;
-  }
-  .adaptive-inspector {
-    max-height: calc(100dvh - 105px);
-  }
-}
-@media (max-width: 760px) {
-  .ms {
-    grid-template-columns: 64px minmax(0, 1fr);
-  }
-  .ms-rail {
-    padding: 16px 8px;
-  }
-  .ms-brand-logo {
-    width: 42px;
-    height: 42px;
-  }
-  .ms-mark,
-  .ms-nav span,
-  .ms-rail-bottom span,
-  .ms-rail:after {
-    display: none;
-  }
-  .ms-brand {
-    margin-bottom: 24px;
-  }
-  .ms-nav button,
-  .ms-rail-bottom button {
-    padding: 12px;
-    justify-content: center;
-  }
-  .ms-ui {
-    grid-template-columns: minmax(0, 1fr);
-    padding: 16px 12px;
-    gap: 12px;
-  }
-  .ms-ask {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .ms-greeting {
-    display: none;
-  }
-  .ms-memory-field {
-    grid-column: 1;
-    grid-row: 3;
-    min-height: 520px;
-  }
-  .ms-context {
-    grid-column: 1;
-    grid-row: 5;
-    padding: 20px;
-  }
-  .ms-context h2 {
-    font-size: 26px;
-  }
-  .ms-context-note {
-    margin: 24px 0;
-  }
-  .ms-library-counts {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .ms-library-counts > div {
-    flex: 1;
-    display: block;
-  }
-  .ms-library-counts dd {
-    margin-top: 8px;
-  }
-  .capture-center {
-    grid-row: 4;
-  }
-  .ms-capture-heading {
-    flex-basis: auto;
-  }
-  .adaptive-inspector {
-    grid-column: 1;
-    grid-row: 3;
-    max-height: calc(100dvh - 110px);
-    min-height: 520px;
-    z-index: 4;
-  }
-  .adaptive[data-inspector="true"] .ms-memory-field {
-    visibility: hidden;
-  }
-  .adaptive-signature {
-    grid-row: 6;
-    font-size: 8px;
-    letter-spacing: 2px;
-  }
-  .adaptive-timeline {
-    grid-row: 6;
-  }
-  .attachment-sheet {
-    left: 76px;
-    right: 12px;
-    top: 80px;
-    padding: 16px;
-  }
-  .ms-field-header h1 {
-    font-size: 27px;
-  }
-  .ms-field-header {
-    padding: 20px 16px 0;
-  }
-  .ms-field-caption {
-    padding: 12px 16px;
-  }
-  .ms-field-caption > span:last-child {
-    display: none;
-  }
-  .ms-view-switch button {
-    padding: 8px 12px;
-  }
-  .ms-field-empty h2 {
-    font-size: 20px;
-  }
-  .graph-tools {
-    left: 8px;
-    right: 8px;
-  }
-  .graph-list {
-    left: 8px;
-    right: 8px;
-    top: 160px;
-  }
-  .ms-vault-settings {
-    padding: 20px;
-  }
-  .ms-vault-settings h2 {
-    font-size: 25px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ms * {
-    transition: none !important;
-    animation: none !important;
-    scroll-behavior: auto !important;
-  }
-}
-.ms button {
-  min-width: 48px;
-}
-@media (min-width: 761px) and (max-width: 960px) {
-  .ms-memory-field {
-    min-height: 430px;
-  }
-  .adaptive-graph {
-    min-height: 240px;
-  }
-  .ms-field-empty {
-    bottom: 64px;
-  }
-  .ms-field-empty h2 {
-    font-size: 18px;
-  }
-  .ms-field-empty p {
-    font-size: 11px;
-  }
-  .capture-bubbles button {
-    grid-template-columns: auto auto;
-    justify-items: start;
-    column-gap: 6px;
-  }
-  .capture-bubbles button > span {
-    grid-row: 1 / span 2;
-    margin: 0;
-    width: 30px;
-    height: 30px;
-  }
-  .capture-bubbles small {
-    font-size: 8px;
-  }
-  .capture-center {
-    gap: 8px;
-  }
-}
+.graph-node text { font-size: 1.375rem; }
+.graph-node.memories circle { fill: url(#memory-light); }
+.empty-motif text { font: 1rem Inter, sans-serif; fill: var(--ink); }
+.ms-context { min-height: 0; max-height: 100%; overflow: auto; }
 .ms-notices {
-  position: sticky;
-  top: 12px;
-  z-index: 6;
   grid-column: 1 / -1;
   grid-row: 2;
   display: grid;
   gap: 8px;
 }
-.ms-ask,
-.ms-greeting {
-  grid-row: 1;
+.ms-ask, .ms-greeting { grid-row: 1; }
+.adaptive-signature { grid-row: 7; padding: 0; }
+.capture-center { padding: 8px 16px; }
+.capture-bubbles small { font-size: 0.625rem; }
+.ms button { min-width: 48px; }
+.ms [aria-disabled="true"] { cursor: not-allowed; }
+.ms [data-inspector] { min-width: 0; }
+.adaptive[data-inspector="true"] .ms-memory-field { display: none; }
+.adaptive[data-inspector="true"] .adaptive-inspector {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  padding: 24px 32px;
+  min-height: 0;
+  scroll-padding: 24px;
 }
-.adaptive-signature {
-  grid-row: 7;
+.adaptive[data-inspector="true"] .capture-center { grid-column: 1 / -1; }
+.adaptive-inspector > section, .adaptive-inspector > div {
+  max-width: 820px;
+  margin-inline: auto;
+}
+.adaptive-inspector > section[aria-label="Processing receipt"] {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.adaptive-inspector > section[aria-label="Processing receipt"] h2 {
+  font: 500 0.875rem/1.5 Inter, sans-serif;
+  margin: 0 0 4px;
+}
+.adaptive-inspector > section[aria-label="Processing receipt"] p { margin: 4px 0; font-size: 0.8125rem; }
+.adaptive-inspector h1 { font-size: 1.875rem; padding-right: 56px; }
+.adaptive-inspector p { max-width: 72ch; }
+.inspector-close { position: sticky; top: 0; z-index: 2; }
+.ms-form > button { justify-self: start; min-width: 160px; }
+.ms-form > label:not(.ms-check) { font-weight: 500; }
+.ms-form textarea { min-height: 200px; }
+.ms-hit h2 { font-size: 1.5rem; }
+.ms-hit > small { display: block; overflow-wrap: anywhere; }
+.ms-evidence[data-tab="history"] .evidence-understanding > p,
+.ms-evidence[data-tab="history"] .evidence-understanding > .ms-actions,
+.ms-evidence[data-tab="history"] .evidence-understanding > label,
+.ms-evidence[data-tab="history"] .evidence-understanding > button,
+.ms-evidence[data-tab="history"] .evidence-understanding > section { display: none; }
+.ms-evidence:not([data-tab="history"]) .evidence-understanding > ol { display: none; }
+.editor-top { justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.editor-top > span { margin-right: auto; font-size: 1rem; font-weight: 500; }
+.editor-formatting { margin-bottom: 16px; border-block: 1px solid var(--line); }
+.ms summary { cursor: pointer; min-height: 48px; padding: 12px 0; font-size: 0.8125rem; }
+.memory-editor textarea { font: 0.9375rem/1.8 Inter, sans-serif; min-height: 260px; }
+.editor-toolbar label { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.editor-toolbar button { font-size: 0.8125rem; }
+.adaptive-timeline { grid-row: 5; }
+@media (max-width: 1300px) {
+  .ms { grid-template-columns: clamp(152px, 10rem, 240px) minmax(0, 1fr); }
+  .ms-ui { padding: 16px; grid-template-columns: minmax(0, 1fr) 240px; }
+  .ms-field-header { flex-wrap: wrap; padding: 16px 20px 0; }
+  .ms-field-header h1 { font-size: 1.625rem; }
+  .ms-view-switch { margin-left: auto; }
+  .ms-capture-heading { display: none; }
+  .capture-bubbles { width: 100%; justify-content: space-around; }
+  .graph-node text { font-size: 1.625rem; }
+}
+@media (max-width: 1100px) {
+  .ms-ui { grid-template-columns: minmax(0, 1fr); }
+  .ms-greeting, .ms-context { display: none; }
+  .ms-field-header { flex-wrap: nowrap; }
+  .ms-field-header h1 { font-size: 1.5625rem; }
+  .ms-field-header > div > p:last-child { font-size: 0.75rem; }
+  .ms-field-caption { padding: 8px 20px 12px; }
+  .ms-field-empty h2 { font-size: 1.1875rem; }
+  .ms-rail:after { margin-top: 24px; }
+  .ms-rail-bottom { margin-top: 16px; padding-top: 12px; }
+}
+@media (max-width: 760px) {
+  .ms { grid-template-columns: 64px minmax(0, 1fr); }
+  .ms-rail { padding: 16px 8px; }
+  .ms-brand-logo { width: 42px; height: 42px; }
+  .ms-mark, .ms-nav span, .ms-rail-bottom span, .ms-rail:after { display: none; }
+  .ms-nav button, .ms-rail-bottom button { padding: 12px; justify-content: center; }
+  .ms-ui { padding: 12px; height: auto; min-height: 100dvh; }
+  .ms-memory-field { min-height: 480px; }
+  .ms-field-header { flex-wrap: wrap; padding: 16px 12px 0; }
+  .ms-field-header h1 { font-size: 1.5625rem; }
+  .ms-field-caption { padding: 12px; }
+  .ms-field-caption > span:last-child { display: none; }
+  .ms-field-empty { padding: 8px 12px 16px; }
+  .capture-center { padding: 8px 0; }
+  .capture-bubbles button { display: flex; flex-direction: column; gap: 4px; padding: 6px; }
+  .capture-bubbles small { display: none; }
+  .adaptive[data-inspector="true"] .adaptive-inspector { padding: 16px; max-height: none; overflow: visible; }
+  .adaptive-inspector h1 { font-size: 1.625rem; }
+  .inspector-tabs { flex-wrap: wrap; overflow: visible; gap: 0; }
+  .inspector-tabs button { padding: 8px 10px; }
+  .adaptive-signature { font-size: 0.5rem; letter-spacing: 1px; }
+  .attachment-sheet { left: 76px; right: 12px; padding: 16px; }
+  .ms-vault-settings { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 
-.graph-node.memories circle {
-  fill: url(#memory-light);
-}
-.empty-motif text {
-  font:
-    14px Inter,
-    sans-serif;
-  fill: var(--recall-graphite);
+.adaptive[data-section="capture"] .ms-form { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.adaptive[data-section="capture"] .ms-form > label,
+.adaptive[data-section="capture"] .ms-form > textarea { grid-column: 1 / -1; }
+.adaptive[data-section="capture"] .ms-form > button { width: 100%; min-width: 0; }
+.adaptive[data-section="capture"] .ms-check { margin: 8px 0; }
+@media (min-width: 761px) and (max-height: 760px) {
+  .adaptive-signature { display: none; }
+  .ms-ui { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .adaptive[data-section="capture"] .adaptive-inspector { padding: 16px 24px; }
+  .adaptive[data-section="capture"] .ms-form textarea { min-height: 120px; }
+  .adaptive[data-section="capture"] h1 { margin-bottom: 8px; }
+  .adaptive[data-section="capture"] section > p { margin: 8px 0 16px; }
+  .ms-field-empty { padding-block: 4px 8px; }
+  .ms-field-empty p br { display: none; }
 }
 
-/* Keep capture in the initial desktop viewport; the field takes the remaining
-   height and the inspector scrolls independently. Source labels retain a
-   larger optical size as the graph adjusts to shorter windows. */
-@media (min-width: 761px) {
-  .ms-ui {
-    height: 100dvh;
-    min-height: 0;
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
-    gap: 12px;
-    padding-top: 20px;
-    padding-bottom: 16px;
-  }
-  .ms-memory-field {
-    min-height: 0;
-  }
-  .adaptive-graph {
-    min-height: 0;
-  }
-  .graph-node text {
-    font-size: 18px;
-  }
-  .capture-center {
-    padding: 10px 16px;
-  }
-  .adaptive-inspector {
-    max-height: 100%;
-    min-height: 0;
-  }
-  .adaptive-signature {
-    grid-row: 6;
-    padding-top: 0;
-  }
+.ms-evidence[data-tab="overview"] .evidence-understanding,
+.ms-evidence[data-tab="history"] .evidence-understanding { border: 0; margin: 0; padding: 0; }
+.adaptive-inspector > section[aria-label="Processing receipt"] { padding: 0 56px 12px 0; margin-bottom: 16px; }
+.memory-editor { margin-top: 12px; }
+.inspector-tabs { margin-bottom: 12px; }
+.editor-formatting { margin: 8px 0; }
+
+.adaptive-graph { display: flex; flex-direction: column; }
+.graph-canvas { position: relative; flex: 1; min-height: 160px; }
+.graph-tools { position: relative; inset: auto; order: -1; padding: 8px 16px; }
+.graph-help { position: relative; inset: auto; margin: 8px 20px; }
+.graph-list { position: relative; inset: auto; margin: 0 16px; max-height: none; min-height: 120px; flex: 1; }
+.adaptive-graph[data-list="true"] .graph-canvas { display: none; }
+.ms-memory-field:has(.is-exploring) { overflow: auto; }
+@media (max-width: 760px) {
+  .adaptive-graph.is-exploring { min-height: 420px; }
+  .graph-tools { padding-inline: 8px; }
+  .graph-list { margin-inline: 8px; }
 }
-@media (min-width: 761px) and (max-width: 1300px) {
-  .ms-capture-heading {
-    display: none;
-  }
-  .capture-bubbles {
-    width: 100%;
-    justify-content: space-around;
-  }
-  .capture-bubbles button {
-    grid-template-columns: auto auto;
-    justify-items: start;
-  }
-  .capture-bubbles button > span {
-    grid-row: 1 / span 2;
-    margin: 0;
-  }
-  .ms-field-header {
-    padding-top: 16px;
-  }
-  .ms-field-header h1 {
-    font-size: 28px;
-  }
-  .ms-field-caption {
-    padding-top: 8px;
-    padding-bottom: 12px;
-  }
-}
-@media (min-width: 761px) {
-  .ms-context {
-    max-height: 100%;
-    overflow: auto;
-    min-height: 0;
-  }
-}
-@media (min-width: 961px) and (max-width: 1300px) {
-  .graph-node text { font-size: 24px; }
-}
-@media (min-width: 761px) and (max-width: 960px) {
-  .graph-node text { font-size: 32px; }
-}
+
+.editor-top button { font-size: .875rem; }
+.ms-hit .ms-markdown :is(h1, h2, h3) { font: 500 1rem/1.5 Inter, sans-serif; margin: 12px 0 8px; padding: 0; }
+.ms-evidence .memory-title { font-size: 1.75rem; }
+
+.ms-rail { min-width: 0; }
+.ms-nav span, .ms-rail-bottom span { min-width: 0; overflow-wrap: anywhere; }

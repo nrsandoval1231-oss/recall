@@ -34,15 +34,17 @@ const rows = names.map((name, i) => ({
 }));
 const results = [];
 try {
-  for (const [width, height] of [
+  for (const [width, height, density = 1] of [
     [1536, 1024],
     [1182, 789],
-    [900, 700],
+    [900, 640],
     [390, 844],
     [430, 932],
+    [900, 640, 2],
   ]) {
     const context = await browser.newContext({
       viewport: { width, height },
+      deviceScaleFactor: density,
       reducedMotion: "reduce",
     });
     const page = await context.newPage();
@@ -76,7 +78,7 @@ try {
       () => document.documentElement.scrollWidth > window.innerWidth,
     );
     await page.screenshot({
-      path: path.join(output, `populated-${width}.png`),
+      path: path.join(output, `populated-${width}${density === 2 ? "-2x" : ""}.png`),
     });
     results.push({
       width,
