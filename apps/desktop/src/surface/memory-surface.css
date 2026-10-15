@@ -1,21 +1,8 @@
-@font-face {
-  font-family: Inter;
-  src: url("/fonts/Inter-Regular.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Playfair Display";
-  src: url("/fonts/PlayfairDisplay-Regular.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400 600;
-  font-display: swap;
-}
+@import "../../../../packages/design-tokens/src/brand.css";
 :root {
   font-family: Inter, sans-serif;
-  color: #2f2f2f;
-  background: #faf8f3;
+  color: var(--recall-graphite);
+  background: var(--recall-ivory);
   font-synthesis: none;
 }
 html,
@@ -26,14 +13,14 @@ body,
   width: 100%;
 }
 .ms {
-  --ink: #2f2f2f;
-  --muted: #686b65;
-  --quiet: #686b65;
-  --accent: #526650;
-  --line: #dedbd3;
+  --ink: var(--recall-graphite);
+  --muted: var(--recall-muted);
+  --quiet: var(--recall-muted);
+  --accent: var(--recall-focus);
+  --line: var(--recall-divider);
   --editorial: "Playfair Display", serif;
   min-height: 100dvh;
-  background: #faf8f3;
+  background: var(--recall-ivory);
   color: var(--ink);
   font:
     14px/1.5 Inter,
@@ -56,7 +43,7 @@ body,
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 14px;
-  background: #faf8f3;
+  background: var(--recall-ivory);
   cursor: pointer;
   transition:
     background 0.16s,
@@ -71,10 +58,10 @@ body,
   cursor: default;
 }
 .ms button[aria-disabled="true"] {
-  color: #686b65;
+  color: var(--recall-muted);
 }
 .ms :focus-visible {
-  outline: 2px solid #526650;
+  outline: 2px solid var(--recall-focus);
   outline-offset: 3px;
 }
 .ms svg {
@@ -98,7 +85,7 @@ body,
   line-height: 1.18;
 }
 .ms a {
-  color: #526650;
+  color: var(--recall-focus);
 }
 .ms-rail {
   border-right: 1px solid var(--line);
@@ -160,7 +147,7 @@ body,
   letter-spacing: 3px;
   font-size: 9px;
   line-height: 2.1;
-  color: #686b65;
+  color: var(--recall-muted);
   margin: 48px auto 0;
 }
 .ms-stage {
@@ -311,26 +298,26 @@ body,
 .graph-node circle {
   stroke: #80917d;
   stroke-width: 1.5;
-  fill: #c97f5b;
+  fill: var(--recall-copper);
 }
 .graph-node.people circle {
-  fill: #8c9f8f;
+  fill: var(--recall-sage);
 }
 .graph-node.places circle {
-  fill: #d1cbc2;
+  fill: var(--recall-stone);
 }
 .graph-node.topics circle {
-  fill: #c97f5b;
+  fill: var(--recall-copper);
 }
 .graph-node.tentative circle {
   stroke-dasharray: 4 4;
 }
 .graph-node.highlighted circle {
-  stroke: #526650;
+  stroke: var(--recall-focus);
   stroke-width: 4;
 }
 .graph-node text {
-  fill: #2f2f2f;
+  fill: var(--recall-graphite);
   font:
     14px Inter,
     sans-serif;
@@ -343,11 +330,11 @@ body,
   outline: none;
 }
 .graph-node:focus circle {
-  stroke: #2f2f2f;
+  stroke: var(--recall-graphite);
   stroke-width: 5;
 }
 .empty-motif circle {
-  stroke: #8c9f8f;
+  stroke: var(--recall-sage);
   stroke-width: 1;
 }
 .ms-field-empty {
@@ -380,12 +367,12 @@ body,
   font-size: 9px;
   letter-spacing: 2px;
   line-height: 1.8;
-  border-left: 26px solid #c97f5b;
+  border-left: 26px solid var(--recall-copper);
   padding-left: 12px;
   border-image: linear-gradient(
       transparent 45%,
-      #c97f5b 45%,
-      #c97f5b 48%,
+      var(--recall-copper) 45%,
+      var(--recall-copper) 48%,
       transparent 48%
     )
     1;
@@ -436,7 +423,7 @@ body,
   display: block;
   width: 28px;
   height: 1px;
-  background: #c97f5b;
+  background: var(--recall-copper);
   margin-bottom: 20px;
 }
 .ms-context-note h3 {
@@ -491,7 +478,7 @@ body,
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid #d1cbc2;
+  border: 1px solid var(--recall-stone);
   border-radius: 50%;
   background: #f2eee7;
 }
@@ -505,7 +492,7 @@ body,
 }
 .capture-bubbles small {
   font-size: 9px;
-  color: #686b65;
+  color: var(--recall-muted);
 }
 .capture-bubbles button[data-active="true"] {
   background: #e5e9df;
@@ -523,7 +510,7 @@ body,
   justify-self: end;
   font-size: 9px;
   letter-spacing: 3px;
-  color: #686b65;
+  color: var(--recall-muted);
   padding-top: 8px;
 }
 .ms-notice,
@@ -639,7 +626,7 @@ body,
   min-height: 20px;
   min-width: 20px;
   margin-top: 2px;
-  accent-color: #526650;
+  accent-color: var(--recall-focus);
 }
 .ms-actions {
   display: flex;
@@ -648,9 +635,9 @@ body,
   margin: 12px 0;
 }
 .ms button.ms-primary {
-  background: #2f2f2f;
-  color: #faf8f3;
-  border-color: #2f2f2f;
+  background: var(--recall-graphite);
+  color: var(--recall-ivory);
+  border-color: var(--recall-graphite);
 }
 .ms-hit {
   border-top: 1px solid var(--line);
@@ -690,7 +677,7 @@ body,
   background: transparent;
 }
 .inspector-tabs button[aria-selected="true"] {
-  border-bottom: 2px solid #526650;
+  border-bottom: 2px solid var(--recall-focus);
 }
 .ms-evidence[data-tab="original"] .evidence-understanding,
 .ms-evidence[data-tab="understanding"] .evidence-original,
@@ -718,7 +705,7 @@ body,
   pointer-events: auto;
 }
 .graph-tools label {
-  background: #faf8f3;
+  background: var(--recall-ivory);
   padding: 4px;
   border-radius: 8px;
 }
@@ -741,7 +728,7 @@ body,
   left: 20px;
   right: 20px;
   font-size: 10px;
-  color: #686b65;
+  color: var(--recall-muted);
 }
 .graph-list {
   position: absolute;
@@ -797,13 +784,13 @@ body,
   padding: 16px;
 }
 .ms-vault-settings {
-  background: #faf8f3;
+  background: var(--recall-ivory);
   max-width: 640px;
   width: 100%;
   max-height: 90dvh;
   overflow: auto;
   padding: 28px;
-  border: 1px solid #d1cbc2;
+  border: 1px solid var(--recall-stone);
   border-radius: 16px;
   box-shadow: 0 20px 70px #2f2f2f25;
 }
@@ -867,7 +854,7 @@ body,
 }
 .editor-save [role="status"] {
   font-size: 12px;
-  color: #686b65;
+  color: var(--recall-muted);
 }
 .editor-conflict {
   border: 1px solid #9d744f;
@@ -887,11 +874,11 @@ body,
 }
 .ms-internal-link {
   border: 0 !important;
-  border-bottom: 1px solid #526650 !important;
+  border-bottom: 1px solid var(--recall-focus) !important;
   border-radius: 0 !important;
   background: transparent !important;
   padding: 0 !important;
-  color: #526650 !important;
+  color: var(--recall-focus) !important;
   text-align: left;
 }
 .attachment-sheet {
@@ -980,10 +967,10 @@ body,
 .ms-knowledge-map button[aria-pressed="true"],
 .ms-knowledge-list button[aria-pressed="true"] {
   background: #e5e9df;
-  border-color: #526650;
+  border-color: var(--recall-focus);
 }
 .ms-knowledge-path > span {
-  color: #526650;
+  color: var(--recall-focus);
   font-size: 12px;
 }
 .ms-knowledge-map small,
@@ -1011,7 +998,7 @@ body,
   text-align: left;
 }
 .ms-knowledge-list button > span {
-  color: #526650;
+  color: var(--recall-focus);
   padding: 0 5px;
 }
 .ms-knowledge-evidence {
@@ -1022,7 +1009,7 @@ body,
 .ms-knowledge-evidence blockquote {
   margin: 8px 0;
   padding: 10px 12px;
-  border-left: 2px solid #8c9f8f;
+  border-left: 2px solid var(--recall-sage);
   background: #eff0e9;
 }
 .ms-knowledge-source {
@@ -1425,7 +1412,7 @@ body,
   font:
     14px Inter,
     sans-serif;
-  fill: #2f2f2f;
+  fill: var(--recall-graphite);
 }
 
 /* Keep capture in the initial desktop viewport; the field takes the remaining

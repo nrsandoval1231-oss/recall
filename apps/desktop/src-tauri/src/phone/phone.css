@@ -1,23 +1,11 @@
-@font-face {
-  font-family: Inter;
-  src: url("/fonts/Inter-Regular.ttf") format("truetype");
-  font-display: swap;
-  font-weight: 400 600;
-}
-@font-face {
-  font-family: "Playfair Display";
-  src: url("/fonts/PlayfairDisplay-Regular.ttf") format("truetype");
-  font-display: swap;
-  font-weight: 400 600;
-}
 :root {
   color-scheme: light;
-  --ivory: #faf8f3;
-  --ink: #2f2f2f;
-  --muted: #64665f;
-  --line: #dedbd3;
-  --sage: #8c9f8f;
-  --copper: #c97f5b;
+  --ivory: var(--recall-ivory);
+  --ink: var(--recall-graphite);
+  --muted: var(--recall-muted);
+  --line: var(--recall-divider);
+  --sage: var(--recall-sage);
+  --copper: var(--recall-copper);
   --surface: #f1eee8;
   font-family: Inter, system-ui, sans-serif;
   color: var(--ink);
@@ -112,7 +100,7 @@ input[type="checkbox"] {
   height: 22px;
   vertical-align: middle;
   margin: 8px 8px 8px 0;
-  accent-color: #526b58;
+  accent-color: var(--recall-focus);
 }
 label:has([type="checkbox"]) {
   font-size: 13px;
@@ -185,7 +173,7 @@ details p {
   margin-top: 12px;
 }
 :focus-visible {
-  outline: 2px solid #526b58;
+  outline: 2px solid var(--recall-focus);
   outline-offset: 4px;
 }
 svg {
@@ -407,7 +395,7 @@ svg {
   border-radius: 50%;
   width: 32px;
   height: 32px;
-  background: #526b58;
+  background: var(--recall-focus);
   color: var(--ivory);
   font-size: 24px;
   font-weight: 300;
@@ -433,7 +421,7 @@ button {
 }
 button:hover,
 .capture-actions a:hover {
-  background: #e7ded4;
+  background: var(--recall-sand);
   color: var(--ink);
 }
 @media (prefers-reduced-motion: reduce) {

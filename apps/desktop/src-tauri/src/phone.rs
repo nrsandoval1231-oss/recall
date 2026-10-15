@@ -1014,32 +1014,23 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         Ok(None) => "<p>No resumable source-specific processing authorization is available. Review on desktop.</p>".into(),
         Err(_) => format!("<p>Native processing is busy or needs review. <a href=\"/saved/{}\">Refresh status</a></p>{recovery}", esc(&memory.id)),
     };
-    let source_card=match read_retry(|| vault.source(&memory.id)){Ok(source)=>format!("<p class=\"path\">Original SHA-256: {}</p><a href=\"/sources/{}\">Open original evidence</a>",esc(&source.sha256),esc(&memory.id)),Err(_)=>"<p>Original evidence unavailable; resolve on desktop.</p>".into()};
-    let body = if let Some(source_path) = source_rel(&memory) {
-        format!(
-            "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. Provider processing status is shown below; nothing is sent without source-specific consent.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>",
-            esc(&source_path),
-            esc(&note_path),
-            esc(&memory.id),
-            esc(&memory.note),
-            esc(&note_path),
-            esc(&source_path),
-        )
-    } else {
-        format!(
-            "<h1>Saved in the desktop vault</h1><p>The note is in {note}. The original text is preserved separately. Provider processing status is shown below; nothing is sent without source-specific consent.</p><p>{}</p><p class=\"path\">{note}</p>",
-            esc(&memory.note),
-            note = esc(&note_path),
-        )
+    let original_path = source_rel(&memory).unwrap_or_else(|| format!("Recall/Sources/{}.txt", memory.id));
+    let source_card = match read_retry(|| vault.source(&memory.id)) {
+        Ok(source) => format!("<a class=\"source-action\" href=\"/sources/{}\">Open original evidence</a><details><summary>Source verification</summary><p class=\"path\">Original SHA-256: {}</p><p class=\"path\">{}</p></details>", esc(&memory.id), esc(&source.sha256), esc(&format!("{} · {}", note_path, original_path))),
+        Err(_) => "<p>Original evidence unavailable; resolve on desktop.</p>".into(),
     };
+    let photo = source_rel(&memory).map(|_| format!("<img src=\"/sources/{}\" alt=\"Original page\">", esc(&memory.id))).unwrap_or_default();
+    let original_kind = if photo.is_empty() { "text" } else { "photo" };
+    let body = format!("<section class=\"memory-detail\"><p class=\"eyebrow\">MEMORY DETAIL</p><h1>{}</h1><p class=\"fine\">Captured {} · Revision {}</p>{photo}<p class=\"memory-text\">{}</p><p class=\"saved-receipt\">Saved in the desktop vault</p><p class=\"fine\">The original {original_kind} is preserved separately. Nothing is sent without source-specific consent.</p>{source_card}</section>",
+        esc(&title_for(&memory)), esc(&memory.captured_at), memory.revision, esc(&memory.note));
     html(
         200,
         page(
             "Saved in the desktop vault",
             &format!(
-                "{body}{source_card}{processing}{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
-                capture_form(&Uuid::new_v4().to_string(), ""),
-                format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
+                "{body}{processing}<details><summary>Capture another memory</summary>{}</details><details><summary>Ask Recall</summary><p class=\"fine\">{KEYWORD_LABEL}</p>{}</details><section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>",
+                capture_form(&Uuid::new_v4().to_string(), "").replace("<h1 id=\"capture-heading\">Write a memory</h1>", "<h2>Write a memory</h2>"),
+                ask_form("")
             ),
         ),
     )
@@ -1152,7 +1143,7 @@ fn page(title: &str, main: &str) -> String {
     )
 }
 
-const PAGE_CSS: &str = include_str!("phone/phone.css");
+const PAGE_CSS: &str = concat!(include_str!("../../../../packages/design-tokens/src/brand.css"), "\n", include_str!("phone/phone.css"));
 
 const MANIFEST: &str = r##"{
   "name": "Recall",
@@ -1273,29 +1264,22 @@ fn utf8_field(bytes: &[u8]) -> Result<String, FormError> {
 }
 
 fn title_for(memory: &VaultMemory) -> String {
-    let line = memory
-        .note
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("")
-        .trim();
-    if line.is_empty() {
-        if memory.source_name.is_empty() {
-            "Untitled page".into()
-        } else {
-            memory.source_name.clone()
+    let note = memory.note.trim();
+    let (frontmatter, body) = if let Some(rest) = note.strip_prefix("---\n") {
+        rest.split_once("\n---").unwrap_or(("", note))
+    } else { ("", note) };
+    if let Some(value) = frontmatter.lines().find_map(|line| line.strip_prefix("title: ")) {
+        if let Ok(title) = serde_json::from_str::<String>(value) {
+            if !title.trim().is_empty() { return title.chars().take(80).collect(); }
         }
-    } else {
-        let mut title = String::new();
-        for (count, ch) in line.chars().enumerate() {
-            if count == 80 {
-                title.push('…');
-                break;
-            }
-            title.push(ch);
-        }
-        title
     }
+    let line = body.lines().find(|line| !line.trim().is_empty()).unwrap_or("").trim().trim_start_matches('#').trim();
+    if line.is_empty() {
+        return if memory.source_name.is_empty() { "Untitled memory".into() } else { memory.source_name.clone() };
+    }
+    let mut title: String = line.chars().take(80).collect();
+    if line.chars().count() > 80 { title.push('…'); }
+    title
 }
 
 fn source_rel(memory: &VaultMemory) -> Option<String> {
