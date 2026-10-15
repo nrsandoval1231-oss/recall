@@ -46,11 +46,15 @@ export function AdaptiveGraph({
       .flatMap((e) => [e.from, e.to]),
   );
   return (
-    <div className={`adaptive-graph ${explore ? "is-exploring" : ""}`} role="region" aria-label="Memory graph environment">
+    <div
+      className={`adaptive-graph ${explore ? "is-exploring" : ""}`}
+      role="region"
+      aria-label="Memory graph environment"
+    >
       {explore && <h1 className="ms-sr">Graph View</h1>}
       <svg
-        viewBox="0 0 1000 800"
-        preserveAspectRatio="xMidYMid slice"
+        viewBox="0 0 1000 700"
+        preserveAspectRatio="xMidYMid meet"
         role="group"
         aria-label="Vault memory graph"
         tabIndex={0}
@@ -99,28 +103,49 @@ export function AdaptiveGraph({
       >
         <defs>
           <radialGradient id="memory-light">
-            <stop stopColor="#fffaf1" />
-            <stop offset=".8" stopColor="#f1e0c5" />
-            <stop offset="1" stopColor="#fffdf8" />
+            <stop stopColor="#c7d0c3" />
+            <stop offset=".65" stopColor="#9aa994" />
+            <stop offset="1" stopColor="#7d8c79" />
           </radialGradient>
         </defs>
         <g
           transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}
         >
-          {graph.nodes.length === 0 && (
-            <g className="empty-motif" aria-hidden="true">
-              {Array.from({ length: 48 }, (_, i) => {
-                const x = 30 + ((i * 173 + Math.floor(i / 3) * 97) % 940),
-                  y = 20 + ((i * i * 59 + i * 73) % 760);
-                return (
-                  <g key={i}>
-                    <path d={`M ${x} ${y} l 95 45 l -30 90 l -65 -135`} />
-                    <circle cx={x} cy={y} r={(i % 3) + 2} />
-                  </g>
-                );
-              })}
-            </g>
-          )}
+          <g className="field-orbits" aria-hidden="true">
+            <ellipse
+              cx="500"
+              cy="350"
+              rx="360"
+              ry="175"
+              transform="rotate(-20 500 350)"
+            />
+            <ellipse
+              cx="500"
+              cy="350"
+              rx="310"
+              ry="210"
+              transform="rotate(29 500 350)"
+            />
+            <ellipse
+              cx="500"
+              cy="350"
+              rx="175"
+              ry="285"
+              transform="rotate(39 500 350)"
+            />
+            <ellipse cx="500" cy="350" rx="150" ry="135" />
+            <circle cx="500" cy="350" r="94" />
+            <circle cx="500" cy="350" r="76" />
+          </g>
+          <g className="empty-motif" aria-hidden="true">
+            <circle cx="500" cy="350" r="52" fill="url(#memory-light)" />
+            <circle cx="500" cy="350" r="60" fill="none" />
+            {graph.nodes.length > 0 && (
+              <text x="500" y="354" textAnchor="middle">
+                Your library
+              </text>
+            )}
+          </g>
           {edges.map((edge, index) => {
             const from = nodes.find((n) => n.id === edge.from)!,
               to = nodes.find((n) => n.id === edge.to)!;
@@ -164,22 +189,23 @@ export function AdaptiveGraph({
                   node.kind === "memories"
                     ? node.memory.id === selected
                       ? 65
-                      : explore
-                        ? 37
-                        : 13
-                    : 5
+                      : 32
+                    : 11
                 }
                 fill={
                   node.kind === "memories" ? "url(#memory-light)" : undefined
                 }
               />
-              {explore && (
-                <text y={node.kind === "memories" ? 3 : 22} textAnchor="middle">
+              {
+                <text
+                  y={node.kind === "memories" ? 54 : 30}
+                  textAnchor="middle"
+                >
                   {node.label.length > 24
                     ? node.label.slice(0, 23) + "…"
                     : node.label}
                 </text>
-              )}
+              }
             </g>
           ))}
         </g>

@@ -245,7 +245,9 @@ describe("Memory Surface", () => {
     const client = vault({ capture, status: async () => chosen }, []);
     render(<MemorySurface vault={client} />);
     expect(
-      await screen.findByRole("heading", { name: "Capture" }),
+      await screen.findByRole("heading", {
+        name: "Your memories belong here.",
+      }),
     ).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /Camera ·/ }));
     await user.type(
@@ -588,9 +590,13 @@ it("saves messy text without provider consent and retrieves original source quot
     screen.getByRole("button", { name: "Inspect original evidence" }),
   ).toBeTruthy();
   expect(screen.getByText(`SHA-256: ${sha}`)).toBeTruthy();
-  expect(screen.getByText("Wording match in the current saved note.")).toBeTruthy();
+  expect(
+    screen.getByText("Wording match in the current saved note."),
+  ).toBeTruthy();
   expect(screen.getByText(/Includes user corrections/)).toBeTruthy();
-  expect(screen.getByText(`Original excerpt: bytes 0–${bytes.length}`)).toBeTruthy();
+  expect(
+    screen.getByText(`Original excerpt: bytes 0–${bytes.length}`),
+  ).toBeTruthy();
 });
 
 it("finishing organization of A never replaces B's correction editor after navigation", async () => {
@@ -954,7 +960,7 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
   history.replaceState(null, "", "/?design=canonical");
   try {
     rawRender(<MemorySurface vault={vault()} />);
-    await screen.findByRole("heading", { name: "Capture" });
+    await screen.findByRole("heading", { name: "Your memories belong here." });
     expect(screen.queryByText("Permian Power Expansion")).toBeNull();
     expect(screen.queryByText("Blake Combs")).toBeNull();
     expect(document.querySelector(".ms")?.getAttribute("data-mode")).toBe(
@@ -965,14 +971,33 @@ it("keeps an empty native vault empty even with the canonical preview parameter"
   }
 });
 
-it("launches the canonical empty Capture surface without synthetic memories", async () => {
+it("launches the canonical empty memory field without synthetic memories", async () => {
   rawRender(<MemorySurface vault={preview} />);
-  expect(screen.getByRole("heading", { name: "Capture" })).toBeTruthy();
+  expect(
+    screen.getByRole("heading", { name: "Your memories belong here." }),
+  ).toBeTruthy();
   expect(screen.getByRole("button", { name: /Camera/ })).toBeTruthy();
   expect(
     screen.getByRole("button", { name: /Speak/ }).getAttribute("aria-disabled"),
   ).toBe("true");
   expect(screen.getByRole("button", { name: /Write/ })).toBeTruthy();
+  expect(screen.getByRole("searchbox", { name: "Ask Recall" })).toBeTruthy();
+  expect(
+    screen.getByRole("region", { name: "Your memory field" }).textContent,
+  ).toContain("0 memories in your library");
+  expect(
+    screen
+      .getByRole("complementary", { name: "Library context" })
+      .querySelectorAll("dd").length,
+  ).toBe(3);
+  expect(
+    [
+      ...screen
+        .getByRole("complementary", { name: "Library context" })
+        .querySelectorAll("dd"),
+    ].map((node) => node.textContent),
+  ).toEqual(["0", "0", "0"]);
+  expect(document.querySelectorAll(".graph-node").length).toBe(0);
   expect(screen.queryByText("Brooks Campus")).toBeNull();
   expect(
     screen.queryByRole("complementary", { name: "Capture calendar" }),
@@ -1039,202 +1064,714 @@ it("Cancel preserves the Write draft and returns keyboard focus to its bubble", 
 });
 
 it("restores a pending photo to Camera with the same retry identity", async () => {
- const intent={operationId:"22222222-2222-4222-8222-222222222222",note:"Saved camera context",kind:"photo"};sessionStorage.setItem(`recall.desktop.capture.v1:${chosen.vault_identity}`,JSON.stringify(intent));
- const client=vault({capture:vi.fn(async()=>null)});rawRender(<MemorySurface vault={client}/>);
- const retry=await screen.findByRole("button",{name:"Retry the same import"});expect(screen.queryByRole("button",{name:"Save note"})).toBeNull();
- fireEvent.click(retry);await act(async()=>{});expect(client.capture).toHaveBeenCalledWith("session-token",intent.operationId,intent.note);
+  const intent = {
+    operationId: "22222222-2222-4222-8222-222222222222",
+    note: "Saved camera context",
+    kind: "photo",
+  };
+  sessionStorage.setItem(
+    `recall.desktop.capture.v1:${chosen.vault_identity}`,
+    JSON.stringify(intent),
+  );
+  const client = vault({ capture: vi.fn(async () => null) });
+  rawRender(<MemorySurface vault={client} />);
+  const retry = await screen.findByRole("button", {
+    name: "Retry the same import",
+  });
+  expect(screen.queryByRole("button", { name: "Save note" })).toBeNull();
+  fireEvent.click(retry);
+  await act(async () => {});
+  expect(client.capture).toHaveBeenCalledWith(
+    "session-token",
+    intent.operationId,
+    intent.note,
+  );
 });
 
-it("restores a pre-capture writing draft after app restart without inventing a saved memory",async()=>{
- const user=userEvent.setup();const client=vault();const view=rawRender(<MemorySurface vault={client}/>);
- await user.click(screen.getByRole("button",{name:/Write ·/}));await user.type(screen.getByLabelText("Your note"),"Unfinished native writing draft?");view.unmount();
- rawRender(<MemorySurface vault={client}/>);await screen.findByText(/Checking this device/).catch(()=>{});
- await user.click(screen.getByRole("button",{name:/Write ·/}));expect((screen.getByLabelText("Your note") as HTMLTextAreaElement).value).toBe("Unfinished native writing draft?");
- expect(client.captureNote).toBeUndefined();expect(screen.queryByTestId("integrity")).toBeNull();
+it("restores a pre-capture writing draft after app restart without inventing a saved memory", async () => {
+  const user = userEvent.setup();
+  const client = vault();
+  const view = rawRender(<MemorySurface vault={client} />);
+  await user.click(screen.getByRole("button", { name: /Write ·/ }));
+  await user.type(
+    screen.getByLabelText("Your note"),
+    "Unfinished native writing draft?",
+  );
+  view.unmount();
+  rawRender(<MemorySurface vault={client} />);
+  await screen.findByText(/Checking this device/).catch(() => {});
+  await user.click(screen.getByRole("button", { name: /Write ·/ }));
+  expect(
+    (screen.getByLabelText("Your note") as HTMLTextAreaElement).value,
+  ).toBe("Unfinished native writing draft?");
+  expect(client.captureNote).toBeUndefined();
+  expect(screen.queryByTestId("integrity")).toBeNull();
 });
 
-  it("requires reviewed provider disclosure and separate explicit graph consent", async () => {
-    const configured = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
-    const client = vault({
-      knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Notes and questions may be sent to these providers.", providers: configured, answer_enabled: false, answer_provider: "provider A", service: { state: "ready", pending: 0, indexed: 0, failed: 0, message: "Ready", providers: configured } })),
-      knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 1, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })),
+it("requires reviewed provider disclosure and separate explicit graph consent", async () => {
+  const configured = {
+    extraction: "provider A",
+    embedding: "provider B",
+    reranking: "provider C",
+  };
+  const client = vault({
+    knowledgeStatus: vi.fn(async () => ({
+      enabled: false,
+      include_existing: false,
+      generation: 0,
+      provider_disclosure:
+        "Notes and questions may be sent to these providers.",
+      providers: configured,
+      answer_enabled: false,
+      answer_provider: "provider A",
+      service: {
+        state: "ready",
+        pending: 0,
+        indexed: 0,
+        failed: 0,
+        message: "Ready",
+        providers: configured,
+      },
+    })),
+    knowledgeConsent: vi.fn(async () => ({
+      version: 1,
+      vault_id: chosen.vault_identity!,
+      enabled: true,
+      include_existing: false,
+      generation: 1,
+      snapshot_sha256: "",
+      existing_fence: [],
+      dismissed_facts: [],
+    })),
+  });
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Settings" }));
+  await screen.findByText(/Notes and questions may be sent/);
+  const enable = screen.getByRole("button", {
+    name: "Enable connected knowledge",
+  }) as HTMLButtonElement;
+  expect(enable.disabled).toBe(true);
+  await user.click(screen.getByLabelText(/I understand that graph processing/));
+  expect(
+    (screen.getByLabelText(/Also process existing notes/) as HTMLInputElement)
+      .checked,
+  ).toBe(false);
+  await user.click(enable);
+  expect(client.knowledgeConsent).toHaveBeenCalledWith(
+    chosen.vault_id,
+    true,
+    false,
+  );
+});
+
+it("requires separate named-provider approval for quoted answers", async () => {
+  const providers = {
+    extraction: "Anthropic Claude model-x",
+    embedding: "embedder",
+    reranking: "ranker",
+  };
+  const status = vi
+    .fn()
+    .mockResolvedValueOnce({
+      enabled: true,
+      include_existing: false,
+      generation: 1,
+      provider_disclosure: "Graph provider disclosure.",
+      providers,
+      answer_enabled: false,
+      answer_provider: providers.extraction,
+      service: {
+        state: "ready",
+        pending: 0,
+        indexed: 1,
+        failed: 0,
+        message: "Ready",
+        providers,
+      },
+    })
+    .mockResolvedValue({
+      enabled: true,
+      include_existing: false,
+      generation: 2,
+      provider_disclosure: "Graph provider disclosure.",
+      providers,
+      answer_enabled: true,
+      answer_provider: providers.extraction,
+      service: {
+        state: "ready",
+        pending: 0,
+        indexed: 1,
+        failed: 0,
+        message: "Ready",
+        providers,
+      },
     });
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(await screen.findByRole("button", { name: "Settings" }));
-    await screen.findByText(/Notes and questions may be sent/);
-    const enable = screen.getByRole("button", { name: "Enable connected knowledge" }) as HTMLButtonElement;
-    expect(enable.disabled).toBe(true);
-    await user.click(screen.getByLabelText(/I understand that graph processing/));
-    expect((screen.getByLabelText(/Also process existing notes/) as HTMLInputElement).checked).toBe(false);
-    await user.click(enable);
-    expect(client.knowledgeConsent).toHaveBeenCalledWith(chosen.vault_id, true, false);
+  const answerConsent = vi.fn(async () => ({
+    version: 2,
+    vault_id: chosen.vault_identity!,
+    enabled: true,
+    include_existing: false,
+    generation: 2,
+    snapshot_sha256: "",
+    existing_fence: [],
+    dismissed_facts: [],
+  }));
+  const client = vault({
+    knowledgeStatus: status,
+    knowledgeAnswerConsent: answerConsent,
   });
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Settings" }));
+  await screen.findByText(/Configured answer model: Anthropic Claude model-x/);
+  expect(
+    screen.queryByLabelText(/I understand that graph processing/),
+  ).toBeNull();
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Enable quoted answers",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  await user.click(
+    screen.getByLabelText(
+      /I approve sending each asked question and its selected current note excerpts/,
+    ),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Enable quoted answers" }),
+  );
+  expect(answerConsent).toHaveBeenCalledWith(chosen.vault_id, true);
+  expect(
+    await screen.findByText(/Enabled for Anthropic Claude model-x/),
+  ).toBeTruthy();
+});
 
-  it("requires separate named-provider approval for quoted answers", async () => {
-    const providers = { extraction: "Anthropic Claude model-x", embedding: "embedder", reranking: "ranker" };
-    const status = vi.fn()
-      .mockResolvedValueOnce({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Graph provider disclosure.", providers, answer_enabled: false, answer_provider: providers.extraction, service: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready", providers } })
-      .mockResolvedValue({ enabled: true, include_existing: false, generation: 2, provider_disclosure: "Graph provider disclosure.", providers, answer_enabled: true, answer_provider: providers.extraction, service: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready", providers } });
-    const answerConsent = vi.fn(async () => ({ version: 2, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 2, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] }));
-    const client = vault({ knowledgeStatus: status, knowledgeAnswerConsent: answerConsent });
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(await screen.findByRole("button", { name: "Settings" }));
-    await screen.findByText(/Configured answer model: Anthropic Claude model-x/);
-    expect(screen.queryByLabelText(/I understand that graph processing/)).toBeNull();
-    expect((screen.getByRole("button", { name: "Enable quoted answers" }) as HTMLButtonElement).disabled).toBe(true);
-    await user.click(screen.getByLabelText(/I approve sending each asked question and its selected current note excerpts/));
-    await user.click(screen.getByRole("button", { name: "Enable quoted answers" }));
-    expect(answerConsent).toHaveBeenCalledWith(chosen.vault_id, true);
-    expect(await screen.findByText(/Enabled for Anthropic Claude model-x/)).toBeTruthy();
-  });
-
-  it("sends quoted answering only after its explicit action and cancels when the question changes", async () => {
-    const source = memory({ note: "Utility late. Crossed out: 8 MW confirmed." });
-    const providers = { extraction: "Anthropic Claude model-x", embedding: "embedder", reranking: "ranker" };
-    const sourceAnswer: SourceAnswer = { question: "utility", message: "Source-backed matches.", hits: [{ memory_id: source.id, revision: source.revision, note_basename: "meeting.md", current_excerpt: source.note, original_excerpt: "Utility late.", source_sha256: source.source_sha256, mime_type: "text/plain" }] };
-    let finish!: (result: MemoryAnswer) => void;
-    const memoryAnswer = vi.fn((_vaultId: string, _question: string, _requestId: string) => new Promise<MemoryAnswer>(resolve => { finish = resolve; }));
-    const client = vault({
+it("sends quoted answering only after its explicit action and cancels when the question changes", async () => {
+  const source = memory({ note: "Utility late. Crossed out: 8 MW confirmed." });
+  const providers = {
+    extraction: "Anthropic Claude model-x",
+    embedding: "embedder",
+    reranking: "ranker",
+  };
+  const sourceAnswer: SourceAnswer = {
+    question: "utility",
+    message: "Source-backed matches.",
+    hits: [
+      {
+        memory_id: source.id,
+        revision: source.revision,
+        note_basename: "meeting.md",
+        current_excerpt: source.note,
+        original_excerpt: "Utility late.",
+        source_sha256: source.source_sha256,
+        mime_type: "text/plain",
+      },
+    ],
+  };
+  let finish!: (result: MemoryAnswer) => void;
+  const memoryAnswer = vi.fn(
+    (_vaultId: string, _question: string, _requestId: string) =>
+      new Promise<MemoryAnswer>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const client = vault(
+    {
       ask: vi.fn(async () => sourceAnswer),
-      knowledgeStatus: vi.fn(async () => ({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Graph disclosure.", providers, answer_enabled: true, answer_provider: providers.extraction, service: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready", providers } })),
+      knowledgeStatus: vi.fn(async () => ({
+        enabled: true,
+        include_existing: false,
+        generation: 1,
+        provider_disclosure: "Graph disclosure.",
+        providers,
+        answer_enabled: true,
+        answer_provider: providers.extraction,
+        service: {
+          state: "ready",
+          pending: 0,
+          indexed: 1,
+          failed: 0,
+          message: "Ready",
+          providers,
+        },
+      })),
       memoryAnswer,
       memoryAnswerCancel: vi.fn(async () => true),
-    }, [source]);
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(screen.getByRole("button", { name: "Search" }));
-    await user.type(await screen.findByRole("searchbox", { name: "Ask Recall" }), "utility");
-    await user.click(screen.getByRole("button", { name: "Ask" }));
-    const answerButton = await screen.findByRole("button", { name: "Answer from notes" });
-    expect(memoryAnswer).not.toHaveBeenCalled();
-    await user.click(answerButton);
-    await screen.findByText("Selecting exact source quotations…");
-    expect(memoryAnswer).toHaveBeenCalledWith(chosen.vault_id, "utility", expect.stringMatching(/^[0-9a-f-]{36}$/i));
-    await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), " changed");
-    expect(client.memoryAnswerCancel).toHaveBeenCalledWith(chosen.vault_id, expect.stringMatching(/^[0-9a-f-]{36}$/i));
-    await act(async () => finish({ sources: sourceAnswer, status: "supported", message: "Selected exact passages from current notes. These quotations are evidence selections, not a verified synthesized answer.", selections: [{ source_id: source.id, revision: source.revision, source_sha256: source.source_sha256, note_sha256: source.source_sha256, quote: "Utility late." }], answer_provider: providers.extraction }));
-    expect(screen.queryByText(/Selected exact passages from current notes/)).toBeNull();
+    },
+    [source],
+  );
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  await user.type(
+    await screen.findByRole("searchbox", { name: "Ask Recall" }),
+    "utility",
+  );
+  await user.click(screen.getByRole("button", { name: "Ask" }));
+  const answerButton = await screen.findByRole("button", {
+    name: "Answer from notes",
   });
+  expect(memoryAnswer).not.toHaveBeenCalled();
+  await user.click(answerButton);
+  await screen.findByText("Selecting exact source quotations…");
+  expect(memoryAnswer).toHaveBeenCalledWith(
+    chosen.vault_id,
+    "utility",
+    expect.stringMatching(/^[0-9a-f-]{36}$/i),
+  );
+  await user.type(
+    screen.getByRole("searchbox", { name: "Ask Recall" }),
+    " changed",
+  );
+  expect(client.memoryAnswerCancel).toHaveBeenCalledWith(
+    chosen.vault_id,
+    expect.stringMatching(/^[0-9a-f-]{36}$/i),
+  );
+  await act(async () =>
+    finish({
+      sources: sourceAnswer,
+      status: "supported",
+      message:
+        "Selected exact passages from current notes. These quotations are evidence selections, not a verified synthesized answer.",
+      selections: [
+        {
+          source_id: source.id,
+          revision: source.revision,
+          source_sha256: source.source_sha256,
+          note_sha256: source.source_sha256,
+          quote: "Utility late.",
+        },
+      ],
+      answer_provider: providers.extraction,
+    }),
+  );
+  expect(
+    screen.queryByText(/Selected exact passages from current notes/),
+  ).toBeNull();
+});
 
-  it("reloads native state after a failed disable and reports remote removal as unconfirmed", async () => {
-    const providers = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
-    const status = vi.fn(async () => ({ enabled: true, include_existing: true, generation: 4,
-      provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
-      answer_enabled: false, answer_provider: "provider A",
-      service: { state: "ready", pending: 0, indexed: 2, failed: 0, message: "Ready", providers } }));
-    const client = vault({ knowledgeStatus: status,
-      knowledgeConsent: vi.fn(async () => { throw new Error("Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects."); }) });
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(await screen.findByRole("button", { name: "Settings" }));
-    await user.click(await screen.findByRole("button", { name: "Disable connected knowledge" }));
-    expect(await screen.findByText(/Locally disabled; remote purge is unconfirmed/)).toBeTruthy();
-    expect(await screen.findByText(/Connected knowledge is locally disabled; remote purge is unconfirmed/)).toBeTruthy();
-    expect(status.mock.calls.length).toBeGreaterThanOrEqual(2);
+it("reloads native state after a failed disable and reports remote removal as unconfirmed", async () => {
+  const providers = {
+    extraction: "provider A",
+    embedding: "provider B",
+    reranking: "provider C",
+  };
+  const status = vi.fn(async () => ({
+    enabled: true,
+    include_existing: true,
+    generation: 4,
+    provider_disclosure:
+      "Notes and questions may be sent to configured providers.",
+    providers,
+    answer_enabled: false,
+    answer_provider: "provider A",
+    service: {
+      state: "ready",
+      pending: 0,
+      indexed: 2,
+      failed: 0,
+      message: "Ready",
+      providers,
+    },
+  }));
+  const client = vault({
+    knowledgeStatus: status,
+    knowledgeConsent: vi.fn(async () => {
+      throw new Error(
+        "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects.",
+      );
+    }),
   });
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Settings" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Disable connected knowledge" }),
+  );
+  expect(
+    await screen.findByText(/Locally disabled; remote purge is unconfirmed/),
+  ).toBeTruthy();
+  expect(
+    await screen.findByText(
+      /Connected knowledge is locally disabled; remote purge is unconfirmed/,
+    ),
+  ).toBeTruthy();
+  expect(status.mock.calls.length).toBeGreaterThanOrEqual(2);
+});
 
-  it("reports accepted asynchronous removal as pending rather than completed", async () => {
-    const providers = { extraction: "provider A", embedding: "provider B", reranking: "provider C" };
-    const ready = { enabled: true, include_existing: true, generation: 4,
-      provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
-      answer_enabled: false, answer_provider: "provider A",
-      service: { state: "ready", pending: 0, indexed: 2, failed: 0, message: "Ready", providers } };
-    const purging = { enabled: false, include_existing: false, generation: 5,
-      provider_disclosure: "Notes and questions may be sent to configured providers.", providers,
-      answer_enabled: false, answer_provider: "provider A",
-      service: { state: "purging", pending: 1, indexed: 0, failed: 0, message: "Removal is pending", providers } };
-    const status = vi.fn().mockResolvedValueOnce(ready).mockResolvedValue(purging);
-    const client = vault({ knowledgeStatus: status,
-      knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: false,
-        include_existing: false, generation: 5, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })) });
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(await screen.findByRole("button", { name: "Settings" }));
-    await user.click(await screen.findByRole("button", { name: "Disable connected knowledge" }));
-    expect(await screen.findByText(/remote removal was requested/i)).toBeTruthy();
-    expect(await screen.findByText("Removal is pending", { exact: false })).toBeTruthy();
-    expect(screen.queryByText(/service confirmed the purge/i)).toBeNull();
+it("reports accepted asynchronous removal as pending rather than completed", async () => {
+  const providers = {
+    extraction: "provider A",
+    embedding: "provider B",
+    reranking: "provider C",
+  };
+  const ready = {
+    enabled: true,
+    include_existing: true,
+    generation: 4,
+    provider_disclosure:
+      "Notes and questions may be sent to configured providers.",
+    providers,
+    answer_enabled: false,
+    answer_provider: "provider A",
+    service: {
+      state: "ready",
+      pending: 0,
+      indexed: 2,
+      failed: 0,
+      message: "Ready",
+      providers,
+    },
+  };
+  const purging = {
+    enabled: false,
+    include_existing: false,
+    generation: 5,
+    provider_disclosure:
+      "Notes and questions may be sent to configured providers.",
+    providers,
+    answer_enabled: false,
+    answer_provider: "provider A",
+    service: {
+      state: "purging",
+      pending: 1,
+      indexed: 0,
+      failed: 0,
+      message: "Removal is pending",
+      providers,
+    },
+  };
+  const status = vi
+    .fn()
+    .mockResolvedValueOnce(ready)
+    .mockResolvedValue(purging);
+  const client = vault({
+    knowledgeStatus: status,
+    knowledgeConsent: vi.fn(async () => ({
+      version: 1,
+      vault_id: chosen.vault_identity!,
+      enabled: false,
+      include_existing: false,
+      generation: 5,
+      snapshot_sha256: "",
+      existing_fence: [],
+      dismissed_facts: [],
+    })),
   });
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Settings" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Disable connected knowledge" }),
+  );
+  expect(await screen.findByText(/remote removal was requested/i)).toBeTruthy();
+  expect(
+    await screen.findByText("Removal is pending", { exact: false }),
+  ).toBeTruthy();
+  expect(screen.queryByText(/service confirmed the purge/i)).toBeNull();
+});
 
-  it("does not offer graph consent when configured providers are unavailable", async () => {
-    const client = vault({ knowledgeStatus: vi.fn(async () => ({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Review providers before enabling.", providers: null, answer_enabled: false, answer_provider: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Local graph service is not configured." } })), knowledgeConsent: vi.fn() });
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(await screen.findByRole("button", { name: "Settings" }));
-    await screen.findByText(/Providers are unavailable or not configured/);
-    expect((screen.getByRole("button", { name: "Enable connected knowledge" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(client.knowledgeConsent).not.toHaveBeenCalled();
+it("does not offer graph consent when configured providers are unavailable", async () => {
+  const client = vault({
+    knowledgeStatus: vi.fn(async () => ({
+      enabled: false,
+      include_existing: false,
+      generation: 0,
+      provider_disclosure: "Review providers before enabling.",
+      providers: null,
+      answer_enabled: false,
+      answer_provider: null,
+      service: {
+        state: "unavailable",
+        pending: 0,
+        indexed: 0,
+        failed: 0,
+        message: "Local graph service is not configured.",
+      },
+    })),
+    knowledgeConsent: vi.fn(),
   });
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Settings" }));
+  await screen.findByText(/Providers are unavailable or not configured/);
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Enable connected knowledge",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  expect(client.knowledgeConsent).not.toHaveBeenCalled();
+});
 
-  it("explicitly rebuilds enabled connected knowledge and reports the native result", async () => {
-    const providers = { extraction: "extractor", embedding: "embedder", reranking: "ranker" };
-    const rebuild = vi.fn(async () => ({ state: "queued", pending: 3, indexed: 4, failed: 0, message: "Rebuild queued", providers }));
-    const client = vault({
-      knowledgeStatus: vi.fn(async () => ({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Notes and questions may be sent to configured providers.", providers, answer_enabled: false, answer_provider: "extractor", service: { state: "ready", pending: 0, indexed: 4, failed: 0, message: "Ready", providers } })),
-      knowledgeConsent: vi.fn(async () => ({ version: 1, vault_id: chosen.vault_identity!, enabled: true, include_existing: false, generation: 1, snapshot_sha256: "", existing_fence: [], dismissed_facts: [] })),
-      knowledgeRebuild: rebuild,
+it("explicitly rebuilds enabled connected knowledge and reports the native result", async () => {
+  const providers = {
+    extraction: "extractor",
+    embedding: "embedder",
+    reranking: "ranker",
+  };
+  const rebuild = vi.fn(async () => ({
+    state: "queued",
+    pending: 3,
+    indexed: 4,
+    failed: 0,
+    message: "Rebuild queued",
+    providers,
+  }));
+  const client = vault({
+    knowledgeStatus: vi.fn(async () => ({
+      enabled: true,
+      include_existing: false,
+      generation: 1,
+      provider_disclosure:
+        "Notes and questions may be sent to configured providers.",
+      providers,
+      answer_enabled: false,
+      answer_provider: "extractor",
+      service: {
+        state: "ready",
+        pending: 0,
+        indexed: 4,
+        failed: 0,
+        message: "Ready",
+        providers,
+      },
+    })),
+    knowledgeConsent: vi.fn(async () => ({
+      version: 1,
+      vault_id: chosen.vault_identity!,
+      enabled: true,
+      include_existing: false,
+      generation: 1,
+      snapshot_sha256: "",
+      existing_fence: [],
+      dismissed_facts: [],
+    })),
+    knowledgeRebuild: rebuild,
+  });
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Settings" }));
+  expect(
+    await screen.findByRole("button", { name: "Rebuild connected knowledge" }),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(
+      /Rebuild reprocesses only notes already allowed by your current consent/,
+    ),
+  ).toBeTruthy();
+  await user.click(
+    screen.getByRole("button", { name: "Rebuild connected knowledge" }),
+  );
+  expect(rebuild).toHaveBeenCalledWith(chosen.vault_id);
+  await screen.findAllByText(/Rebuild queued/);
+});
+
+it("refreshes a processing graph once it finishes indexing without revisiting the view", async () => {
+  const relationship = {
+    id: "fact-1",
+    source_id: memory().id,
+    revision: 1,
+    source_sha256: memory().source_sha256,
+    note_sha256: memory().source_sha256,
+    source_name: "north-lot.png",
+    note_path: memory().note_path,
+    quote: "North lot is the laydown yard.",
+    subject_id: "entity-yard",
+    subject: "North lot",
+    subject_type: "Location",
+    predicate: "WORKS_ON",
+    object_id: "entity-project",
+    object: "East project",
+    object_type: "Project",
+    fact: "North lot works on East project",
+    valid_at: null,
+    invalid_at: null,
+    extracted_at: "2026-08-21T15:04:00Z",
+    inferred: true,
+    uncertainty: "",
+    related_source_ids: [memory().id],
+    supports: [
+      {
+        source_id: memory().id,
+        revision: 1,
+        source_sha256: memory().source_sha256,
+        note_sha256: memory().source_sha256,
+        quote: "North lot is the laydown yard.",
+      },
+    ],
+  };
+  const search = vi
+    .fn()
+    .mockResolvedValueOnce({
+      status: {
+        state: "processing",
+        pending: 1,
+        indexed: 0,
+        failed: 0,
+        message: "Indexing",
+      },
+      relationships: [],
+    })
+    .mockResolvedValue({
+      status: {
+        state: "ready",
+        pending: 0,
+        indexed: 1,
+        failed: 0,
+        message: "Ready",
+      },
+      relationships: [relationship],
     });
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(await screen.findByRole("button", { name: "Settings" }));
-    expect(await screen.findByRole("button", { name: "Rebuild connected knowledge" })).toBeTruthy();
-    expect(screen.getByText(/Rebuild reprocesses only notes already allowed by your current consent/)).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Rebuild connected knowledge" }));
-    expect(rebuild).toHaveBeenCalledWith(chosen.vault_id);
-    await screen.findAllByText(/Rebuild queued/);
+  const user = userEvent.setup();
+  render(
+    <MemorySurface vault={vault({ knowledgeSearch: search }, [memory()])} />,
+  );
+  await user.click(await screen.findByRole("button", { name: "Home" }));
+  await user.click(screen.getByRole("button", { name: "Memories" }));
+  expect(await screen.findByText(/1 pending/)).toBeTruthy();
+  await waitFor(() => expect(search).toHaveBeenCalledTimes(2), {
+    timeout: 5000,
   });
+  expect(
+    await screen.findByRole("button", {
+      name: /North lot Works on East project/,
+    }),
+  ).toBeTruthy();
+  expect(screen.getByText(/1 indexed/)).toBeTruthy();
+});
 
-  it("refreshes a processing graph once it finishes indexing without revisiting the view", async () => {
-    const relationship = {
-      id: "fact-1", source_id: memory().id, revision: 1, source_sha256: memory().source_sha256, note_sha256: memory().source_sha256,
-      source_name: "north-lot.png", note_path: memory().note_path, quote: "North lot is the laydown yard.",
-      subject_id: "entity-yard", subject: "North lot", subject_type: "Location", predicate: "WORKS_ON",
-      object_id: "entity-project", object: "East project", object_type: "Project", fact: "North lot works on East project",
-      valid_at: null, invalid_at: null, extracted_at: "2026-08-21T15:04:00Z", inferred: true, uncertainty: "",
-      related_source_ids: [memory().id], supports: [{ source_id: memory().id, revision: 1, source_sha256: memory().source_sha256, note_sha256: memory().source_sha256, quote: "North lot is the laydown yard." }],
-    };
-    const search = vi.fn()
-      .mockResolvedValueOnce({ status: { state: "processing", pending: 1, indexed: 0, failed: 0, message: "Indexing" }, relationships: [] })
-      .mockResolvedValue({ status: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready" }, relationships: [relationship] });
-    const user = userEvent.setup();
-    render(<MemorySurface vault={vault({ knowledgeSearch: search }, [memory()])} />);
-    await user.click(await screen.findByRole("button", { name: "Home" }));
-    await user.click(screen.getByRole("button", { name: "Memories" }));
-    expect(await screen.findByText(/1 pending/)).toBeTruthy();
-    await waitFor(() => expect(search).toHaveBeenCalledTimes(2), { timeout: 5000 });
-    expect(await screen.findByRole("button", { name: /North lot Works on East project/ })).toBeTruthy();
-    expect(screen.getByText(/1 indexed/)).toBeTruthy();
-  });
-
-  it("discards a late relationship response after switching vaults", async () => {
-    let finish!: (reply: KnowledgeSearchReply) => void;
-    const nextVault = { ...chosen, root: "/other/vault", vault_id: "other-session", vault_identity: "22222222-2222-4222-8222-222222222222" };
-    const client = vault({
+it("discards a late relationship response after switching vaults", async () => {
+  let finish!: (reply: KnowledgeSearchReply) => void;
+  const nextVault = {
+    ...chosen,
+    root: "/other/vault",
+    vault_id: "other-session",
+    vault_identity: "22222222-2222-4222-8222-222222222222",
+  };
+  const client = vault(
+    {
       openDefault: vi.fn(async () => nextVault),
-      knowledgeSearch: vi.fn((_vaultId: string, _query: string) => new Promise<KnowledgeSearchReply>(resolve => { finish = resolve; })),
-    }, [memory()]);
-    const user = userEvent.setup(); render(<MemorySurface vault={client} />);
-    await user.click(await screen.findByRole("button", { name: "Home" }));
-    await user.click(screen.getByRole("button", { name: "Memories" }));
-    await user.click(screen.getByRole("button", { name: "Settings" }));
-    await user.click(screen.getByRole("button", { name: "Use default library" }));
-    await waitFor(() => expect(client.openDefault).toHaveBeenCalled());
-    await act(async () => finish({ status: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Stale response" }, relationships: [] }));
-    expect(screen.queryByText("Stale response")).toBeNull();
-    expect(screen.queryByText("Checking connected knowledge…")).toBeNull();
-  });
+      knowledgeSearch: vi.fn(
+        (_vaultId: string, _query: string) =>
+          new Promise<KnowledgeSearchReply>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    },
+    [memory()],
+  );
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await user.click(await screen.findByRole("button", { name: "Home" }));
+  await user.click(screen.getByRole("button", { name: "Memories" }));
+  await user.click(screen.getByRole("button", { name: "Settings" }));
+  await user.click(screen.getByRole("button", { name: "Use default library" }));
+  await waitFor(() => expect(client.openDefault).toHaveBeenCalled());
+  await act(async () =>
+    finish({
+      status: {
+        state: "ready",
+        pending: 0,
+        indexed: 1,
+        failed: 0,
+        message: "Stale response",
+      },
+      relationships: [],
+    }),
+  );
+  expect(screen.queryByText("Stale response")).toBeNull();
+  expect(screen.queryByText("Checking connected knowledge…")).toBeNull();
+});
 
 it("shows native-verified quotations for text captures with the legacy no-attachment hash", async () => {
-  const source = memory({ source_name: "", source_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", note: "Synthetic utility delivery remains uncertain." });
+  const source = memory({
+    source_name: "",
+    source_sha256:
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    note: "Synthetic utility delivery remains uncertain.",
+  });
   const originalHash = "b".repeat(64);
-  const providers = { extraction: "synthetic-provider", embedding: "local", reranking: "local" };
-  const sources: SourceAnswer = { question: "utility", message: "Source-backed matches.", hits: [{ memory_id: source.id, revision: source.revision, note_basename: "synthetic.md", current_excerpt: source.note, original_excerpt: source.note, source_sha256: originalHash, mime_type: "text/plain" }] };
-  const client = vault({
-    ask: vi.fn(async () => sources),
-    knowledgeStatus: vi.fn(async () => ({ enabled: true, include_existing: false, generation: 1, provider_disclosure: "Synthetic test only", providers, answer_enabled: true, answer_provider: providers.extraction, service: { state: "ready", pending: 0, indexed: 1, failed: 0, message: "Ready", providers } })),
-    memoryAnswer: vi.fn(async () => ({ sources, status: "supported", message: "Synthetic source selection.", selections: [{ source_id: source.id, revision: source.revision, source_sha256: originalHash, note_sha256: "c".repeat(64), quote: source.note }], answer_provider: providers.extraction })),
-  }, [source]);
-  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  const providers = {
+    extraction: "synthetic-provider",
+    embedding: "local",
+    reranking: "local",
+  };
+  const sources: SourceAnswer = {
+    question: "utility",
+    message: "Source-backed matches.",
+    hits: [
+      {
+        memory_id: source.id,
+        revision: source.revision,
+        note_basename: "synthetic.md",
+        current_excerpt: source.note,
+        original_excerpt: source.note,
+        source_sha256: originalHash,
+        mime_type: "text/plain",
+      },
+    ],
+  };
+  const client = vault(
+    {
+      ask: vi.fn(async () => sources),
+      knowledgeStatus: vi.fn(async () => ({
+        enabled: true,
+        include_existing: false,
+        generation: 1,
+        provider_disclosure: "Synthetic test only",
+        providers,
+        answer_enabled: true,
+        answer_provider: providers.extraction,
+        service: {
+          state: "ready",
+          pending: 0,
+          indexed: 1,
+          failed: 0,
+          message: "Ready",
+          providers,
+        },
+      })),
+      memoryAnswer: vi.fn(async () => ({
+        sources,
+        status: "supported",
+        message: "Synthetic source selection.",
+        selections: [
+          {
+            source_id: source.id,
+            revision: source.revision,
+            source_sha256: originalHash,
+            note_sha256: "c".repeat(64),
+            quote: source.note,
+          },
+        ],
+        answer_provider: providers.extraction,
+      })),
+    },
+    [source],
+  );
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
   await waitFor(() => expect(client.list).toHaveBeenCalled());
   await user.click(screen.getByRole("button", { name: "Search" }));
-  await user.type(screen.getByRole("searchbox", { name: "Ask Recall" }), "utility");
+  await user.type(
+    screen.getByRole("searchbox", { name: "Ask Recall" }),
+    "utility",
+  );
   await user.click(screen.getByRole("button", { name: "Ask" }));
-  await user.click(await screen.findByRole("button", { name: "Answer from notes" }));
-  expect(await screen.findByRole("heading", { name: "Selected source quotations" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Inspect supporting note and original" })).toBeTruthy();
+  await user.click(
+    await screen.findByRole("button", { name: "Answer from notes" }),
+  );
+  expect(
+    await screen.findByRole("heading", { name: "Selected source quotations" }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", {
+      name: "Inspect supporting note and original",
+    }),
+  ).toBeTruthy();
 });

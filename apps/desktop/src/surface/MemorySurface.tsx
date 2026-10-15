@@ -24,7 +24,13 @@ import {
   BuildingsIcon,
 } from "@phosphor-icons/react";
 import { KnowledgePanel } from "./KnowledgePanel";
-import type { KnowledgeRelationship, KnowledgeServiceStatus, KnowledgeStatus, MemoryAnswer, AnswerSelection } from "../platform/local-vault";
+import type {
+  KnowledgeRelationship,
+  KnowledgeServiceStatus,
+  KnowledgeStatus,
+  MemoryAnswer,
+  AnswerSelection,
+} from "../platform/local-vault";
 
 import { NoteMarkdown } from "./NoteMarkdown";
 import { vaultContext, noteBody, type SourceRow } from "./vault-context";
@@ -90,12 +96,12 @@ interface Preview {
 
 const RAIL: { id: Section; label: string }[] = [
   { id: "home", label: "Home" },
-  { id: "graph", label: "Graph View" },
-  { id: "recent", label: "Memories" },
+  { id: "ask", label: "Search" },
+  { id: "timeline", label: "Timeline" },
   { id: "people", label: "People" },
   { id: "topics", label: "Topics" },
-  { id: "timeline", label: "Timeline" },
-  { id: "ask", label: "Search" },
+  { id: "recent", label: "Memories" },
+  { id: "graph", label: "Graph View" },
 ];
 
 const MONTHS = [
@@ -282,13 +288,23 @@ export function MemorySurface({
   const [_panel, setPanel] = useState<Panel>("overview");
   const [answer, setAnswer] = useState<KeywordAnswer | null>(null);
   const [sourceAnswer, setSourceAnswer] = useState<SourceAnswer | null>(null);
-  const [quotedAnswer, setQuotedAnswer] = useState<{ vaultId: string; question: string; requestId: string; result: MemoryAnswer } | null>(null);
+  const [quotedAnswer, setQuotedAnswer] = useState<{
+    vaultId: string;
+    question: string;
+    requestId: string;
+    result: MemoryAnswer;
+  } | null>(null);
   const [quotedAnswerBusy, setQuotedAnswerBusy] = useState(false);
-  const [knowledgeStatus, setKnowledgeStatus] = useState<KnowledgeStatus | null>(null);
-  const [knowledgeRows, setKnowledgeRows] = useState<KnowledgeRelationship[]>([]);
-  const [knowledgeResultStatus, setKnowledgeResultStatus] = useState<KnowledgeServiceStatus | null>(null);
+  const [knowledgeStatus, setKnowledgeStatus] =
+    useState<KnowledgeStatus | null>(null);
+  const [knowledgeRows, setKnowledgeRows] = useState<KnowledgeRelationship[]>(
+    [],
+  );
+  const [knowledgeResultStatus, setKnowledgeResultStatus] =
+    useState<KnowledgeServiceStatus | null>(null);
   const [knowledgeConsentChecked, setKnowledgeConsentChecked] = useState(false);
-  const [knowledgeIncludeExisting, setKnowledgeIncludeExisting] = useState(false);
+  const [knowledgeIncludeExisting, setKnowledgeIncludeExisting] =
+    useState(false);
   const [answerConsentChecked, setAnswerConsentChecked] = useState(false);
   const [knowledgeBusy, setKnowledgeBusy] = useState(false);
   const [processingConsent, setProcessingConsent] = useState(false);
@@ -329,7 +345,11 @@ export function MemorySurface({
   const sourceRequest = useRef(0);
   const askRequest = useRef(0);
   const answerRequest = useRef(0);
-  const activeAnswerRequest = useRef<{ vaultId: string; requestId: string; sequence: number } | null>(null);
+  const activeAnswerRequest = useRef<{
+    vaultId: string;
+    requestId: string;
+    sequence: number;
+  } | null>(null);
   const knowledgeRequest = useRef(0);
   const evidenceRef = useRef<string | null>(null);
   const correctionVersion = useRef(0);
@@ -367,18 +387,37 @@ export function MemorySurface({
     setQuotedAnswerBusy(false);
     setQuotedAnswer(null);
     if (!vault.memoryAnswerCancel) {
-      if (explicit && inScope(activeRequest.vaultId)) setNotice("The answer is no longer shown, but native cancellation is unavailable; provider work or charges may remain.");
+      if (explicit && inScope(activeRequest.vaultId))
+        setNotice(
+          "The answer is no longer shown, but native cancellation is unavailable; provider work or charges may remain.",
+        );
       return;
     }
     try {
-      const cancelled = await vault.memoryAnswerCancel(activeRequest.vaultId, activeRequest.requestId);
-      if (explicit && sequence === answerRequest.current && inScope(activeRequest.vaultId)) {
-        setNotice(cancelled
-          ? "The local request was fenced. A provider may still finish work, and any provider charge may remain."
-          : "Cancellation was not confirmed; provider work or charges may remain.");
+      const cancelled = await vault.memoryAnswerCancel(
+        activeRequest.vaultId,
+        activeRequest.requestId,
+      );
+      if (
+        explicit &&
+        sequence === answerRequest.current &&
+        inScope(activeRequest.vaultId)
+      ) {
+        setNotice(
+          cancelled
+            ? "The local request was fenced. A provider may still finish work, and any provider charge may remain."
+            : "Cancellation was not confirmed; provider work or charges may remain.",
+        );
       }
     } catch {
-      if (explicit && sequence === answerRequest.current && inScope(activeRequest.vaultId)) setNotice("Cancellation was not confirmed; provider work or charges may remain.");
+      if (
+        explicit &&
+        sequence === answerRequest.current &&
+        inScope(activeRequest.vaultId)
+      )
+        setNotice(
+          "Cancellation was not confirmed; provider work or charges may remain.",
+        );
     }
   }
   function changeQuestion(value: string) {
@@ -388,13 +427,20 @@ export function MemorySurface({
     }
     setQuery(value);
   }
-  const active = kept.filter(memory => memory.state === "active" && memory.revision > 0 && !memory.conflict);
+  const active = kept.filter(
+    (memory) =>
+      memory.state === "active" && memory.revision > 0 && !memory.conflict,
+  );
   const demo = !vault.available;
 
   useEffect(() => {
     if (!quotedAnswer) return;
-    const stillCurrent = quotedAnswer.vaultId === selected?.vault_id && quotedAnswer.question === query.trim()
-      && quotedAnswer.result.selections.every(selection => active.some(memory => matchesAnswerSelection(memory, selection)));
+    const stillCurrent =
+      quotedAnswer.vaultId === selected?.vault_id &&
+      quotedAnswer.question === query.trim() &&
+      quotedAnswer.result.selections.every((selection) =>
+        active.some((memory) => matchesAnswerSelection(memory, selection)),
+      );
     if (!stillCurrent) setQuotedAnswer(null);
   }, [items, query, quotedAnswer, selected?.vault_id]);
 
@@ -414,7 +460,10 @@ export function MemorySurface({
       if (!vaultId || activeRequest?.vaultId !== vaultId) return;
       activeAnswerRequest.current = null;
       answerRequest.current += 1;
-      if (vault.memoryAnswerCancel) void vault.memoryAnswerCancel(vaultId, activeRequest.requestId).catch(() => undefined);
+      if (vault.memoryAnswerCancel)
+        void vault
+          .memoryAnswerCancel(vaultId, activeRequest.requestId)
+          .catch(() => undefined);
     };
   }, [selected?.vault_id, vault.memoryAnswerCancel]);
 
@@ -472,15 +521,50 @@ export function MemorySurface({
   }, [librarian]);
 
   function openSettings() {
-    settingsTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setVaultSettings(true); setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false); setAnswerConsentChecked(false);
-    if (!selected || !vault.knowledgeStatus) { setKnowledgeStatus(null); return; }
+    settingsTrigger.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setVaultSettings(true);
+    setKnowledgeConsentChecked(false);
+    setKnowledgeIncludeExisting(false);
+    setAnswerConsentChecked(false);
+    if (!selected || !vault.knowledgeStatus) {
+      setKnowledgeStatus(null);
+      return;
+    }
     const vaultId = selected.vault_id;
-    void vault.knowledgeStatus(vaultId).then(next => { if (inScope(vaultId)) setKnowledgeStatus(next); }).catch(() => {
-      if (inScope(vaultId)) setKnowledgeStatus({ enabled: false, include_existing: false, generation: 0, provider_disclosure: "Graph knowledge is unavailable. Keyword search remains available.", providers: null, answer_enabled: false, answer_provider: null, service: { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: "Graph knowledge is unavailable. Keyword search remains available." } });
-    });
+    void vault
+      .knowledgeStatus(vaultId)
+      .then((next) => {
+        if (inScope(vaultId)) setKnowledgeStatus(next);
+      })
+      .catch(() => {
+        if (inScope(vaultId))
+          setKnowledgeStatus({
+            enabled: false,
+            include_existing: false,
+            generation: 0,
+            provider_disclosure:
+              "Graph knowledge is unavailable. Keyword search remains available.",
+            providers: null,
+            answer_enabled: false,
+            answer_provider: null,
+            service: {
+              state: "unavailable",
+              pending: 0,
+              indexed: 0,
+              failed: 0,
+              message:
+                "Graph knowledge is unavailable. Keyword search remains available.",
+            },
+          });
+      });
   }
-  function closeSettings() { setVaultSettings(false); settingsTrigger.current?.focus(); }
+  function closeSettings() {
+    setVaultSettings(false);
+    settingsTrigger.current?.focus();
+  }
   useEffect(() => {
     if (!vaultSettings) return;
     const dialog = document.querySelector<HTMLElement>("[data-vault-dialog]");
@@ -491,10 +575,19 @@ export function MemorySurface({
         settingsTrigger.current?.focus();
       }
       if (event.key === "Tab") {
-        const controls = dialog?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])');
-        const first = controls?.[0], last = controls?.[controls.length - 1];
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-        if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        const controls = dialog?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        );
+        const first = controls?.[0],
+          last = controls?.[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        }
+        if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
       }
     }
     document.addEventListener("keydown", dialogKeys);
@@ -527,7 +620,11 @@ export function MemorySurface({
       requestAnimationFrame(() => askRef.current?.focus());
       return;
     }
-    if (section === "ask") { setBusy(false); void cancelMemoryAnswer(); setQuotedAnswer(null); }
+    if (section === "ask") {
+      setBusy(false);
+      void cancelMemoryAnswer();
+      setQuotedAnswer(null);
+    }
     if (next === "graph") setExploring(true);
     if (next === "home") setExploring(false);
     setSection(next);
@@ -538,114 +635,232 @@ export function MemorySurface({
     setError("");
     setNotice("");
     if (!organizationActive()) setProcessingState("");
-    knowledgeRequest.current += 1; setKnowledgeRows([]); setKnowledgeResultStatus(null); setKnowledgeBusy(false);
+    knowledgeRequest.current += 1;
+    setKnowledgeRows([]);
+    setKnowledgeResultStatus(null);
+    setKnowledgeBusy(false);
     setAnswer(null);
-    setSourceAnswer(null); setQuotedAnswer(null);
+    setSourceAnswer(null);
+    setQuotedAnswer(null);
     setVaultHits(null);
-    if (next === "home" || next === "projects" || next === "organizations") { setPanel("overview"); setDetail(null); }
-    if (next === "topics") { setPanel("topics"); setDetail(null); }
-    if (next === "people" || next === "places" || next === "equipment" || next === "timeline" || next === "recent") setPanel(panelFor(next));
-    if ((next === "timeline" || next === "recent") && !demo) void loadKnowledge("");
+    if (next === "home" || next === "projects" || next === "organizations") {
+      setPanel("overview");
+      setDetail(null);
+    }
+    if (next === "topics") {
+      setPanel("topics");
+      setDetail(null);
+    }
+    if (
+      next === "people" ||
+      next === "places" ||
+      next === "equipment" ||
+      next === "timeline" ||
+      next === "recent"
+    )
+      setPanel(panelFor(next));
+    if ((next === "timeline" || next === "recent") && !demo)
+      void loadKnowledge("");
   }
 
   async function loadKnowledge(queryText: string) {
     if (!selected || !vault.knowledgeSearch) return;
-    const vaultId = selected.vault_id, request = ++knowledgeRequest.current;
-    setKnowledgeBusy(true); setKnowledgeRows([]); setKnowledgeResultStatus(null);
+    const vaultId = selected.vault_id,
+      request = ++knowledgeRequest.current;
+    setKnowledgeBusy(true);
+    setKnowledgeRows([]);
+    setKnowledgeResultStatus(null);
     try {
       const result = await vault.knowledgeSearch(vaultId, queryText);
-      if (inScope(vaultId) && request === knowledgeRequest.current) { setKnowledgeRows(result.relationships); setKnowledgeResultStatus(result.status); }
+      if (inScope(vaultId) && request === knowledgeRequest.current) {
+        setKnowledgeRows(result.relationships);
+        setKnowledgeResultStatus(result.status);
+      }
     } catch (knowledgeError) {
-      if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeResultStatus({ state: "unavailable", pending: 0, indexed: 0, failed: 0, message: message(knowledgeError) });
-    } finally { if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeBusy(false); }
+      if (inScope(vaultId) && request === knowledgeRequest.current)
+        setKnowledgeResultStatus({
+          state: "unavailable",
+          pending: 0,
+          indexed: 0,
+          failed: 0,
+          message: message(knowledgeError),
+        });
+    } finally {
+      if (inScope(vaultId) && request === knowledgeRequest.current)
+        setKnowledgeBusy(false);
+    }
   }
 
   async function loadMemoryKnowledge(memory: VaultMemory) {
     if (!selected || !vault.knowledgeSearch) return;
-    const vaultId = selected.vault_id, request = ++knowledgeRequest.current;
-    setKnowledgeBusy(true); setKnowledgeRows([]); setKnowledgeResultStatus(null);
+    const vaultId = selected.vault_id,
+      request = ++knowledgeRequest.current;
+    setKnowledgeBusy(true);
+    setKnowledgeRows([]);
+    setKnowledgeResultStatus(null);
     try {
       const result = await vault.knowledgeSearch(vaultId, "");
       if (!inScope(vaultId) || request !== knowledgeRequest.current) return;
-      setKnowledgeRows(result.relationships.filter(row => row.source_id === memory.id || row.supports.some(support => support.source_id === memory.id)));
+      setKnowledgeRows(
+        result.relationships.filter(
+          (row) =>
+            row.source_id === memory.id ||
+            row.supports.some((support) => support.source_id === memory.id),
+        ),
+      );
       setKnowledgeResultStatus(result.status);
     } catch (knowledgeError) {
-      if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeResultStatus({ state: "unavailable", pending: 0, indexed: 0, failed: 0, message: message(knowledgeError) });
-    } finally { if (inScope(vaultId) && request === knowledgeRequest.current) setKnowledgeBusy(false); }
+      if (inScope(vaultId) && request === knowledgeRequest.current)
+        setKnowledgeResultStatus({
+          state: "unavailable",
+          pending: 0,
+          indexed: 0,
+          failed: 0,
+          message: message(knowledgeError),
+        });
+    } finally {
+      if (inScope(vaultId) && request === knowledgeRequest.current)
+        setKnowledgeBusy(false);
+    }
   }
 
   async function updateKnowledgeConsent(enabled: boolean) {
     if (!selected || !vault.knowledgeConsent) return;
     const vaultId = selected.vault_id;
-    setKnowledgeBusy(true); setError("");
+    setKnowledgeBusy(true);
+    setError("");
     try {
-      await vault.knowledgeConsent(vaultId, enabled, enabled && knowledgeIncludeExisting);
+      await vault.knowledgeConsent(
+        vaultId,
+        enabled,
+        enabled && knowledgeIncludeExisting,
+      );
       if (!inScope(vaultId)) return;
       const next = await vault.knowledgeStatus?.(vaultId);
       if (inScope(vaultId) && next) setKnowledgeStatus(next);
-      setKnowledgeConsentChecked(false); setKnowledgeIncludeExisting(false);
+      setKnowledgeConsentChecked(false);
+      setKnowledgeIncludeExisting(false);
       setAnswerConsentChecked(false);
-      if (!enabled) { void cancelMemoryAnswer(); setQuotedAnswer(null); }
-      setNotice(enabled ? "Connected knowledge consent saved. Existing notes are included only if you selected them." : "Connected knowledge and quoted answers are disabled locally. Remote removal was requested; in-flight provider work or costs may remain until cancellation is confirmed. Keyword search remains available.");
+      if (!enabled) {
+        void cancelMemoryAnswer();
+        setQuotedAnswer(null);
+      }
+      setNotice(
+        enabled
+          ? "Connected knowledge consent saved. Existing notes are included only if you selected them."
+          : "Connected knowledge and quoted answers are disabled locally. Remote removal was requested; in-flight provider work or costs may remain until cancellation is confirmed. Keyword search remains available.",
+      );
     } catch (knowledgeError) {
       if (!inScope(vaultId)) return;
       const failure = message(knowledgeError);
-      const remoteUnconfirmed = !enabled && failure.toLowerCase().includes("locally disabled");
+      const remoteUnconfirmed =
+        !enabled && failure.toLowerCase().includes("locally disabled");
       if (remoteUnconfirmed) {
         setKnowledgeConsentChecked(false);
-        setAnswerConsentChecked(false); void cancelMemoryAnswer(); setQuotedAnswer(null);
-        setKnowledgeStatus(current => current ? { ...current, enabled: false, include_existing: false, answer_enabled: false, service: { ...current.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } } : current);
+        setAnswerConsentChecked(false);
+        void cancelMemoryAnswer();
+        setQuotedAnswer(null);
+        setKnowledgeStatus((current) =>
+          current
+            ? {
+                ...current,
+                enabled: false,
+                include_existing: false,
+                answer_enabled: false,
+                service: {
+                  ...current.service,
+                  state: "unavailable",
+                  message: "Locally disabled; remote purge is unconfirmed.",
+                },
+              }
+            : current,
+        );
       }
       // Reload native state even on rejection: a revocation error can mean the
       // durable local fence committed while loopback cancellation did not.
       try {
         const next = await vault.knowledgeStatus?.(vaultId);
-        if (inScope(vaultId) && next) setKnowledgeStatus(remoteUnconfirmed
-          ? { ...next, enabled: false, include_existing: false, answer_enabled: false, service: { ...next.service, state: "unavailable", message: "Locally disabled; remote purge is unconfirmed." } }
-          : next);
-      } catch { /* retain the explicit disabled-but-unconfirmed state above */ }
-      if (inScope(vaultId)) setError(remoteUnconfirmed ? "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects." : failure);
+        if (inScope(vaultId) && next)
+          setKnowledgeStatus(
+            remoteUnconfirmed
+              ? {
+                  ...next,
+                  enabled: false,
+                  include_existing: false,
+                  answer_enabled: false,
+                  service: {
+                    ...next.service,
+                    state: "unavailable",
+                    message: "Locally disabled; remote purge is unconfirmed.",
+                  },
+                }
+              : next,
+          );
+      } catch {
+        /* retain the explicit disabled-but-unconfirmed state above */
+      }
+      if (inScope(vaultId))
+        setError(
+          remoteUnconfirmed
+            ? "Connected knowledge is locally disabled; remote purge is unconfirmed and will retry when the service reconnects."
+            : failure,
+        );
+    } finally {
+      if (inScope(vaultId)) setKnowledgeBusy(false);
     }
-    finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
   }
 
   async function updateAnswerConsent(enabled: boolean) {
     if (!selected || !vault.knowledgeAnswerConsent) return;
     const vaultId = selected.vault_id;
-    setKnowledgeBusy(true); setError("");
+    setKnowledgeBusy(true);
+    setError("");
     try {
       await vault.knowledgeAnswerConsent(vaultId, enabled);
       if (!inScope(vaultId)) return;
-      if (!enabled) { void cancelMemoryAnswer(); setQuotedAnswer(null); }
+      if (!enabled) {
+        void cancelMemoryAnswer();
+        setQuotedAnswer(null);
+      }
       const next = await vault.knowledgeStatus?.(vaultId);
       if (!inScope(vaultId)) return;
       if (next) setKnowledgeStatus(next);
       setAnswerConsentChecked(false);
-      setNotice(enabled
-        ? `Quoted-answer consent saved for ${next?.answer_provider ?? "the configured answer provider"}. Each answer still requires your separate action.`
-        : "Quoted answers are disabled locally. In-flight provider work or costs may remain until cancellation is confirmed.");
+      setNotice(
+        enabled
+          ? `Quoted-answer consent saved for ${next?.answer_provider ?? "the configured answer provider"}. Each answer still requires your separate action.`
+          : "Quoted answers are disabled locally. In-flight provider work or costs may remain until cancellation is confirmed.",
+      );
     } catch (consentError) {
       if (inScope(vaultId)) setError(message(consentError));
-    } finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
+    } finally {
+      if (inScope(vaultId)) setKnowledgeBusy(false);
+    }
   }
 
   async function rebuildKnowledge() {
     if (!selected || !vault.knowledgeRebuild) return;
     const vaultId = selected.vault_id;
-    setKnowledgeBusy(true); setError("");
+    setKnowledgeBusy(true);
+    setError("");
     try {
       const service = await vault.knowledgeRebuild(vaultId);
       if (!inScope(vaultId)) return;
-      setKnowledgeStatus(current => current ? { ...current, service } : current);
+      setKnowledgeStatus((current) =>
+        current ? { ...current, service } : current,
+      );
       setKnowledgeResultStatus(service);
       setNotice(service.message);
     } catch (rebuildError) {
       if (inScope(vaultId)) setError(message(rebuildError));
-    } finally { if (inScope(vaultId)) setKnowledgeBusy(false); }
+    } finally {
+      if (inScope(vaultId)) setKnowledgeBusy(false);
+    }
   }
 
   async function dismissKnowledge(factId: string) {
-    if (!selected || !vault.knowledgeDismiss) throw new Error("Connected knowledge dismissal is unavailable.");
+    if (!selected || !vault.knowledgeDismiss)
+      throw new Error("Connected knowledge dismissal is unavailable.");
     const vaultId = selected.vault_id;
     try {
       await vault.knowledgeDismiss(vaultId, factId);
@@ -669,10 +884,22 @@ export function MemorySurface({
               ? await vault.create?.()
               : await vault.openDefault();
       if (!alive.current) return;
-      if (!next) { setNotice("Folder choice cancelled. Nothing was written."); return; }
-      clearPreview(); evidenceRef.current = null; askRequest.current += 1;
-      setSourceAnswer(null); setProcessingState(""); setProcessingConsent(false); setReviewRetryAcknowledged(false);
-      knowledgeRequest.current += 1; setKnowledgeStatus(null); setKnowledgeRows([]); setKnowledgeResultStatus(null); setKnowledgeBusy(false);
+      if (!next) {
+        setNotice("Folder choice cancelled. Nothing was written.");
+        return;
+      }
+      clearPreview();
+      evidenceRef.current = null;
+      askRequest.current += 1;
+      setSourceAnswer(null);
+      setProcessingState("");
+      setProcessingConsent(false);
+      setReviewRetryAcknowledged(false);
+      knowledgeRequest.current += 1;
+      setKnowledgeStatus(null);
+      setKnowledgeRows([]);
+      setKnowledgeResultStatus(null);
+      setKnowledgeBusy(false);
       sourceRequest.current += 1;
       setPending(null);
       setDraft("");
@@ -721,7 +948,8 @@ export function MemorySurface({
 
   async function ask(event: { preventDefault(): void }) {
     event.preventDefault();
-    void cancelMemoryAnswer(); setQuotedAnswer(null);
+    void cancelMemoryAnswer();
+    setQuotedAnswer(null);
     const request = ++askRequest.current;
     evidenceRef.current = null;
     sourceRequest.current += 1;
@@ -743,11 +971,19 @@ export function MemorySurface({
     try {
       if (vault.ask) {
         const response = await vault.ask(selected.vault_id, query);
-        if (!inScope(selected.vault_id) || request !== askRequest.current) return;
-        setSourceAnswer(response); setVaultHits(null); setAnswer(null);
-        if (vault.knowledgeStatus) void vault.knowledgeStatus(selected.vault_id).then(next => {
-          if (inScope(selected.vault_id) && request === askRequest.current) setKnowledgeStatus(next);
-        }).catch(() => undefined);
+        if (!inScope(selected.vault_id) || request !== askRequest.current)
+          return;
+        setSourceAnswer(response);
+        setVaultHits(null);
+        setAnswer(null);
+        if (vault.knowledgeStatus)
+          void vault
+            .knowledgeStatus(selected.vault_id)
+            .then((next) => {
+              if (inScope(selected.vault_id) && request === askRequest.current)
+                setKnowledgeStatus(next);
+            })
+            .catch(() => undefined);
         return;
       }
       const hits = await vault.list(selected.vault_id, query);
@@ -764,26 +1000,60 @@ export function MemorySurface({
   }
 
   async function answerFromNotes() {
-    if (!selected || demo || !query.trim() || !vault.memoryAnswer || !knowledgeStatus?.answer_enabled || !knowledgeStatus.answer_provider) return;
+    if (
+      !selected ||
+      demo ||
+      !query.trim() ||
+      !vault.memoryAnswer ||
+      !knowledgeStatus?.answer_enabled ||
+      !knowledgeStatus.answer_provider
+    )
+      return;
     if (activeAnswerRequest.current) return;
     const requestId = globalThis.crypto?.randomUUID?.();
-    if (!requestId) { setError("This device cannot create an answer request id. Nothing was sent."); return; }
-    const vaultId = selected.vault_id, question = query.trim(), sequence = ++answerRequest.current;
+    if (!requestId) {
+      setError(
+        "This device cannot create an answer request id. Nothing was sent.",
+      );
+      return;
+    }
+    const vaultId = selected.vault_id,
+      question = query.trim(),
+      sequence = ++answerRequest.current;
     activeAnswerRequest.current = { vaultId, requestId, sequence };
-    setQuotedAnswer(null); setQuotedAnswerBusy(true); setError(""); setNotice("");
+    setQuotedAnswer(null);
+    setQuotedAnswerBusy(true);
+    setError("");
+    setNotice("");
     try {
       const response = await vault.memoryAnswer(vaultId, question, requestId);
-      if (!inScope(vaultId) || answerRequest.current !== sequence || activeAnswerRequest.current?.requestId !== requestId) return;
+      if (
+        !inScope(vaultId) ||
+        answerRequest.current !== sequence ||
+        activeAnswerRequest.current?.requestId !== requestId
+      )
+        return;
       const currentProvider = knowledgeStatus.answer_provider;
-      const selectionsAreCurrent = response.selections.every(selection => active.some(memory =>
-        matchesAnswerSelection(memory, selection)));
-      const providerChanged = response.status === "supported" && response.answer_provider !== currentProvider;
-      const result = !selectionsAreCurrent || providerChanged
-        ? { ...response, status: "stale", message: "A source or approved provider changed while answering. No quotations are shown; run Ask again after reviewing Settings.", selections: [] }
-        : response;
+      const selectionsAreCurrent = response.selections.every((selection) =>
+        active.some((memory) => matchesAnswerSelection(memory, selection)),
+      );
+      const providerChanged =
+        response.status === "supported" &&
+        response.answer_provider !== currentProvider;
+      const result =
+        !selectionsAreCurrent || providerChanged
+          ? {
+              ...response,
+              status: "stale",
+              message:
+                "A source or approved provider changed while answering. No quotations are shown; run Ask again after reviewing Settings.",
+              selections: [],
+            }
+          : response;
       setQuotedAnswer({ vaultId, question, requestId, result });
     } catch (answerError) {
-      if (inScope(vaultId) && answerRequest.current === sequence) setError(message(answerError));
+      if (inScope(vaultId) && answerRequest.current === sequence)
+        setError(message(answerError));
     } finally {
       if (activeAnswerRequest.current?.requestId === requestId) {
         activeAnswerRequest.current = null;
@@ -1462,40 +1732,89 @@ export function MemorySurface({
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
   });
-  const activeKnowledgeKey = selected && vault.knowledgeSearch
-    ? section === "ask" && sourceAnswer?.knowledge_status ? `ask:${selected.vault_identity}:${sourceAnswer.question}`
-      : section === "evidence" && evidenceMemory ? `evidence:${selected.vault_identity}:${evidenceMemory.id}`
-        : (section === "recent" || section === "timeline") ? `${section}:${selected.vault_identity}` : null
-    : null;
-  const activeKnowledgeStatus = section === "ask" ? sourceAnswer?.knowledge_status : knowledgeResultStatus;
-  const knowledgePollable = Boolean(activeKnowledgeStatus && activeKnowledgeStatus.pending > 0 && activeKnowledgeStatus.failed === 0
-    && !["failed", "error", "unavailable", "disabled"].includes(activeKnowledgeStatus.state.toLowerCase()));
+  const activeKnowledgeKey =
+    selected && vault.knowledgeSearch
+      ? section === "ask" && sourceAnswer?.knowledge_status
+        ? `ask:${selected.vault_identity}:${sourceAnswer.question}`
+        : section === "evidence" && evidenceMemory
+          ? `evidence:${selected.vault_identity}:${evidenceMemory.id}`
+          : section === "recent" || section === "timeline"
+            ? `${section}:${selected.vault_identity}`
+            : null
+      : null;
+  const activeKnowledgeStatus =
+    section === "ask" ? sourceAnswer?.knowledge_status : knowledgeResultStatus;
+  const knowledgePollable = Boolean(
+    activeKnowledgeStatus &&
+    activeKnowledgeStatus.pending > 0 &&
+    activeKnowledgeStatus.failed === 0 &&
+    !["failed", "error", "unavailable", "disabled"].includes(
+      activeKnowledgeStatus.state.toLowerCase(),
+    ),
+  );
   const activeKnowledgeRef = useRef<string | null>(null);
   activeKnowledgeRef.current = activeKnowledgeKey;
   useEffect(() => {
-    if (!activeKnowledgeKey || !selected || !vault.knowledgeSearch || !knowledgePollable || !activeKnowledgeStatus) return;
+    if (
+      !activeKnowledgeKey ||
+      !selected ||
+      !vault.knowledgeSearch ||
+      !knowledgePollable ||
+      !activeKnowledgeStatus
+    )
+      return;
     let cancelled = false;
     let timer: number | undefined;
     const vaultId = selected.vault_id;
     const viewKey = activeKnowledgeKey;
-    const queryText = section === "ask" ? sourceAnswer?.question ?? "" : "";
+    const queryText = section === "ask" ? (sourceAnswer?.question ?? "") : "";
     const startedAt = Date.now();
-    const current = () => !cancelled && inScope(vaultId) && activeKnowledgeRef.current === viewKey;
-    const publish = (service: KnowledgeServiceStatus, relationships: KnowledgeRelationship[]) => {
+    const current = () =>
+      !cancelled && inScope(vaultId) && activeKnowledgeRef.current === viewKey;
+    const publish = (
+      service: KnowledgeServiceStatus,
+      relationships: KnowledgeRelationship[],
+    ) => {
       if (!current()) return;
-      if (section === "ask") setSourceAnswer(value => value?.question === queryText ? { ...value, knowledge_status: service, graph_relationships: relationships } : value);
+      if (section === "ask")
+        setSourceAnswer((value) =>
+          value?.question === queryText
+            ? {
+                ...value,
+                knowledge_status: service,
+                graph_relationships: relationships,
+              }
+            : value,
+        );
       else {
-        const relevant = section === "evidence" && evidenceMemory
-          ? relationships.filter(row => row.source_id === evidenceMemory.id || row.supports.some(support => support.source_id === evidenceMemory.id))
-          : relationships;
-        setKnowledgeRows(relevant); setKnowledgeResultStatus(service);
+        const relevant =
+          section === "evidence" && evidenceMemory
+            ? relationships.filter(
+                (row) =>
+                  row.source_id === evidenceMemory.id ||
+                  row.supports.some(
+                    (support) => support.source_id === evidenceMemory.id,
+                  ),
+              )
+            : relationships;
+        setKnowledgeRows(relevant);
+        setKnowledgeResultStatus(service);
       }
     };
     const poll = async () => {
       if (!current()) return;
       if (Date.now() - startedAt >= 60_000) {
-        const timeoutStatus = { ...activeKnowledgeStatus, message: "Indexing is still pending. Reopen this view later to check its status." };
-        publish(timeoutStatus, section === "ask" ? sourceAnswer?.graph_relationships ?? [] : knowledgeRows);
+        const timeoutStatus = {
+          ...activeKnowledgeStatus,
+          message:
+            "Indexing is still pending. Reopen this view later to check its status.",
+        };
+        publish(
+          timeoutStatus,
+          section === "ask"
+            ? (sourceAnswer?.graph_relationships ?? [])
+            : knowledgeRows,
+        );
         return;
       }
       try {
@@ -1503,53 +1822,134 @@ export function MemorySurface({
         if (!current()) return;
         publish(result.status, result.relationships);
         const next = result.status;
-        const canContinue = next.pending > 0 && next.failed === 0 && !["failed", "error", "unavailable", "disabled"].includes(next.state.toLowerCase());
-        if (canContinue && Date.now() - startedAt < 60_000) timer = window.setTimeout(() => void poll(), 2_000);
+        const canContinue =
+          next.pending > 0 &&
+          next.failed === 0 &&
+          !["failed", "error", "unavailable", "disabled"].includes(
+            next.state.toLowerCase(),
+          );
+        if (canContinue && Date.now() - startedAt < 60_000)
+          timer = window.setTimeout(() => void poll(), 2_000);
       } catch (pollError) {
-        const unavailable: KnowledgeServiceStatus = { state: "unavailable", pending: 0, indexed: 0, failed: 0, message: message(pollError) };
+        const unavailable: KnowledgeServiceStatus = {
+          state: "unavailable",
+          pending: 0,
+          indexed: 0,
+          failed: 0,
+          message: message(pollError),
+        };
         publish(unavailable, []);
       }
     };
     timer = window.setTimeout(() => void poll(), 2_000);
-    return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };
-  }, [activeKnowledgeKey, activeKnowledgeStatus?.pending, activeKnowledgeStatus?.failed, activeKnowledgeStatus?.state, knowledgePollable, section, sourceAnswer?.question, selected?.vault_id, vault.knowledgeSearch]);
-  const currentQuotedAnswer = quotedAnswer && selected?.vault_id === quotedAnswer.vaultId && query.trim() === quotedAnswer.question
-    && quotedAnswer.result.selections.every(selection => active.some(memory => matchesAnswerSelection(memory, selection)))
-    ? quotedAnswer.result : null;
-  const quotedAnswerPanel = selected && !demo && query.trim() && vault.memoryAnswer ? <section className="ms-knowledge-settings" aria-label="Quoted answer from notes">
-    <h2>Quoted answer from notes</h2>
-    {knowledgeStatus?.answer_enabled && knowledgeStatus.answer_provider
-      ? <><p className="ms-fine">Each request sends this question and the selected current note excerpts to {knowledgeStatus.answer_provider}. Recall shows exact source quotations, not a verified synthesized answer.</p>
-        {!quotedAnswerBusy && <button type="button" onClick={() => void answerFromNotes()}>Answer from notes</button>}</>
-      : <p role="status">Quoted answers are off. Review Settings to separately approve a configured answer provider; keyword search remains available.</p>}
-    {quotedAnswerBusy && <><p role="status">Selecting exact source quotations…</p><button type="button" onClick={() => void cancelMemoryAnswer(true)}>Cancel answer</button></>}
-    {currentQuotedAnswer && <article className="ms-hit" aria-label="Quoted answer result"><h3>{currentQuotedAnswer.status === "supported" ? "Selected source quotations" : "No supported quoted answer"}</h3><p>{currentQuotedAnswer.message}</p>{currentQuotedAnswer.answer_provider && <small>Provider: {currentQuotedAnswer.answer_provider}</small>}{currentQuotedAnswer.selections.map(selection => {
-      const memory = active.find(row => matchesAnswerSelection(row, selection));
-      return <div key={`${selection.source_id}:${selection.revision}:${selection.source_sha256}`}><blockquote>{selection.quote}</blockquote>{memory && <><p>{titleOf(memory)} · revision {selection.revision}</p><button type="button" onClick={() => void openVaultMemory(memory)}>Inspect supporting note and original</button></>}</div>;
-    })}</article>}
-  </section> : null;
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [
+    activeKnowledgeKey,
+    activeKnowledgeStatus?.pending,
+    activeKnowledgeStatus?.failed,
+    activeKnowledgeStatus?.state,
+    knowledgePollable,
+    section,
+    sourceAnswer?.question,
+    selected?.vault_id,
+    vault.knowledgeSearch,
+  ]);
+  const currentQuotedAnswer =
+    quotedAnswer &&
+    selected?.vault_id === quotedAnswer.vaultId &&
+    query.trim() === quotedAnswer.question &&
+    quotedAnswer.result.selections.every((selection) =>
+      active.some((memory) => matchesAnswerSelection(memory, selection)),
+    )
+      ? quotedAnswer.result
+      : null;
+  const quotedAnswerPanel =
+    selected && !demo && query.trim() && vault.memoryAnswer ? (
+      <section
+        className="ms-knowledge-settings"
+        aria-label="Quoted answer from notes"
+      >
+        <h2>Quoted answer from notes</h2>
+        {knowledgeStatus?.answer_enabled && knowledgeStatus.answer_provider ? (
+          <>
+            <p className="ms-fine">
+              Each request sends this question and the selected current note
+              excerpts to {knowledgeStatus.answer_provider}. Recall shows exact
+              source quotations, not a verified synthesized answer.
+            </p>
+            {!quotedAnswerBusy && (
+              <button type="button" onClick={() => void answerFromNotes()}>
+                Answer from notes
+              </button>
+            )}
+          </>
+        ) : (
+          <p role="status">
+            Quoted answers are off. Review Settings to separately approve a
+            configured answer provider; keyword search remains available.
+          </p>
+        )}
+        {quotedAnswerBusy && (
+          <>
+            <p role="status">Selecting exact source quotations…</p>
+            <button type="button" onClick={() => void cancelMemoryAnswer(true)}>
+              Cancel answer
+            </button>
+          </>
+        )}
+        {currentQuotedAnswer && (
+          <article className="ms-hit" aria-label="Quoted answer result">
+            <h3>
+              {currentQuotedAnswer.status === "supported"
+                ? "Selected source quotations"
+                : "No supported quoted answer"}
+            </h3>
+            <p>{currentQuotedAnswer.message}</p>
+            {currentQuotedAnswer.answer_provider && (
+              <small>Provider: {currentQuotedAnswer.answer_provider}</small>
+            )}
+            {currentQuotedAnswer.selections.map((selection) => {
+              const memory = active.find((row) =>
+                matchesAnswerSelection(row, selection),
+              );
+              return (
+                <div
+                  key={`${selection.source_id}:${selection.revision}:${selection.source_sha256}`}
+                >
+                  <blockquote>{selection.quote}</blockquote>
+                  {memory && (
+                    <>
+                      <p>
+                        {titleOf(memory)} · revision {selection.revision}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void openVaultMemory(memory)}
+                      >
+                        Inspect supporting note and original
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </article>
+        )}
+      </section>
+    ) : null;
   return (
     <div
       className="ms adaptive"
       data-mode={demo ? "unavailable" : "vault"}
       data-inspector={inspector}
     >
-      <AdaptiveGraph
-        key={selected?.vault_identity ?? "no-vault"}
-        memories={visibleMemories}
-        explore={exploring || section === "evidence"}
-        selected={evidenceId}
-        highlights={
-          sourceAnswer?.hits.map((h) => h.memory_id) ??
-          vaultHits?.map((m) => m.id) ??
-          []
-        }
-        onSelect={(memory) => void openVaultMemory(memory)}
-      />
       <aside className="ms-rail" aria-label="Recall">
         <div className="ms-brand">
-          <span className="ms-brand-logo" aria-hidden="true" />
-          <span className="ms-mark">Recall</span>
+          <img className="ms-brand-logo" src="/brand/orbital-mark.svg" alt="" />
+          <span className="ms-mark">recall</span>
         </div>
         <nav className="ms-nav" aria-label="Memory">
           {RAIL.map((item) => (
@@ -1574,27 +1974,34 @@ export function MemorySurface({
       </aside>
       <main className="ms-stage">
         <div className="ms-ui">
-          {checking && (
-            <p className="ms-notice" role="status">
-              Checking this device…
-            </p>
+          {(checking ||
+            error ||
+            notice ||
+            (processingState && section !== "evidence")) && (
+            <div className="ms-notices" aria-label="Library status">
+              {checking && (
+                <p className="ms-notice" role="status">
+                  Checking this device…
+                </p>
+              )}
+              {error && (
+                <p className="ms-error" role="alert">
+                  {error}
+                </p>
+              )}
+              {notice && (
+                <p className="ms-notice" role="status">
+                  {notice}
+                </p>
+              )}
+              {processingState && section !== "evidence" && (
+                <p className="ms-notice" role="status">
+                  {processingState}
+                </p>
+              )}
+            </div>
           )}
-          {error && (
-            <p className="ms-error" role="alert">
-              {error}
-            </p>
-          )}
-          {notice && (
-            <p className="ms-notice" role="status">
-              {notice}
-            </p>
-          )}
-          {processingState && section !== "evidence" && (
-            <p className="ms-notice" role="status">
-              {processingState}
-            </p>
-          )}
-          {(section === "ask" || exploring) && (
+          {
             <form
               className="ms-ask"
               role="search"
@@ -1609,18 +2016,133 @@ export function MemorySurface({
                 ref={askRef}
                 type="search"
                 value={query}
-                placeholder="Ask Recall anything…"
+                placeholder="Search your memories…"
                 onChange={(e) => changeQuestion(e.target.value)}
               />
               <button type="submit" disabled={busy} aria-label="Ask">
                 <ArrowRightIcon />
               </button>
             </form>
+          }
+          <div className="ms-greeting">
+            <img src="/brand/orbital-mark.svg" alt="" />
+            <span>
+              Your private memory.<small>A more human tomorrow.</small>
+            </span>
+          </div>
+          <section className="ms-memory-field" aria-label="Your memory field">
+            <header className="ms-field-header">
+              <div>
+                <p className="ms-kicker">YOUR MEMORY FIELD</p>
+                <h1>
+                  {kept.length
+                    ? "Everything is connected."
+                    : "Your memories belong here."}
+                </h1>
+                <p>People, places, and moments. Remembered together.</p>
+              </div>
+              <div className="ms-view-switch" aria-label="Memory views">
+                <button
+                  aria-pressed={section !== "timeline" && section !== "recent"}
+                  onClick={() => go("graph")}
+                >
+                  Map
+                </button>
+                <button
+                  aria-label="Timeline view"
+                  aria-pressed={section === "timeline"}
+                  onClick={() => go("timeline")}
+                >
+                  Timeline
+                </button>
+                <button
+                  aria-pressed={section === "recent"}
+                  onClick={() => go("recent")}
+                >
+                  List
+                </button>
+              </div>
+            </header>
+            <AdaptiveGraph
+              key={selected?.vault_identity ?? "no-vault"}
+              memories={visibleMemories}
+              explore={exploring || section === "evidence"}
+              selected={evidenceId}
+              highlights={
+                sourceAnswer?.hits.map((h) => h.memory_id) ??
+                vaultHits?.map((m) => m.id) ??
+                []
+              }
+              onSelect={(memory) => void openVaultMemory(memory)}
+            />
+            {kept.length === 0 && (
+              <div className="ms-field-empty">
+                <h2>A little space for what matters.</h2>
+                <p>
+                  Capture a thought, a page, a moment.
+                  <br />
+                  Your memory field will grow from what you save.
+                </p>
+              </div>
+            )}
+            <div className="ms-field-caption">
+              <span>
+                {kept.length} {kept.length === 1 ? "memory" : "memories"} in
+                your library
+              </span>
+              <span>
+                SOME THINGS
+                <br />
+                BELONG TOGETHER
+              </span>
+            </div>
+          </section>
+          {!inspector && (
+            <aside className="ms-context" aria-label="Library context">
+              <p className="ms-kicker">YOUR LIBRARY</p>
+              <h2>
+                {kept.length
+                  ? "A place for what you know."
+                  : "Make room for a memory."}
+              </h2>
+              <p>
+                {kept.length
+                  ? "Every connection begins with something you saved. Open a memory to see its original source."
+                  : "Small moments, remembered today. Start with a note or an original page."}
+              </p>
+              <dl className="ms-library-counts">
+                <div>
+                  <dt>Memories</dt>
+                  <dd>{kept.length}</dd>
+                </div>
+                <div>
+                  <dt>People mentioned</dt>
+                  <dd>{vaultContext(active).people.length}</dd>
+                </div>
+                <div>
+                  <dt>Places mentioned</dt>
+                  <dd>{vaultContext(active).places.length}</dd>
+                </div>
+              </dl>
+              <div className="ms-context-note">
+                <span className="ms-copper-rule" />
+                <h3>Yours to keep.</h3>
+                <p>
+                  Originals stay in your Recall library. You can inspect,
+                  correct, and take them with you.
+                </p>
+              </div>
+              <button onClick={openSettings}>
+                {selected ? "Library settings" : "Create or open your library"}
+              </button>
+            </aside>
           )}
-          {!exploring && section !== "ask" && section !== "evidence" && (
+          {
             <section className="capture-center" aria-label="Capture actions">
-              <h1>Capture</h1>
-              <p>Turn moments into lasting memory.</p>
+              <div className="ms-capture-heading">
+                <h2>Keep a moment.</h2>
+                <p>There’s no need to file it first.</p>
+              </div>
               <div className="capture-bubbles">
                 <button
                   type="button"
@@ -1674,7 +2196,7 @@ export function MemorySurface({
                 </button>
               )}
             </section>
-          )}
+          }
           {inspector && (
             <aside
               className="adaptive-inspector glass"
@@ -1878,8 +2400,18 @@ export function MemorySurface({
                             : hit.note_basename}
                         </h2>
                         {hit.match_reason && <p>{hit.match_reason}</p>}
-                        <p>Current note · revision {hit.revision}{hit.human_corrected ? " · Includes user corrections; the original below is unchanged." : ""}</p>
-                        {hit.captured_at && <small>Captured {hit.captured_at} · Note revised {hit.updated_at}</small>}
+                        <p>
+                          Current note · revision {hit.revision}
+                          {hit.human_corrected
+                            ? " · Includes user corrections; the original below is unchanged."
+                            : ""}
+                        </p>
+                        {hit.captured_at && (
+                          <small>
+                            Captured {hit.captured_at} · Note revised{" "}
+                            {hit.updated_at}
+                          </small>
+                        )}
                         <NoteMarkdown>
                           {noteBody({
                             id: hit.memory_id,
@@ -1888,9 +2420,13 @@ export function MemorySurface({
                         </NoteMarkdown>
                         <h2>Original evidence</h2>
                         <p>{hit.original_excerpt}</p>
-                        {hit.original_start_byte != null && hit.original_end_byte != null && (
-                          <small>Original excerpt: bytes {hit.original_start_byte}–{hit.original_end_byte}</small>
-                        )}
+                        {hit.original_start_byte != null &&
+                          hit.original_end_byte != null && (
+                            <small>
+                              Original excerpt: bytes {hit.original_start_byte}–
+                              {hit.original_end_byte}
+                            </small>
+                          )}
                         <small>SHA-256: {hit.source_sha256}</small>
                         <button
                           onClick={() => {
@@ -1954,9 +2490,38 @@ export function MemorySurface({
                   )}
                 </section>
               )}
-              {section === "ask" && sourceAnswer?.knowledge_status && <KnowledgePanel key={`${selected?.vault_identity}:ask:${sourceAnswer.question}`} relationships={sourceAnswer.graph_relationships ?? []} status={sourceAnswer.knowledge_status} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
+              {section === "ask" && sourceAnswer?.knowledge_status && (
+                <KnowledgePanel
+                  key={`${selected?.vault_identity}:ask:${sourceAnswer.question}`}
+                  relationships={sourceAnswer.graph_relationships ?? []}
+                  status={sourceAnswer.knowledge_status}
+                  memories={active}
+                  onInspect={(memory) => void openVaultMemory(memory)}
+                  onCorrect={(memory) => void openVaultMemory(memory)}
+                  onDismiss={
+                    vault.knowledgeDismiss
+                      ? (id) => dismissKnowledge(id)
+                      : undefined
+                  }
+                />
+              )}
               {section === "ask" && quotedAnswerPanel}
-              {(section === "evidence" || section === "recent") && vault.knowledgeSearch && <KnowledgePanel key={`${selected?.vault_identity}:${section}:${evidenceMemory?.id ?? "all"}`} relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} />}
+              {(section === "evidence" || section === "recent") &&
+                vault.knowledgeSearch && (
+                  <KnowledgePanel
+                    key={`${selected?.vault_identity}:${section}:${evidenceMemory?.id ?? "all"}`}
+                    relationships={knowledgeRows}
+                    status={knowledgeResultStatus}
+                    memories={active}
+                    onInspect={(memory) => void openVaultMemory(memory)}
+                    onCorrect={(memory) => void openVaultMemory(memory)}
+                    onDismiss={
+                      vault.knowledgeDismiss
+                        ? (id) => dismissKnowledge(id)
+                        : undefined
+                    }
+                  />
+                )}
             </aside>
           )}
           {section === "timeline" && (
@@ -1991,7 +2556,24 @@ export function MemorySurface({
               ))}
             </section>
           )}
-          {section === "timeline" && vault.knowledgeSearch && <div className="adaptive-timeline glass"><KnowledgePanel key={`${selected?.vault_identity}:timeline`} temporalOnly relationships={knowledgeRows} status={knowledgeResultStatus} memories={active} onInspect={memory => void openVaultMemory(memory)} onCorrect={memory => void openVaultMemory(memory)} onDismiss={vault.knowledgeDismiss ? id => dismissKnowledge(id) : undefined} /></div>}
+          {section === "timeline" && vault.knowledgeSearch && (
+            <div className="adaptive-timeline glass">
+              <KnowledgePanel
+                key={`${selected?.vault_identity}:timeline`}
+                temporalOnly
+                relationships={knowledgeRows}
+                status={knowledgeResultStatus}
+                memories={active}
+                onInspect={(memory) => void openVaultMemory(memory)}
+                onCorrect={(memory) => void openVaultMemory(memory)}
+                onDismiss={
+                  vault.knowledgeDismiss
+                    ? (id) => dismissKnowledge(id)
+                    : undefined
+                }
+              />
+            </div>
+          )}
           {vaultSettings && (
             <div className="ms-modal-backdrop" onClick={closeSettings}>
               <div
@@ -2096,19 +2678,202 @@ export function MemorySurface({
                     ))}
                   </section>
                 )}
-            {selected && vault.knowledgeStatus && vault.knowledgeConsent && <section className="ms-knowledge-settings" aria-label="Connected knowledge settings"><h3>Connected knowledge</h3>{knowledgeStatus ? <><p>{knowledgeStatus.provider_disclosure}</p><p role="status">{knowledgeStatus.enabled ? "Enabled" : "Disabled"} · {knowledgeStatus.service.message} {knowledgeStatus.service.pending ? `${knowledgeStatus.service.pending} pending.` : ""}</p>{knowledgeStatus.providers && <p>Configured providers: extraction {knowledgeStatus.providers.extraction}; embeddings {knowledgeStatus.providers.embedding}; reranking {knowledgeStatus.providers.reranking}.</p>}{!knowledgeStatus.enabled && <><label className="ms-check"><input type="checkbox" checked={knowledgeConsentChecked} onChange={event => setKnowledgeConsentChecked(event.target.checked)} /> I understand that graph processing may send notes and Ask questions to the configured providers above.</label><label className="ms-check"><input type="checkbox" checked={knowledgeIncludeExisting} onChange={event => setKnowledgeIncludeExisting(event.target.checked)} /> Also process existing notes (optional; off by default).</label></>}
-              {!knowledgeStatus.enabled && !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim()) && <p role="status">Providers are unavailable or not configured. Keyword search still works; connected knowledge cannot be enabled yet.</p>}
-              <button type="button" disabled={knowledgeBusy || (!knowledgeStatus.enabled && (!knowledgeConsentChecked || !(knowledgeStatus.providers?.extraction.trim() && knowledgeStatus.providers.embedding.trim() && knowledgeStatus.providers.reranking.trim())))} onClick={() => void updateKnowledgeConsent(!knowledgeStatus.enabled)}>{knowledgeStatus.enabled ? "Disable connected knowledge" : "Enable connected knowledge"}</button>
-              {knowledgeStatus.enabled && vault.knowledgeRebuild && <><p>Rebuild reprocesses only notes already allowed by your current consent. Provider charges may apply.</p><button type="button" disabled={knowledgeBusy} onClick={() => void rebuildKnowledge()}>Rebuild connected knowledge</button></>}</> : <p role="status">Loading connected knowledge configuration…</p>}
-            </section>}
-            {selected && knowledgeStatus && vault.knowledgeAnswerConsent && <section className="ms-knowledge-settings" aria-label="Quoted answer settings"><h3>Quoted answers</h3>
-              <p>Separate opt-in: when requested, Recall sends your question and selected current note excerpts to the named answer model. The model can select exact quotations; it cannot write a synthesized answer. This setting does not follow graph-processing consent.</p>
-              {!knowledgeStatus.enabled ? <p role="status">Enable connected knowledge first, then review and separately approve a configured answer model here.</p>
-                : knowledgeStatus.answer_enabled && knowledgeStatus.answer_provider ? <><p role="status">Enabled for {knowledgeStatus.answer_provider}. Every question still requires the Answer from notes action.</p><button type="button" disabled={knowledgeBusy} onClick={() => void updateAnswerConsent(false)}>Disable quoted answers</button><p className="ms-fine">Disabling fences new local requests. In-flight provider work or charges may remain until cancellation is confirmed.</p></>
-                  : knowledgeStatus.answer_provider ? <><p>Configured answer model: {knowledgeStatus.answer_provider}. A changed provider identity requires fresh approval.</p><label className="ms-check"><input type="checkbox" checked={answerConsentChecked} onChange={event => setAnswerConsentChecked(event.target.checked)} /> I approve sending each asked question and its selected current note excerpts to {knowledgeStatus.answer_provider} for exact quotation selection.</label><button type="button" disabled={knowledgeBusy || !answerConsentChecked} onClick={() => void updateAnswerConsent(true)}>Enable quoted answers</button></>
-                    : <p role="status">No configured answer model is available. Keyword Ask and relationship browsing remain available.</p>}
-            </section>}
-            {providerSettings && <ProviderSettings api={providerSettings} />}
+                {selected &&
+                  vault.knowledgeStatus &&
+                  vault.knowledgeConsent && (
+                    <section
+                      className="ms-knowledge-settings"
+                      aria-label="Connected knowledge settings"
+                    >
+                      <h3>Connected knowledge</h3>
+                      {knowledgeStatus ? (
+                        <>
+                          <p>{knowledgeStatus.provider_disclosure}</p>
+                          <p role="status">
+                            {knowledgeStatus.enabled ? "Enabled" : "Disabled"} ·{" "}
+                            {knowledgeStatus.service.message}{" "}
+                            {knowledgeStatus.service.pending
+                              ? `${knowledgeStatus.service.pending} pending.`
+                              : ""}
+                          </p>
+                          {knowledgeStatus.providers && (
+                            <p>
+                              Configured providers: extraction{" "}
+                              {knowledgeStatus.providers.extraction}; embeddings{" "}
+                              {knowledgeStatus.providers.embedding}; reranking{" "}
+                              {knowledgeStatus.providers.reranking}.
+                            </p>
+                          )}
+                          {!knowledgeStatus.enabled && (
+                            <>
+                              <label className="ms-check">
+                                <input
+                                  type="checkbox"
+                                  checked={knowledgeConsentChecked}
+                                  onChange={(event) =>
+                                    setKnowledgeConsentChecked(
+                                      event.target.checked,
+                                    )
+                                  }
+                                />{" "}
+                                I understand that graph processing may send
+                                notes and Ask questions to the configured
+                                providers above.
+                              </label>
+                              <label className="ms-check">
+                                <input
+                                  type="checkbox"
+                                  checked={knowledgeIncludeExisting}
+                                  onChange={(event) =>
+                                    setKnowledgeIncludeExisting(
+                                      event.target.checked,
+                                    )
+                                  }
+                                />{" "}
+                                Also process existing notes (optional; off by
+                                default).
+                              </label>
+                            </>
+                          )}
+                          {!knowledgeStatus.enabled &&
+                            !(
+                              knowledgeStatus.providers?.extraction.trim() &&
+                              knowledgeStatus.providers.embedding.trim() &&
+                              knowledgeStatus.providers.reranking.trim()
+                            ) && (
+                              <p role="status">
+                                Providers are unavailable or not configured.
+                                Keyword search still works; connected knowledge
+                                cannot be enabled yet.
+                              </p>
+                            )}
+                          <button
+                            type="button"
+                            disabled={
+                              knowledgeBusy ||
+                              (!knowledgeStatus.enabled &&
+                                (!knowledgeConsentChecked ||
+                                  !(
+                                    knowledgeStatus.providers?.extraction.trim() &&
+                                    knowledgeStatus.providers.embedding.trim() &&
+                                    knowledgeStatus.providers.reranking.trim()
+                                  )))
+                            }
+                            onClick={() =>
+                              void updateKnowledgeConsent(
+                                !knowledgeStatus.enabled,
+                              )
+                            }
+                          >
+                            {knowledgeStatus.enabled
+                              ? "Disable connected knowledge"
+                              : "Enable connected knowledge"}
+                          </button>
+                          {knowledgeStatus.enabled &&
+                            vault.knowledgeRebuild && (
+                              <>
+                                <p>
+                                  Rebuild reprocesses only notes already allowed
+                                  by your current consent. Provider charges may
+                                  apply.
+                                </p>
+                                <button
+                                  type="button"
+                                  disabled={knowledgeBusy}
+                                  onClick={() => void rebuildKnowledge()}
+                                >
+                                  Rebuild connected knowledge
+                                </button>
+                              </>
+                            )}
+                        </>
+                      ) : (
+                        <p role="status">
+                          Loading connected knowledge configuration…
+                        </p>
+                      )}
+                    </section>
+                  )}
+                {selected &&
+                  knowledgeStatus &&
+                  vault.knowledgeAnswerConsent && (
+                    <section
+                      className="ms-knowledge-settings"
+                      aria-label="Quoted answer settings"
+                    >
+                      <h3>Quoted answers</h3>
+                      <p>
+                        Separate opt-in: when requested, Recall sends your
+                        question and selected current note excerpts to the named
+                        answer model. The model can select exact quotations; it
+                        cannot write a synthesized answer. This setting does not
+                        follow graph-processing consent.
+                      </p>
+                      {!knowledgeStatus.enabled ? (
+                        <p role="status">
+                          Enable connected knowledge first, then review and
+                          separately approve a configured answer model here.
+                        </p>
+                      ) : knowledgeStatus.answer_enabled &&
+                        knowledgeStatus.answer_provider ? (
+                        <>
+                          <p role="status">
+                            Enabled for {knowledgeStatus.answer_provider}. Every
+                            question still requires the Answer from notes
+                            action.
+                          </p>
+                          <button
+                            type="button"
+                            disabled={knowledgeBusy}
+                            onClick={() => void updateAnswerConsent(false)}
+                          >
+                            Disable quoted answers
+                          </button>
+                          <p className="ms-fine">
+                            Disabling fences new local requests. In-flight
+                            provider work or charges may remain until
+                            cancellation is confirmed.
+                          </p>
+                        </>
+                      ) : knowledgeStatus.answer_provider ? (
+                        <>
+                          <p>
+                            Configured answer model:{" "}
+                            {knowledgeStatus.answer_provider}. A changed
+                            provider identity requires fresh approval.
+                          </p>
+                          <label className="ms-check">
+                            <input
+                              type="checkbox"
+                              checked={answerConsentChecked}
+                              onChange={(event) =>
+                                setAnswerConsentChecked(event.target.checked)
+                              }
+                            />{" "}
+                            I approve sending each asked question and its
+                            selected current note excerpts to{" "}
+                            {knowledgeStatus.answer_provider} for exact
+                            quotation selection.
+                          </label>
+                          <button
+                            type="button"
+                            disabled={knowledgeBusy || !answerConsentChecked}
+                            onClick={() => void updateAnswerConsent(true)}
+                          >
+                            Enable quoted answers
+                          </button>
+                        </>
+                      ) : (
+                        <p role="status">
+                          No configured answer model is available. Keyword Ask
+                          and relationship browsing remain available.
+                        </p>
+                      )}
+                    </section>
+                  )}
+                {providerSettings && (
+                  <ProviderSettings api={providerSettings} />
+                )}
               </div>
             </div>
           )}
@@ -2161,22 +2926,7 @@ export function MemorySurface({
               )}
             </div>
           )}
-          {section === "evidence" && (
-            <div
-              className="compact-capture"
-              aria-label="Capture another source"
-            >
-              <button onClick={() => startCapture("photo")}>
-                <CameraIcon /> Camera
-              </button>
-              <button onClick={() => startCapture("text")}>
-                <PencilSimpleIcon /> Write
-              </button>
-            </div>
-          )}
-          <footer className="adaptive-signature">
-            CAPTURE · UNDERSTAND · CONNECT
-          </footer>
+          <footer className="adaptive-signature">A MORE HUMAN TOMORROW</footer>
         </div>
       </main>
     </div>
@@ -2186,10 +2936,19 @@ export function MemorySurface({
 // Native answers verify the immutable original hash, current note hash and exact quote.
 // Text-only legacy rows retain the empty-attachment sentinel in their list metadata;
 // their stable ID and revision still identify the native-verified original.
-function matchesAnswerSelection(memory: VaultMemory, selection: AnswerSelection): boolean {
-  const textOnly = memory.source_name === "" && memory.source_sha256 === "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-  return memory.id === selection.source_id && memory.revision === selection.revision
-    && (memory.source_sha256 === selection.source_sha256 || textOnly);
+function matchesAnswerSelection(
+  memory: VaultMemory,
+  selection: AnswerSelection,
+): boolean {
+  const textOnly =
+    memory.source_name === "" &&
+    memory.source_sha256 ===
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  return (
+    memory.id === selection.source_id &&
+    memory.revision === selection.revision &&
+    (memory.source_sha256 === selection.source_sha256 || textOnly)
+  );
 }
 
 function titleOf(memory: VaultMemory): string {
@@ -2511,7 +3270,6 @@ function Evidence(props: {
                 disabled={props.busy}
               />
               <div className="ms-actions">
-
                 <button
                   type="button"
                   disabled={props.busy}

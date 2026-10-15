@@ -20,7 +20,9 @@ function position(id: string) {
   let hash = 2166136261;
   for (const char of id)
     hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
-  return { x: 120 + (hash % 760), y: 95 + (Math.floor(hash / 997) % 610) };
+  const angle = (hash % 3600) * Math.PI / 1800;
+  const ring = 0.72 + (Math.floor(hash / 3600) % 28) / 100;
+  return { x: 500 + Math.cos(angle) * 365 * ring, y: 350 + Math.sin(angle) * 240 * ring };
 }
 function displayTitle(value: string) {
   const label =
