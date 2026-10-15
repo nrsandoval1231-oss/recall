@@ -1,0 +1,29 @@
+   Compiling recall-desktop v0.1.0 (/workspace/recall/apps/desktop/src-tauri)
+warning: function `parse_note` is never used
+   --> src/processing.rs:596:8
+    |
+596 | pub fn parse_note(
+    |        ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `captured_text_while_locked` is never used
+    --> src/local_vault.rs:1916:19
+     |
+ 525 | impl Vault {
+     | ---------- method in this implementation
+...
+1916 |     pub(crate) fn captured_text_while_locked(&self,memory_id:&str)->Result<Vec<u8>> {
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated function `memory` is never used
+   --> src/persistence.rs:200:12
+    |
+150 | impl NativeStore {
+    | ---------------- associated function in this implementation
+...
+200 |     pub fn memory() -> Result<Self, StoreError> {
+    |            ^^^^^^
+
+warning: `recall-desktop` (lib) generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.45s

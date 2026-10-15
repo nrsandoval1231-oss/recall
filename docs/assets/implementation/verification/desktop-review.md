@@ -1,0 +1,26 @@
+# Independent desktop review
+
+Reviewed current commit `3f75b92` (including `6edab93`), supplied `/tmp/recall-desktop-review.diff`, AGENTS.md, VISION.md, DESIGN.md and implementation report. Inspected exact approved desktop and brand boards, populated 1536 screenshot, and canonical after graph1536, inspection1536, empty900 and ask1182 screenshots. Some captures predate final tab/shading/layout repairs; those known stale differences are not findings. No passed suites rerun; no source edits.
+
+## Findings
+
+- **P2 — Keep failures/receipts within the active viewport.** `apps/desktop/src/surface/memory-surface.css:1404-1408` assigns the shared `.ms-notices` container to grid row 6, after the memory field/capture rows (and timeline rows when present). Its contents include checking, errors, success notices and processing feedback (`MemorySurface.tsx:1949` onward). At 1182×789 the field's 590px minimum, top search row, capture row, gaps and padding already consume the viewport; a failed save or offline error therefore appears below the fold instead of alongside the action. The alert live region helps screen-reader users but does not reveal the failure to sighted users or scroll it into view. Reserve a visible status row near search, or place the relevant message inside the inspector/capture panel without displacing search to the bottom.
+
+- **P2 — Resolve graph node collisions even in the small-library case.** `apps/desktop/src/surface/adaptive-graph.ts:23-25` independently hashes every node into the same narrow orbital band without accounting for other nodes, node radius or labels. Existing synthetic fixture source `11111111-1111-4111-8111-111111111111` and its `:topics:0` utility node are now only **34.28 graph units** apart (previous layout: **222.99**). Source radius is 32, selected source radius 65, and topic radius 11 (`AdaptiveGraph.tsx:187-195`), so the topic overlaps the source even before selection, and sits wholly inside it when selected. This is visibly reproduced in ask1182/inspection1536 captures; the connecting edge is obscured and labels compete with the circles. This is not limited to the large/dense libraries acknowledged in the report. Add deterministic spacing/collision handling that considers source sizes and label bounds while retaining stable positions. Keep the relationship list as an alternative, not the sole remedy for a two-node graph.
+
+## Assessment
+
+The shell is recognizably in the approved family: warm ivory, editorial serif, thin orbital mark, restrained rail/global search, large memory field, quiet contextual panel and Camera/Speak/Write. The production vector is a plausible reconstruction, not proof of an owner-approved vector master or pixel parity. Typography is substantially more legible than tiny board labels. Honest counts replace fabricated wellbeing metrics; no photographic decoration is introduced. Final shading/anchor repairs should be judged in refreshed captures.
+
+Source inspection indicates capture, revision-safe edits, original attachments, correction/history, provider consent/settings, budgets, backup and pairing callbacks are preserved. Graph relationships still derive from actual notes/mentions/wikilinks; decorative orbits are aria-hidden and do not fabricate graph nodes. Keyboard-operable graph nodes, focus styling, searchable relationship list, reduced-motion styling and inspector dismissal remain present. Active legacy-cloud query/import is retired while frozen source is retained. No critical data-loss regression found in the reviewed changes.
+
+**Verdict: request changes for the two P2 issues before calling desktop implementation ready.** Native Windows and physical-device acceptance remain unverified. Final browser screenshots require refresh and should not be described as pixel-perfect acceptance.
+
+## Scoped re-review — fix commit `458b329`
+
+Reviewed `/tmp/recall-desktop-fix.diff` for the two P2 findings only. No tests rerun; implementer reports surface/graph 45/45, graph 9/9 and typecheck passing. Final refreshed browser screenshots remain root's verification responsibility.
+
+- **Status/error placement: addressed.** `.ms-notices` now occupies row 2 immediately below global search; memory field/inspector/capture/timeline rows have been shifted consistently in desktop and narrow breakpoint rules. Error and receipt messages no longer follow the entire workspace at row 6.
+- **Small-library node collision: addressed.** `separateNodes` checks previously placed nodes and the central library mark, reserves horizontal room for labels and vertical room for selected source circles, and searches bounded deterministic alternative positions. It changes derived layout coordinates only. The added fixture regression directly covers the colliding source/utility pair and preserves edges and source bytes; a six-node case checks separation and stable input-order behavior. Dense libraries can still exhaust the available space and use the least-overlapping candidate, so this is not a universal collision-free graph claim.
+
+**Updated scoped verdict: both original P2 findings addressed; no remaining blocker from this review.** This approval covers the two code fixes, not pixel parity or native/device acceptance. Refresh visual evidence before making final visual claims.

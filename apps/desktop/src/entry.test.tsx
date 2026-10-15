@@ -10,28 +10,46 @@ const preview: LocalVault = {
   available: false,
   status: async () => ({ root: null, vault_id: null, vault_identity: null }),
   select: async () => null,
-  openDefault: async () => ({ root: null, vault_id: null, vault_identity: null }),
+  openDefault: async () => ({
+    root: null,
+    vault_id: null,
+    vault_identity: null,
+  }),
   capture: async () => null,
   list: async () => [],
   rebuild: async () => [],
-  restoreNote: async () => { throw new Error("unused"); },
-  remove: async () => { throw new Error("unused"); },
-  correct: async () => { throw new Error("unused"); },
-  source: async () => { throw new Error("unused"); },
+  restoreNote: async () => {
+    throw new Error("unused");
+  },
+  remove: async () => {
+    throw new Error("unused");
+  },
+  correct: async () => {
+    throw new Error("unused");
+  },
+  source: async () => {
+    throw new Error("unused");
+  },
   history: async () => [],
 };
 
 describe("desktop entry", () => {
   it("opens the Memory Surface without an email sign-in", () => {
     render(<DesktopEntry vault={preview} search="" />);
-    expect(screen.getByRole("heading", { name: "Capture" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Your memories belong here." }),
+    ).toBeTruthy();
     expect(screen.queryByText("Email me a sign-in link")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Email" })).toBeNull();
   });
 
-  it("keeps the cloud client off the happy path", async () => {
+  it("ignores the retired cloud selector and keeps the local surface", async () => {
     render(<DesktopEntry vault={preview} search="?mode=legacy-cloud" />);
-    expect(await screen.findByRole("heading", { name: "Recall isn't configured" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your memories belong here.",
+      }),
+    ).toBeTruthy();
     expect(screen.queryByText("Brooks Campus")).toBeNull();
     expect(screen.queryByText("Email me a sign-in link")).toBeNull();
   });

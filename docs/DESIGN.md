@@ -6,22 +6,20 @@
 
 ## Exact approved references and preservation
 
-The original-byte files are preserved in the owner's Library archive **`Recall-Approved-UI-2026-10-15.zip`**, with a SHA-256 manifest. These are original generated attachments, not regenerated approximations. The archive also retains three same-family supporting studies for safekeeping; those are not alternative authorities.
+The owner confirmed on 2026-10-15 that the exact files uploaded in [PR #61](https://github.com/nrsandoval1231-oss/recall/pull/61), commit `b4b9eebc2f88a64fcb8960b21db2f46e1f04a8a8`, are canonical. This explicit decision supersedes the earlier archive hashes. The three PNGs below are imported byte-for-byte from that PR; they have not been resized, recompressed or regenerated.
 
-**Repository image import is pending.** The paths below are reserved import destinations, not claims that PNGs are already committed. Do not create broken image embeds, placeholder replacements or substitute the retired reference. Import these exact bytes before claiming visual implementation acceptance.
-
-| Role | Original attachment | Archive member | Reserved repository destination |
+| Role | Original attachment | PR #61 path | Repository destination |
 |---|---|---|---|
-| Desktop | `recall_a_more_human_tomorrow.png` | `approved/desktop.png` | `docs/assets/approved/desktop.png` |
-| Mobile | `recall_a_kinder_tomorrow.png` | `approved/mobile.png` | `docs/assets/approved/mobile.png` |
-| Brand | `recall_brand_identity_style_guide.png` | `approved/brand.png` | `docs/assets/approved/brand.png` |
+| Desktop | `recall_a_more_human_tomorrow.png` | `docs/design/desktop-screens.png` | `docs/assets/approved/desktop.png` |
+| Mobile | `recall_a_kinder_tomorrow.png` | `docs/design/mobile-screens.png` | `docs/assets/approved/mobile.png` |
+| Brand | `recall_brand_identity_style_guide.png` | `docs/design/brand-board.png` | `docs/assets/approved/brand.png` |
 
 All three are 1448 × 1086 pixels. Required SHA-256 values:
 
 ```text
-desktop.png  fca554c1820fde0cdc55d2e0d5cb1ced3ba3d60a20491a5ef15b4cf8505b0e35
-mobile.png   a33a359fc61a8bd8e8d1180d22bfe8fe6862a9c7c803c4dba7c85e6dc990389a
-brand.png    65e68b9329a225cc3b29471326aed1874d112954e19a961f441213084bb6fa61
+desktop.png  dbbf2e64d7f57ec09b422a94fcf6a38b0b9a670d44ad98fec10746cad10c2739
+mobile.png   e781f517c846f4cf20bc5ea623f9a4a522ead73bf81fde606b507d884cc189fe
+brand.png    f3cac65230d5d7e19f989ed4bbdb99225eacb0c7b0b85f65e0d9842966e64a1e
 ```
 
 The superseded design PNG is removed from the active tree; Git history is sufficient for historical recovery. Historical screenshots, fixture names, source comments and frozen cloud UI are not visual references. Remaining old implementation is migration debt, not a competing approved direction. See [STATUS.md](STATUS.md).

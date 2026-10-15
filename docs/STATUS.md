@@ -10,21 +10,95 @@ _Last updated: 2026-10-15. Initial UI-authority audit baseline: `8423206fa683d48
 
 **Approved:** Nick selected the final photo-free desktop, mobile and brand boards as Recall's only UI vision. [DESIGN.md](DESIGN.md) replaces the earlier four-panel reference and records the exact originals, hashes, identity, palette, typography, logo direction, screen composition and safeguards. README, VISION, AGENTS, the desktop/token documentation and PR checklist point to that one authority. The obsolete active design PNG is removed; historical technical evidence is retained and explicitly non-authoritative for design.
 
-**Preserved:** all three original approved boards plus three same-family supporting studies, without recompression, in the owner's Library archive `Recall-Approved-UI-2026-10-15.zip`. The archive has a SHA-256 manifest. The supporting studies are not competing authorities; photographic and blue-violet explorations are excluded.
+**Canonical asset import:** the owner explicitly approved the exact PR #61 files on 2026-10-15, superseding the previous archive checksums. Original PNG bytes from PR head `b4b9eebc2f88a64fcb8960b21db2f46e1f04a8a8` are now in `docs/assets/approved/`; current SHA-256 values are in DESIGN.md. This import alone does not establish UI acceptance.
 
-**Not yet complete:** the three full-resolution PNGs have not been imported into GitHub. DESIGN.md lists their reserved paths and required checksums. This documentation lock does not implement the new UI, produce final vector logo masters or establish screenshot parity. Do not regenerate the references or use the retired design to fill that gap.
+### Implementation plan and preservation audit
 
-### Source audit and implementation debt
+Baseline: latest remote main `e5f6be02282e71acbc8fe30e22a3646b4b13f654`. Dedicated branch: `feat/canonical-approved-ui`.
 
-- Automated UI verification (`apps/desktop/scripts/verify-ui.mjs`, CI `adaptive-desktop-ui`) no longer compares against the retired four-panel image, which the lock removed and the script had required. It still captures four viewports and runs the axe, console-error and synthetic IPC walkthrough checks. **There is no visual comparison against the approved boards yet**; add one when their PNGs are imported.
+| Classification | Active files / behavior | Action |
+|---|---|---|
+| KEEP | Native vault adapter, writer/revision safety, original capture/inspection, MemoryEditor, KnowledgePanel, ProviderSettings, backups, pairing | Preserve contracts and regression coverage. No Rust core/storage rewrite. |
+| REPLACE | MemorySurface shell, memory-surface.css, AdaptiveGraph presentation, shared design tokens | Approved rail/search/field/context layout, real evidence graph, honest empty state, accessible controls, self-hosted Playfair Display/Inter. |
+| REPLACE | phone.rs presentation and phone companion shell | Matching focused phone pages; preserve IndexedDB outbox, consent, receipts, existing routes and private connection. |
+| REMOVE | Selectable desktop legacy-cloud entry; old surface logo/workspace imagery | Remove active alternative and confirmed unused assets after checking consumers. |
+| HISTORICAL | docs/history, frozen apps/web, apps/mobile and cloud services | Retain historical evidence and applications; do not use them as visual authority. |
 
-- `docs/DESIGN.md` previously required the older exact four-panel PNG. That design authority is replaced, not retained as an option.
-- Shared token documentation and `packages/design-tokens/src/index.ts` said no brand had been approved. That claim is corrected; exported runtime token values remain unchanged and need a tested migration.
-- `apps/desktop/src/surface/memory-surface.css` still uses Georgia/Times, brown/cognac accents and its previous composition. It has not been migrated to Playfair Display / Inter and the approved palette.
-- The desktop source tree still contains `surface/assets/recall-logo.png`, `surface/assets/recall-workspace.webp`, old fixture/component names and the explicit `?mode=legacy-cloud` entry. These are not approved visual alternatives. Inspect references and remove or replace obsolete runtime assets/components with regression coverage during implementation; their deletion is not claimed here.
-- Frozen cloud-era applications and historical screenshots are retained as implementation/history, not design directions. This was a targeted source/documentation authority audit, not a complete rendered-screen, dependency or native-runtime audit.
+Execution sequence:
 
-The authority lock changes documentation and the token source header comment only, and removes the superseded documentation image. No application behavior, provider configuration, database, private library, deployment or production processing is changed. No new npm, Rust, native-device or visual parity pass is claimed for this lock.
+- [x] Import and SHA-256 verify exact canonical artwork.
+- [x] Capture baseline desktop/phone; retain synthetic versus native evidence labels.
+- [x] Implement shared mark variants, typography, palette and primitives, then desktop shell/search/graph/inspector.
+- [x] Apply matching presentation to the existing phone companion.
+- [x] Compare isolated reference panels to actual captures at desktop 1536×1024, 1182×789, 900×700 and phone 390/430; repair discrepancies, test keyboard/reduced motion and contrast.
+- [x] Run applicable lint/typecheck/unit/browser/native checks, remove obsolete consumers, record exact exits and unverified gates, open review PR. No merge or deployment.
+
+Risk-focused checks: empty libraries must not fabricate memories; unavailable recording stays explicit; capture drafts/consent survive navigation; evidence and correction history remain accessible; offline phone delivery remains idempotent and tied to the original library.
+
+## PR #63 rendered-app repair — owner visual approval pending
+
+The owner rejected the audited UI at `6decc918a68b23340cd3514c654ebea477eca5ea`. Fetched PR #63 and main before work: the PR still had that exact head, with no newer changes to reconcile. Repairs remain on the same feature branch; no merge or deployment. Production changes: desktop `94ed0ec`, phone `8fe6f55d978f23ec80c1bf23ab725777365aab8b`; `755ac05` is indentation only and `83a32dd` adds validation screenshot evidence. Later commits retain this record and captures. The three canonical PNG hashes are unchanged.
+
+**Actual before/after screens:** [side-by-side comparisons](assets/polish/comparisons), [before](assets/polish/before), [after](assets/polish/after), [commands/results and capture hashes](assets/polish/verification). Comparisons place complete screenshots at their original size, without cropping, distortion or similarity scoring. All data is explicitly synthetic. Desktop runs the actual React UI with synthetic native-command responses; phone runs the actual Linux companion against a disposable synthetic library.
+
+Repairs, in implementation order:
+
+1. **Layout/hierarchy:** reduce rail and display-heading scale; use the full memory-field width below 1100px. Put empty-state text in document flow rather than over the shrinking graph. Give capture, editor and Ask the primary workspace instead of the 230px inspector. Keep the graph mounted so its viewport/selection survive returning to it. Relationship-list controls now remain outside the list's scrolling area.
+2. **Editor/state:** four focused Note / Original / Related / History tabs; remove the duplicated note rendering, fold formatting/link tools and move attachment recovery below editing. Autosave/session/revision behavior is unchanged. Processing shows the actual receipt text rather than a permanent “Processing your memory” heading. Pending Ask says “Searching…”; failures retain the question. Source excerpts, byte offsets, citations and original navigation remain.
+3. **Phone:** tighten header/form spacing, refine the native file input, and position Save using measured navigation height (including safe areas and enlarged text). Field errors are adjacent and focus the relevant control; storage errors remain by Save. Hide bottom navigation only when a focused text field has a substantially reduced visual viewport. Keep the live form/draft and outbox contracts. Retrieval and quoted-answer headings use source text instead of UUID filenames; retain a readable fallback, original excerpts and verification disclosures.
+4. **Polish/accessibility:** relative type sizes support 200% text; rail width adapts accordingly. Non-scaling graph strokes retain crispness at normal zoom and 2× device pixel density. Focus, disabled states, reduced motion and existing 48px action targets remain.
+
+**Measured regression:** baseline 900×640 graph region y=253.53–454.72 overlapped the empty message y=377.27–439.50; task width was 230px ([baseline geometry](assets/polish/before/layout-regressions.json)). The current browser verifier asserts the empty message starts below the graph and that desktop task width is at least 600px (or 65% of the viewport). It checks actual rectangles and pending/completed states rather than accepting replacement images.
+
+**Final verification:** all commands below exited 0. Commands run from repository root. Native commands use the same user-space GTK/WebKit environment recorded below (`PKG_CONFIG_SYSROOT_DIR`, `PKG_CONFIG_PATH`, `LIBRARY_PATH`, `LD_LIBRARY_PATH` pointing into `/tmp/recall-sysroot`); Chromium is `/usr/bin/chromium`.
+
+| Command | Result |
+|---|---|
+| `npm run check` | Lint, all typechecks, 302 unit tests passed. |
+| `npm run build -w @recall/desktop` | Production build passed. |
+| `cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin recall-phone` | Passed; three existing dead-code warnings. |
+| `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib` | 295 passed, 3 ignored. |
+| `LD_LIBRARY_PATH=/tmp/recall-sysroot/usr/lib/x86_64-linux-gnu RECALL_CHROMIUM=/usr/bin/chromium npm run test:phone` | 18 passed: offline durability/retry, library switching, receipt integrity, drafts/consent, field validation, source-title/evidence access, keyboard focus, 48px targets, reduced visual viewport and 200% text. |
+| `RECALL_UI_URL=http://127.0.0.1:1420 RECALL_CHROMIUM=/usr/bin/chromium RECALL_UI_EVIDENCE_DIR=$PWD/docs/assets/polish/after npm run test:visual -w @recall/desktop` | Five viewports: 1536×1024, 1182×789, 900×640, 390×844, 430×932. Empty, capture, saved, processing, failed/retry, ready/editor, history, graph, Ask loading/results/error/empty and original-photo states. No axe violations, overflow or console errors. 200% desktop text checked at900. |
+| `RECALL_UI_EVIDENCE_DIR=$PWD/docs/assets/polish/after node apps/desktop/scripts/verify-populated.mjs` | Six populated layouts including 900×640 at2× density; zero axe/overflow findings. |
+| `RECALL_PHONE_EVIDENCE_DIR=$PWD/docs/assets/polish/after node apps/desktop/scripts/verify-phone.mjs` | Native loopback at18788; Home/Write/Camera/receipts/detail/Ask/results/validation at320/390/430. No axe/overflow/console findings. |
+| `python scripts/compare-polish-ui.py` | Full-size before/after comparisons retained. |
+| `git diff --check` | Passed. |
+
+**Failures found and repaired:** baseline regression run failed on the 230px workspace and stale processing heading; baseline narrow capture also lacked an exposed h1. The first repaired walkthrough found relationship-list controls intercepted by the list; moved controls/list into normal layout. The 200% phone test exposed Save/navigation overlap; measuring actual nav height fixed it. Initial check exited2 on a test-only Testing Library option mismatch. Stale Back-button, field-error-location, helper-copy and file-attribute-order assertions were updated without dropping original preservation, retry or consent assertions. These failures are not counted as passes.
+
+**Visual review and remaining gates:** reviewed actual 900px empty/capture/editor/Ask, populated graph at1×/2×, wide capture, phone Write/results and 200% text captures. The repaired tasks are wider, controls no longer collide in tested states, and phone Save is fully visible. This is a repair submission for **owner visual approval**, not a declaration of canonical pixel parity or completed device acceptance. No physical iPhone/Safari keyboard, installed Windows, real Tailscale, live providers, assistive-technology or clean-machine restore validation was performed. Visual-viewport tests are browser-contract simulations only. Large/dense graph layout beyond the previous bounded200-node behavior remains unverified. Three native tests remain ignored; frozen-cloud browser UI tests were not run.
+
+## Canonical implementation evidence — 2026-10-15
+
+The initial implementation at PR #63 head `6decc91` was **rejected by the owner for rendered visual quality**. The following is its historical automated evidence, not visual acceptance. See the repair record above for the current candidate. Source candidate `7dd083c488d1747d188ebd9723296a3b647cb691` received independent whole-branch review; `76eda68` fixes only test fixture/type declarations. Integrated main `c793c43` (PR #60) at `e68728c`, preserving its provider defaults and model-specific pricing safeguards. Merge conflicts retained canonical hash verification and main's stale-image cleanup. No provider implementation conflict occurred.
+
+**Retained evidence:** [before](assets/implementation/before) captures baseline `e5f6be0`; [after](assets/implementation/after) captures the running implementation. Desktop uses explicitly synthetic IPC and source records; phone captures use the actual Linux native companion with a temporary synthetic library. No screenshot is installed-Windows, physical-phone or live-provider evidence. [Panel comparisons and overlays](assets/implementation/comparisons) record original crop bounds and uniform scaling in `method.json`; aspect differences are preserved. No similarity score is used as an acceptance proxy. [Independent review and test logs](assets/implementation/verification) retain findings and repairs.
+
+Desktop evidence covers 1536×1024, 1182×789, 900×700, plus 390/430 responsive checks: empty, saved, processing, ready, inspection, graph, Ask, original photo and six-record populated layouts. Phone evidence covers Home, Write, Camera, receipts, detail, Ask and results at 390/430, plus offline/delivery receipts. Browser checks found zero axe violations, horizontal overflow or console errors in captured states. This does not replace manual assistive-technology testing.
+
+**Visual findings:** the shared palette, local Playfair Display/Inter, reconstructed orbital SVG variants, rail/search/field/context hierarchy and focused phone views now follow the canonical family. Explicit review repaired hidden notices, colliding small-library graph labels, phone focus/target sizes and clipped desktop capture actions. Remaining differences are visible in the comparisons: readable type and 48px phone actions are larger than board labels; real evidence topology replaces illustrative category counts and wellbeing metrics; phone capture retains file selection, consent and delivery status, so Write has a different vertical composition and persistent masthead. Unsupported timeline/social/profile and recording controls are not simulated. The logo is a vector reconstruction, not an original editable master approved separately by the owner. No exact pixel-parity claim is made.
+
+**Cleanup:** removed active legacy-cloud switching, obsolete `recall-logo.png`/`recall-workspace.webp`, unused dashboard components and fixture. Markdown safety coverage moved with its live consumer. Frozen applications, backend modules, historical evidence and all native storage/ownership contracts remain. Shared `brand.css` now supplies desktop and phone palette/fonts; source photos remain original evidence only.
+
+**Verification commands and exits:** commands run from repository root unless specified. Native commands used `PKG_CONFIG_SYSROOT_DIR=/tmp/recall-sysroot`, corresponding `PKG_CONFIG_PATH`, `LIBRARY_PATH` and `LD_LIBRARY_PATH` for user-space GTK/WebKit development dependencies; Chromium was `/usr/bin/chromium`.
+
+| Command | Final result |
+|---|---|
+| `npm run check` | Exit 0; lint, workspace/E2E typechecks and 301 unit tests. |
+| `npm run build -w @recall/desktop` | Exit 0. |
+| `cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin recall-phone` | Exit 0; existing dead-code warnings. |
+| `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib` | Exit 0; 294 passed, 3 ignored. |
+| `LD_LIBRARY_PATH=/tmp/recall-sysroot/usr/lib/x86_64-linux-gnu RECALL_CHROMIUM=/usr/bin/chromium RECALL_PHONE_EVIDENCE_DIR=$PWD/docs/assets/implementation/after npm run test:phone` | Exit 0; 14 passed, including offline/idempotency, draft preservation, keyboard focus and target-size coverage. |
+| `RECALL_UI_URL=http://127.0.0.1:1420 RECALL_CHROMIUM=/usr/bin/chromium RECALL_UI_EVIDENCE_DIR=$PWD/docs/assets/implementation/after npm run test:visual -w @recall/desktop` | Exit 0; five viewport walkthroughs, canonical SHA checks. |
+| `RECALL_UI_URL=http://127.0.0.1:1420 RECALL_UI_EVIDENCE_DIR=$PWD/docs/assets/implementation/after node apps/desktop/scripts/verify-populated.mjs` | Exit 0; five layouts, six synthetic source records. |
+| `RECALL_PHONE_EVIDENCE_DIR=$PWD/docs/assets/implementation/after node apps/desktop/scripts/verify-phone.mjs` | Exit 0; native loopback server at 18788, fourteen captures. |
+| `python scripts/compare-approved-ui.py` | Exit 0; cropped-panel side-by-side images and overlays. |
+| `git diff --check` | Exit 0. |
+
+**Failures resolved during implementation:** initial missing npm/Rust/native dependencies required environment setup. Stale heading, public-shell cache and broad image assertions were updated for the new presentation while retaining source-specific checks. Axe exposed a missing capture heading, repaired. Final check initially exited 2 because the new token filesystem test lacked Node types; the test now declares them. Phone visual helper initially exited 1 on a stale synthetic-title prefix assertion; changing to the actual fixture content assertion passed. These were not counted as successful runs. No test pass or device result is inferred from screenshots.
+
+**Not verified / remaining gates:** installed Windows packaging/credential store; physical iPhone Safari, virtual keyboard and assistive technology; actual Tailscale pairing; live Jev/Claude and handwriting quality; real clean-machine backup/restore; large/dense graph visual quality (separation is bounded to the first 200 nodes); owner optical approval of the reconstructed mark and compositions. Frozen-cloud `npm run test:ui` was not run; current production presentation uses the checks above. Three native tests remain ignored. No merge, release or deployment performed.
 
 ## Definition-of-done scorecard
 
@@ -59,7 +133,7 @@ Friends install the Windows build and use their own Claude key (option 1; no sha
 
 ## Next steps
 
-**Owner-authorized visual work:** import the exact approved originals, then migrate the existing desktop and phone presentation to DESIGN.md. Preserve working capture, evidence inspection, corrections, consent, offline behavior and pairing. Replace old logos, palettes and decorative assets after checking their consumers; do not keep a selectable alternate UI. Retain exact-commit before/after screenshots and regression results. Preserve the provider Settings work merged in PR #59.
+**Visual acceptance:** review the retained reference-panel comparisons and functioning branch. Resolve owner-identified fidelity gaps before merge; the implementation is not a pixel-parity or installed-device acceptance claim. Provider Settings changes from PR #60 are incorporated unchanged.
 
 The existing v1 acceptance sequence remains required:
 
@@ -73,4 +147,4 @@ The existing v1 acceptance sequence remains required:
 
 ## Concurrent work and PR history
 
-PR #60, **Prefill provider model, prices and budgets in Settings**, is open. PR #59 merged at `07e79bfeb5141632b1ae0ddebd09ea534de88375`; the UI lock `e5f6be0` preserves its provider code, Settings component, release workflow, development guidance and tester guide. No release/tag approval is granted by the UI lock. PR #26 was closed 2026-10-15; its branch is historical, not a design reference. Recheck live PR state before acting.
+PR #60, **Prefill provider model, prices and budgets in Settings**, merged at `c793c43` and is incorporated in this branch at `e68728c`. PR #59 merged at `07e79bfeb5141632b1ae0ddebd09ea534de88375`; the UI lock `e5f6be0` preserves its provider code, Settings component, release workflow, development guidance and tester guide. No release/tag approval is granted by the UI lock. PR #26 was closed 2026-10-15; its branch is historical, not a design reference. Recheck live PR state before acting.

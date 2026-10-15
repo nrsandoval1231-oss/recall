@@ -20,7 +20,51 @@ function position(id: string) {
   let hash = 2166136261;
   for (const char of id)
     hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
-  return { x: 120 + (hash % 760), y: 95 + (Math.floor(hash / 997) % 610) };
+  const angle = ((hash % 3600) * Math.PI) / 1800;
+  const ring = 0.72 + (Math.floor(hash / 3600) % 28) / 100;
+  return {
+    x: 500 + Math.cos(angle) * 365 * ring,
+    y: 350 + Math.sin(angle) * 240 * ring,
+  };
+}
+/** Layout only: leave source identities, provenance and relationships unchanged.
+ * Reserve room for source hit targets, their labels, and the central library mark.
+ * Sorted source/mention order makes collision resolution independent of index order.
+ */
+function separateNodes(nodes: GraphNode[]) {
+  const placed: GraphNode[] = [];
+  const width = (node: { label: string }) =>
+    Math.max(70, Math.min(node.label.length, 18) * 8);
+  // The view renders at most 200 nodes; larger libraries remain searchable in the list.
+  for (const node of nodes.slice(0, 200)) {
+    const origin = { x: node.x, y: node.y };
+    let best = origin;
+    let bestPenalty = Infinity;
+    const obstacles = [...placed, { x: 500, y: 350, label: "Your library" }];
+    for (let attempt = 0; attempt < 360; attempt++) {
+      const angle = attempt * 2.399963229728653;
+      const radius = 20 * Math.sqrt(attempt);
+      const candidate = {
+        x: Math.max(160, Math.min(840, origin.x + Math.cos(angle) * radius)),
+        y: Math.max(100, Math.min(590, origin.y + Math.sin(angle) * radius)),
+      };
+      let penalty = 0;
+      for (const other of obstacles) {
+        const overlapX =
+          width(node) + width(other) + 12 - Math.abs(candidate.x - other.x);
+        const overlapY = 145 - Math.abs(candidate.y - other.y);
+        if (overlapX > 0 && overlapY > 0) penalty += overlapX * overlapY;
+      }
+      if (penalty < bestPenalty) {
+        best = candidate;
+        bestPenalty = penalty;
+      }
+      if (penalty === 0) break;
+    }
+    node.x = best.x;
+    node.y = best.y;
+    placed.push(node);
+  }
 }
 function displayTitle(value: string) {
   const label =
@@ -102,5 +146,6 @@ export function deriveGraph(memories: VaultMemory[]) {
         });
     }
   }
+  separateNodes(nodes);
   return { nodes, edges };
 }

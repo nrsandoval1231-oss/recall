@@ -1,14 +1,19 @@
+/// <reference types="node" />
 import { describe, expect, it } from "vitest";
 import { color, contrastRatio, statusPresentation, toneColor } from "./index";
 
 describe("design tokens", () => {
   it("body text and status colors meet WCAG AA (4.5:1) on the paper background", () => {
     expect(contrastRatio(color.ink, color.paper)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(color.inkMuted, color.paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(color.inkMuted, color.paper)).toBeGreaterThanOrEqual(
+      4.5,
+    );
     for (const tone of Object.values(toneColor)) {
       expect(contrastRatio(tone, color.paper)).toBeGreaterThanOrEqual(4.5);
     }
-    expect(contrastRatio(color.accentText, color.accent)).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrastRatio(color.accentText, color.accent),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it("every status has a text label and a non-color glyph, and labels are distinct", () => {
@@ -26,13 +31,29 @@ describe("design tokens", () => {
     expect(serverStatusKey("stored", null)).toBe("uploaded");
     expect(serverStatusKey("stored", { state: "queued" })).toBe("queued");
     expect(serverStatusKey("stored", { state: "cancelled" })).toBe("paused");
-    expect(serverStatusKey("stored", { state: "queued", blocked_reason: "budget_exhausted" })).toBe("paused");
-    expect(serverStatusKey("processing", { state: "retrying", blocked_reason: "budget_exhausted" })).toBe("paused");
-    expect(serverStatusKey("processing", { state: "running" })).toBe("processing");
+    expect(
+      serverStatusKey("stored", {
+        state: "queued",
+        blocked_reason: "budget_exhausted",
+      }),
+    ).toBe("paused");
+    expect(
+      serverStatusKey("processing", {
+        state: "retrying",
+        blocked_reason: "budget_exhausted",
+      }),
+    ).toBe("paused");
+    expect(serverStatusKey("processing", { state: "running" })).toBe(
+      "processing",
+    );
     expect(serverStatusKey("ready", { state: "succeeded" })).toBe("ready");
     expect(serverStatusKey("needs_review", null)).toBe("needs_review");
-    expect(serverStatusKey("failed", { state: "failed" })).toBe("processing_failed");
-    expect(statusPresentation.processing_failed.label).toMatch(/original is safe/);
+    expect(serverStatusKey("failed", { state: "failed" })).toBe(
+      "processing_failed",
+    );
+    expect(statusPresentation.processing_failed.label).toMatch(
+      /original is safe/,
+    );
   });
 
   it("uses the contract's honest terminology", () => {
@@ -41,4 +62,15 @@ describe("design tokens", () => {
     expect(statusPresentation.uploaded.label).toBe("Uploaded");
     expect(statusPresentation.failed.label).toMatch(/^Failed/);
   });
+});
+
+it("keeps the shared desktop/phone CSS palette aligned with platform tokens", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { palette } = await import("./index");
+  const css = await readFile(new URL("./brand.css", import.meta.url), "utf8");
+  for (const [name, value] of Object.entries(palette)) {
+    expect(css.toLowerCase()).toContain(
+      `--recall-${name}: ${value.toLowerCase()};`,
+    );
+  }
 });

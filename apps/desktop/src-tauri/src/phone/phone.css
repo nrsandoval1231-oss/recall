@@ -1,0 +1,498 @@
+:root {
+  color-scheme: light;
+  --ivory: var(--recall-ivory);
+  --ink: var(--recall-graphite);
+  --muted: var(--recall-muted);
+  --line: var(--recall-divider);
+  --sage: var(--recall-sage);
+  --copper: var(--recall-copper);
+  --surface: #f1eee8;
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--ivory);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: calc(16px + env(safe-area-inset-top)) 24px
+    calc(100px + env(safe-area-inset-bottom));
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  max-width: 620px;
+  margin-inline: auto;
+}
+h1,
+h2,
+h3 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0 0 16px;
+}
+h1 {
+  font-size: 1.875rem;
+  letter-spacing: -0.8px;
+}
+h2 {
+  font-size: 1.75rem;
+}
+h3 {
+  font-size: 1.4375rem;
+}
+p {
+  margin: 0 0 16px;
+}
+a {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button,
+a,
+input,
+textarea,
+summary {
+  touch-action: manipulation;
+}
+button {
+  cursor: pointer;
+  min-height: 48px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--ivory);
+  padding: 12px 16px;
+  margin: 8px 0;
+}
+button.secondary {
+  background: transparent;
+  color: var(--ink);
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+label {
+  display: block;
+  margin: 16px 0;
+}
+input:not([type="checkbox"]):not([type="hidden"]),
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  vertical-align: middle;
+  margin: 8px 8px 8px 0;
+  accent-color: var(--recall-focus);
+}
+label:has([type="checkbox"]) {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  min-height: 48px;
+}
+textarea {
+  min-height: 160px;
+  resize: vertical;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+input[type="file"] {
+  font-size: 0.8125rem;
+}
+input[type="file"]::file-selector-button {
+  background: var(--ivory);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 10px;
+  margin-right: 8px;
+}
+input[type="search"] {
+  font-size: 1rem;
+}
+.fine,
+footer,
+.connection-info {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+section,
+article {
+  margin: 24px 0;
+}
+article {
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+  overflow-wrap: anywhere;
+}
+article img,
+main > img,
+#photo-preview img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: 16px;
+  background: var(--surface);
+}
+.path,
+pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 0.75rem;
+}
+details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 24px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+summary {
+  cursor: pointer;
+  min-height: 48px;
+  padding: 12px 0;
+}
+details p {
+  margin-top: 12px;
+}
+:focus-visible {
+  outline: 2px solid var(--recall-focus);
+  outline-offset: 4px;
+}
+svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+[hidden] {
+  display: none !important;
+}
+.phone-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  gap: 16px;
+}
+.phone-brand a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  min-height: 48px;
+}
+.phone-brand img {
+  width: 44px;
+  height: 44px;
+}
+.phone-brand a span {
+  font:
+    2rem "Playfair Display",
+    Georgia,
+    serif;
+  letter-spacing: -1px;
+}
+.brand-signature {
+  font-size: 0.625rem;
+  max-width: 100px;
+  letter-spacing: 1px;
+  line-height: 1.6;
+  text-align: right;
+}
+.eyebrow {
+  font-size: 0.625rem;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.intro {
+  font-size: 0.875rem;
+  color: var(--muted);
+  max-width: 250px;
+}
+.search-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  min-height: 48px;
+  border-radius: 24px;
+  background: var(--surface);
+  padding: 12px 16px;
+  margin: 24px 0;
+}
+.search-link svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.capture-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.capture-actions a,
+.capture-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding: 16px 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 108px;
+  background: transparent;
+  color: var(--ink);
+  margin: 0;
+}
+.capture-actions small {
+  font-size: 0.625rem;
+  color: var(--muted);
+}
+.capture-actions svg {
+  width: 26px;
+  height: 26px;
+}
+.capture-actions [aria-disabled="true"] {
+  color: var(--muted);
+}
+#speak-status:empty {
+  display: none;
+}
+#speak-status {
+  font-size: 0.8125rem;
+  border-left: 2px solid var(--copper);
+  padding: 12px;
+  margin: 16px 0;
+}
+.home-orbit {
+  height: 168px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  margin: 24px 0 8px;
+}
+.home-orbit img {
+  width: 160px;
+  height: 160px;
+  opacity: 0.8;
+}
+.home-signature {
+  text-align: center;
+  font:
+    italic 1.1875rem "Playfair Display",
+    Georgia,
+    serif;
+}
+.receipt-link {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  min-height: 48px;
+  padding: 12px 0;
+  text-decoration: none;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  font-size: 0.875rem;
+  text-decoration: none;
+  margin-bottom: 0;
+}
+.capture-form {
+  margin-top: 8px;
+}
+.capture-form > .fine {
+  font-size: 0.75rem;
+}
+.ask-greeting {
+  background: var(--surface);
+  padding: 20px;
+  border-radius: 16px;
+  font:
+    1.5rem/1.3 "Playfair Display",
+    Georgia,
+    serif;
+  margin: 24px 0 32px;
+}
+.ask-view form {
+  margin-bottom: 24px;
+}
+.connection-info {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  overflow-wrap: anywhere;
+}
+.connection-info p:empty {
+  display: none;
+}
+.phone-nav {
+  position: fixed;
+  z-index: 4;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  max-width: 620px;
+  margin: auto;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  background: var(--ivory);
+  border-top: 1px solid var(--line);
+}
+.phone-nav a {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 52px;
+  text-decoration: none;
+  font-size: 0.6875rem;
+  gap: 4px;
+  color: var(--muted);
+}
+.phone-nav a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.nav-capture span {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  background: var(--recall-focus);
+  color: var(--ivory);
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1;
+}
+.phone-nav a[aria-current="page"]:after {
+  content: "";
+  width: 16px;
+  height: 2px;
+  background: var(--copper);
+}
+.receipt-view:has([data-testid="outbox"]:empty):after {
+  content: "No captures saved on this device yet.";
+  display: block;
+  color: var(--muted);
+  padding: 32px 0;
+  font-size: 0.875rem;
+}
+.phone-nav a,
+.capture-actions a,
+button {
+  transition: background-color 160ms ease;
+}
+button:hover,
+.capture-actions a:hover {
+  background: var(--recall-sand);
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (max-width: 360px) {
+  body {
+    padding-inline: 16px;
+  }
+  .brand-signature {
+    display: none;
+  }
+}
+
+article p a,
+article > a,
+article li > a,
+main > a[href^="/sources/"],
+.source-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+}
+article > a + a {
+  margin-inline-start: 8px;
+}
+article[data-memory] h2 {
+  font:
+    500 1.125rem/1.5 Inter,
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.memory-text {
+  white-space: pre-wrap;
+}
+
+/* Focused capture: a single form, unchanged outbox and source-specific consent. */
+body { --nav-height: calc(76px + env(safe-area-inset-bottom)); }
+body[data-view="write"] .phone-brand,
+body[data-view="camera"] .phone-brand { margin-bottom: 4px; }
+.capture-form { margin: 8px 0 16px; }
+.capture-form h1 { font-size: 1.75rem; margin-bottom: 16px; }
+.capture-form label { margin: 12px 0; font-size: 0.875rem; }
+.capture-form textarea { height: clamp(160px, 23dvh, 240px); scroll-margin-block: 24px; }
+.capture-form input[type="file"] { background: transparent; padding: 4px; font-size: 0.75rem; }
+.capture-form input[type="file"]::file-selector-button { min-height: 48px; padding: 8px 12px; border-radius: 8px; }
+.capture-form label.capture-consent { display: flex; align-items: flex-start; gap: 10px; font-size: 0.75rem; }
+.capture-consent input { flex: none; margin: 2px 0; }
+.capture-save {
+  position: sticky;
+  bottom: var(--nav-height);
+  z-index: 3;
+  background: var(--ivory);
+  padding: 8px 0;
+}
+.capture-save button { margin: 0; }
+.capture-form > .fine { margin-top: 8px; }
+.field-error { color: #843625; font-size: 0.8125rem; margin: 4px 0 12px; }
+.field-error:empty { display: none; }
+[aria-invalid="true"] { border-color: #843625 !important; }
+.keyboard-open .phone-nav { display: none; }
+.keyboard-open .capture-save { bottom: 0; }
+.keyboard-open { padding-bottom: 24px; }
+article[data-memory] h2 { font: 400 1.5rem/1.3 "Playfair Display", serif; margin-bottom: 12px; }
+article[data-memory] h3 { font: 500 0.875rem/1.5 Inter, sans-serif; margin-top: 24px; }
+article[data-memory] > p { line-height: 1.65; }
+article[data-memory] details { margin-top: 16px; padding-top: 4px; }
+body:has(.phone-app) { padding-bottom: calc(var(--nav-height) + 24px); }
+body.keyboard-open:has(.phone-app) { padding-bottom: 24px; }
+body:not(:has(.phone-app)) { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }

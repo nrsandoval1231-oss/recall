@@ -10,7 +10,7 @@ A private, local-first external memory. Photograph your notes or type a brain-du
 
 **Locked on 2026-10-15:** warm ivory, graphite, sage and copper; editorial typography; the orbital Recall identity; photo-free interface decoration. The latest approved desktop, mobile and brand boards are the sole visual direction. [DESIGN.md](docs/DESIGN.md) records the exact references, checksums, palette, typography, logo, interaction rules and acceptance requirements.
 
-Original boards are preserved in `Recall-Approved-UI-2026-10-15.zip` in the owner's Library. Repository PNG import and application visual migration remain pending; this lock is not a claim that the installed app already matches the mockups. Older references and historical screenshots must not guide new UI work. Captured photos and scans remain valid source evidence.
+The owner-designated canonical PR #61 PNGs are committed in `docs/assets/approved/` with verified hashes. The desktop and existing phone companion now use the approved brand system; implementation evidence and remaining acceptance limits are recorded in [STATUS.md](docs/STATUS.md). Older references and historical screenshots must not guide new UI work. Captured photos and scans remain valid source evidence.
 
 ## Docs (read in this order)
 
@@ -35,7 +35,7 @@ cd apps/desktop && npx tauri dev
 
 ```text
 apps/desktop/          product: React UI + Rust core (src-tauri), includes recall-phone
-packages/design-tokens shared UI tokens; existing values require approved-brand migration
+packages/design-tokens shared approved palette, typography, spacing and semantic UI tokens
 tests/                 phone, ui, native runtime checks
 apps/web, apps/mobile, services/backend, packages/{api-client,sync,contracts}
                        legacy cloud stack (frozen, not the product)

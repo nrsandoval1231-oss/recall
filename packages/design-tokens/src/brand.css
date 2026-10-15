@@ -1,0 +1,32 @@
+/* Shared desktop and native-phone identity. See docs/DESIGN.md. */
+@font-face {
+  font-family: Inter;
+  src: url("/fonts/Inter-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/PlayfairDisplay-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+}
+:root {
+  --recall-ivory: #faf8f3;
+  --recall-linen: #ebe1d9;
+  --recall-stone: #d1cbc2;
+  --recall-sage: #8c9f8f;
+  --recall-copper: #c97f5b;
+  --recall-graphite: #2f2f2f;
+  --recall-moss: #b7c4b6;
+  --recall-sand: #e7ded4;
+  --recall-blush: #f3ebe6;
+  --recall-mist: #f7f5f2;
+  --recall-muted: #62665e;
+  --recall-focus: #526650;
+  --recall-divider: #dedbd3;
+  --recall-display: "Playfair Display", Georgia, serif;
+  --recall-body: Inter, system-ui, sans-serif;
+}

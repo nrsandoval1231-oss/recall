@@ -1,0 +1,20 @@
+
+> @recall/desktop@0.1.0 test:visual
+> node scripts/verify-ui.mjs
+
+file:///workspace/recall/apps/desktop/scripts/verify-ui.mjs:332
+if (polishFailures.length && !process.env.RECALL_RECORD_BASELINE) throw Error(polishFailures.join("\n"));
+                                                                        ^
+
+Error: Task workspace too narrow at 900: 230
+Completed processing retains active heading
+    at file:///workspace/recall/apps/desktop/scripts/verify-ui.mjs:332:73
+
+Node.js v24.19.0
+npm error Lifecycle script `test:visual` failed with error:
+npm error code 1
+npm error path /workspace/recall/apps/desktop
+npm error workspace @recall/desktop@0.1.0
+npm error location /workspace/recall/apps/desktop
+npm error command failed
+npm error command sh -c node scripts/verify-ui.mjs

@@ -210,7 +210,7 @@ fn respond(
     output = output.with_header(ascii_header("X-Frame-Options", "DENY")?);
     output = output.with_header(ascii_header(
         "Content-Security-Policy",
-        "default-src 'self'; img-src 'self' blob:; style-src 'unsafe-inline'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'self'; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     )?);
     for (name, value) in &response.extra {
         output = output.with_header(ascii_header(name, value)?);
@@ -266,6 +266,11 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             "text/javascript; charset=utf-8",
             include_bytes!("phone/companion.js").to_vec(),
         ),
+        ("GET" | "HEAD", "/phone-ui.js") => bytes(200, "text/javascript; charset=utf-8", include_bytes!("phone/ui.js").to_vec()),
+        ("GET" | "HEAD", "/brand/orbital-mark.svg") => bytes(200, "image/svg+xml", include_bytes!("../../public/brand/orbital-mark.svg").to_vec()),
+        ("GET" | "HEAD", "/brand/favicon.svg") => bytes(200, "image/svg+xml", include_bytes!("../../public/brand/favicon.svg").to_vec()),
+        ("GET" | "HEAD", "/fonts/Inter-Regular.ttf") => bytes(200, "font/ttf", include_bytes!("../../public/fonts/Inter-Regular.ttf").to_vec()),
+        ("GET" | "HEAD", "/fonts/PlayfairDisplay-Regular.ttf") => bytes(200, "font/ttf", include_bytes!("../../public/fonts/PlayfairDisplay-Regular.ttf").to_vec()),
         ("GET" | "HEAD", "/companion-sw.js") => bytes(
             200,
             "text/javascript; charset=utf-8",
@@ -843,7 +848,7 @@ fn render_memory_answer(mut answer: crate::knowledge::MemoryAnswer, current: &[V
         let Some(source) = source else { continue };
         let memory = &source.memory;
         cards.push_str(&format!("<article><h2>Exact passage from {}</h2><blockquote>{}</blockquote><p class=\"path\">Note revision {} · {}</p><p class=\"path\">SHA-256: {}</p><p><a href=\"/saved/{}\">Inspect supporting note and original</a></p></article>",
-            esc(memory.note_path.as_deref().unwrap_or("Captured note")), esc(&selection.quote), selection.revision,
+            esc(&title_for(memory)), esc(&selection.quote), selection.revision,
             esc(memory.note_path.as_deref().unwrap_or("Captured note")), esc(&source.source_sha256), esc(&memory.id)));
     }
     if answer.status == "supported" && cards.is_empty() {
@@ -925,7 +930,9 @@ fn render_source_answer(answer: crate::memory_query::Answer) -> String {
         } else {
             ""
         };
-        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><p>Current note · revision {}{correction}</p><p class=\"fine\">Captured {} · Note revised {}</p><p>{}</p><h3>Original evidence</h3><p>{}</p>{range}<p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p><p><a href=\"/sources/{}\">Open original</a> · <a href=\"/saved/{}\">Inspect memory</a></p></article>",esc(&hit.memory_id),esc(&hit.note_basename),esc(&hit.match_reason),hit.revision,esc(&hit.captured_at),esc(&hit.updated_at),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id),esc(&hit.memory_id)));
+        let fallback = format!("Memory captured {}", hit.captured_at.chars().take(10).collect::<String>());
+        let title = title_from_note(if hit.current_excerpt.trim().is_empty() { &hit.original_excerpt } else { &hit.current_excerpt }, &fallback);
+        cards.push_str(&format!("<article data-memory=\"{}\"><h2>{}</h2><p>{}</p><p>Current note · revision {}{correction}</p><p class=\"fine\">Captured {} · Note revised {}</p><p>{}</p><h3>Original evidence</h3><p>{}</p>{range}<details><summary>Source verification</summary><p class=\"path\">SHA-256: {}</p><p class=\"path\">{}</p></details><p><a href=\"/sources/{}\">Open original</a> · <a href=\"/saved/{}\">Inspect memory</a></p></article>",esc(&hit.memory_id),esc(&title),esc(&hit.match_reason),hit.revision,esc(&hit.captured_at),esc(&hit.updated_at),esc(&hit.current_excerpt),esc(&hit.original_excerpt),esc(&hit.source_sha256),esc(&paths),esc(&hit.memory_id),esc(&hit.memory_id)));
     }
     let mut graph_cards = String::new();
     for relationship in &answer.graph_relationships {
@@ -936,13 +943,13 @@ fn render_source_answer(answer: crate::memory_query::Answer) -> String {
         }
         graph_cards.push_str("</ul></article>");
     }
-    let heading = if answer.hits.is_empty() { "Related inferred knowledge" } else { "Source-backed matches and related knowledge" };
+    let heading = if answer.hits.is_empty() { "Related inferred knowledge" } else { "Source-backed matches" };
     let disclosure = if answer.graph_relationships.is_empty() {
-        format!("{KEYWORD_LABEL} Retrieved local note quotes and original evidence.")
+        KEYWORD_LABEL.to_owned()
     } else {
         "Graph relationships are inferred and unverified. When enabled, the question and eligible notes may be processed by the configured, disclosed providers. This is retrieval, not a generated answer.".to_owned()
     };
-    format!("<h1>{heading}</h1><p>{}</p><p class=\"fine\">{}</p>{cards}{graph_cards}",esc(&answer.message),esc(&disclosure))
+    format!("<h1>{heading}</h1><p class=\"fine\">{}</p><details class=\"retrieval-details\"><summary>How these matches were found</summary><p>{}</p></details>{cards}{graph_cards}",esc(&disclosure),esc(&answer.message))
 }
 
 // Only retry inspection on brief native writer contention. Never retry a model
@@ -1009,32 +1016,23 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         Ok(None) => "<p>No resumable source-specific processing authorization is available. Review on desktop.</p>".into(),
         Err(_) => format!("<p>Native processing is busy or needs review. <a href=\"/saved/{}\">Refresh status</a></p>{recovery}", esc(&memory.id)),
     };
-    let source_card=match read_retry(|| vault.source(&memory.id)){Ok(source)=>format!("<p class=\"path\">Original SHA-256: {}</p><a href=\"/sources/{}\">Open original evidence</a>",esc(&source.sha256),esc(&memory.id)),Err(_)=>"<p>Original evidence unavailable; resolve on desktop.</p>".into()};
-    let body = if let Some(source_path) = source_rel(&memory) {
-        format!(
-            "<h1>Saved in the desktop vault</h1><p>The original photo is in {} and the note is in {}. Provider processing status is shown below; nothing is sent without source-specific consent.</p><img src=\"/sources/{}\" alt=\"Original page\"><p>{}</p><p class=\"path\">{}</p><p class=\"path\">{}</p>",
-            esc(&source_path),
-            esc(&note_path),
-            esc(&memory.id),
-            esc(&memory.note),
-            esc(&note_path),
-            esc(&source_path),
-        )
-    } else {
-        format!(
-            "<h1>Saved in the desktop vault</h1><p>The note is in {note}. The original text is preserved separately. Provider processing status is shown below; nothing is sent without source-specific consent.</p><p>{}</p><p class=\"path\">{note}</p>",
-            esc(&memory.note),
-            note = esc(&note_path),
-        )
+    let original_path = source_rel(&memory).unwrap_or_else(|| format!("Recall/Sources/{}.txt", memory.id));
+    let source_card = match read_retry(|| vault.source(&memory.id)) {
+        Ok(source) => format!("<a class=\"source-action\" href=\"/sources/{}\">Open original evidence</a><details><summary>Source verification</summary><p class=\"path\">Original SHA-256: {}</p><p class=\"path\">{}</p></details>", esc(&memory.id), esc(&source.sha256), esc(&format!("{} · {}", note_path, original_path))),
+        Err(_) => "<p>Original evidence unavailable; resolve on desktop.</p>".into(),
     };
+    let photo = source_rel(&memory).map(|_| format!("<img src=\"/sources/{}\" alt=\"Original page\">", esc(&memory.id))).unwrap_or_default();
+    let original_kind = if photo.is_empty() { "text" } else { "photo" };
+    let body = format!("<section class=\"memory-detail\"><p class=\"eyebrow\">MEMORY DETAIL</p><h1>{}</h1><p class=\"fine\">Captured {} · Revision {}</p>{photo}<p class=\"memory-text\">{}</p><p class=\"saved-receipt\">Saved in the desktop vault</p><p class=\"fine\">The original {original_kind} is preserved separately. Nothing is sent without source-specific consent.</p>{source_card}</section>",
+        esc(&title_for(&memory)), esc(&memory.captured_at), memory.revision, esc(&memory.note));
     html(
         200,
         page(
             "Saved in the desktop vault",
             &format!(
-                "{body}{source_card}{processing}{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL}</p>{}</section>",
-                capture_form(&Uuid::new_v4().to_string(), ""),
-                format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
+                "{body}{processing}<details><summary>Capture another memory</summary>{}</details><details><summary>Ask Recall</summary><p class=\"fine\">{KEYWORD_LABEL}</p>{}</details><section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>",
+                capture_form(&Uuid::new_v4().to_string(), "").replace("<h1 id=\"capture-heading\">Write a memory</h1>", "<h2>Write a memory</h2>"),
+                ask_form("")
             ),
         ),
     )
@@ -1116,19 +1114,16 @@ fn same_origin(headers: &[(&str, &str)]) -> Result<(), PhoneResponse> {
 }
 
 fn home_page() -> String {
-    page(
-        "Recall",
-        &format!(
-            "<p class=\"mark\">RECALL</p><p class=\"tag\">Your life remembers itself.</p><h1>Capture and ask</h1><p>Capture to your Recall library on the desktop. There is no account. A photo is optional. Processing runs on the desktop only after your per-capture consent and native provider configuration.</p>{}<section><h2>Ask</h2><p class=\"fine\">{KEYWORD_LABEL} Searched notes are on the desktop, not a fresh Claude answer. Optional connected knowledge is inferred and unverified. Quoted answers require separate approval in desktop Settings; this phone cannot enable that consent.</p>{}</section><footer><p>On the iPhone, join the same Tailscale network, open this address in Safari, and use Add to Home Screen if you want an icon. Offline reopening requires HTTPS and a completed first visit. On HTTP, keep this page open to queue captures. Browser storage can be cleared by your device; a library receipt is your confirmation of transfer.</p><p>Use your authorized Tailscale connection. Recall does not install a certificate; HTTPS can be supplied by Tailscale Serve. Do not forward this port to the public internet.</p></footer>",
-            capture_form(&Uuid::new_v4().to_string(), ""),
-            format!("{}<section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>", ask_form(""))
-        ),
-    )
+    let shell = include_str!("phone/home.html")
+        .replace("{{CAPTURE}}", &capture_form(&Uuid::new_v4().to_string(), ""))
+        .replace("{{ASK}}", &ask_form(""))
+        .replace("{{KEYWORD_LABEL}}", KEYWORD_LABEL);
+    page("Recall — Your memories belong here", &shell)
 }
 
 fn capture_form(operation_id: &str, note: &str) -> String {
     format!(
-        "<section><h2>Capture</h2><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" maxlength=\"262144\" placeholder=\"Your words, not a reading of the page\">{}</textarea></label><label>Photo or file, optional<input type=\"file\" name=\"photo\" accept=\"image/png,image/jpeg,image/webp\"></label><label><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><button type=\"submit\">Save capture</button></form><p class=\"fine\">A photo is optional. Original text is preserved under Recall/Sources and the note is saved under Recall/Memories. When you include a photo, the original is written into Recall/Sources before the Markdown note. A failed save is not described as saved.</p></section>",
+        "<section class=\"capture-form\"><h1 id=\"capture-heading\">Write a memory</h1><form method=\"post\" action=\"/capture\" enctype=\"multipart/form-data\"><input type=\"hidden\" name=\"operation_id\" value=\"{}\"><label>Note, in your words<textarea name=\"note\" aria-describedby=\"note-error\" maxlength=\"262144\" placeholder=\"Jot down a moment, a thought, or something you never want to forget.\">{}</textarea></label><p id=\"note-error\" class=\"field-error\" role=\"alert\"></p><div id=\"photo-preview\" hidden></div><label>Photo or file, optional<input type=\"file\" name=\"photo\" aria-describedby=\"photo-error\" accept=\"image/png,image/jpeg,image/webp\" capture=\"environment\"></label><p id=\"photo-error\" class=\"field-error\" role=\"alert\"></p><label class=\"capture-consent\"><input type=\"checkbox\" name=\"process_consent\" value=\"true\"> Send this saved source to Jev and Claude with up to four relevant vault excerpts. Provider charges apply.</label><div class=\"capture-save\"><p id=\"capture-error\" class=\"field-error\" role=\"alert\"></p><button type=\"submit\">Save capture</button></div></form><p class=\"fine\">Your original is saved first. Processing is optional.</p></section>",
         esc(operation_id),
         esc(note)
     )
@@ -1136,52 +1131,29 @@ fn capture_form(operation_id: &str, note: &str) -> String {
 
 fn ask_form(question: &str) -> String {
     format!(
-        "<form method=\"post\" action=\"/ask\"><label>Ask the notes<input name=\"q\" maxlength=\"4096\" value=\"{}\" autocomplete=\"off\" required></label><button class=\"secondary\" type=\"submit\">Search notes</button></form>",
+        "<form method=\"post\" action=\"/ask\"><label>Ask the notes<input type=\"search\" placeholder=\"What are you trying to remember?\" name=\"q\" aria-describedby=\"ask-error\" maxlength=\"4096\" value=\"{}\" autocomplete=\"off\" required></label><p id=\"ask-error\" class=\"field-error\" role=\"alert\"></p><button class=\"secondary\" type=\"submit\">Search notes</button></form>",
         esc(question)
     )
 }
 
 fn page(title: &str, main: &str) -> String {
     format!(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-title\" content=\"Recall\"><meta name=\"theme-color\" content=\"#12141a\"><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" href=\"/icon.png\"><title>{}</title><style>{}</style></head><body>{}</body></html>",
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-title\" content=\"Recall\"><meta name=\"theme-color\" content=\"#FAF8F3\"><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" href=\"/brand/favicon.svg\"><title>{}</title><style>{}</style></head><body><header class=\"phone-brand\"><a href=\"/#home\" aria-label=\"Recall home\"><img src=\"/brand/orbital-mark.svg\" alt=\"\"><span>recall</span></a><span class=\"brand-signature\">A more human tomorrow.</span></header><main>{}</main></body></html>",
         esc(title),
         PAGE_CSS,
         main
     )
 }
 
-const PAGE_CSS: &str = "
-:root { color-scheme: dark; }
-* { box-sizing: border-box; }
-body { margin: 0; background: #12141a; color: #f6f1e8; font-family: \"Segoe UI\", \"Avenir Next\", system-ui, sans-serif; line-height: 1.45; padding: calc(20px + env(safe-area-inset-top)) 18px calc(32px + env(safe-area-inset-bottom)); }
-h1, h2, p { margin: 0 0 12px; }
-h1 { font-family: Palatino, Georgia, serif; font-weight: 500; font-size: 32px; }
-h2 { font-size: 18px; }
-a { color: #f2d7a2; }
-.mark { letter-spacing: 0.42em; font-size: 13px; margin-bottom: 6px; }
-.tag { font-family: Palatino, Georgia, serif; font-style: italic; color: rgba(246,241,232,0.72); }
-.fine, footer { color: rgba(246,241,232,0.72); font-size: 13px; }
-footer { margin-top: 18px; }
-section, article { background: rgba(22,24,30,0.72); border: 1px solid rgba(255,244,220,0.18); border-radius: 18px; padding: 16px; margin: 14px 0; }
-label { display: block; margin: 12px 0; }
-input, textarea, button { width: 100%; font: inherit; color: inherit; }
-input[type=text], input:not([type]), textarea { min-height: 48px; border-radius: 12px; border: 1px solid rgba(255,244,220,0.28); background: rgba(255,255,255,0.04); padding: 10px 12px; }
-textarea { min-height: 96px; resize: vertical; }
-input[type=file] { margin-top: 8px; }
-button { min-height: 48px; margin-top: 8px; border: 0; border-radius: 14px; background: #f2d7a2; color: #1a140c; font-weight: 650; }
-button.secondary { background: transparent; color: #f6f1e8; border: 1px solid rgba(255,244,220,0.35); }
-img { width: 100%; border-radius: 16px; background: #0e1014; margin: 8px 0 12px; }
-.path { font-family: ui-monospace, \"Cascadia Mono\", monospace; font-size: 12px; word-break: break-all; }
-:focus-visible { outline: 2px solid #f2d7a2; outline-offset: 2px; }
-";
+const PAGE_CSS: &str = concat!(include_str!("../../../../packages/design-tokens/src/brand.css"), "\n", include_str!("phone/phone.css"));
 
 const MANIFEST: &str = r##"{
   "name": "Recall",
   "short_name": "Recall",
   "display": "standalone",
   "start_url": "/",
-  "background_color": "#12141a",
-  "theme_color": "#12141a",
+  "background_color": "#FAF8F3",
+  "theme_color": "#FAF8F3",
   "icons": [{ "src": "/icon.png", "sizes": "32x32", "type": "image/png", "purpose": "any" }]
 }"##;
 
@@ -1294,29 +1266,26 @@ fn utf8_field(bytes: &[u8]) -> Result<String, FormError> {
 }
 
 fn title_for(memory: &VaultMemory) -> String {
-    let line = memory
-        .note
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("")
-        .trim();
-    if line.is_empty() {
-        if memory.source_name.is_empty() {
-            "Untitled page".into()
-        } else {
-            memory.source_name.clone()
+    title_from_note(&memory.note, "Untitled memory")
+}
+
+fn title_from_note(note: &str, fallback: &str) -> String {
+    let note = note.trim();
+    let (frontmatter, body) = if let Some(rest) = note.strip_prefix("---\n") {
+        rest.split_once("\n---").unwrap_or(("", note))
+    } else { ("", note) };
+    if let Some(value) = frontmatter.lines().find_map(|line| line.strip_prefix("title: ")) {
+        if let Ok(title) = serde_json::from_str::<String>(value) {
+            if !title.trim().is_empty() { return title.chars().take(80).collect(); }
         }
-    } else {
-        let mut title = String::new();
-        for (count, ch) in line.chars().enumerate() {
-            if count == 80 {
-                title.push('…');
-                break;
-            }
-            title.push(ch);
-        }
-        title
     }
+    let line = body.lines().find(|line| !line.trim().is_empty()).unwrap_or("").trim().trim_start_matches('#').trim();
+    if line.is_empty() {
+        return fallback.to_owned();
+    }
+    let mut title: String = line.chars().take(80).collect();
+    if line.chars().count() > 80 { title.push('…'); }
+    title
 }
 
 fn source_rel(memory: &VaultMemory) -> Option<String> {
@@ -2113,6 +2082,13 @@ mod tests {
     }
 
     #[test]
+    fn result_titles_use_source_text_and_readable_fallback() {
+        assert_eq!(title_from_note("---\ntitle: \"A quiet afternoon\"\n---\nBody", "Fallback"), "A quiet afternoon");
+        assert_eq!(title_from_note("# A human heading\nMore", "Fallback"), "A human heading");
+        assert_eq!(title_from_note("  ", "Memory captured 2026-10-15"), "Memory captured 2026-10-15");
+    }
+
+    #[test]
     fn phone_ask_keeps_keyword_evidence_when_graph_search_is_unavailable() {
         let answer = crate::memory_query::Answer {
             question: "synthetic query".into(), message: "Local source matches remain available.".into(),
@@ -2124,6 +2100,10 @@ mod tests {
         };
         let rendered = render_source_answer(answer);
         assert!(rendered.contains("Source-backed matches"));
+        assert!(rendered.contains("<h2>&lt;b&gt;Local evidence&lt;/b&gt;</h2>"));
+        assert!(!rendered.contains("<h2>synthetic.md</h2>"));
+        assert!(rendered.contains("Original excerpt: bytes 0–18"));
+        assert!(rendered.contains("Source verification"));
         assert!(rendered.contains("&lt;b&gt;Local evidence&lt;/b&gt;"));
         assert!(rendered.contains("Local keyword retrieval"));
         assert!(!rendered.contains("Related knowledge (inferred)"));
@@ -2284,12 +2264,13 @@ mod tests {
         let dir = TempDir::new();
         Vault::open(&dir.0).unwrap();
         let home = text(&call(&dir.0, "GET", "/", &[], b""));
-        assert!(home.contains("A photo is optional."));
         assert!(home.contains("Photo or file, optional"));
-        assert!(
-            !home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\" required")
-        );
-        assert!(home.contains("name=\"photo\" accept=\"image/png,image/jpeg,image/webp\""));
+        let photo_input = home.split("<input").find(|tag| tag.starts_with(" type=\"file\""))
+            .unwrap().split('>').next().unwrap();
+        assert!(photo_input.contains("name=\"photo\""));
+        assert!(photo_input.contains("accept=\"image/png,image/jpeg,image/webp\""));
+        assert!(photo_input.contains("capture=\"environment\""));
+        assert!(!photo_input.contains("required"));
 
         let id = Uuid::new_v4().to_string();
         let boundary = "RecallSyntheticBoundary";
@@ -2328,7 +2309,8 @@ mod tests {
         assert!(saved.contains("original text is preserved"));
         assert!(saved.contains("Meet Pat at the pump house, uncertain?"));
         assert!(saved.contains("Original SHA-256"));
-        assert!(!saved.contains("<img"));
+        assert!(!saved.contains("alt=\"Original page\""));
+        assert!(!saved.contains("src=\"/sources/"));
         assert_eq!(
             call(&dir.0, "GET", &format!("/sources/{id}"), &[], b"").status,
             200
@@ -2365,7 +2347,8 @@ mod tests {
         assert!(page.contains("Original evidence"));
         assert!(page.contains(&format!("Recall/Memories/{id}.md")));
         assert!(page.contains(&format!("Recall/Sources/{id}.txt")));
-        assert!(!page.contains("<img"));
+        assert!(!page.contains("alt=\"Original page\""));
+        assert!(!page.contains("<img src=\"/sources/"));
         assert!(page.contains(&format!("/sources/{id}")));
 
         let mut changed = Vec::new();

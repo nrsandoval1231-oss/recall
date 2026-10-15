@@ -46,144 +46,173 @@ export function AdaptiveGraph({
       .flatMap((e) => [e.from, e.to]),
   );
   return (
-    <div className={`adaptive-graph ${explore ? "is-exploring" : ""}`} role="region" aria-label="Memory graph environment">
+    <div
+      className={`adaptive-graph ${explore ? "is-exploring" : ""}`}
+      role="region"
+      data-list={list}
+      aria-label="Memory graph environment"
+    >
       {explore && <h1 className="ms-sr">Graph View</h1>}
-      <svg
-        viewBox="0 0 1000 800"
-        preserveAspectRatio="xMidYMid slice"
-        role="group"
-        aria-label="Vault memory graph"
-        tabIndex={0}
-        onPointerDown={(event) => {
-          if (!explore || event.target !== event.currentTarget) return;
-          const p = point(event.currentTarget, event.clientX, event.clientY);
-          drag.current = { x: p.x, y: p.y, vx: viewport.x, vy: viewport.y };
-          event.currentTarget.setPointerCapture(event.pointerId);
-        }}
-        onPointerMove={(event) => {
-          if (drag.current) {
+      <div className="graph-canvas">
+        <svg
+          viewBox="60 45 880 610"
+          preserveAspectRatio="xMidYMid meet"
+          role="group"
+          aria-label="Vault memory graph"
+          tabIndex={0}
+          onPointerDown={(event) => {
+            if (!explore || event.target !== event.currentTarget) return;
             const p = point(event.currentTarget, event.clientX, event.clientY);
-            setViewport((v) => ({
-              ...v,
-              x: drag.current!.vx + (p.x - drag.current!.x),
-              y: drag.current!.vy + (p.y - drag.current!.y),
-            }));
-          }
-        }}
-        onPointerUp={() => {
-          drag.current = null;
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
-        onWheel={(event) => {
-          if (explore)
-            setViewport((v) => ({
-              ...v,
-              zoom: Math.min(2.5, Math.max(0.5, v.zoom - event.deltaY * 0.001)),
-            }));
-        }}
-        onKeyDown={(event) => {
-          const delta: { [key: string]: [number, number] } = {
-            ArrowLeft: [30, 0],
-            ArrowRight: [-30, 0],
-            ArrowUp: [0, 30],
-            ArrowDown: [0, -30],
-          };
-          const move = delta[event.key];
-          if (move) {
-            event.preventDefault();
-            setViewport((v) => ({ ...v, x: v.x + move[0], y: v.y + move[1] }));
-          }
-        }}
-      >
-        <defs>
-          <radialGradient id="memory-light">
-            <stop stopColor="#fffaf1" />
-            <stop offset=".8" stopColor="#f1e0c5" />
-            <stop offset="1" stopColor="#fffdf8" />
-          </radialGradient>
-        </defs>
-        <g
-          transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}
+            drag.current = { x: p.x, y: p.y, vx: viewport.x, vy: viewport.y };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            if (drag.current) {
+              const p = point(event.currentTarget, event.clientX, event.clientY);
+              setViewport((v) => ({
+                ...v,
+                x: drag.current!.vx + (p.x - drag.current!.x),
+                y: drag.current!.vy + (p.y - drag.current!.y),
+              }));
+            }
+          }}
+          onPointerUp={() => {
+            drag.current = null;
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+          }}
+          onWheel={(event) => {
+            if (explore)
+              setViewport((v) => ({
+                ...v,
+                zoom: Math.min(2.5, Math.max(0.5, v.zoom - event.deltaY * 0.001)),
+              }));
+          }}
+          onKeyDown={(event) => {
+            const delta: { [key: string]: [number, number] } = {
+              ArrowLeft: [30, 0],
+              ArrowRight: [-30, 0],
+              ArrowUp: [0, 30],
+              ArrowDown: [0, -30],
+            };
+            const move = delta[event.key];
+            if (move) {
+              event.preventDefault();
+              setViewport((v) => ({ ...v, x: v.x + move[0], y: v.y + move[1] }));
+            }
+          }}
         >
-          {graph.nodes.length === 0 && (
-            <g className="empty-motif" aria-hidden="true">
-              {Array.from({ length: 48 }, (_, i) => {
-                const x = 30 + ((i * 173 + Math.floor(i / 3) * 97) % 940),
-                  y = 20 + ((i * i * 59 + i * 73) % 760);
-                return (
-                  <g key={i}>
-                    <path d={`M ${x} ${y} l 95 45 l -30 90 l -65 -135`} />
-                    <circle cx={x} cy={y} r={(i % 3) + 2} />
-                  </g>
-                );
-              })}
-            </g>
-          )}
-          {edges.map((edge, index) => {
-            const from = nodes.find((n) => n.id === edge.from)!,
-              to = nodes.find((n) => n.id === edge.to)!;
-            return (
-              <line
-                key={index}
-                x1={from.x}
-                y1={from.y}
-                x2={to.x}
-                y2={to.y}
-                className={edge.tentative ? "tentative" : ""}
-              >
-                <title>{edge.reason}</title>
-              </line>
-            );
-          })}
-          {nodes.map((node) => (
-            <g
-              key={node.id}
-              className={`graph-node ${node.kind} ${node.tentative ? "tentative" : ""} ${node.memory.id === selected || highlights.includes(node.memory.id) || connected.has(node.id) ? "highlighted" : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-label={`${node.label} · ${node.tentative ? "Unresolved; " : ""}1 source · revision ${node.memory.revision}`}
-              onClick={() => onSelect(node.memory)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(node.memory);
-                }
-              }}
-              transform={`translate(${node.x} ${node.y})`}
-            >
-              <title>
-                {node.label} ·{" "}
-                {node.tentative
-                  ? "Unresolved mention; identity not confirmed"
-                  : "Saved source"}
-              </title>
-              <circle
-                r={
-                  node.kind === "memories"
-                    ? node.memory.id === selected
-                      ? 65
-                      : explore
-                        ? 37
-                        : 13
-                    : 5
-                }
-                fill={
-                  node.kind === "memories" ? "url(#memory-light)" : undefined
-                }
+          <defs>
+            <radialGradient id="memory-light">
+              <stop stopColor="#c7d0c3" />
+              <stop offset=".65" stopColor="#9aa994" />
+              <stop offset="1" stopColor="#7d8c79" />
+            </radialGradient>
+          </defs>
+          <g
+            transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}
+          >
+            <g className="field-orbits" aria-hidden="true">
+              <ellipse
+                cx="500"
+                cy="350"
+                rx="360"
+                ry="175"
+                transform="rotate(-20 500 350)"
               />
-              {explore && (
-                <text y={node.kind === "memories" ? 3 : 22} textAnchor="middle">
-                  {node.label.length > 24
-                    ? node.label.slice(0, 23) + "…"
-                    : node.label}
+              <ellipse
+                cx="500"
+                cy="350"
+                rx="310"
+                ry="210"
+                transform="rotate(29 500 350)"
+              />
+              <ellipse
+                cx="500"
+                cy="350"
+                rx="175"
+                ry="285"
+                transform="rotate(39 500 350)"
+              />
+              <ellipse cx="500" cy="350" rx="150" ry="135" />
+              <circle cx="500" cy="350" r="94" />
+              <circle cx="500" cy="350" r="76" />
+            </g>
+            <g className="empty-motif" aria-hidden="true">
+              <circle cx="500" cy="350" r="52" fill="url(#memory-light)" />
+              <circle cx="500" cy="350" r="60" fill="none" />
+              {graph.nodes.length > 0 && (
+                <text x="500" y="354" textAnchor="middle">
+                  Your library
                 </text>
               )}
             </g>
-          ))}
-        </g>
-      </svg>
+            {edges.map((edge, index) => {
+              const from = nodes.find((n) => n.id === edge.from)!,
+                to = nodes.find((n) => n.id === edge.to)!;
+              return (
+                <line
+                  key={index}
+                  x1={from.x}
+                  y1={from.y}
+                  x2={to.x}
+                  y2={to.y}
+                  className={edge.tentative ? "tentative" : ""}
+                >
+                  <title>{edge.reason}</title>
+                </line>
+              );
+            })}
+            {nodes.map((node) => (
+              <g
+                key={node.id}
+                className={`graph-node ${node.kind} ${node.tentative ? "tentative" : ""} ${node.memory.id === selected || highlights.includes(node.memory.id) || connected.has(node.id) ? "highlighted" : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`${node.label} · ${node.tentative ? "Unresolved; " : ""}1 source · revision ${node.memory.revision}`}
+                onClick={() => onSelect(node.memory)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(node.memory);
+                  }
+                }}
+                transform={`translate(${node.x} ${node.y})`}
+              >
+                <title>
+                  {node.label} ·{" "}
+                  {node.tentative
+                    ? "Unresolved mention; identity not confirmed"
+                    : "Saved source"}
+                </title>
+                <circle
+                  r={
+                    node.kind === "memories"
+                      ? node.memory.id === selected
+                        ? 65
+                        : 32
+                      : 11
+                  }
+                  fill={
+                    node.kind === "memories" ? "url(#memory-light)" : undefined
+                  }
+                />
+                {
+                  <text
+                    y={node.kind === "memories" ? 54 : 30}
+                    textAnchor="middle"
+                  >
+                    {node.label.length > 18
+                      ? node.label.slice(0, 17) + "…"
+                      : node.label}
+                  </text>
+                }
+              </g>
+            ))}
+          </g>
+        </svg>
+      </div>
       {explore && (
         <>
           <div className="graph-tools" aria-label="Graph controls">
