@@ -1,0 +1,43 @@
+{
+  "brand": "MONOLITH",
+  "tagline": "Your world. Connected.",
+  "status": "approved design direction; vector mark reconstructed for production",
+  "colors": {
+    "obsidian": "#050607",
+    "charcoal": "#121418",
+    "graphite": "#1F2328",
+    "slate": "#3A4048",
+    "steel": "#8A8F98",
+    "silver": "#E5E7EB",
+    "mist": "#2A2F36",
+    "smoke": "#3B424C",
+    "glass": "#505862",
+    "frost": "#6B7280"
+  },
+  "typography": {
+    "heading": "Sora",
+    "body": "Inter"
+  },
+  "radii_px": [
+    4,
+    8,
+    12,
+    16,
+    24
+  ],
+  "spacing_px": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48
+  ],
+  "glass": {
+    "surface": "rgba(31,35,40,0.58)",
+    "border": "rgba(229,231,235,0.13)",
+    "blur": "18px",
+    "text": "#E5E7EB"
+  }
+}
