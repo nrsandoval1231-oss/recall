@@ -47,15 +47,16 @@ export function AdaptiveGraph({
   );
   return (
     <div
-      className={`adaptive-graph ${explore ? "is-exploring" : ""}`}
+      className={`adaptive-graph ${explore ? "is-exploring" : ""} ${selected || highlights.length ? "has-emphasis" : ""}`}
       role="region"
       data-list={list}
+      data-dense={nodes.length > 40}
       aria-label="Memory graph environment"
     >
       {explore && <h1 className="ms-sr">Graph View</h1>}
       <div className="graph-canvas">
         <svg
-          viewBox="60 45 880 610"
+          viewBox="20 45 1040 610"
           preserveAspectRatio="xMidYMid meet"
           role="group"
           aria-label="Vault memory graph"
@@ -104,11 +105,17 @@ export function AdaptiveGraph({
           }}
         >
           <defs>
-            <radialGradient id="memory-light">
-              <stop stopColor="#c7d0c3" />
-              <stop offset=".65" stopColor="#9aa994" />
-              <stop offset="1" stopColor="#7d8c79" />
-            </radialGradient>
+            {[
+              ["sage", "#b7c0b0", "#8a9683", "#788570"],
+              ["copper", "#dfb493", "#c18b69", "#b47d5e"],
+              ["stone", "#d4d0c7", "#b4b3aa", "#a4a59c"],
+            ].map(([name, light, middle, edge]) => (
+              <radialGradient key={name} id={`memory-${name}`} cx="32%" cy="28%" r="80%">
+                <stop stopColor={light} />
+                <stop offset=".65" stopColor={middle} />
+                <stop offset="1" stopColor={edge} />
+              </radialGradient>
+            ))}
           </defs>
           <g
             transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}
@@ -140,7 +147,7 @@ export function AdaptiveGraph({
               <circle cx="500" cy="350" r="76" />
             </g>
             <g className="empty-motif" aria-hidden="true">
-              <circle cx="500" cy="350" r="52" fill="url(#memory-light)" />
+              <circle cx="500" cy="350" r="52" fill="url(#memory-sage)" />
               <circle cx="500" cy="350" r="60" fill="none" />
               {graph.nodes.length > 0 && (
                 <text x="500" y="354" textAnchor="middle">
@@ -158,7 +165,7 @@ export function AdaptiveGraph({
                   y1={from.y}
                   x2={to.x}
                   y2={to.y}
-                  className={edge.tentative ? "tentative" : ""}
+                  className={`${edge.tentative ? "tentative" : ""} ${edge.from === selected || edge.to === selected ? "is-related" : ""}`}
                 >
                   <title>{edge.reason}</title>
                 </line>
@@ -167,8 +174,9 @@ export function AdaptiveGraph({
             {nodes.map((node) => (
               <g
                 key={node.id}
-                className={`graph-node ${node.kind} ${node.tentative ? "tentative" : ""} ${node.memory.id === selected || highlights.includes(node.memory.id) || connected.has(node.id) ? "highlighted" : ""}`}
+                className={`graph-node tone-${["sage", "copper", "stone"][Array.from(node.id).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 3]} ${node.kind} ${node.tentative ? "tentative" : ""} ${node.id === selected ? "is-selected" : highlights.includes(node.memory.id) || connected.has(node.id) || node.memory.id === selected ? "highlighted" : ""}`}
                 role="button"
+                aria-pressed={node.id === selected}
                 tabIndex={0}
                 aria-label={`${node.label} · ${node.tentative ? "Unresolved; " : ""}1 source · revision ${node.memory.revision}`}
                 onClick={() => onSelect(node.memory)}
@@ -186,28 +194,23 @@ export function AdaptiveGraph({
                     ? "Unresolved mention; identity not confirmed"
                     : "Saved source"}
                 </title>
-                <circle
-                  r={
-                    node.kind === "memories"
-                      ? node.memory.id === selected
-                        ? 65
-                        : 32
-                      : 11
-                  }
-                  fill={
-                    node.kind === "memories" ? "url(#memory-light)" : undefined
-                  }
-                />
+                {/* Stable hit area surrounds the fine orbital ring. */}
+                <circle className="node-hit" r={node.kind === "memories" ? 38 : 24} />
+                <circle className="node-orbit" r={node.kind === "memories" ? 28 : 17} />
+                <circle className="node-light" r={node.kind === "memories" ? 22 : 11} />
+                <circle className="node-focus" r={node.kind === "memories" ? 40 : 26} />
                 {
                   <text
-                    y={node.kind === "memories" ? 54 : 30}
-                    textAnchor="middle"
+                    x={node.kind === "memories" ? 36 : 24}
+                    y={-3}
+                    textAnchor="start"
                   >
                     {node.label.length > 18
                       ? node.label.slice(0, 17) + "…"
                       : node.label}
                   </text>
                 }
+                <text className="node-meta" x={node.kind === "memories" ? 36 : 24} y={15}>1 source</text>
               </g>
             ))}
           </g>

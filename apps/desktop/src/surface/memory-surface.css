@@ -281,40 +281,41 @@ body,
 }
 .field-orbits {
   fill: none;
-  stroke: #c7c3b9;
-  stroke-width: 1;
+  stroke: #aaa296;
+  stroke-width: .75;
+  opacity: .4;
+  pointer-events: none;
 }
 .adaptive-graph line {
-  stroke: #888c80;
+  stroke: #82786a;
+  stroke-width: .75;
+  opacity: .16;
+  transition: opacity 280ms ease;
+}
+.adaptive-graph line.is-related { opacity: .24; }
+.adaptive-graph line.tentative { stroke-dasharray: 4 5; }
+.graph-node { cursor: pointer; }
+.graph-node .node-light {
+  stroke: #ffffff;
   stroke-width: 1;
+  opacity: .85;
+  pointer-events: none;
+  transition: opacity 280ms ease;
 }
-.adaptive-graph line.tentative {
-  stroke-dasharray: 4 5;
+.has-emphasis .graph-node .node-light { opacity: .45; }
+.graph-node.highlighted .node-light { opacity: .75; }
+.graph-node:hover .node-light,
+.graph-node:focus-visible .node-light { opacity: 1; }
+.graph-node.is-selected .node-light { opacity: 1; }
+.graph-node.is-selected .node-orbit { stroke-width: 1.5; opacity: 1; }
+.graph-node .node-hit { fill: transparent; stroke: none; }
+.graph-node .node-focus {
+  fill: none;
+  stroke: none;
+  pointer-events: none;
 }
-.graph-node {
-  cursor: pointer;
-}
-.graph-node circle {
-  stroke: #80917d;
-  stroke-width: 1.5;
-  fill: var(--recall-copper);
-}
-.graph-node.people circle {
-  fill: var(--recall-sage);
-}
-.graph-node.places circle {
-  fill: var(--recall-stone);
-}
-.graph-node.topics circle {
-  fill: var(--recall-copper);
-}
-.graph-node.tentative circle {
-  stroke-dasharray: 4 4;
-}
-.graph-node.highlighted circle {
-  stroke: var(--recall-focus);
-  stroke-width: 4;
-}
+.graph-node.is-selected text { font-weight: 600; }
+.graph-node.tentative text { text-decoration: underline dotted; }
 .graph-node text {
   fill: var(--recall-graphite);
   font:
@@ -328,14 +329,14 @@ body,
 .graph-node:focus {
   outline: none;
 }
-.graph-node:focus circle {
+.graph-node:focus-visible .node-focus {
   stroke: var(--recall-graphite);
-  stroke-width: 5;
+  stroke-width: 2;
+  stroke-dasharray: 3 4;
 }
-.empty-motif circle {
-  stroke: var(--recall-sage);
-  stroke-width: 1;
-}
+.empty-motif { pointer-events: none; }
+.empty-motif circle { stroke: #fff; stroke-width: 1; opacity: .9; }
+.empty-motif circle[fill="none"] { stroke: #9da38f; stroke-width: .65; opacity: .4; }
 .ms-field-empty {
   position: relative;
   flex: none;
@@ -1065,9 +1066,15 @@ body,
 .adaptive-graph line, .field-orbits > *, .graph-node circle, .empty-motif circle {
   vector-effect: non-scaling-stroke;
 }
-.graph-node text { font-size: 1.375rem; }
-.graph-node.memories circle { fill: url(#memory-light); }
-.empty-motif text { font: 1rem Inter, sans-serif; fill: var(--ink); }
+.graph-node text { font-size: 1.125rem; font-weight: 500; }
+.graph-node .node-meta { font-size: .875rem; font-weight: 400; fill: #62665e; }
+.graph-node .node-orbit { fill: none; stroke: #a6ab9e; stroke-width: .75; opacity: .6; pointer-events: none; }
+.graph-node.tone-sage .node-light { fill: url(#memory-sage); }
+.graph-node.tone-copper .node-light { fill: url(#memory-copper); }
+.graph-node.tone-copper .node-orbit { stroke: #bf957c; }
+.graph-node.tone-stone .node-light { fill: url(#memory-stone); }
+
+.empty-motif text { font: 1rem Inter, sans-serif; fill: #fff; }
 .ms-context { min-height: 0; max-height: 100%; overflow: auto; }
 .ms-notices {
   grid-column: 1 / -1;
@@ -1135,7 +1142,7 @@ body,
   .ms-view-switch { margin-left: auto; }
   .ms-capture-heading { display: none; }
   .capture-bubbles { width: 100%; justify-content: space-around; }
-  .graph-node text { font-size: 1.625rem; }
+  .graph-node text { font-size: 1.125rem; }
 }
 @media (max-width: 1100px) {
   .ms-ui { grid-template-columns: minmax(0, 1fr); }
@@ -1218,3 +1225,73 @@ body,
 
 .ms-rail { min-width: 0; }
 .ms-nav span, .ms-rail-bottom span { min-width: 0; overflow-wrap: anywhere; }
+
+/* Dense fields reveal labels on demand; names remain available to assistive
+   technology and in the searchable relationship list. */
+.adaptive-graph[data-dense="true"] .graph-node text { opacity: 0; pointer-events: none; }
+.adaptive-graph[data-dense="true"] .graph-node:hover text,
+.adaptive-graph[data-dense="true"] .graph-node:focus-visible text,
+.adaptive-graph[data-dense="true"] .graph-node.is-selected text { opacity: 1; }
+
+/* Desktop proportions from the owner's reference window: a quiet 16% rail,
+   a broad memory field, and a readable quarter-width context panel. */
+@media (min-width: 1101px) {
+  .ms { grid-template-columns: clamp(176px, 15.7vw, 242px) minmax(0, 1fr); }
+  .ms-ui {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 30%);
+    gap: 16px;
+    padding: 24px 20px 16px;
+  }
+  .ms-rail { padding: 28px 16px; }
+  .ms-brand { margin-bottom: 20px; }
+  .ms-brand-logo { width: 72px; height: 72px; }
+  .ms-mark { font-size: 2.625rem; letter-spacing: -1.5px; }
+  .ms-nav { gap: 0; }
+  .ms-nav button, .ms-rail-bottom button { font-size: .8125rem; }
+  .ms-rail:after { margin-top: auto; padding-top: 32px; letter-spacing: 2.5px; }
+  .ms-ask { margin-right: 48px; }
+  .ms-field-header { padding: 20px 24px 0; flex-wrap: nowrap; }
+  .ms-field-header h1 { font-size: clamp(1.75rem, 2.35vw, 2.25rem); letter-spacing: -1.1px; }
+  .ms-field-header > div > p:last-child {
+    font-family: var(--editorial);
+    font-size: .9375rem;
+    line-height: 1.5;
+  }
+  .ms-kicker { font-size: .625rem; letter-spacing: 1.7px; margin-bottom: 4px; }
+  .ms-memory-field, .ms-context { border-radius: 12px; }
+  .ms-context { padding: 22px 24px; display: flex; flex-direction: column; }
+  .ms-context h2 { font-size: clamp(1.5rem, 1.85vw, 1.875rem); margin: 8px 0 16px; }
+  .ms-context > p:not(.ms-kicker) { font-size: .8125rem; line-height: 1.6; }
+  .ms-context-note { order: 3; margin: auto 0 24px; padding-top: 32px; }
+  .ms-context-note h3 { font-size: 1.5rem; }
+  .ms-context-note p { font-family: var(--editorial); font-size: 1.125rem; line-height: 1.4; }
+  .ms-library-counts {
+    order: 4;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 16px 8px;
+    margin: 0 0 16px;
+    border: 1px solid #e7e3dc;
+    border-radius: 8px;
+  }
+  .ms-library-counts > div {
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 0 8px;
+    border-bottom: 0;
+    font-size: .625rem;
+    line-height: 1.4;
+  }
+  .ms-library-counts > div + div { border-left: 1px solid var(--line); }
+  .ms-library-counts dd { font-size: 1.375rem; }
+  .ms-context > button { order: 5; }
+}
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .ms-brand-logo { width: 64px; height: 64px; }
+  .ms-mark { font-size: 2.25rem; }
+  .ms-context { padding: 20px; }
+  .ms-context-note { margin-bottom: 16px; padding-top: 20px; }
+  .ms-context-note p { font-size: 1rem; }
+  .ms-library-counts { padding: 12px 4px; }
+}
