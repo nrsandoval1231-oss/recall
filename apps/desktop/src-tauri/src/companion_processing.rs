@@ -501,27 +501,56 @@ mod tests {
         let first_intent = consent(&vault, &first, true).unwrap().unwrap(); let second_intent = consent(&vault, &second, true).unwrap().unwrap();
         let (entered, receiver) = mpsc::sync_channel(1);
         let parser = Arc::new(BlockingParser { calls: AtomicUsize::new(0), entered: Mutex::new(Some(entered)), release: Barrier::new(2) });
+        let first_starts = Arc::new(AtomicUsize::new(0));
+        let (resume_release, resume_gate) = mpsc::channel();
+        let mut resume_release = Some(resume_release);
+        let resume_gate = Arc::new(Mutex::new(resume_gate));
         let dispatch = |vault: &Vault, intent: Intent| {
-            let parser = parser.clone();
-            enqueue_with(vault, intent, move |v, i| run_with(v, i, &processing::Config::synthetic_test_config(), &crate::librarian::organization_tests::config(), parser.as_ref(), &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()))
+            let parser = parser.clone(); let first_starts = first_starts.clone();
+            let first_id = first.id.clone(); let resume_gate = resume_gate.clone();
+            enqueue_with(vault, intent, move |v, i| {
+                if i.memory_id == first_id {
+                    if first_starts.fetch_add(1, Ordering::SeqCst) == 0 {
+                        // Yield A after its actual durable parse, before any
+                        // organizer dispatch, as ordinary writer contention can.
+                        let (parse, _, _) = stages(v, &i.memory_id)?;
+                        let job = processing::parse_with_visual(v, &processing::Config::synthetic_test_config(), &parse, &i.memory_id, i.revision, true, parser.as_ref(), None)?;
+                        assert_eq!(job.state, "parsed");
+                        return Err("Vault is busy in another Recall process".into());
+                    }
+                    // B can finish before A resumes its already-paid parse.
+                    // Keep that ordering deterministic without timing sleeps.
+                    resume_gate.lock().unwrap().recv().map_err(|_| "Synthetic test cancelled")?;
+                }
+                run_with(v, i, &processing::Config::synthetic_test_config(), &crate::librarian::organization_tests::config(), parser.as_ref(), &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude())
+            })
         };
         dispatch(&vault, first_intent).unwrap(); receiver.recv_timeout(Duration::from_secs(5)).unwrap();
         dispatch(&vault, second_intent).unwrap();
         assert_eq!(project_with(&vault, &second, false, &dispatch).state, "pending");
         assert_eq!(parser.calls.load(Ordering::SeqCst), 1);
         parser.release.wait();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while ACTIVE.lock().unwrap().contains(&format!("{}:{}", vault.id, first.id)) {
+            assert!(Instant::now() < deadline); std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(recorded(&vault, &first.id).unwrap().unwrap().state, "pending");
         let deadline = Instant::now() + Duration::from_secs(15);
         loop {
             std::thread::sleep(Duration::from_millis(50));
             let reopened = Vault::open(&temp.0).unwrap();
-            project_with(&reopened, &first, true, &dispatch);
+            // List order can dispatch B while A waits for a later refresh.
             let b = project_with(&reopened, &second, true, &dispatch);
-            if b.state == "complete" { break; }
+            let a = project_with(&reopened, &first, true, &dispatch);
+            if a.state == "complete" && b.state == "complete" { break; }
+            if b.state == "complete" { if let Some(release) = resume_release.take() { release.send(()).unwrap(); } }
+            assert_ne!(a.state, "failed", "{}", a.message);
             assert_ne!(b.state, "failed", "{}", b.message);
-            assert!(Instant::now() < deadline, "{}: {}; active={:?}; parser calls={}; A={:?}; B={:?}", b.state, b.message, ACTIVE.lock().unwrap(), parser.calls.load(Ordering::SeqCst), status(&reopened, &first.id), status(&reopened, &second.id));
+            assert!(Instant::now() < deadline, "A={:?}; B={:?}; active={:?}; parser calls={}", a, b, ACTIVE.lock().unwrap(), parser.calls.load(Ordering::SeqCst));
         }
         assert_eq!(parser.calls.load(Ordering::SeqCst), 2);
-        assert_eq!(vault.history(&first.id).unwrap().len(), 2); assert_eq!(vault.history(&second.id).unwrap().len(), 2);
+        assert_eq!(vault.history(&first.id).unwrap().len(), 2, "A={:?}; B={:?}; active={:?}", recorded(&vault, &first.id), recorded(&vault, &second.id), ACTIVE.lock().unwrap());
+        assert_eq!(vault.history(&second.id).unwrap().len(), 2, "B={:?}", recorded(&vault, &second.id));
         assert_eq!(project_with(&vault, &second, true, &dispatch).state, "complete");
         assert_eq!(parser.calls.load(Ordering::SeqCst), 2);
         assert!(local_contention("Vault is busy in another Recall process"));
