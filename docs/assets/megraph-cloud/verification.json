@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "nativeIPC": false,
+  "productionPWA": true,
+  "database": "real PostgreSQL",
+  "checked": [
+    "cookie login",
+    "capture",
+    "correct",
+    "original hash",
+    "graph",
+    "keyword search",
+    "reload persistence",
+    "mobile capture",
+    "axe",
+    "logout"
+  ],
+  "errors": []
+}

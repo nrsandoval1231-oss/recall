@@ -216,7 +216,7 @@ describe("Memory Surface", () => {
 
     await user.click(screen.getByRole("button", { name: "Search" }));
     await user.type(
-      screen.getByRole("searchbox", { name: "Ask Recall" }),
+      screen.getByRole("searchbox", { name: "Ask MONOLITH" }),
       "laydown",
     );
     await user.click(screen.getByRole("button", { name: "Ask" }));
@@ -468,7 +468,7 @@ describe("Memory Surface", () => {
     await user.click(screen.getByRole("button", { name: "Close inspector" }));
     await user.click(screen.getByRole("button", { name: "Search" }));
     await user.type(
-      screen.getByRole("searchbox", { name: "Ask Recall" }),
+      screen.getByRole("searchbox", { name: "Ask MONOLITH" }),
       "laydown",
     );
     await user.click(screen.getByRole("button", { name: "Ask" }));
@@ -981,7 +981,7 @@ it("launches the canonical empty memory field without synthetic memories", async
     screen.getByRole("button", { name: /Speak/ }).getAttribute("aria-disabled"),
   ).toBe("true");
   expect(screen.getByRole("button", { name: /Write/ })).toBeTruthy();
-  expect(screen.getByRole("searchbox", { name: "Ask Recall" })).toBeTruthy();
+  expect(screen.getByRole("searchbox", { name: "Ask MONOLITH" })).toBeTruthy();
   expect(
     screen.getByRole("region", { name: "Your memory field" }).textContent,
   ).toContain("0 memories in your library");
@@ -1307,7 +1307,7 @@ it("sends quoted answering only after its explicit action and cancels when the q
   render(<MemorySurface vault={client} />);
   await user.click(screen.getByRole("button", { name: "Search" }));
   await user.type(
-    await screen.findByRole("searchbox", { name: "Ask Recall" }),
+    await screen.findByRole("searchbox", { name: "Ask MONOLITH" }),
     "utility",
   );
   await user.click(screen.getByRole("button", { name: "Ask" }));
@@ -1323,7 +1323,7 @@ it("sends quoted answering only after its explicit action and cancels when the q
     expect.stringMatching(/^[0-9a-f-]{36}$/i),
   );
   await user.type(
-    screen.getByRole("searchbox", { name: "Ask Recall" }),
+    screen.getByRole("searchbox", { name: "Ask MONOLITH" }),
     " changed",
   );
   expect(client.memoryAnswerCancel).toHaveBeenCalledWith(
@@ -1759,7 +1759,7 @@ it("shows native-verified quotations for text captures with the legacy no-attach
   await waitFor(() => expect(client.list).toHaveBeenCalled());
   await user.click(screen.getByRole("button", { name: "Search" }));
   await user.type(
-    screen.getByRole("searchbox", { name: "Ask Recall" }),
+    screen.getByRole("searchbox", { name: "Ask MONOLITH" }),
     "utility",
   );
   await user.click(screen.getByRole("button", { name: "Ask" }));

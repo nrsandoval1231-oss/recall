@@ -15,18 +15,17 @@ fs.mkdirSync(output, { recursive: true });
 fs.rmSync(path.join(output, "approved-comparison.jpg"), { force: true });
 const uiUrl = process.env.RECALL_UI_URL || "http://127.0.0.1:4173/";
 
-const approvedHashes = {
-  desktop: "dbbf2e64d7f57ec09b422a94fcf6a38b0b9a670d44ad98fec10746cad10c2739",
-  mobile: "e781f517c846f4cf20bc5ea623f9a4a522ead73bf81fde606b507d884cc189fe",
-  brand: "f3cac65230d5d7e19f989ed4bbdb99225eacb0c7b0b85f65e0d9842966e64a1e",
-};
-for (const [name, hash] of Object.entries(approvedHashes)) {
-  const bytes = fs.readFileSync(
-    path.join(repo, `docs/assets/approved/${name}.png`),
-  );
-  if (createHash("sha256").update(bytes).digest("hex") !== hash)
-    throw Error(`Canonical ${name} reference changed`);
-}
+const brandRoot = path.join(repo, "branding/monolith/v1");
+const markSource = fs.readFileSync(path.join(brandRoot, "logos/monolith-mark-white.svg"), "utf8");
+const appIconSource = fs.readFileSync(path.join(brandRoot, "icons/monolith-app-dark.svg"), "utf8");
+const brandTokens = JSON.parse(fs.readFileSync(path.join(brandRoot, "tokens/monolith.tokens.json"), "utf8"));
+if (!markSource.includes("<path") || !markSource.includes("L100 91") || /<circle\b/i.test(markSource))
+  throw Error("MONOLITH one-color ribbon M source is missing or malformed");
+if (!appIconSource.includes("<rect") || !appIconSource.includes("L100 91"))
+  throw Error("MONOLITH app icon source is missing or malformed");
+if (brandTokens.brand !== "MONOLITH" || brandTokens.typography?.heading !== "Sora" || brandTokens.typography?.body !== "Inter")
+  throw Error("MONOLITH brand tokens changed unexpectedly");
+const brandSourceCheck = { brand: brandTokens.brand, mark: "logos/monolith-mark-white.svg", appIcon: "icons/monolith-app-dark.svg", typography: brandTokens.typography };
 const browser = await chromium.launch(
   process.env.RECALL_CHROMIUM
     ? { executablePath: process.env.RECALL_CHROMIUM }
@@ -224,6 +223,16 @@ for (const [w, h] of [
     });
   };
   await shot("empty");
+  const markElement = page.locator(".ms-mark");
+  if (await markElement.isVisible()) {
+    const markBounds = await markElement.boundingBox();
+    const railBounds = await page.locator(".ms-rail").boundingBox();
+    check(
+      markBounds.x >= railBounds.x - 1 &&
+        markBounds.x + markBounds.width <= railBounds.x + railBounds.width + 1,
+      `MONOLITH wordmark escapes the navigation rail at ${w}x${h}`,
+    );
+  }
   const emptyBox = await page.locator(".ms-field-empty").boundingBox();
   const orbBox = await page.locator(".adaptive-graph").boundingBox();
   check(emptyBox.y >= orbBox.y + orbBox.height, `Empty message overlaps orb at ${w}×${h}`);
@@ -356,7 +365,7 @@ fs.writeFileSync(
   JSON.stringify(
     {
       kind: "Synthetic browser IPC checks; not native persistence, installed Windows, or live-provider acceptance",
-      approvedHashes,
+      brandSourceCheck,
       results,
       errors,
     },

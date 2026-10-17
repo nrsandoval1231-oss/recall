@@ -22,9 +22,9 @@ Describe relevant authorization, retry, provenance, correction, and conflict che
 
 ## UI and brand (required for visual changes)
 
-- [ ] Uses only the owner-approved 2026-10-15 direction in `docs/DESIGN.md`; no old reference, alternate logo, palette or UI proposal.
-- [ ] Exact approved reference PNGs are available and verified before claiming visual acceptance; missing references are reported, not regenerated.
-- [ ] No photographs in branding, icons, avatars, backgrounds or decorative cards. Original captured photos/scans remain inspectable evidence.
+- [ ] Uses only the owner-selected MONOLITH direction in `docs/DESIGN.md`; no old reference, alternate logo, palette or UI proposal.
+- [ ] Actual MONOLITH source guide/M assets are checked; generated runtime icons derive from them. Missing ZIP/raster masters are reported.
+- [ ] Restrained imagery follows the guide; original captured photos/scans remain inspectable evidence.
 - [ ] No invented mockup counts, psychological scores, social behavior, fake recordings or unsupported capabilities.
 - [ ] Actual screenshots, responsive states, keyboard access, contrast and reduced motion are checked and their evidence level is stated. Documentation approval is not implementation acceptance.
 

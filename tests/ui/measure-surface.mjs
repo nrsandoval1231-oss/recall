@@ -28,7 +28,7 @@ await page.evaluate(() => {
 await page
   .getByLabel("What do you need to remember?", { exact: true })
   .fill("What do you know about Brooks Campus?");
-await page.getByRole("button", { name: "Ask Recall", exact: true }).click();
+await page.getByRole("button", { name: "Ask MONOLITH", exact: true }).click();
 await page
   .getByRole("button", { name: /Focus memory/ })
   .first()

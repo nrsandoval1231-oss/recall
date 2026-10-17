@@ -1,6 +1,6 @@
-# Recall — Development
+# MONOLITH — Development
 
-How to build, run and test the product (desktop + phone). The frozen cloud-era setup is in [legacy-cloud/DEVELOPMENT.md](legacy-cloud/DEVELOPMENT.md).
+How to build, run and test the product (desktop + phone). Active authenticated cloud setup is in `infra/megraph/README.md`; historical setup is in [legacy-cloud/DEVELOPMENT.md](legacy-cloud/DEVELOPMENT.md).
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ npm ci                      # once, from the repo root
 
 ```bash
 cd apps/desktop
-npm run dev                 # browser preview only: synthetic fixture, cannot write a library
+npm run dev                 # authenticated browser entry; synthetic IPC is injected only by the UI test harness
 npx tauri dev               # real app: choose a folder or "Use default library" (Documents/Recall)
 npx tauri build             # NSIS installer (unsigned)
 ```
@@ -65,7 +65,7 @@ Browser and visual tests use explicitly synthetic native IPC. They are not proof
 
 ## CI
 
-`.github/workflows/ci.yml` runs TS checks, Playwright, native Rust tests on Linux and Windows, the Windows installer artifact, and the legacy backend suite. An Actions artifact is not installed-app acceptance.
+`.github/workflows/ci.yml` runs TS checks, Playwright, native Rust tests on Linux and Windows, the Windows installer artifact, and the backend suite (reused for cloud checkpoint). An Actions artifact is not installed-app acceptance.
 
 ## Tester releases
 

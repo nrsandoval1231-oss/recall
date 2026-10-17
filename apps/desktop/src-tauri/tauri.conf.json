@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Recall",
+  "productName": "MONOLITH",
   "version": "0.1.0",
   "identifier": "com.example.recall.desktop",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Recall",
+        "title": "MONOLITH",
         "width": 1440,
         "height": 960,
         "minWidth": 900,

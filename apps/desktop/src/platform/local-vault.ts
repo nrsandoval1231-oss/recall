@@ -93,6 +93,7 @@ export interface KnowledgeControl { version: number; vault_id: string; enabled: 
 export interface AnswerSelection { source_id: string; revision: number; source_sha256: string; note_sha256: string; quote: string }
 export interface MemoryAnswer { sources: SourceAnswer; status: "supported" | "insufficient" | "unavailable" | "cancelled" | "stale" | string; message: string; selections: AnswerSelection[]; answer_provider: string | null }
 export interface LocalVault {
+  readonly storage?: "cloud" | "local";
   exportLibrary?(expectedVaultId: string): Promise<LibraryBackup | null>;
   restoreLibrary?(): Promise<VaultStatus | null>;
   readonly available: boolean;

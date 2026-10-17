@@ -33,7 +33,7 @@ export function AskForm({
         onChange={(e) => setQuestion(e.target.value)}
       />
       <button
-        aria-label="Ask Recall"
+        aria-label="Ask MONOLITH"
         type="submit"
         disabled={busy || !question.trim()}
       >

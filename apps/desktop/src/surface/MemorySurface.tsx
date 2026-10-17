@@ -265,10 +265,12 @@ function vaultTicks(memories: VaultMemory[]): TimelineTick[] {
 }
 
 export function MemorySurface({
+  cloudControls,
   vault,
   librarian = unavailableLibrarian,
 }: {
   vault: LocalVault;
+  cloudControls?: import("react").ReactNode;
   librarian?: Librarian;
 }) {
   const [vaultSettings, setVaultSettings] = useState(false);
@@ -1171,7 +1173,7 @@ export function MemorySurface({
       evidenceRef.current = saved.id;
       setEvidenceId(saved.id);
       setCorrection(noteBody(saved));
-      setNotice("Saved locally with original text evidence.");
+      setNotice(vault.storage === "cloud" ? "Saved on this device with original text evidence. Check sync status for cloud confirmation." : "Saved locally with original text evidence.");
       await loadSource(scope.vault_id, saved);
       await organizeMemory(saved);
     } catch (captureError) {
@@ -1957,10 +1959,10 @@ export function MemorySurface({
       data-inspector={inspector}
       data-section={section}
     >
-      <aside className="ms-rail" aria-label="Recall">
+      <aside className="ms-rail" aria-label="MONOLITH">
         <div className="ms-brand">
-          <img className="ms-brand-logo" src="/brand/orbital-mark.svg" alt="" />
-          <span className="ms-mark">recall</span>
+          <img className="ms-brand-logo" src="/brand/monolith-mark.svg" alt="" />
+          <span className="ms-mark">MONOLITH</span>
         </div>
         <nav className="ms-nav" aria-label="Memory">
           {RAIL.map((item) => (
@@ -1977,6 +1979,7 @@ export function MemorySurface({
           ))}
         </nav>
         <div className="ms-rail-bottom">
+          {cloudControls}
           <button type="button" aria-label="Settings" onClick={openSettings}>
             <GearSixIcon />
             <span>Settings</span>
@@ -2020,7 +2023,7 @@ export function MemorySurface({
             >
               <SearchIcon />
               <label className="ms-sr" htmlFor="recall-ask">
-                Ask Recall
+                Ask MONOLITH
               </label>
               <input
                 id="recall-ask"
@@ -2036,9 +2039,9 @@ export function MemorySurface({
             </form>
           }
           <div className="ms-greeting">
-            <img src="/brand/orbital-mark.svg" alt="" />
+            <img src="/brand/monolith-mark.svg" alt="" />
             <span>
-              Your private memory.<small>A more human tomorrow.</small>
+              Your private memory.<small>Your world. Connected.</small>
             </span>
           </div>
           <section className="ms-memory-field" aria-label="Your memory field">
@@ -2139,7 +2142,7 @@ export function MemorySurface({
                 <span className="ms-copper-rule" />
                 <h3>Yours to keep.</h3>
                 <p>
-                  Originals stay in your Recall library. You can inspect,
+                  Originals stay in your MONOLITH library. You can inspect,
                   correct, and take them with you.
                 </p>
               </div>
@@ -2937,7 +2940,7 @@ export function MemorySurface({
               )}
             </div>
           )}
-          <footer className="adaptive-signature">A MORE HUMAN TOMORROW</footer>
+          <footer className="adaptive-signature">YOUR WORLD. CONNECTED.</footer>
         </div>
       </main>
     </div>
@@ -3035,7 +3038,7 @@ function AskResults({
   return (
     <div>
       <p className="ms-kicker">ASK</p>
-      <h1>Ask Recall</h1>
+      <h1>Ask MONOLITH</h1>
       <p className="ms-fine">
         {KEYWORD_LABEL}
         {demo

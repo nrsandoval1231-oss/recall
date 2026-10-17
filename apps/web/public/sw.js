@@ -1,12 +1,12 @@
 /* Recall app shell. Private API and enrollment responses are never cached. */
-const SHELL = "recall-shell-v1";
+const SHELL = "recall-shell-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL)
       .then((cache) =>
-        cache.addAll(["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"]),
+        cache.addAll(["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/fonts/Inter-Regular.ttf", "/fonts/Sora-Variable.ttf"]),
       )
       .then(() => self.skipWaiting()),
   );

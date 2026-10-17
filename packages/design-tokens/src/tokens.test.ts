@@ -64,13 +64,22 @@ describe("design tokens", () => {
   });
 });
 
-it("keeps the shared desktop/phone CSS palette aligned with platform tokens", async () => {
+it("keeps the shared desktop/phone palette aligned with MONOLITH tokens", async () => {
   const { readFile } = await import("node:fs/promises");
-  const { palette } = await import("./index");
+  const expected = {
+    obsidian: "#050607",
+    charcoal: "#121418",
+    graphite: "#1f2328",
+    slate: "#3a4048",
+    steel: "#8a8f98",
+    silver: "#e5e7eb",
+    mist: "#2a2f36",
+    smoke: "#3b424c",
+    glass: "#505862",
+    frost: "#6b7280",
+  };
   const css = await readFile(new URL("./brand.css", import.meta.url), "utf8");
-  for (const [name, value] of Object.entries(palette)) {
-    expect(css.toLowerCase()).toContain(
-      `--recall-${name}: ${value.toLowerCase()};`,
-    );
+  for (const [name, value] of Object.entries(expected)) {
+    expect(css.toLowerCase()).toContain(`--monolith-${name}: ${value};`);
   }
 });

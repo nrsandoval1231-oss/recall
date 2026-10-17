@@ -1942,6 +1942,40 @@ impl Vault {
         Ok(ProcessingSnapshot { memory, source, human_corrected })
     }
 
+    /// Read-only migration package, including retained deletion history. Never
+    /// changes originals or uses a client-supplied filesystem path.
+    pub fn sync_export(&self, memory_id: &str) -> Result<serde_json::Value> {
+        let _lock = self.lock()?;
+        id(memory_id)?;
+        if let Some(error) = self.recover()?.get(memory_id) { return Err(error.clone()); }
+        let memory = self.reconciled(memory_id)?;
+        if memory.conflict.is_some() || !["active", "deleted"].contains(&memory.state.as_str()) {
+            return Err("Resolve the local memory conflict before migration".into());
+        }
+        // Do not advertise a completed migration while secondary attachments
+        // remain only on this device. The full local backup is retained.
+        let attachments = self.path("_meta/attachments");
+        if attachments.exists() {
+            for entry in fs::read_dir(&attachments).map_err(|e| e.to_string())? {
+                let path = entry.map_err(|e| e.to_string())?.path();
+                let receipt: serde_json::Value = serde_json::from_slice(&read(&path, 2 * 1024 * 1024)?).map_err(|e| e.to_string())?;
+                if receipt["memory_id"].as_str() == Some(memory_id) {
+                    return Err("This memory has additional attachments. Keep it local until attachment migration is available; the full backup is retained.".into());
+                }
+            }
+        }
+        let records = self.records(memory_id)?;
+        let source = if absent_original(&memory) {
+            let bytes = records.first().ok_or("Missing original history")?.memory.note.as_bytes().to_vec();
+            VaultSource {sha256: hash(&bytes), bytes, mime_type: "text/plain".into()}
+        } else { self.verify_source(&memory)? };
+        let history: Vec<VaultRevision> = records.into_iter().map(|event| VaultRevision {
+            revision:event.memory.revision, note:event.memory.note, recorded_at:event.memory.updated_at,
+            origin:event.origin, kind:event.kind,
+        }).collect();
+        Ok(serde_json::json!({"memory":memory,"source":source,"history":history}))
+    }
+
     pub fn source(&self, memory_id: &str) -> Result<VaultSource> {
         let _lock = self.lock()?;
         if let Some(error) = self.recover()?.get(memory_id) {

@@ -1,4 +1,5 @@
 mod library_backup;
+mod cloud;
 #[allow(dead_code)]
 mod jev;
 mod processing;
@@ -30,6 +31,16 @@ impl NativeState {
 
 fn fail(error: impl std::fmt::Display) -> String {
     error.to_string()
+}
+
+#[tauri::command]
+fn vault_sync_export(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String) -> Result<serde_json::Value,String> {
+    state.with(&expected_vault_id, |vault| vault.sync_export(&memory_id))
+}
+
+#[tauri::command]
+fn cloud_cache(state: tauri::State<'_, NativeState>, action: String, scope: String, payload: serde_json::Value) -> Result<serde_json::Value, String> {
+    state.store()?.cloud_cache(&action, &scope, payload).map_err(fail)
 }
 
 #[tauri::command]
@@ -654,6 +665,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            cloud_cache,
+            vault_sync_export,
+            cloud::cloud_connect,
+            cloud::cloud_request,
+            cloud::cloud_disconnect,
             vault_status,
             library_create,
             library_attach,

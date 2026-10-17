@@ -7,7 +7,7 @@ async function reconstruct(page: Page) {
   await page
     .getByLabel("What do you need to remember?", { exact: true })
     .fill(question);
-  await page.getByRole("button", { name: "Ask Recall", exact: true }).click();
+  await page.getByRole("button", { name: "Ask MONOLITH", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: question, exact: true }),
   ).toBeVisible();
@@ -131,7 +131,7 @@ test("canonical journey preserves evidence, refocus and prior composition", asyn
   await expect(page.getByText(/Startup is now expected in March/)).toHaveCount(
     0,
   );
-  await page.getByRole("button", { name: "Ask Recall", exact: true }).click();
+  await page.getByRole("button", { name: "Ask MONOLITH", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "Supporting memories", exact: true }),
   ).toBeVisible();

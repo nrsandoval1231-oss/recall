@@ -248,10 +248,10 @@ test("offline photo bytes survive reload and transfer; only public shell is cach
   expect(cached.sort()).toEqual([
     "/",
     "/brand/favicon.svg",
-    "/brand/orbital-mark.svg",
+    "/brand/monolith-mark.svg",
     "/companion.js",
     "/fonts/Inter-Regular.ttf",
-    "/fonts/PlayfairDisplay-Regular.ttf",
+    "/fonts/Sora-Variable.ttf",
     "/icon.png",
     "/manifest.webmanifest",
     "/phone-ui.js",
@@ -566,7 +566,7 @@ test("focused phone navigation preserves drafts and consent; Speak stays honest"
     page.getByRole("img", { name: "Selected original photo" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Ask", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Ask Recall" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask MONOLITH" })).toBeVisible();
   await page.getByRole("link", { name: "Write a memory" }).click();
   await expect(
     page.getByRole("img", { name: "Selected original photo" }),
@@ -611,7 +611,7 @@ test("keyboard hash navigation focuses the visible heading through save and hist
   ).toBeFocused();
   await page.getByRole("link", { name: "Ask", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Ask Recall" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Ask MONOLITH" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Ask the notes")).toBeFocused();
   await page.getByRole("link", { name: "← Home", exact: true }).focus();
@@ -677,7 +677,7 @@ test("capture keeps Save above navigation and validates beside the field", async
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     const save = page.getByRole("button", { name: "Save capture", exact: true });
-    const nav = page.getByRole("navigation", { name: "Recall" });
+    const nav = page.getByRole("navigation", { name: "MONOLITH" });
     const saveBox = (await save.boundingBox())!;
     const navBox = (await nav.boundingBox())!;
     expect(saveBox.height).toBeGreaterThanOrEqual(48);
@@ -719,10 +719,10 @@ test("reduced visual viewport keeps the focused draft usable without nav coverin
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
   await expect(page.locator("body")).toHaveClass(/keyboard-open/);
-  await expect(page.getByRole("navigation", { name: "Recall" })).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "MONOLITH" })).toBeHidden();
   await expect(note).toHaveValue("Synthetic keyboard draft");
   await page.getByRole("button", { name: "Save capture", exact: true }).focus();
-  await expect(page.getByRole("navigation", { name: "Recall" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "MONOLITH" })).toBeVisible();
 });
 
 
@@ -734,6 +734,6 @@ test("phone capture reflows at twice the default text size", async ({ page }) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.getByRole("button", { name: "Save capture", exact: true }).scrollIntoViewIfNeeded();
   const save = (await page.getByRole("button", { name: "Save capture", exact: true }).boundingBox())!;
-  const nav = (await page.getByRole("navigation", { name: "Recall" }).boundingBox())!;
+  const nav = (await page.getByRole("navigation", { name: "MONOLITH" }).boundingBox())!;
   expect(save.y + save.height).toBeLessThanOrEqual(nav.y);
 });

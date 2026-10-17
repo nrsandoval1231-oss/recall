@@ -66,8 +66,8 @@ export function App({ services }: { services: Services }) {
   if (startupError)
     return (
       <main className="gate card">
-        <div className="brand">Recall</div>
-        <h1>Recall is unavailable.</h1>
+        <div className="brand">MONOLITH</div>
+        <h1>MONOLITH is unavailable.</h1>
         <p className="error" role="alert">
           {startupError}
         </p>
@@ -92,7 +92,7 @@ export function App({ services }: { services: Services }) {
 function Unprovisioned({ notice }: { notice: string | null }) {
   return (
     <main className="gate card">
-      <div className="brand">Recall</div>
+      <div className="brand">MONOLITH</div>
       <h1>This browser is not provisioned.</h1>
       <p className="muted">
         A provisioned device opens straight into memory. Ask an operator to
