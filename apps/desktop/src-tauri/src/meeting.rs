@@ -78,7 +78,7 @@ pub fn validate(
         &parsed.model,
     )?;
     if ![1, 2].contains(&layout.schema_version)
-        || !["meeting", "project", "operations"].contains(&layout.category.as_str())
+        || !["note", "photo", "meeting", "project", "operations"].contains(&layout.category.as_str())
         || layout
             .title_span
             .is_some_and(|n| n >= parsed.candidates.len() || parsed.candidates[n].span.retracted)
@@ -142,21 +142,18 @@ pub fn render(
     {
         return Err("Invalid native source UUID".into());
     }
-    let title = layout
-        .title_span
-        .map(|n| {
-            format!(
-                "Meeting — {}",
-                parsed.candidates[n]
-                    .span
-                    .text
-                    .chars()
-                    .take(100)
-                    .collect::<String>()
-            )
-        })
-        .unwrap_or_else(|| "Meeting notes".into());
-    let mut out=format!("---\nrecall_id: {}\ntitle: {}\ntype: {}\nsource_sha256: {}\nparser_model: {}\nstatus: needs-review\ntags: [recall/meeting, recall/needs-review]\n---\n\n# {}\n\n",yaml(&parsed.source_id),yaml(&title),yaml(&layout.category),yaml(&parsed.source_sha256),yaml(&parsed.model),escaped(&title));
+    let title_span = layout.title_span.or_else(|| {
+        parsed.candidates.iter().position(|candidate| !candidate.span.retracted)
+    });
+    let title = title_span
+        .map(|n| parsed.candidates[n].span.text.chars().take(100).collect::<String>())
+        .filter(|title| !title.trim().is_empty())
+        .unwrap_or_else(|| match layout.category.as_str() {
+            "photo" => "Photo memory".into(),
+            "meeting" => "Meeting notes".into(),
+            _ => "Untitled memory".into(),
+        });
+    let mut out=format!("---\nrecall_id: {}\ntitle: {}\ntype: {}\nsource_sha256: {}\nparser_model: {}\nstatus: needs-review\ntags: [recall/{}, recall/needs-review]\n---\n\n# {}\n\n",yaml(&parsed.source_id),yaml(&title),yaml(&layout.category),yaml(&parsed.source_sha256),yaml(&parsed.model),layout.category,escaped(&title));
     let mut sections: [Vec<usize>; 4] = Default::default();
     for n in layout
         .observations
@@ -309,7 +306,7 @@ pub(crate) fn evidence(parsed: &jev::ParsedSource, context: &[Context]) -> serde
 }
 pub fn tool_schema() -> serde_json::Value {
     serde_json::json!({"type":"object","additionalProperties":false,"required":["schema_version","title_span","category","observations","follow_ups","questions","related_memory_ids"],"properties":{
-        "schema_version":{"type":"integer","enum":[2]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["meeting","project","operations"]},
+        "schema_version":{"type":"integer","enum":[2]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["note","photo","meeting","project","operations"]},
         "observations":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"follow_ups":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"questions":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"related_memory_ids":{"type":"array","maxItems":4,"items":{"type":"string"}}}})
 }
 #[cfg(test)]
@@ -416,6 +413,26 @@ pub(crate) mod tests {
             tool_schema()["properties"]["schema_version"]["enum"],
             serde_json::json!([2])
         );
+    }
+    #[test]
+    fn generic_photo_uses_source_title_and_photo_type() {
+        let p = source();
+        let mut l = layout(&p);
+        l.category = "photo".into();
+        l.title_span = None;
+        let out = render(&l, &p, &[]).unwrap();
+        assert!(out.contains("type: \"photo\""));
+        assert!(out.contains("tags: [recall/photo, recall/needs-review]"));
+        assert!(out.contains("# Brad says maybe 5–10 MW?"));
+        assert!(!out.contains("Meeting -"));
+    }
+    #[test]
+    fn title_fallback_skips_retracted_source_spans() {
+        let p = source();
+        let mut l = layout(&p);
+        l.title_span = None;
+        let out = render(&l, &p, &[]).unwrap();
+        assert!(!out.contains("# Crossed out:"));
     }
     #[test]
     fn explicit_source_actions_survive_model_section_misclassification() {

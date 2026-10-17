@@ -2,6 +2,12 @@
 
 Updated 2026-10-17. This is the active record. The [prior status ledger](history/STATUS-PRE-MONOLITH-2026-10-17.md) is preserved unchanged as historical evidence; its design mandates and next steps are superseded here.
 
+## Capture enrichment repair - 2026-10-17
+
+Approved repair candidate based on PR #66. Native Markdown rendering now accepts generic `note` and `photo` categories alongside the existing meeting/project/operations categories, derives a fallback title from the first non-retracted source span, and writes category-specific tags. The organization prompt allows generic photos and notes to remain generically typed. Adaptive graph previews prefer an authored Markdown heading to the source filename. Synthetic regression coverage was added for a generic photo, retracted-title fallback, and heading-first preview.
+
+This is a partial repair only. Native capture consent remains an explicit per-capture choice with default off and the native provider ledger still blocks uncertain replays. The cloud library still has no native-record enrichment worker, and cloud captures do not yet enter the native Jev/Claude pipeline. Durable per-memory unified processing states, automatic queue recovery across both storage modes, and a cloud processing UX remain open. No providers, private captures, credentials, devices or deployment were used for this candidate.
+
 ## Reconciliation scope
 
 Owner instruction: “monolith is the canonical vision. Remove anything that conflicts”. Main was rechecked at ba196b869bac40bacc34a17641eef11bd83c36ca; PR #64 at d16423c43ab90e1a7de6f52c54f57087cdb90342; PR #65 at c252475d63c31671e70c4a35b687107a6f4af8a9. This isolated candidate builds on PR #64 and imports PR #65's source brand pack unchanged. Other checkouts and branches are untouched.
