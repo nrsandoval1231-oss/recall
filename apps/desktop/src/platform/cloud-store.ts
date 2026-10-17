@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { VaultMemory, VaultSource } from "./local-vault";
 export interface CloudMutation {
+  processing_consent?: boolean;
   operation_id: string; memory_id: string; expected_revision: number;
   action: "capture" | "correct" | "remove" | "restore";
   note?: string; source_base64?: string; source_name?: string; mime_type?: string; source_sha256?: string; expected_vault_id?: string; captured_at?: string;

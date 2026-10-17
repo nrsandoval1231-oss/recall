@@ -20,6 +20,7 @@ class InterpretRequest:
     pages: list[PageImage]
     schema: dict[str, Any]
     repair_note: str | None = None  # validation errors from a previous attempt, for one repair call
+    system: str | None = None  # trusted caller prompt; never supplied by captured content
 
 
 @dataclass(frozen=True)

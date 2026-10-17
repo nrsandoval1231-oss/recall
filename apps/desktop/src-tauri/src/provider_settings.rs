@@ -47,6 +47,7 @@ struct Keyring;
 
 impl Store for Keyring {
     fn get(&self, name: &str) -> Result<Option<String>, String> {
+        if disabled() { return Ok(None); }
         let entry = keyring::Entry::new(SERVICE, name).map_err(|e| e.to_string())?;
         match entry.get_password() {
             Ok(value) => Ok(Some(value)),
@@ -75,7 +76,21 @@ fn clean(value: Option<String>) -> Option<String> {
 /// The configured value for one setting: saved value first, then the environment.
 /// A credential-store failure falls back to the environment rather than failing the caller.
 pub fn lookup(name: &str) -> Option<String> {
+    if disabled() { return None; }
     lookup_with(&Keyring, name, |n| std::env::var(n).ok())
+}
+/// Nonpersistent synthetic validation fence, checked before credential access and network setup.
+pub(crate) fn disabled() -> bool { std::env::var("RECALL_DISABLE_PROVIDERS").as_deref() == Ok("1") }
+
+#[cfg(test)]
+#[test]
+fn synthetic_environment_fences_runtime_credentials_and_transport() {
+    // The controller enables this flag for the complete synthetic native suite.
+    if disabled() {
+        assert!(lookup("RECALL_CLAUDE_API_KEY").is_none());
+        assert!(lookup("TYPESAFE_API_KEY").is_none());
+        assert!(crate::librarian::provider_agent(1).is_err());
+    }
 }
 
 fn lookup_with(store: &dyn Store, name: &str, env: impl Fn(&str) -> Option<String>) -> Option<String> {

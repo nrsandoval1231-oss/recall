@@ -59,6 +59,8 @@ impl KnowledgeControl {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VaultMemory {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub processing: Option<crate::companion_processing::Outcome>,
     pub id: String,
     pub revision: u64,
     pub note: String,
@@ -175,6 +177,7 @@ mod event_memory {
             updated_at: m.updated_at,
             conflict: m.conflict,
             state: "active".into(),
+            processing: None,
             note_path: None,
         })
     }
@@ -1443,6 +1446,7 @@ impl Vault {
             updated_at: now,
             conflict: None,
             state: "active".into(),
+            processing: None,
             note_path: None,
         };
         let e = Event {
@@ -1498,6 +1502,7 @@ impl Vault {
             updated_at: now,
             conflict: None,
             state: "active".into(),
+            processing: None,
             note_path: None,
         };
         let e = Event {
@@ -1629,6 +1634,7 @@ impl Vault {
                     updated_at: String::new(),
                     conflict: Some(format!("Memory unavailable: {err}")),
                     state: "conflict".into(),
+                    processing: None,
                     note_path: None,
                 },
             };
@@ -1665,6 +1671,7 @@ impl Vault {
                     updated_at: String::new(),
                     conflict: Some(format!("Pending capture preserved: {error}")),
                     state: "conflict".into(),
+                    processing: None,
                     note_path: None,
                 });
             }

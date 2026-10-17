@@ -5,7 +5,7 @@ fn reviewed_organization_audit_survives_interrupted_reservation_and_rejects_tamp
     use crate::librarian::{self,CallError,OrganizationTransport};
     struct Rejected;
     impl OrganizationTransport for Rejected {
-        fn organize(&self,_:&str,_:&str,_:&serde_json::Value)->std::result::Result<crate::meeting::Layout,CallError>{Err(CallError::HttpStatus(400))}
+        fn organize(&self,_:&str,_:&str,_:&serde_json::Value)->std::result::Result<crate::meeting::Layout,CallError>{Err(CallError::HttpStatus(500))}
     }
     struct Count(std::cell::Cell<u32>);
     impl OrganizationTransport for Count {

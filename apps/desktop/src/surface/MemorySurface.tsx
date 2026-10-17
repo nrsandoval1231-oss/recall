@@ -1,4 +1,4 @@
-import { graphTitle } from "./adaptive-graph";
+import { graphTitle, memoryPreview } from "./adaptive-graph";
 import { nativeProviderSettings } from "../platform/provider-settings";
 import { ProviderSettings } from "./ProviderSettings";
 import { attachmentIntent, clearAttachmentIntent } from "./attachment-intent";
@@ -81,6 +81,7 @@ interface Selected {
   vault_identity: string;
 }
 interface PendingCapture {
+  processingConsent?: boolean;
   operationId: string;
   note: string;
   kind?: "photo" | "text";
@@ -198,7 +199,9 @@ function readPending(identity: string): PendingCapture | null {
   const kind = "kind" in data ? data.kind : undefined;
   if (kind !== undefined && kind !== "photo" && kind !== "text")
     throw new Error("Pending capture kind is invalid.");
-  return { operationId: operationIdValue, note, kind };
+  const processingConsent = "processingConsent" in data ? data.processingConsent : false;
+  if (typeof processingConsent !== "boolean") throw new Error("Pending source permission is invalid; processing stopped.");
+  return { operationId: operationIdValue, note, kind, processingConsent };
 }
 function displayDate(iso: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
@@ -311,6 +314,7 @@ export function MemorySurface({
   const [answerConsentChecked, setAnswerConsentChecked] = useState(false);
   const [knowledgeBusy, setKnowledgeBusy] = useState(false);
   const [processingConsent, setProcessingConsent] = useState(false);
+  const [automaticProcessing, setAutomaticProcessing] = useState(false);
   const [processingState, setProcessingState] = useState("");
   const [reviewRetryAcknowledged, setReviewRetryAcknowledged] = useState(false);
   const [vaultHits, setVaultHits] = useState<VaultMemory[] | null>(null);
@@ -343,6 +347,19 @@ export function MemorySurface({
   previewRef.current = preview;
 
   const selected = selectedFrom(status);
+  useEffect(() => {
+    setAutomaticProcessing(selected?.vault_identity ? localStorage.getItem(`recall.automatic-processing.v1:${selected.vault_identity}`) === "true" : false);
+  }, [selected?.vault_identity]);
+  useEffect(() => {
+    if (!selected || !vault.requestProcessing) return;
+    let cancelled = false;
+    const scope = selected.vault_id;
+    const timer = window.setInterval(() => {
+      void vault.list(scope, "").then(rows => { if (!cancelled && inScope(scope)) setItems(rows); }).catch(() => undefined);
+    }, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [selected?.vault_id, vault]);
+
   const scopeRef = useRef<string | null>(null);
   scopeRef.current = selected?.vault_id ?? null;
   const sourceRequest = useRef(0);
@@ -1149,6 +1166,7 @@ export function MemorySurface({
       operationId: operationId(),
       note: draft,
       kind: "text" as const,
+      processingConsent: automaticProcessing || processingConsent,
     };
     sessionStorage.setItem(
       captureKey(scope.vault_identity),
@@ -1162,6 +1180,7 @@ export function MemorySurface({
         scope.vault_id,
         intent.operationId,
         intent.note,
+        ...(intent.processingConsent ? [true] as const : [] as const),
       );
       if (!inScope(scope.vault_id)) return;
       sessionStorage.removeItem(captureKey(scope.vault_identity));
@@ -1175,7 +1194,8 @@ export function MemorySurface({
       setCorrection(noteBody(saved));
       setNotice(vault.storage === "cloud" ? "Saved on this device with original text evidence. Check sync status for cloud confirmation." : "Saved locally with original text evidence.");
       await loadSource(scope.vault_id, saved);
-      await organizeMemory(saved);
+      if (vault.requestProcessing) setProcessingState(saved.processing?.message ?? "Original saved. Processing permission retained with this capture.");
+      else await organizeMemory(saved);
     } catch (captureError) {
       if (inScope(scope.vault_id)) setError(message(captureError));
     } finally {
@@ -1204,6 +1224,7 @@ export function MemorySurface({
       operationId: operationId(),
       note: draft,
       kind: "photo" as const,
+      processingConsent: automaticProcessing || processingConsent,
     };
     sessionStorage.setItem(
       captureKey(selected.vault_identity),
@@ -1217,6 +1238,7 @@ export function MemorySurface({
         selected.vault_id,
         intent.operationId,
         intent.note,
+        ...(intent.processingConsent ? [true] as const : [] as const),
       );
       if (!inScope(selected.vault_id)) return;
       if (!saved) {
@@ -1238,7 +1260,8 @@ export function MemorySurface({
       setEvidenceId(saved.id);
       setCorrection(noteBody(saved));
       await loadSource(selected.vault_id, saved);
-      await organizeMemory(saved);
+      if (vault.requestProcessing) setProcessingState(saved.processing?.message ?? "Original saved. Processing permission retained with this capture.");
+      else await organizeMemory(saved);
     } catch (importError) {
       if (inScope(selected.vault_id))
         setError(
@@ -2301,7 +2324,7 @@ export function MemorySurface({
                     onOrganize={() =>
                       evidenceMemory && void organizeMemory(evidenceMemory)
                     }
-                    canProcess={Boolean(vault.parse)}
+                    canProcess={Boolean(vault.parse || vault.requestProcessing)}
                     canReviewOrganization={Boolean(
                       vault.reviewedOrganize &&
                       selected &&
@@ -2357,6 +2380,14 @@ export function MemorySurface({
                         }
                       }}
                     />
+                    <label className="ms-check">
+                      <input type="checkbox" checked={automaticProcessing} onChange={(event) => {
+                        const enabled = event.target.checked;
+                        if (selected) localStorage.setItem(`recall.automatic-processing.v1:${selected.vault_identity}`, String(enabled));
+                        setAutomaticProcessing(enabled);
+                      }} />{" "}
+                      Automatically organize new captures on this device. Sends each new source and up to four relevant library excerpts to the configured AI providers; charges apply. Existing captures are excluded. Turn off to stop authorizing future captures.
+                    </label>
                     <label className="ms-check">
                       <input
                         type="checkbox"
@@ -2491,6 +2522,8 @@ export function MemorySurface({
                       {visibleMemories.map((memory) => (
                         <article className="ms-hit" key={memory.id}>
                           <h3>{titleOf(memory)}</h3>
+                          <p>{memoryPreview(memory)}</p>
+                          <p className="ms-fine">{memory.processing?.state ?? "saved"} · {memory.processing?.message ?? "Original saved."}</p>
                           <p>
                             {displayDate(memory.captured_at)} · revision{" "}
                             {memory.revision}
@@ -3139,6 +3172,7 @@ function Evidence(props: {
       data-tab={tab}
     >
       <h1 className="memory-title">{demoMemory?.title ?? (memory ? titleOf(memory) : "Memory")}</h1>
+      {memory?.processing && <p role="status">{memory.processing.state} · {memory.processing.message}</p>}
       <div className="inspector-tabs" role="tablist" aria-label="Memory layers">
         {["overview", "original", "related", "history"].map(
           (layer) => (
@@ -3352,8 +3386,8 @@ function Evidence(props: {
                         props.onProcessingConsent(event.target.checked)
                       }
                     />{" "}
-                    Send this source to Jev and Claude with up to four relevant
-                    vault excerpts. Provider charges apply.
+                    Send this source to Jev and Claude in native mode, or the configured cloud AI provider, with up to four relevant
+                    library excerpts. Provider charges apply. Uncertain deliveries are never automatically replayed.
                   </label>
                   <button
                     type="button"

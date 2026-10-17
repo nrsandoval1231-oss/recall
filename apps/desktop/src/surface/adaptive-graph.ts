@@ -104,7 +104,12 @@ export function graphTitle(memory: VaultMemory) {
     .split("\n")
     .find((value) => value.trim() && !value.trim().startsWith("<!--") && !value.trim().startsWith("#"))
     ?.trim();
-  return displayTitle(heading || line || name || "Untitled memory");
+  return displayTitle(heading || name || line || "Untitled memory");
+}
+export function memoryPreview(memory: VaultMemory): string {
+  const scalar = /^summary: (".*")$/m.exec(memory.note)?.[1];
+  if (scalar) { try { const parsed: unknown = JSON.parse(scalar); if (typeof parsed === "string") return parsed.slice(0, 400); } catch { /* Fall through to authored text. */ } }
+  return memory.note.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").split("\n").filter(line => line.trim() && !line.startsWith("#") && !line.startsWith("<!--")).join(" ").slice(0, 240) || "Original photo saved. Choose processing for a visual description.";
 }
 export function deriveGraph(memories: VaultMemory[]) {
   const records = memories

@@ -25,6 +25,42 @@ pub struct Outcome {
     pub memory_id: String,
     pub revision: u64,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Retry { intent: Intent, from_parser: String }
+fn stages(vault: &Vault, memory: &str) -> Result<(String, String, String), String> {
+    let mut attempt = 0;
+    let mut parse = stage(memory, "parse");
+    for number in 1..=2 {
+        let target = path(vault, memory, &format!("retry-{number}"))?;
+        if !target.exists() { break; }
+        let retry: Retry = serde_json::from_slice(&local_vault::read(&target, 16 * 1024)?).map_err(|_| "Invalid processing retry receipt")?;
+        if retry.intent.vault_id != vault.id || retry.intent.memory_id != memory || retry.intent.revision != 1 || retry.from_parser != parse { return Err("Processing retry identity mismatch".into()); }
+        let stored: Intent = serde_json::from_slice(&local_vault::read(&path(vault, memory, "consent")?, 16 * 1024)?).map_err(|_| "Invalid source permission")?;
+        if serde_json::to_vec(&stored).ok() != serde_json::to_vec(&retry.intent).ok() { return Err("Processing retry source mismatch".into()); }
+        attempt = number; parse = stage(memory, &format!("parse-retry-{number}"));
+    }
+    Ok((parse, stage(memory, &if attempt == 0 { "organize".into() } else { format!("organize-retry-{attempt}") }), stage(memory, &if attempt == 0 { "publish".into() } else { format!("publish-retry-{attempt}") })))
+}
+pub(crate) fn retry_allows(vault: &Vault, memory: &str, operation: &str) -> bool {
+    stages(vault, memory).is_ok_and(|(parse, organize, _)| parse != stage(memory, "parse") && (operation == parse || operation == organize || operation == processing::visual_operation(&parse)))
+}
+/// Explicit user action only. A known rejected current stage is required; an
+/// uncertain or interrupted delivery can never authorize a new identity.
+pub fn retry_rejected(vault: &Vault, memory: &str) -> Result<(), String> {
+    let intent = recoverable(vault, memory)?;
+    let (parse, organize, _) = stages(vault, memory)?;
+    let rejected = processing::status(vault, &parse).is_ok_and(|job| job.state == "failed")
+        || librarian::rejected_operation(vault, &processing::visual_operation(&parse))?
+        || librarian::rejected_operation(vault, &organize)?;
+    if !rejected { return Err("This delivery is uncertain or requires review. Check provider usage; no automatic replay is permitted.".into()); }
+    let _lock = vault.lock()?;
+    let current = stages(vault, memory)?;
+    if current.0 != parse { return Ok(()); }
+    let number = if path(vault, memory, "retry-1")?.exists() { 2 } else { 1 };
+    if path(vault, memory, "retry-2")?.exists() { return Err("Three processing attempts reached. Original retained; provider review is required.".into()); }
+    persist(&path(vault, memory, &format!("retry-{number}"))?, &Retry { intent, from_parser: parse })
+}
 fn stage(memory: &str, label: &str) -> String {
     let hash = Sha256::digest(format!("recall-phone-meeting-v1:{memory}:{label}").as_bytes());
     let mut bytes = [0_u8; 16];
@@ -165,8 +201,9 @@ pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
         .name("recall-phone-processing".into())
         .spawn(move || {
             let _guard = guard;
+            let _ = record(&worker, &Outcome { state: "processing".into(), message: "Processing the authorized source. Original retained.".into(), memory_id: intent.memory_id.clone(), revision: intent.revision });
             let outcome = run(&worker, &intent).unwrap_or_else(|error| Outcome {
-                state: "error".into(),
+                state: if [400,401,403,404,422,429].iter().any(|code| error.contains(&format!("HTTP {code}"))) { "failed" } else if error.to_lowercase().contains("uncertain") || error.contains("resend blocked") || error.contains("may have received") { "uncertain" } else { "failed" }.into(),
                 message: error,
                 memory_id: requested.memory_id,
                 revision: requested.revision,
@@ -200,9 +237,7 @@ fn run_with(
     if serde_json::to_vec(&stored).ok() != serde_json::to_vec(intent).ok() {
         return Err("Companion consent identity mismatch".into());
     }
-    let parse = stage(&intent.memory_id, "parse");
-    let organize = stage(&intent.memory_id, "organize");
-    let publish = stage(&intent.memory_id, "publish");
+    let (parse, organize, publish) = stages(vault, &intent.memory_id)?;
     if let Ok(memory) = vault.publish_meeting(&parse, &organize, &publish) {
         return Ok(Outcome {
             state: if memory.state == "active" && memory.conflict.is_none() {
@@ -219,6 +254,9 @@ fn run_with(
     let snapshot = vault.processing_snapshot(&intent.memory_id, intent.revision)?;
     if snapshot.human_corrected || snapshot.source.sha256 != intent.source_sha256 {
         return Err("Companion source changed; processing stopped".into());
+    }
+    if !parser_config.ready() || !claude_config.ready {
+        return Ok(Outcome { state: "configuration-required".into(), message: "Original saved. Configure Jev and Claude keys, models, prices and budget caps in Settings. Configured means fields are present, not that a connection was verified.".into(), memory_id: intent.memory_id.clone(), revision: intent.revision });
     }
     let job = processing::parse_with_visual(
         vault,
@@ -254,10 +292,11 @@ pub fn record(vault: &Vault, outcome: &Outcome) -> Result<(), String> {
     librarian::atomic_write(&target, &bytes)
 }
 pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
+    let (parse, organize, publish) = stages(vault, memory)?;
     if let Ok(current) = vault.publish_meeting(
-        &stage(memory, "parse"),
-        &stage(memory, "organize"),
-        &stage(memory, "publish"),
+        &parse,
+        &organize,
+        &publish,
     ) {
         return Ok(Some(Outcome {
             state: if current.state == "active" && current.conflict.is_none() {
@@ -285,6 +324,10 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
                 || !(1..=10000).contains(&outcome.revision)
                 || ![
                     "pending",
+                    "processing",
+                    "configuration-required",
+                    "consent-required",
+                    "failed",
                     "needs_transcription",
                     "needs_review",
                     "uncertain",
@@ -302,6 +345,25 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
             Ok(Some(outcome))
         }
     }
+}
+
+/// List-time recovery never grants consent or creates new provider identities.
+/// Durable stage ledgers stop any interrupted chargeable call from being replayed.
+pub fn project(vault: &Vault, memory: &VaultMemory, resume: bool) -> Outcome {
+    let outcome = status(vault, &memory.id).ok().flatten();
+    let has_consent = path(vault, &memory.id, "consent").map(|p| p.exists()).unwrap_or(false);
+    let current = outcome.unwrap_or_else(|| Outcome {
+        state: if has_consent { "pending" } else { "consent-required" }.into(),
+        message: if has_consent { "Authorized processing pending." } else { "Original saved. Choose processing before sending this source to AI." }.into(),
+        memory_id: memory.id.clone(), revision: memory.revision,
+    });
+    if resume && has_consent && matches!(current.state.as_str(), "pending" | "processing" | "configuration-required") {
+        match recoverable(vault, &memory.id) {
+            Ok(intent) => { let _ = enqueue(vault, intent); },
+            Err(message) => return Outcome { state: "needs_review".into(), message, ..current },
+        }
+    }
+    Outcome { state: match current.state.as_str() { "published" => "complete", "error" => "failed", other => other }.into(), ..current }
 }
 
 #[cfg(test)]
@@ -330,6 +392,64 @@ mod tests {
     }
     use crate::jev;
     #[test]
+    fn explicit_known_rejection_retries_are_bounded_and_uncertainty_cannot_unlock_them() {
+        struct Rejected(&'static str, AtomicUsize);
+        impl processing::ParserTransport for Rejected {
+            fn parse(&self, _: &jev::JevConfig, _: &str, _: &str, _: &str) -> Result<jev::ParsedSource, String> { self.1.fetch_add(1, Ordering::SeqCst); Err(self.0.into()) }
+        }
+        for (failure, retryable) in [("Jev HTTP 401", true), ("synthetic timeout", false)] {
+            let (temp, vault, _, memory) = crate::librarian::organization_tests::setup();
+            let saved = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == memory).unwrap();
+            let intent = consent(&vault, &saved, true).unwrap().unwrap(); let parser = Rejected(failure, AtomicUsize::new(0));
+            let config = crate::librarian::organization_tests::config();
+            let count = if retryable { 3 } else { 1 };
+            for number in 0..count {
+                let outcome = run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &config, &parser, &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()).unwrap();
+                record(&vault, &outcome).unwrap();
+                assert_eq!(outcome.state, if retryable { "failed" } else { "uncertain" });
+                if number + 1 < count { retry_rejected(&Vault::open(&temp.0).unwrap(), &memory).unwrap(); }
+            }
+            assert!(retry_rejected(&vault, &memory).is_err());
+            assert_eq!(parser.1.load(Ordering::SeqCst), count);
+            assert_eq!(vault.history(&memory).unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn known_claude_rejection_requires_explicit_retry_receipt_then_can_publish() {
+        struct RejectOnce(AtomicUsize);
+        impl librarian::OrganizationTransport for RejectOnce {
+            fn organize(&self, model: &str, key: &str, evidence: &serde_json::Value) -> std::result::Result<crate::meeting::Layout, librarian::CallError> {
+                if self.0.fetch_add(1, Ordering::SeqCst) == 0 { Err(librarian::CallError::HttpStatus(401)) }
+                else { crate::librarian::organization_tests::claude().organize(model, key, evidence) }
+            }
+        }
+        let (_temp, vault, _, memory) = crate::librarian::organization_tests::setup();
+        let saved = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == memory).unwrap();
+        let intent = consent(&vault, &saved, true).unwrap().unwrap(); let parser = Parser(AtomicUsize::new(0)); let claude = RejectOnce(AtomicUsize::new(0)); let config = crate::librarian::organization_tests::config();
+        let error = run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &config, &parser, &librarian::ClaudeTransport, &claude).unwrap_err();
+        assert!(error.contains("Credentials were rejected"));
+        retry_rejected(&vault, &memory).unwrap();
+        let outcome = run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &config, &parser, &librarian::ClaudeTransport, &claude).unwrap();
+        assert_eq!(outcome.state, "published"); assert_eq!(claude.0.load(Ordering::SeqCst), 2);
+        assert_eq!(vault.history(&memory).unwrap().len(), 2);
+    }
+    #[test]
+    fn source_authorization_survives_restart_without_authorizing_prior_captures() {
+        let (temp, vault, _, memory) = crate::librarian::organization_tests::setup();
+        let saved = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == memory).unwrap();
+        assert_eq!(project(&vault, &saved, false).state, "consent-required");
+        consent(&vault, &saved, true).unwrap().unwrap();
+        let reopened = Vault::open(&temp.0).unwrap();
+        assert_eq!(project(&reopened, &saved, false).state, "pending");
+        let other = reopened.capture_note(&Uuid::new_v4().to_string(), "SYNTHETIC unconsented old capture").unwrap();
+        assert_eq!(project(&reopened, &other, false).state, "consent-required");
+        assert!(recoverable(&reopened, &other.id).is_err());
+        let intent = recoverable(&reopened, &saved.id).unwrap();
+        let outcome = run_with(&reopened, &intent, &processing::Config::default(), &crate::librarian::organization_tests::config(), &Parser(AtomicUsize::new(0)), &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()).unwrap();
+        record(&reopened, &outcome).unwrap();
+        assert_eq!(project(&Vault::open(&temp.0).unwrap(), &saved, false).state, "configuration-required");
+    }
+    #[test]
     fn no_consent_or_missing_configuration_never_calls_provider() {
         let (t, v, _, memory) = crate::librarian::organization_tests::setup();
         let m = v
@@ -353,7 +473,7 @@ mod tests {
             &crate::librarian::organization_tests::claude(),
         )
         .unwrap();
-        assert_eq!(outcome.state, "pending");
+        assert_eq!(outcome.state, "configuration-required");
         assert_eq!(parser.0.load(Ordering::SeqCst), 0);
         record(&v, &outcome).unwrap();
         assert_eq!(
@@ -361,7 +481,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .state,
-            "pending"
+            "configuration-required"
         );
     }
     #[test]

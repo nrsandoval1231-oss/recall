@@ -111,6 +111,23 @@ const preview: LocalVault = {
   status: async () => emptyStatus,
 };
 
+it("automatic processing starts unchecked and authorizes only captures saved after opt-in", async () => {
+  const captureNote = vi.fn(async (_scope: string, id: string, note: string, permitted?: boolean) => memory({id, note, source_name: "note.txt", processing: {state: permitted ? "pending" : "consent-required", message: "Synthetic durable state"}}));
+  const client = vault({captureNote, requestProcessing: vi.fn()}, [memory()]);
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await screen.findByRole("button", {name: "Open original: north-lot"});
+  await user.click(screen.getByRole("button", {name: /Write · Type a note/}));
+  const automatic = screen.getByLabelText(/Automatically organize new captures/);
+  expect((automatic as HTMLInputElement).checked).toBe(false);
+  await user.click(automatic);
+  expect(client.requestProcessing).not.toHaveBeenCalled();
+  await user.type(screen.getByLabelText("Your note"), "SYNTHETIC next source");
+  await user.click(screen.getByRole("button", {name: "Save note"}));
+  await waitFor(() => expect(captureNote).toHaveBeenCalledWith("session-token", expect.any(String), "SYNTHETIC next source", true));
+  expect(client.requestProcessing).not.toHaveBeenCalled();
+});
+
 it("requires separate source consent and unchecked cost review for the retained failed organization", async () => {
   const initial = memory({ source_name: "Draft.png", note: "Utility late." });
   const parser = "22222222-2222-4222-8222-222222222222",

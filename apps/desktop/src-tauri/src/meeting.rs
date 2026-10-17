@@ -29,6 +29,18 @@ fn safe_target(value: &str) -> bool {
         && !value.contains(['/', '\\', '[', ']', '#', '|'])
         && !value.chars().any(char::is_control)
 }
+fn connection_support<'a>(parsed: &'a jev::ParsedSource, target: &'a Context) -> Option<(&'a str, &'a str)> {
+    for candidate in parsed.candidates.iter().filter(|c| !c.span.retracted) {
+        for word in candidate.span.text.split(|c: char| !c.is_alphanumeric()).filter(|w| w.len() > 3) {
+            let word = word.to_lowercase();
+            if ["this", "that", "with", "from", "have", "source", "memory", "notes", "review", "recall", "visual", "observation", "inferred"].contains(&word.as_str()) { continue; }
+            if let Some(line) = target.excerpt.lines().find(|line| line.split(|c: char| !c.is_alphanumeric()).any(|token| token.to_lowercase() == word)) {
+                return Some((&candidate.span.text, line));
+            }
+        }
+    }
+    None
+}
 pub fn context(memories: &[VaultMemory], source: &str) -> Vec<Context> {
     let words: BTreeSet<_> = source
         .split(|c: char| !c.is_alphanumeric())
@@ -77,7 +89,7 @@ pub fn validate(
         &parsed.source_sha256,
         &parsed.model,
     )?;
-    if ![1, 2].contains(&layout.schema_version)
+    if ![1, 2, 3].contains(&layout.schema_version)
         || !["note", "photo", "meeting", "project", "operations"].contains(&layout.category.as_str())
         || layout
             .title_span
@@ -91,6 +103,9 @@ pub fn validate(
         })
     {
         return Err("Invalid organization identity, title or category".into());
+    }
+    if layout.schema_version >= 3 && layout.category == "meeting" && parsed.transcription.starts_with("Visual observation (inferred):") && !["meeting", "agenda", "minutes", "attendees"].iter().any(|word| parsed.transcription.to_lowercase().contains(word)) {
+        return Err("A general visual observation cannot be forced into a meeting".into());
     }
     let mut spans = BTreeSet::new();
     for n in layout
@@ -110,6 +125,9 @@ pub fn validate(
     for id in &layout.related_memory_ids {
         if id == &parsed.source_id || !context.iter().any(|c| &c.id == id) || !links.insert(id) {
             return Err("Unauthorized or duplicate related memory".into());
+        }
+        if layout.schema_version >= 3 && !context.iter().find(|c| &c.id == id).is_some_and(|target| connection_support(parsed, target).is_some()) {
+            return Err("Related memory has no shared source evidence".into());
         }
     }
     Ok(())
@@ -142,18 +160,34 @@ pub fn render(
     {
         return Err("Invalid native source UUID".into());
     }
-    let title_span = layout.title_span.or_else(|| {
-        parsed.candidates.iter().position(|candidate| !candidate.span.retracted)
-    });
-    let title = title_span
-        .map(|n| parsed.candidates[n].span.text.chars().take(100).collect::<String>())
-        .filter(|title| !title.trim().is_empty())
-        .unwrap_or_else(|| match layout.category.as_str() {
-            "photo" => "Photo memory".into(),
-            "meeting" => "Meeting notes".into(),
-            _ => "Untitled memory".into(),
-        });
-    let mut out=format!("---\nrecall_id: {}\ntitle: {}\ntype: {}\nsource_sha256: {}\nparser_model: {}\nstatus: needs-review\ntags: [recall/{}, recall/needs-review]\n---\n\n# {}\n\n",yaml(&parsed.source_id),yaml(&title),yaml(&layout.category),yaml(&parsed.source_sha256),yaml(&parsed.model),layout.category,escaped(&title));
+    let title = if layout.schema_version < 3 {
+        layout.title_span.map(|n| format!("Meeting — {}", parsed.candidates[n].span.text.chars().take(100).collect::<String>()))
+            .unwrap_or_else(|| "Meeting notes".into())
+    } else {
+        layout.title_span.or_else(|| parsed.candidates.iter().position(|candidate| !candidate.span.retracted))
+            .map(|n| parsed.candidates[n].span.text.chars().take(100).collect::<String>())
+            .filter(|title| !title.trim().is_empty())
+            .unwrap_or_else(|| match layout.category.as_str() {
+                "photo" => "Photo memory".into(),
+                "meeting" => "Meeting notes".into(),
+                _ => "Untitled memory".into(),
+            })
+    };
+    let tag_category = if layout.schema_version < 3 { "meeting" } else { &layout.category };
+    let mut out=format!("---\nrecall_id: {}\ntitle: {}\ntype: {}\nsource_sha256: {}\nparser_model: {}\nstatus: needs-review\ntags: [recall/{}, recall/needs-review]\n---\n\n# {}\n\n",yaml(&parsed.source_id),yaml(&title),yaml(&layout.category),yaml(&parsed.source_sha256),yaml(&parsed.model),tag_category,escaped(&title));
+    if layout.schema_version >= 3 {
+        let summary = parsed.candidates.iter().filter(|c| !c.span.retracted).take(2)
+            .map(|c| c.span.text.as_str()).collect::<Vec<_>>().join(" ").chars().take(400).collect::<String>();
+        out = out.replacen(&format!("title: {}\n", yaml(&title)), &format!("title: {}\nsummary: {}\n", yaml(&title), yaml(&summary)), 1);
+        let mut tags = vec![format!("recall/{}", layout.category), "recall/needs-review".into()];
+        for mention in parsed.mentions.iter().filter(|m| !m.span.retracted).take(6) {
+            let tag = mention.span.text.to_lowercase().chars().filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-').take(60).collect::<String>();
+            if !tag.is_empty() && !tags.contains(&tag) { tags.push(tag); }
+        }
+        out = out.replacen(&format!("tags: [recall/{}, recall/needs-review]", layout.category), &format!("tags: {}", serde_json::to_string(&tags).map_err(|_| "Invalid tags")?), 1);
+        let heading = format!("# {}\n\n", escaped(&title));
+        out = out.replacen(&heading, &format!("{heading}{}\n\nAI interpretation — proposal for review.\n\n", escaped(&summary)), 1);
+    }
     let mut sections: [Vec<usize>; 4] = Default::default();
     for n in layout
         .observations
@@ -232,6 +266,12 @@ pub fn render(
             .expect("validated native context")
             .note_basename;
         out.push_str(&format!("- [[Recall/Memories/{}|Related source-backed memory]] (possible relationship; review)\n",target.strip_suffix(".md").expect("validated native basename")));
+        if layout.schema_version >= 3 {
+            let related = context.iter().find(|c| &c.id == id).expect("validated context");
+            if let Some((source, target)) = connection_support(parsed, related) {
+                out.push_str(&format!("  Shared source wording: “{}” ↔ “{}” (target revision {}; suggestion only).\n", escaped(source), escaped(target), related.revision));
+            }
+        }
     }
     out.push_str(&format!("\n## Original evidence\n\n[[Recall/Sources/{}.txt|Original meeting capture]]\n\nSHA-256: `{}`\n\nOrganization is derived from source statements. Estimates, identities and dates require review.\n",parsed.source_id,parsed.source_sha256));
     Ok(out)
@@ -306,7 +346,7 @@ pub(crate) fn evidence(parsed: &jev::ParsedSource, context: &[Context]) -> serde
 }
 pub fn tool_schema() -> serde_json::Value {
     serde_json::json!({"type":"object","additionalProperties":false,"required":["schema_version","title_span","category","observations","follow_ups","questions","related_memory_ids"],"properties":{
-        "schema_version":{"type":"integer","enum":[2]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["note","photo","meeting","project","operations"]},
+        "schema_version":{"type":"integer","enum":[3]},"title_span":{"type":["integer","null"],"minimum":0},"category":{"type":"string","enum":["note","photo","meeting","project","operations"]},
         "observations":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"follow_ups":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"questions":{"type":"array","maxItems":64,"items":{"type":"integer","minimum":0}},"related_memory_ids":{"type":"array","maxItems":4,"items":{"type":"string"}}}})
 }
 #[cfg(test)]
@@ -411,18 +451,19 @@ pub(crate) mod tests {
     fn provider_schema_uses_current_renderer_contract() {
         assert_eq!(
             tool_schema()["properties"]["schema_version"]["enum"],
-            serde_json::json!([2])
+            serde_json::json!([3])
         );
     }
     #[test]
     fn generic_photo_uses_source_title_and_photo_type() {
         let p = source();
         let mut l = layout(&p);
+        l.schema_version = 3;
         l.category = "photo".into();
         l.title_span = None;
         let out = render(&l, &p, &[]).unwrap();
         assert!(out.contains("type: \"photo\""));
-        assert!(out.contains("tags: [recall/photo, recall/needs-review]"));
+        assert!(out.contains("tags: [\"recall/photo\",\"recall/needs-review\"]"));
         assert!(out.contains("# Brad says maybe 5–10 MW?"));
         assert!(!out.contains("Meeting -"));
     }
@@ -430,6 +471,7 @@ pub(crate) mod tests {
     fn title_fallback_skips_retracted_source_spans() {
         let p = source();
         let mut l = layout(&p);
+        l.schema_version = 3;
         l.title_span = None;
         let out = render(&l, &p, &[]).unwrap();
         assert!(!out.contains("# Crossed out:"));
@@ -471,6 +513,17 @@ pub(crate) mod tests {
         let mut value = serde_json::to_value(layout(&p)).unwrap();
         value["confirmed_capacity"] = "8 MW".into();
         assert!(serde_json::from_value::<Layout>(value).is_err());
+    }
+    #[test]
+    fn current_connection_suggestions_require_visible_source_and_target_support() {
+        let source = source(); let mut plan = layout(&source); plan.schema_version = 3;
+        let mut target = Context { id: uuid::Uuid::new_v4().to_string(), revision: 2, excerpt: "Unrelated blue sphere.".into(), note_basename: "synthetic.md".into() };
+        plan.related_memory_ids = vec![target.id.clone()];
+        assert!(validate(&plan, &source, &[target.clone()]).is_err());
+        target.excerpt = "Utility delay in the synthetic source.".into();
+        let note = render(&plan, &source, &[target]).unwrap();
+        assert!(note.contains("Shared source wording:")); assert!(note.contains("target revision 2"));
+        assert!(note.contains("possible relationship; review"));
     }
     #[test]
     fn source_markdown_is_escaped() {

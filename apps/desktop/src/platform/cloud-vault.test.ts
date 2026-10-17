@@ -75,3 +75,20 @@ it("refuses corrupted cached originals", async () => {
   await store.remote(api.scope,{id,revision:1,state:"active"} as VaultMemory,{bytes:[1],sha256:"0".repeat(64),mime_type:"text/plain"} as VaultSource);
   await expect(vault.source(api.scope,id)).rejects.toThrow("integrity");
 });
+
+it("retains per-source automatic permission through offline restart without authorizing older captures", async () => {
+  const api = server(); const store = new BrowserCloudStore(); const vault = new CloudVault(store, api.request);
+  await vault.status(); api.setOnline(false);
+  const old = crypto.randomUUID(), authorized = crypto.randomUUID();
+  await vault.captureNote(api.scope, old, "SYNTHETIC older source");
+  await vault.captureNote(api.scope, authorized, "SYNTHETIC authorized source", true);
+  await vault.synchronize();
+  const reopened = new CloudVault(new BrowserCloudStore(), api.request);
+  await reopened.status();
+  const queued = await store.pending(api.scope);
+  expect(queued.find(item => item.memory === old)?.body.processing_consent).toBe(false);
+  expect(queued.find(item => item.memory === authorized)?.body.processing_consent).toBe(true);
+  expect((await reopened.list(api.scope, "")).find(row => row.id === authorized)?.processing?.message).toContain("after cloud sync");
+  api.setOnline(true); await reopened.synchronize(); await reopened.synchronize();
+  expect(api.rows.size).toBe(2); expect(await store.pending(api.scope)).toEqual([]);
+});

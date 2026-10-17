@@ -405,7 +405,10 @@ pub fn parse(
         .set("Authorization", &format!("Bearer {}", config.api_key))
         .set("Content-Type", "application/json")
         .send_bytes(&payload)
-        .map_err(|_| "Jev request failed; outcome may be uncertain. Do not automatically retry.")?;
+        .map_err(|error| match error {
+            ureq::Error::Status(code, _) => format!("Jev HTTP {code}. {} Delivery is recorded; do not automatically retry.", crate::librarian::http_hint(code)),
+            _ => "Jev request timed out or disconnected; outcome may be uncertain. Review provider usage before retrying.".into(),
+        })?;
     let mut bytes = Vec::new();
     response
         .into_reader()

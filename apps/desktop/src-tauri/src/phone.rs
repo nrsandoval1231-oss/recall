@@ -466,6 +466,9 @@ fn resume_processing(root: &Path, request: &PhoneRequest<'_>, memory_id: &str) -
         Ok(intent) => intent,
         Err(error) => return html(403, page("Processing needs review", &format!("<h1>Processing needs review</h1><p>{}</p><p>Nothing new was sent. Inspect the saved source and authorization on desktop.</p>", esc(&error)))),
     };
+    if crate::companion_processing::status(&vault, &memory_id).ok().flatten().is_some_and(|outcome| outcome.state == "failed" && [400,401,403,404,422,429].iter().any(|code| outcome.message.contains(&format!("HTTP {code}")))) {
+        if let Err(error) = crate::companion_processing::retry_rejected(&vault, &memory_id) { return saved_processing_error(&memory_id, &error); }
+    }
     match crate::companion_processing::enqueue(&vault, intent) {
         Ok(()) => redirect(&format!("/saved/{memory_id}")),
         Err(error) => saved_processing_error(&memory_id, &error),

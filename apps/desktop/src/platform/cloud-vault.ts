@@ -1,5 +1,5 @@
 import { BrowserCloudStore, type CloudStore, type CloudMutation } from "./cloud-store";
-import type { LocalVault, SourceAnswer, VaultMemory, VaultRevision, VaultSource, VaultStatus } from "./local-vault";
+import type { LocalVault, SourceAnswer, VaultMemory, VaultRevision, VaultSource, VaultStatus, ProcessingOutcome } from "./local-vault";
 
 export class CloudError extends Error {
   constructor(message: string, readonly status: number, readonly code: string, readonly details?: unknown) { super(message); }
@@ -162,6 +162,7 @@ export class CloudVault implements LocalVault {
     const now = new Date().toISOString();
     if (body.action === "capture") body.captured_at = body.captured_at ?? now;
     const record: VaultMemory = {
+      processing: body.action === "capture" ? {state: body.processing_consent ? "saved" : "consent-required", message: body.processing_consent ? "Saved on this device. Authorized processing queues after cloud sync." : "Original saved. Choose processing before sending this source to AI."} : current?.processing,
       id: body.memory_id, revision: body.expected_revision + 1, state: body.action === "remove" ? "deleted" : "active",
       note: body.action === "correct" || body.action === "capture" ? body.note ?? "" : current?.note ?? "",
       source_name: current?.source_name ?? body.source_name ?? "note.txt", source_sha256: current?.source_sha256 ?? source?.sha256 ?? "",
@@ -172,17 +173,22 @@ export class CloudVault implements LocalVault {
     void this.synchronize();
     return record;
   }
-  captureNote(scope: string, operation: string, note: string) {
-    return this.mutate(scope, {operation_id: operation, memory_id: operation, action: "capture", expected_revision: 0, note});
+  async requestProcessing(scope: string, memory: string, revision: number, consent: boolean) {
+    await this.check(scope);
+    await this.synchronize();
+    return this.request<ProcessingOutcome>(`/library/memories/${encodeURIComponent(memory)}/processing`, {method: "POST", body: JSON.stringify({expected_vault_id: scope, expected_revision: revision, consent})});
   }
-  async capture(scope: string, operation: string, note: string) {
+  captureNote(scope: string, operation: string, note: string, processingConsent = false) {
+    return this.mutate(scope, {operation_id: operation, memory_id: operation, action: "capture", expected_revision: 0, note, processing_consent: processingConsent});
+  }
+  async capture(scope: string, operation: string, note: string, processingConsent = false) {
     const file = await pickFile("image/jpeg,image/png,image/heic,image/heif");
     if (!file) return null;
     if (file.size > 25 * 1024 * 1024) throw new Error("Choose an original smaller than 25 MiB.");
     const bytes = new Uint8Array(await file.arrayBuffer());
     return this.mutate(scope, {operation_id: operation, memory_id: operation, action: "capture", expected_revision: 0,
       note, source_name: file.name, mime_type: file.type || (file.name.toLowerCase().endsWith(".heic") ? "image/heic" : "image/heif"),
-      source_base64: base64(bytes), source_sha256: await sha256(bytes)});
+      source_base64: base64(bytes), source_sha256: await sha256(bytes), processing_consent: processingConsent});
   }
   correct(scope: string, memory: string, revision: number, operation: string, note: string) {
     return this.mutate(scope, {operation_id: operation, memory_id: memory, action: "correct", expected_revision: revision, note});

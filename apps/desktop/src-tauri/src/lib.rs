@@ -305,6 +305,7 @@ fn vault_capture(
     expected_vault_id: String,
     operation_id: String,
     note: String,
+    processing_consent: Option<bool>,
 ) -> Result<Option<local_vault::VaultMemory>, String> {
     let saved = state.with(&expected_vault_id, |vault| {
         if let Some(saved) = vault.capture_receipt(&operation_id, &note)? {
@@ -322,7 +323,11 @@ fn vault_capture(
     if saved.is_some() {
         if let Ok(vault) = state.with(&expected_vault_id, |vault| Ok(vault.clone())) { knowledge::best_effort_refresh(&vault); }
     }
-    Ok(saved)
+    saved.map(|mut memory| { state.with(&expected_vault_id, |vault| {
+        if let Some(intent) = companion_processing::consent(vault, &memory, processing_consent.unwrap_or(false))? { companion_processing::enqueue(vault, intent)?; }
+        memory.processing = Some(companion_processing::project(vault, &memory, false));
+        Ok(memory)
+    }) }).transpose()
 }
 #[tauri::command]
 fn vault_capture_note(
@@ -330,6 +335,7 @@ fn vault_capture_note(
     expected_vault_id: String,
     operation_id: String,
     note: String,
+    processing_consent: Option<bool>,
 ) -> Result<local_vault::VaultMemory, String> {
     let memory = state.with(&expected_vault_id, |vault| {
         let memory=vault.capture_note(&operation_id, &note)?;
@@ -337,7 +343,23 @@ fn vault_capture_note(
         Ok(memory)
     })?;
     if let Ok(vault) = state.with(&expected_vault_id, |vault| Ok(vault.clone())) { knowledge::best_effort_refresh(&vault); }
-    Ok(memory)
+    state.with(&expected_vault_id, |vault| {
+        let mut memory = memory;
+        if let Some(intent) = companion_processing::consent(vault, &memory, processing_consent.unwrap_or(false))? { companion_processing::enqueue(vault, intent)?; }
+        memory.processing = Some(companion_processing::project(vault, &memory, false));
+        Ok(memory)
+    })
+}
+
+#[tauri::command]
+fn capture_processing(state: tauri::State<'_, local_vault::LocalVaultState>, expected_vault_id: String, memory_id: String, expected_revision: u64, consent: bool) -> Result<companion_processing::Outcome, String> {
+    state.with(&expected_vault_id, |vault| {
+        let memory = vault.list_with_deleted("", false)?.into_iter().find(|m| m.id == memory_id).ok_or("Memory unavailable")?;
+        if memory.revision != expected_revision { return Err("Memory changed. Human corrections are preserved.".into()); }
+        if consent && companion_processing::status(vault, &memory_id)?.is_some_and(|outcome| outcome.state == "failed" && [400,401,403,404,422,429].iter().any(|code| outcome.message.contains(&format!("HTTP {code}")))) { companion_processing::retry_rejected(vault, &memory_id)?; }
+        if let Some(intent) = companion_processing::consent(vault, &memory, consent)? { companion_processing::enqueue(vault, intent)?; }
+        Ok(companion_processing::project(vault, &memory, false))
+    })
 }
 
 #[tauri::command]
@@ -347,8 +369,12 @@ fn vault_list(
     query: String,
     include_deleted: Option<bool>,
 ) -> Result<Vec<local_vault::VaultMemory>, String> {
-    let rows = state.with(&expected_vault_id, |vault| {
+    let mut rows = state.with(&expected_vault_id, |vault| {
         vault.list_with_deleted(&query, include_deleted.unwrap_or(false))
+    })?;
+    state.with(&expected_vault_id, |vault| {
+        for memory in &mut rows { memory.processing = Some(companion_processing::project(vault, memory, true)); }
+        Ok(())
     })?;
     if let Ok(vault) = state.with(&expected_vault_id, |vault| Ok(vault.clone())) { knowledge::best_effort_refresh(&vault); }
     Ok(rows)
@@ -683,6 +709,7 @@ pub fn run() {
             vault_open_default,
             vault_capture,
             vault_capture_note,
+            capture_processing,
             vault_list,
             vault_correct,
             vault_restore_note,
