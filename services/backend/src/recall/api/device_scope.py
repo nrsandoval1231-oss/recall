@@ -2,23 +2,45 @@
 
 from __future__ import annotations
 
+from http.cookies import SimpleCookie
+
 from starlette.concurrency import run_in_threadpool
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ..domain.enrollment import EnrollmentService
 from ..request_scope import device_scope, rejected_device_session
 
 
 class DeviceSessionMiddleware:
-    def __init__(self, app: ASGIApp, enrollment: EnrollmentService) -> None:
+    def __init__(self, app: ASGIApp, enrollment: EnrollmentService, allowed_origins: list[str] | None = None) -> None:
         self.app = app
         self.enrollment = enrollment
+        self.allowed_origins = allowed_origins or []
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
         authorization = _header(scope, "authorization")
+        if not authorization:
+            cookies: SimpleCookie = SimpleCookie()
+            try:
+                cookies.load(_header(scope, "cookie") or "")
+            except Exception:
+                cookies = SimpleCookie()
+            session = cookies.get("megraph_session")
+            if session:
+                if (
+                    scope.get("method") not in ("GET", "HEAD", "OPTIONS")
+                    and _header(scope, "origin") not in self.allowed_origins
+                ):
+                    response = JSONResponse(
+                        {"error": {"code": "CSRF_BLOCKED", "message": "Cross-origin request refused."}}, status_code=403
+                    )
+                    await response(scope, receive, send)
+                    return
+                authorization = "Bearer " + session.value
         scope_token = None
         rejected_token = None
         try:
@@ -30,7 +52,17 @@ class DeviceSessionMiddleware:
                         rejected_token = rejected_device_session.set(True)
                     else:
                         scope_token = device_scope.set(resolved)
-            await self.app(scope, receive, send)
+
+            async def private_send(message: Message) -> None:
+                if message["type"] == "http.response.start" and scope.get("path", "").startswith("/v1/"):
+                    message["headers"] = [
+                        (k, v)
+                        for k, v in message.get("headers", [])
+                        if k.lower() not in (b"cache-control", b"x-content-type-options")
+                    ] + [(b"cache-control", b"no-store"), (b"x-content-type-options", b"nosniff")]
+                await send(message)
+
+            await self.app(scope, receive, private_send)
         finally:
             if scope_token is not None:
                 device_scope.reset(scope_token)

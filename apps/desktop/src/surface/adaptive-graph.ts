@@ -87,7 +87,7 @@ export function graphTitle(memory: VaultMemory) {
   }
   const body = memory.note.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
   const heading = /^#{1,2}\s+(.+)$/m.exec(body)?.[1];
-  const name = memory.source_name.replace(/\.[a-z0-9]+$/i, "");
+  const name = (memory.source_name === "note.txt" ? "" : memory.source_name).replace(/\.[a-z0-9]+$/i, "");
   const line = body
     .split("\n")
     .find((value) => value.trim() && !value.trim().startsWith("<!--"))

@@ -2306,3 +2306,22 @@ fn default_library_creation_never_requires_a_documents_lookup_for_an_explicit_na
  assert_eq!(default_library_directory(Some(root.to_str().unwrap()),||Err("unknown path".into()),||Err("home unavailable".into())).unwrap(),root);
  let home=std::env::temp_dir();assert_eq!(default_library_directory(None,||Err("unknown path".into()),||Ok(home.clone())).unwrap(),home.join("Documents/Recall"));
 }
+
+#[test]
+fn cloud_export_preserves_original_history_and_refuses_incomplete_attachment_migration() {
+    let f = Fixture::new();
+    let vault = f.vault();
+    let id = op();
+    vault.capture_note(&id, "SYNTHETIC original").unwrap();
+    vault.correct(&id, 1, &op(), "SYNTHETIC corrected").unwrap();
+    let exported = vault.sync_export(&id).unwrap();
+    assert_eq!(exported["memory"]["id"], id);
+    assert_eq!(exported["memory"]["revision"], 2);
+    assert_eq!(exported["history"][0]["note"], "SYNTHETIC original");
+    assert_eq!(exported["source"]["sha256"], hash(b"SYNTHETIC original"));
+    let attachment = f.0.join("synthetic.txt");
+    fs::write(&attachment, "SYNTHETIC additional attachment").unwrap();
+    crate::attachments::add_from_path(&vault, &id, 2, &op(), &attachment).unwrap();
+    assert!(vault.sync_export(&id).unwrap_err().contains("additional attachments"));
+    assert_eq!(vault.source(&id).unwrap().bytes, b"SYNTHETIC original");
+}

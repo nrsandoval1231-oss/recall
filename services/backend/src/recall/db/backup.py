@@ -113,7 +113,9 @@ def backup(dsn: str, store: ObjectStore, destination: Path) -> dict[str, Any]:
             if total_bytes > MAX_ARCHIVE_BYTES:
                 raise ValueError("Database dump exceeds backup bound.")
             for source_id, key, expected in conn.execute(
-                "select id, storage_key, server_sha256 from source_objects where verified_at is not null order by id"
+                "select id::text, storage_key, server_sha256 from source_objects where verified_at is not null "
+                "union all select 'library-' || workspace_id::text || '-' || id::text, source_key, source_sha256 "
+                "from library_documents order by 1"
             ):
                 target = root / "originals" / str(source_id)
                 target.parent.mkdir(exist_ok=True)
@@ -216,7 +218,9 @@ def restore(dsn: str, store: ObjectStore, archive_path: Path) -> dict[str, Any]:
         with psycopg.connect(dsn) as conn:
             actual = conn.execute(
                 "select id::text,storage_key,server_sha256 from source_objects "
-                "where verified_at is not null order by id"
+                "where verified_at is not null union all "
+                "select 'library-' || workspace_id::text || '-' || id::text, source_key, source_sha256 "
+                "from library_documents order by 1"
             ).fetchall()
             expected = [(item["source_id"], item["storage_key"], item["sha256"]) for item in manifest["originals"]]
             if actual != expected:

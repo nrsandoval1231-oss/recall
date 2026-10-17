@@ -11,6 +11,7 @@ export function hasPendingMeeting(selected: { vault_identity: string }, memory: 
   try { const raw = localStorage.getItem(intentKey(selected, memory)); if (!raw) return false; const intent = savedIntent(raw); return !intent.published && intent.revision === memory.revision && memory.state === "active" && !memory.conflict; } catch { return false; }
 }
 export async function processMeeting(vault: LocalVault, selected: { vault_id: string; vault_identity: string }, memory: VaultMemory, consent: boolean, onState: (message: string) => void, options?: { reviewRetry: boolean; acknowledgeUncertainty: boolean }): Promise<VaultMemory | null> {
+  if (vault.storage === "cloud") { onState("Saved on this device. Check sync status for cloud confirmation."); return null; }
   if (!consent) { onState("Saved locally. Agree before sending this source to Jev and Claude."); return null; }
   if (!vault.parse || !vault.organize || !vault.publish) throw new Error("Open the current native Recall application to organize this memory.");
   if (options?.reviewRetry && !options.acknowledgeUncertainty) throw new Error("Review must acknowledge that prior attempts may have incurred charges.");

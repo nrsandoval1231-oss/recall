@@ -1,0 +1,74 @@
+/* global document, innerWidth, navigator, fetch */
+// Real HTTP API + PostgreSQL. No Tauri mocks, no desktop process, synthetic content only.
+import { chromium, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import fs from "node:fs";
+import process from "node:process";
+const browser = await chromium.launch({executablePath: process.env.RECALL_CHROMIUM || "/usr/bin/chromium"});
+const output = "test-results/megraph-cloud";
+fs.mkdirSync(output, {recursive: true});
+const context = await browser.newContext({viewport: {width: 1182, height: 789}});
+const page = await context.newPage();
+const errors = [];
+page.on("pageerror", error => errors.push(error.message));
+try {
+  await page.goto(process.env.MEGRAPH_TEST_ORIGIN || "http://127.0.0.1:1420");
+  await page.getByLabel("Owner access code").fill(process.env.MEGRAPH_TEST_ENROLLMENT);
+  await page.getByRole("button", {name: "Open MeGraph", exact: true}).click();
+  await page.getByRole("button", {name: /Write ·/}).click();
+  await page.getByLabel("Your note").fill("SYNTHETIC CLOUD ACCEPTANCE: Blue pump inspected at 42 psi.");
+  await page.getByRole("button", {name: "Save note", exact: true}).click();
+  await page.getByRole("tab", {name: "Original", exact: true}).click();
+  await page.getByTestId("integrity").waitFor();
+  await page.getByRole("tab", {name: "Note", exact: true}).click();
+  await page.getByLabel("Your correction").fill("SYNTHETIC CLOUD ACCEPTANCE: Blue pump corrected to 43 psi.");
+  await page.getByRole("button", {name: "Save correction", exact: true}).click();
+  await page.getByText(/original source is unchanged/).waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", {name: "Graph View", exact: true}).click();
+  await page.locator(".graph-node").first().waitFor();
+  await page.screenshot({path: `${output}/web-graph.png`});
+  await page.getByRole("searchbox").fill("pump");
+  await page.getByRole("button", {name: "Ask", exact: true}).click();
+  await page.getByRole("heading", {name: "Source-backed matches", exact: true}).waitFor();
+  await page.getByRole("button", {name: "Inspect original evidence"}).first().click();
+  await page.getByRole("tab", {name: "Original", exact: true}).click();
+  await page.getByTestId("integrity").waitFor();
+  await page.screenshot({path: `${output}/web-original.png`});
+  await page.reload();
+  await page.getByRole("button", {name: "Graph View", exact: true}).click();
+  await expect(page.locator(".graph-node.memories")).toHaveCount(1);
+  if (process.env.MEGRAPH_TEST_PWA === "1") {
+    await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+    await page.reload();
+    await page.getByRole("button", {name: /Write ·/}).waitFor();
+    await context.setOffline(true);
+    await page.getByRole("button", {name: /Write ·/}).click();
+    await page.getByLabel("Your note").fill("SYNTHETIC OFFLINE: Queued independently of the desktop.");
+    await page.getByRole("button", {name: "Save note", exact: true}).click();
+    await page.getByRole("tab", {name: "Original", exact: true}).click();
+    await page.getByTestId("integrity").waitFor();
+    await page.reload();
+    await page.getByRole("button", {name: "Graph View", exact: true}).click();
+    await expect(page.locator(".graph-node.memories")).toHaveCount(2);
+    await context.setOffline(false);
+    await expect(page.getByText("All changes synced to your private cloud library.")).toBeVisible({timeout: 30000});
+    const count = await page.evaluate(async () => (await (await fetch("/v1/library/memories")).json()).length);
+    if (count !== 2) throw Error("Offline submission duplicated or lost");
+  }
+  await page.setViewportSize({width: 390, height: 844});
+  await page.getByRole("button", {name: /Write ·/}).click();
+  await page.getByLabel("Your note").fill("SYNTHETIC MOBILE ACCEPTANCE: Small pump note from mobile browser.");
+  await page.getByRole("button", {name: "Save note", exact: true}).click();
+  await page.getByRole("tab", {name: "Original", exact: true}).click();
+  await page.getByTestId("integrity").waitFor();
+  await page.screenshot({path: `${output}/mobile-source.png`});
+  const axe = await new AxeBuilder({page}).analyze();
+  if (axe.violations.length) throw Error(JSON.stringify(axe.violations.map(v => ({id: v.id, nodes:v.nodes.map(n=>n.target)}))));
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error("Mobile overflow");
+  await page.getByRole("button", {name: "Sign out", exact:true}).click();
+  await page.getByLabel("Owner access code").waitFor();
+  if (errors.length) throw Error(errors.join("\n"));
+  fs.writeFileSync(`${output}/verification.json`, JSON.stringify({synthetic:true, nativeIPC:false, productionPWA:process.env.MEGRAPH_TEST_PWA === "1", database:"real PostgreSQL", checked:["cookie login", "capture", "correct", "original hash", "graph", "keyword search", "reload persistence", "mobile capture", "axe", "logout"], errors}, null, 2));
+  process.stdout.write("PASS: real cloud HTTP capture/edit/search/source/graph, mobile layout, session and reload checks\n");
+} finally { await browser.close(); }

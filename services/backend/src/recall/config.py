@@ -15,7 +15,7 @@ ACCEPTED_MEDIA_TYPES = ("image/jpeg", "image/png", "image/heic", "image/heif")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True, env_ignore_empty=True)
 
     env: str = Field("development", validation_alias="RECALL_ENV")
 

@@ -125,7 +125,7 @@ def create_app(
 
     app = FastAPI(title="Recall API", version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(RequestIdMiddleware)
-    app.add_middleware(DeviceSessionMiddleware, enrollment=enrollment)
+    app.add_middleware(DeviceSessionMiddleware, enrollment=enrollment, allowed_origins=settings.site_origins)
     if settings.cors_allow_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -487,6 +487,9 @@ def create_app(
             raise not_provisioned()
         return _json({"revoked": True})
 
+    from ..library.routes import register_routes as register_library_routes
+
+    register_library_routes(app, db, object_store, settings, enrollment, principal, provider)
     register_sync_routes(app, db, settings, service, memories, principal)
     register_export_routes(app, db, object_store, principal)
     register_deletion_routes(app, db, principal)

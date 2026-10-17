@@ -1295,3 +1295,21 @@ body,
   .ms-context-note p { font-size: 1rem; }
   .ms-library-counts { padding: 12px 4px; }
 }
+
+/* Access controls only; the approved Memory Surface styling stays shared. */
+.cloud-access { display: grid; place-items: center; padding: 24px; }
+.cloud-access .ms-context { display: flex; flex-direction: column; width: min(100%, 440px); grid-area: auto; align-self: center; }
+.cloud-access form, .cloud-access label { display: grid; gap: 12px; }
+.cloud-signout { position: fixed; bottom: 8px; left: 12px; z-index: 3; min-height: 44px; padding: 8px 12px; color: #2f2f2f; background: #faf8f3; border: 1px solid #dedbd3; border-radius: 8px; font: .75rem Inter, sans-serif; }
+.cloud-session-error { position: fixed; bottom: 56px; left: 12px; background: #faf8f3; padding: 12px; }
+
+.cloud-sync-status { position: fixed; bottom: 0; right: 12px; max-width: min(70vw, 620px); padding: 4px 8px; background: #faf8f3; color: #62665e; font: .6875rem/1.4 Inter, sans-serif; z-index: 3; }
+
+.cloud-local { position: fixed; bottom: 8px; left: 100px; z-index: 3; min-height: 44px; padding: 8px; background: #faf8f3; color: #2f2f2f; border: 1px solid #dedbd3; border-radius: 8px; }
+
+.cloud-import { position: fixed; bottom: 56px; left: 12px; z-index: 3; min-height: 44px; padding: 8px; color: #2f2f2f; background: #faf8f3; border: 1px solid #dedbd3; border-radius: 8px; }
+.cloud-migration { position: fixed; bottom: 108px; left: 12px; max-width: 440px; max-height: 35vh; overflow: auto; z-index: 4; background: #faf8f3; border: 1px solid #dedbd3; padding: 16px; }
+
+.cloud-account { position: fixed; top: 8px; right: 12px; z-index: 5; min-height: 44px; padding: 8px; color: #2f2f2f; background: #faf8f3; border: 1px solid #dedbd3; border-radius: 8px; }
+.cloud-settings { position: fixed; top: 56px; right: 12px; width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 80px); overflow: auto; padding: 24px; z-index: 12; background: #faf8f3; color: #2f2f2f; }
+.cloud-settings button { min-height: 44px; margin: 8px 0; }

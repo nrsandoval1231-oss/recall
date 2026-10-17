@@ -2,6 +2,10 @@
 
 **Status:** the one product-scope and trust authority for this repository. Approved 2026-10-15. [DESIGN.md](DESIGN.md) is the sole UI and brand authority and records the owner's latest photo-free desktop/mobile/brand approval. Other files, historical instructions and existing implementation do not override these authorities.
 
+## Owner-directed evolution — 2026-10-17
+
+Product name: **MeGraph — Your world. Connected.** The owner now requires an always-on authenticated cloud platform for the shared web/iPhone PWA and existing offline Windows client, including safe bidirectional synchronization. This explicitly supersedes the local-only, no-login and frozen-cloud restrictions below. Existing originals, corrections, provenance, deterministic validation and approved UI remain mandatory. Internal Recall names and native-library formats remain compatible. No new Obsidian integration is required for cloud independence; existing plain Markdown compatibility remains.
+
 ## What Recall is
 
 **Recall is a private, local-first external memory.** You capture anything (a photo of handwritten notes, a typed brain-dump, eventually your voice), and later you can ask a vague question and get back what you knew, with the original source to prove it.

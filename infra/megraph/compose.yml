@@ -1,0 +1,98 @@
+name: megraph
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: recall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      MEGRAPH_OWNER_PASSWORD: ${MEGRAPH_OWNER_PASSWORD:?required}
+      MEGRAPH_API_PASSWORD: ${MEGRAPH_API_PASSWORD:?required}
+      MEGRAPH_WORKER_PASSWORD: ${MEGRAPH_WORKER_PASSWORD:?required}
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/10-megraph.sh:ro
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d recall']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: &logs
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  migrate:
+    build: {context: ../.., dockerfile: services/backend/Dockerfile}
+    image: megraph-backend:local
+    environment:
+      RECALL_MIGRATION_DATABASE_URL: ${RECALL_MIGRATION_DATABASE_URL:?required}
+    command: [python, -m, recall.db.migrate]
+    depends_on: {db: {condition: service_healthy}}
+    restart: 'no'
+    logging: *logs
+  api:
+    image: megraph-backend:local
+    environment: &runtime
+      DATABASE_URL: ${DATABASE_URL:?required}
+      RECALL_ENV: production
+      RECALL_AUTO_PROVISION_WORKSPACES: 'false'
+      RECALL_AUTH_ISSUER: ${RECALL_AUTH_ISSUER:?required}
+      RECALL_AUTH_JWT_SECRET: ${RECALL_AUTH_JWT_SECRET:?required}
+      RECALL_SIGNING_SECRET: ${RECALL_SIGNING_SECRET:?required}
+      RECALL_OPERATOR_TOKEN: ${RECALL_OPERATOR_TOKEN:?required}
+      RECALL_SITE_ORIGINS: ${RECALL_SITE_ORIGINS:?required}
+      RECALL_STORAGE_BACKEND: local
+      RECALL_LOCAL_STORAGE_DIR: /app/storage
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL_ID: ${AI_MODEL_ID:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_INPUT_USD_PER_MTOK: ${AI_INPUT_USD_PER_MTOK:-}
+      AI_OUTPUT_USD_PER_MTOK: ${AI_OUTPUT_USD_PER_MTOK:-}
+      RECALL_AI_DAILY_BUDGET_USD: ${RECALL_AI_DAILY_BUDGET_USD:-}
+      RECALL_AI_MONTHLY_BUDGET_USD: ${RECALL_AI_MONTHLY_BUDGET_USD:-}
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    volumes: [originals:/app/storage]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ['/tmp:size=1152m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz',timeout=5)"]
+      interval: 20s
+      timeout: 8s
+      retries: 5
+    logging: *logs
+  worker:
+    image: megraph-backend:local
+    environment:
+      <<: *runtime
+      RECALL_WORKER_DATABASE_URL: ${RECALL_WORKER_DATABASE_URL:?required}
+      RECALL_OPERATOR_TOKEN: '' 
+    command: [python, -m, recall.ingestion.worker]
+    depends_on: {api: {condition: service_healthy}}
+    volumes: [originals:/app/storage]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ['/tmp:size=256m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *logs
+  web:
+    build: {context: ../.., dockerfile: infra/megraph/Web.Dockerfile}
+    depends_on: {api: {condition: service_healthy}}
+    ports: ['127.0.0.1:18880:8080']
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ['/tmp:size=64m,mode=1777', '/var/cache/nginx', '/var/run']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/healthz]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    logging: *logs
+volumes:
+  database:
+  originals:

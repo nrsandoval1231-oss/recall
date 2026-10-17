@@ -2,6 +2,24 @@
 
 Describes the code as it exists today. Product intent lives in [VISION.md](VISION.md). If this file drifts from the code, fix this file in the same PR.
 
+## MeGraph cloud evolution — owner decision 2026-10-17
+
+The owner authorized an always-on Hostinger platform, authenticated web/PWA access, and offline Windows synchronization. This supersedes the local-only/no-login restriction below; the existing implementation description is retained for migration context. The approved React Memory Surface and native library remain the compatibility boundary. Reuse the existing FastAPI/PostgreSQL service, private write-once object storage, revocable device enrollment, provider adapters, budget enforcement and backup machinery. Do not introduce a second mobile backend or replace the desktop library.
+
+Native Markdown memories need an additive cloud representation because the older cloud capture schema only accepts image pages and AI-projected memories. Preserve native UUIDs, original hashes, Markdown, revisions and deletion tombstones in workspace-scoped records; never coerce native notes into fabricated image captures. Use revision-conditional writes and operation receipts, with immutable originals and append-only history. PostgreSQL is canonical for synchronized cloud records; the desktop library remains usable independently. Initial migration is opt-in, additive and backed up, with no local deletion or overwrite.
+
+Browser sessions use the existing one-time operator enrollment exchanged for HttpOnly cookies, with strict same-origin mutation checks. No open signup or browser-held operator/provider secret. Desktop credentials stay in the OS credential store. All platform access stays behind adapters. Deploy only into a dedicated Compose project/network/volumes and the existing reverse proxy after inspecting Hostinger; do not alter Orloom or GridLens. No Hostinger access is currently present in this workspace.
+
+## Cloud checkpoint implementation
+
+`apps/desktop/src/main.tsx` selects native entry only inside Tauri and `CloudEntry` in an ordinary browser. Both use the approved MemorySurface. `platform/cloud-vault.ts` translates its existing interface to authenticated `/v1/library` calls. IndexedDB or native SQLite stores the record and pending mutation together. Remote revisions cannot replace records with pending edits. Tombstones retain originals/history. The current implementation uses full bounded snapshots and prefetches primary originals, not yet incremental large-library replication.
+
+`services/backend/src/recall/library` adds native Markdown records beside the retained image-capture model, using the existing database transactions/RLS/workspace serialization, object store, enrollment, consent, provider budgets and answer citation validator. It does not currently feed these native records through the legacy extraction/embedding worker. Relationships explicitly present in Markdown remain available to the shared graph; automatic cloud relationship extraction is unfinished.
+
+The native cloud adapter performs bounded HTTPS requests on blocking-worker tasks, refuses redirects and holds credentials in the existing OS credential store. Its SQLite journal is additive to `recall.sqlite3`. Original library mode is preserved; imports require a full backup and refuse memories whose secondary attachments cannot yet migrate. This is an incremental cloud client, not a claim that the old Markdown folder is already continuously synchronized.
+
+Deploy configuration: `infra/megraph/compose.yml`, restricted API/worker, PostgreSQL/pgvector, private original volume, and a same-origin web reverse proxy on host loopback. Production TLS remains the existing Hostinger proxy's responsibility. See `infra/megraph/README.md` and the open implementation/acceptance gates in STATUS.
+
 ## Shape
 
 ```text

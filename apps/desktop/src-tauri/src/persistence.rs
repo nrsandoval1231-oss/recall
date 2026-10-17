@@ -1576,6 +1576,31 @@ mod tests {
     }
 
     #[test]
+    fn cloud_journal_keeps_offline_edits_and_conflicts_across_restart() {
+        let (store, base) = temp_store("cloud-journal");
+        let scope = WORKSPACE_ID;
+        let id = SOURCE_ID;
+        let first = serde_json::json!({"id": id, "revision": 1, "note": "SYNTHETIC original"});
+        let mutation = serde_json::json!({"operation_id": id, "memory_id": id, "expected_revision": 0, "action": "capture"});
+        let payload = serde_json::json!({"record": first, "source": {"bytes": [1,2,3]}, "mutation": mutation});
+        store.cloud_cache("commit", scope, payload.clone()).unwrap();
+        store.cloud_cache("commit", scope, payload).unwrap();
+        assert_eq!(store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap().as_array().unwrap().len(), 1);
+        store.cloud_cache("conflict", scope, serde_json::json!({"operation": id, "error": "Concurrent edit"})).unwrap();
+        store.cloud_cache("remote", scope, serde_json::json!({"record": {"id": id,"revision": 2,"note":"remote"}})).unwrap();
+        assert_eq!(store.cloud_cache("list", scope, serde_json::Value::Null).unwrap()[0]["note"], "SYNTHETIC original");
+        assert_eq!(store.cloud_cache("list", USER_ID, serde_json::Value::Null).unwrap(), serde_json::json!([]));
+        drop(store);
+        let reopened = NativeStore::open(base.join("cache.sqlite3"), base.join("sources")).unwrap();
+        assert_eq!(reopened.cloud_cache("pending", scope, serde_json::Value::Null).unwrap()[0]["error"], "Concurrent edit");
+        reopened.cloud_cache("accept", scope, serde_json::json!({"operation": id, "record": first})).unwrap();
+        assert_eq!(reopened.cloud_cache("pending", scope, serde_json::Value::Null).unwrap(), serde_json::json!([]));
+        assert_eq!(reopened.cloud_cache("source", scope, serde_json::json!({"id": id})).unwrap()["bytes"], serde_json::json!([1,2,3]));
+        drop(reopened);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn fts_latency_metric_for_one_thousand_synthetic_records() {
         let s = NativeStore::memory().unwrap();
         let records = (0..1000)
@@ -1612,5 +1637,77 @@ mod tests {
         );
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].record_id, synthetic_uuid(777));
+    }
+}
+
+// Additive SQLite journal for the shared cloud-library adapter. Existing native
+// libraries and the older cache/outbox tables are never rewritten or removed.
+impl NativeStore {
+    pub fn cloud_cache(&self, action: &str, scope: &str, payload: serde_json::Value) -> Result<serde_json::Value, StoreError> {
+        Self::uuid_ok(scope)?;
+        let mut conn = self.conn.lock().map_err(|_| StoreError::InvalidIdentifier)?;
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS cloud_documents(scope TEXT NOT NULL,id TEXT NOT NULL,record TEXT NOT NULL,source TEXT,PRIMARY KEY(scope,id)); CREATE TABLE IF NOT EXISTS cloud_operations(scope TEXT NOT NULL,operation TEXT NOT NULL,memory TEXT NOT NULL,body TEXT NOT NULL,error TEXT,PRIMARY KEY(scope,operation));")?;
+        let tx = conn.transaction()?;
+        let text = |name: &str| payload.get(name).and_then(serde_json::Value::as_str).ok_or(StoreError::InvalidIdentifier);
+        let answer = match action {
+            "list" => {
+                let mut statement = tx.prepare("SELECT record FROM cloud_documents WHERE scope=?1 ORDER BY id")?;
+                let rows = statement.query_map([scope], |row| row.get::<_,String>(0))?;
+                let mut records = Vec::new();
+                for row in rows { records.push(serde_json::from_str::<serde_json::Value>(&row?)?); }
+                serde_json::Value::Array(records)
+            },
+            "source" => {
+                let source: Option<String> = tx.query_row("SELECT source FROM cloud_documents WHERE scope=?1 AND id=?2", params![scope,text("id")?], |row| row.get(0)).optional()?.flatten();
+                source.map(|value| serde_json::from_str(&value)).transpose()?.unwrap_or(serde_json::Value::Null)
+            },
+            "pending" => {
+                let mut statement = tx.prepare("SELECT operation,memory,body,error FROM cloud_operations WHERE scope=?1 ORDER BY rowid")?;
+                let rows = statement.query_map([scope], |row| Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?,row.get::<_,String>(2)?,row.get::<_,Option<String>>(3)?)))?;
+                let mut records = Vec::new();
+                for row in rows { let (operation,memory,body,error)=row?; records.push(serde_json::json!({"scope":scope,"operation":operation,"memory":memory,"body":serde_json::from_str::<serde_json::Value>(&body)?,"error":error})); }
+                serde_json::Value::Array(records)
+            },
+            "conflict" => {
+                tx.execute("UPDATE cloud_operations SET error=?3 WHERE scope=?1 AND operation=?2",params![scope,text("operation")?,text("error")?])?;
+                serde_json::Value::Null
+            },
+            "commit" | "remote" | "accept" => {
+                let record = payload.get("record").ok_or(StoreError::InvalidIdentifier)?;
+                let id = record.get("id").and_then(serde_json::Value::as_str).ok_or(StoreError::InvalidIdentifier)?;
+                Self::uuid_ok(id)?;
+                let revision = record.get("revision").and_then(serde_json::Value::as_i64).filter(|v|*v>0).ok_or(StoreError::InvalidIdentifier)?;
+                let current: Option<(String, Option<String>)> = tx.query_row("SELECT record,source FROM cloud_documents WHERE scope=?1 AND id=?2",params![scope,id], |row|Ok((row.get(0)?,row.get(1)?))).optional()?;
+                let prior_revision = current.as_ref().map(|(value,_)|serde_json::from_str::<serde_json::Value>(value)).transpose()?.and_then(|v|v.get("revision").and_then(serde_json::Value::as_i64)).unwrap_or(0);
+                let mut save = true;
+                if action == "commit" {
+                    let mutation = payload.get("mutation").ok_or(StoreError::InvalidIdentifier)?;
+                    let op = mutation.get("operation_id").and_then(serde_json::Value::as_str).ok_or(StoreError::InvalidIdentifier)?;
+                    Self::uuid_ok(op)?;
+                    let body = serde_json::to_string(mutation)?;
+                    let replay: Option<String> = tx.query_row("SELECT body FROM cloud_operations WHERE scope=?1 AND operation=?2",params![scope,op], |row|row.get(0)).optional()?;
+                    if let Some(previous) = replay {
+                        if previous != body { return Err(StoreError::InvalidIdentifier); }
+                        save = false;
+                    } else {
+                        if mutation.get("expected_revision").and_then(serde_json::Value::as_i64) != Some(prior_revision) || revision != prior_revision+1 { return Err(StoreError::InvalidIdentifier); }
+                        tx.execute("INSERT INTO cloud_operations(scope,operation,memory,body) VALUES(?1,?2,?3,?4)",params![scope,op,id,body])?;
+                    }
+                } else {
+                    if action == "accept" { tx.execute("DELETE FROM cloud_operations WHERE scope=?1 AND operation=?2",params![scope,text("operation")?])?; }
+                    let count:i64=tx.query_row("SELECT count(*) FROM cloud_operations WHERE scope=?1 AND memory=?2",params![scope,id],|row|row.get(0))?;
+                    save = count == 0 && prior_revision <= revision;
+                }
+                if save {
+                    let supplied = payload.get("source").filter(|v|!v.is_null()).map(serde_json::to_string).transpose()?;
+                    let source = supplied.or_else(||current.and_then(|(_,source)|source));
+                    tx.execute("INSERT INTO cloud_documents(scope,id,record,source) VALUES(?1,?2,?3,?4) ON CONFLICT(scope,id) DO UPDATE SET record=excluded.record,source=excluded.source",params![scope,id,serde_json::to_string(record)?,source])?;
+                }
+                serde_json::Value::Null
+            },
+            _ => return Err(StoreError::InvalidIdentifier),
+        };
+        tx.commit()?;
+        Ok(answer)
     }
 }
