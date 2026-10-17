@@ -267,10 +267,10 @@ fn handle(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             include_bytes!("phone/companion.js").to_vec(),
         ),
         ("GET" | "HEAD", "/phone-ui.js") => bytes(200, "text/javascript; charset=utf-8", include_bytes!("phone/ui.js").to_vec()),
-        ("GET" | "HEAD", "/brand/orbital-mark.svg") => bytes(200, "image/svg+xml", include_bytes!("../../public/brand/orbital-mark.svg").to_vec()),
+        ("GET" | "HEAD", "/brand/monolith-mark.svg") => bytes(200, "image/svg+xml", include_bytes!("../../public/brand/monolith-mark.svg").to_vec()),
         ("GET" | "HEAD", "/brand/favicon.svg") => bytes(200, "image/svg+xml", include_bytes!("../../public/brand/favicon.svg").to_vec()),
         ("GET" | "HEAD", "/fonts/Inter-Regular.ttf") => bytes(200, "font/ttf", include_bytes!("../../public/fonts/Inter-Regular.ttf").to_vec()),
-        ("GET" | "HEAD", "/fonts/PlayfairDisplay-Regular.ttf") => bytes(200, "font/ttf", include_bytes!("../../public/fonts/PlayfairDisplay-Regular.ttf").to_vec()),
+        ("GET" | "HEAD", "/fonts/Sora-Variable.ttf") => bytes(200, "font/ttf", include_bytes!("../../public/fonts/Sora-Variable.ttf").to_vec()),
         ("GET" | "HEAD", "/companion-sw.js") => bytes(
             200,
             "text/javascript; charset=utf-8",
@@ -1030,7 +1030,7 @@ fn saved(root: &Path, id: &str) -> PhoneResponse {
         page(
             "Saved in the desktop vault",
             &format!(
-                "{body}{processing}<details><summary>Capture another memory</summary>{}</details><details><summary>Ask Recall</summary><p class=\"fine\">{KEYWORD_LABEL}</p>{}</details><section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>",
+                "{body}{processing}<details><summary>Capture another memory</summary>{}</details><details><summary>Ask MONOLITH</summary><p class=\"fine\">{KEYWORD_LABEL}</p>{}</details><section><p data-testid=\"connection-state\" role=\"status\">Connecting to library…</p><p id=\"local-status\" role=\"status\"></p><button id=\"retry-queue\" type=\"button\">Retry queued captures</button><div data-testid=\"outbox\"></div></section><script src=\"/companion.js\" defer></script>",
                 capture_form(&Uuid::new_v4().to_string(), "").replace("<h1 id=\"capture-heading\">Write a memory</h1>", "<h2>Write a memory</h2>"),
                 ask_form("")
             ),
@@ -1138,7 +1138,7 @@ fn ask_form(question: &str) -> String {
 
 fn page(title: &str, main: &str) -> String {
     format!(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-title\" content=\"Recall\"><meta name=\"theme-color\" content=\"#FAF8F3\"><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" href=\"/brand/favicon.svg\"><title>{}</title><style>{}</style></head><body><header class=\"phone-brand\"><a href=\"/#home\" aria-label=\"Recall home\"><img src=\"/brand/orbital-mark.svg\" alt=\"\"><span>recall</span></a><span class=\"brand-signature\">A more human tomorrow.</span></header><main>{}</main></body></html>",
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"><meta name=\"mobile-web-app-capable\" content=\"yes\"><meta name=\"apple-mobile-web-app-title\" content=\"MONOLITH\"><meta name=\"theme-color\" content=\"#050607\"><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"manifest\" href=\"/manifest.webmanifest\"><link rel=\"icon\" href=\"/brand/favicon.svg\"><title>{}</title><style>{}</style></head><body><header class=\"phone-brand\"><a href=\"/#home\" aria-label=\"MONOLITH home\"><img src=\"/brand/monolith-mark.svg\" alt=\"\"><span>MONOLITH</span></a><span class=\"brand-signature\">Your world. Connected.</span></header><main>{}</main></body></html>",
         esc(title),
         PAGE_CSS,
         main
@@ -1148,12 +1148,12 @@ fn page(title: &str, main: &str) -> String {
 const PAGE_CSS: &str = concat!(include_str!("../../../../packages/design-tokens/src/brand.css"), "\n", include_str!("phone/phone.css"));
 
 const MANIFEST: &str = r##"{
-  "name": "Recall",
-  "short_name": "Recall",
+  "name": "MONOLITH",
+  "short_name": "MONOLITH",
   "display": "standalone",
   "start_url": "/",
-  "background_color": "#FAF8F3",
-  "theme_color": "#FAF8F3",
+  "background_color": "#050607",
+  "theme_color": "#050607",
   "icons": [{ "src": "/icon.png", "sizes": "32x32", "type": "image/png", "purpose": "any" }]
 }"##;
 

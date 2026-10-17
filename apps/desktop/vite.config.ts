@@ -7,7 +7,7 @@ export default defineConfig({
     name: "megraph-offline-shell",
     apply: "build",
     generateBundle(_options, bundle) {
-      const paths = ["/", "/manifest.webmanifest", "/brand/app-icon-192.png", "/brand/app-icon-512.png",
+      const paths = ["/", "/manifest.webmanifest", "/brand/app-icon-192.png", "/brand/app-icon-512.png", "/fonts/Inter-Regular.ttf", "/fonts/Sora-Variable.ttf",
         ...Object.keys(bundle).map(path => `/${path}`)];
       this.emitFile({type: "asset", fileName: "shell-assets.js", source: `self.MEGRAPH_SHELL = ${JSON.stringify(paths)};`});
     },

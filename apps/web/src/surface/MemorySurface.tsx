@@ -362,13 +362,13 @@ export function MemorySurface({
       <header className="surface-header">
         <button
           className="wordmark"
-          aria-label="Recall home"
+          aria-label="MONOLITH home"
           disabled={savingCorrection}
           onClick={home}
         >
-          Recall<span className="wordmark-dot">•</span>
+          MONOLITH<span className="wordmark-dot">•</span>
         </button>
-        <nav aria-label="Recall">
+        <nav aria-label="MONOLITH">
           <button
             className="nav-action"
             disabled={savingCorrection}

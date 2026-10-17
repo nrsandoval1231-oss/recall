@@ -1,6 +1,6 @@
 @import "../../../../packages/design-tokens/src/brand.css";
 :root {
-  font-family: Inter, sans-serif;
+  font-family: var(--monolith-font-body);
   color: var(--recall-graphite);
   background: var(--recall-ivory);
   font-synthesis: none;
@@ -18,12 +18,12 @@ body,
   --quiet: var(--recall-muted);
   --accent: var(--recall-focus);
   --line: var(--recall-divider);
-  --editorial: "Playfair Display", serif;
+  --editorial: var(--monolith-font-heading);
   min-height: 100dvh;
   background: var(--recall-ivory);
   color: var(--ink);
   font:
-    0.875rem/1.5 Inter,
+    0.875rem/1.5 var(--monolith-font-body),
     sans-serif;
   display: grid;
   grid-template-columns: clamp(176px, 11rem, 240px) minmax(0, 1fr);
@@ -50,8 +50,8 @@ body,
     border-color 0.16s;
 }
 .ms button:hover {
-  background: #efede6;
-  border-color: #9b9f94;
+  background: #1F2328;
+  border-color: #505862;
 }
 .ms button:disabled {
   opacity: 0.55;
@@ -71,8 +71,8 @@ body,
 .ms textarea,
 .ms select {
   min-height: 48px;
-  background: #fcfbf8;
-  border: 1px solid #c6c5bc;
+  background: #1F2328;
+  border: 1px solid #3A4048;
   border-radius: 8px;
   padding: 10px;
   max-width: 100%;
@@ -93,7 +93,7 @@ body,
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
-  background: #f9f7f2;
+  background: #121418;
 }
 .ms-brand {
   display: flex;
@@ -107,8 +107,10 @@ body,
   height: 64px;
 }
 .ms-mark {
-  font: 2.25rem/1.1 var(--editorial);
-  letter-spacing: -2px;
+  max-width: 100%;
+  text-align: center;
+  font: clamp(1.15rem, 1.25vw, 1.4rem)/1.2 var(--editorial);
+  letter-spacing: 0.035em;
 }
 .ms-nav {
   display: grid;
@@ -134,7 +136,7 @@ body,
   stroke-width: 1;
 }
 .ms-nav button[aria-current="page"] {
-  background: #eae9e3;
+  background: #1F2328;
 }
 .ms-rail-bottom {
   margin-top: 32px;
@@ -142,13 +144,25 @@ body,
   border-top: 1px solid var(--line);
 }
 .ms-rail:after {
-  content: "SMALL MOMENTS\A A BRIGHTER YOU";
+  content: "YOUR WORLD\A CONNECTED";
   white-space: pre;
   letter-spacing: 3px;
   font-size: 0.5625rem;
   line-height: 2.1;
   color: var(--recall-muted);
   margin: 48px auto 0;
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .ms-ask,
+  .ms-memory-field,
+  .ms-context,
+  .adaptive-inspector {
+    background: var(--monolith-glass-bg);
+    border-color: var(--monolith-glass-border);
+    -webkit-backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+    backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+  }
 }
 .ms-stage {
   min-width: 0;
@@ -169,11 +183,11 @@ body,
   align-items: center;
   gap: 8px;
   margin: 0 0 4px;
-  border: 1px solid #e4e0d9;
+  border: 1px solid #3A4048;
   border-radius: 28px;
-  background: #fcfbf8;
+  background: #1F2328;
   padding: 0 8px 0 18px;
-  box-shadow: 0 2px 5px #2f2f2f04;
+  box-shadow: 0 2px 5px #12141804;
   min-width: 0;
 }
 .ms-ask input {
@@ -211,15 +225,15 @@ body,
   grid-column: 1;
   grid-row: 3;
   min-width: 0;
-  border: 1px solid #e7e3dc;
+  border: 1px solid #3A4048;
   border-radius: 16px;
   position: relative;
   min-height: 590px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fbfaf6;
-  box-shadow: 0 3px 12px #2f2f2f03;
+  background: #1F2328;
+  box-shadow: 0 3px 12px #12141803;
 }
 .ms-field-header {
   padding: 20px 24px 0;
@@ -234,7 +248,7 @@ body,
     0.625rem/1.5 Inter,
     sans-serif;
   letter-spacing: 2px;
-  color: #575b55;
+  color: #E5E7EB;
   margin: 0 0 8px;
 }
 .ms-field-header h1 {
@@ -250,7 +264,7 @@ body,
 .ms-view-switch {
   display: flex;
   border-radius: 24px;
-  background: #efede7;
+  background: #1F2328;
   flex: none;
   padding: 0 3px;
   align-items: center;
@@ -264,7 +278,7 @@ body,
   border-radius: 24px;
 }
 .ms-view-switch button[aria-pressed="true"] {
-  background: #e0e2da;
+  background: #1F2328;
 }
 .adaptive-graph {
   position: relative;
@@ -281,13 +295,13 @@ body,
 }
 .field-orbits {
   fill: none;
-  stroke: #aaa296;
+  stroke: #505862;
   stroke-width: .75;
   opacity: .4;
   pointer-events: none;
 }
 .adaptive-graph line {
-  stroke: #82786a;
+  stroke: #505862;
   stroke-width: .75;
   opacity: .16;
   transition: opacity 280ms ease;
@@ -296,7 +310,7 @@ body,
 .adaptive-graph line.tentative { stroke-dasharray: 4 5; }
 .graph-node { cursor: pointer; }
 .graph-node .node-light {
-  stroke: #ffffff;
+  stroke: #3A4048;
   stroke-width: 1;
   opacity: .85;
   pointer-events: none;
@@ -322,7 +336,7 @@ body,
     0.875rem Inter,
     sans-serif;
   paint-order: stroke;
-  stroke: #fbfaf6;
+  stroke: #3A4048;
   stroke-width: 5;
   stroke-linejoin: round;
 }
@@ -335,8 +349,8 @@ body,
   stroke-dasharray: 3 4;
 }
 .empty-motif { pointer-events: none; }
-.empty-motif circle { stroke: #fff; stroke-width: 1; opacity: .9; }
-.empty-motif circle[fill="none"] { stroke: #9da38f; stroke-width: .65; opacity: .4; }
+.empty-motif circle { stroke: #3A4048; stroke-width: 1; opacity: .9; }
+.empty-motif circle[fill="none"] { stroke: #505862; stroke-width: .65; opacity: .4; }
 .ms-field-empty {
   position: relative;
   flex: none;
@@ -379,13 +393,13 @@ body,
 .adaptive-inspector {
   grid-column: 2;
   grid-row: 3 / span 2;
-  border: 1px solid #e7e3dc;
+  border: 1px solid #3A4048;
   border-radius: 16px;
   padding: 24px 20px;
-  background: #fbfaf6;
+  background: #1F2328;
   min-width: 0;
   align-self: stretch;
-  box-shadow: 0 3px 12px #2f2f2f03;
+  box-shadow: 0 3px 12px #12141803;
 }
 .ms-context h2 {
   font-size: 1.5rem;
@@ -439,10 +453,10 @@ body,
   align-items: center;
   flex-wrap: wrap;
   gap: 14px;
-  border: 1px solid #e7e3dc;
+  border: 1px solid #3A4048;
   border-radius: 16px;
   padding: 16px 20px;
-  background: #fbfaf6;
+  background: #1F2328;
 }
 .ms-capture-heading {
   margin-right: auto;
@@ -478,7 +492,7 @@ body,
   height: 36px;
   border: 1px solid var(--recall-stone);
   border-radius: 50%;
-  background: #f2eee7;
+  background: #1F2328;
 }
 .capture-bubbles svg {
   width: 21px;
@@ -493,7 +507,7 @@ body,
   color: var(--recall-muted);
 }
 .capture-bubbles button[data-active="true"] {
-  background: #e5e9df;
+  background: #1F2328;
 }
 .capture-center > .ms-fine {
   margin: 0;
@@ -517,17 +531,17 @@ body,
   position: relative;
   z-index: 5;
   padding: 12px 16px;
-  border: 1px solid #b8c2b2;
-  background: #eff2e9;
+  border: 1px solid #3A4048;
+  background: #1F2328;
   border-radius: 8px;
   margin: 0;
   font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 .ms-error {
-  border-color: #a35442;
-  background: #f5e9e3;
-  color: #843625;
+  border-color: #505862;
+  background: #1F2328;
+  color: #E5E7EB;
 }
 .ms-sr {
   position: absolute;
@@ -541,8 +555,8 @@ body,
   border: 0;
 }
 .glass {
-  background: #fbfaf6;
-  border: 1px solid #e7e3dc;
+  background: #1F2328;
+  border: 1px solid #3A4048;
   border-radius: 16px;
 }
 .adaptive-inspector {
@@ -598,7 +612,7 @@ body,
     sans-serif;
   max-height: 280px;
   overflow: auto;
-  background: #efebe3;
+  background: #1F2328;
   padding: 16px;
   border-radius: 8px;
 }
@@ -776,7 +790,7 @@ body,
 .ms-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: #2f2f2f55;
+  background: #12141855;
   display: grid;
   place-items: center;
   z-index: 20;
@@ -791,7 +805,7 @@ body,
   padding: 28px;
   border: 1px solid var(--recall-stone);
   border-radius: 16px;
-  box-shadow: 0 20px 70px #2f2f2f25;
+  box-shadow: 0 20px 70px #12141825;
 }
 .ms-vault-settings header {
   display: flex;
@@ -856,8 +870,8 @@ body,
   color: var(--recall-muted);
 }
 .editor-conflict {
-  border: 1px solid #9d744f;
-  background: #f5eee2;
+  border: 1px solid #505862;
+  background: #1F2328;
   border-radius: 8px;
   padding: 12px;
   margin: 12px 0;
@@ -889,7 +903,7 @@ body,
   max-height: 80dvh;
   overflow: auto;
   padding: 24px;
-  box-shadow: 0 12px 40px #2f2f2f20;
+  box-shadow: 0 12px 40px #12141820;
 }
 .attachment-sheet header {
   display: flex;
@@ -905,7 +919,7 @@ body,
 .attachment-sheet pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: #efebe3;
+  background: #1F2328;
   padding: 16px;
   border-radius: 8px;
 }
@@ -965,7 +979,7 @@ body,
 }
 .ms-knowledge-map button[aria-pressed="true"],
 .ms-knowledge-list button[aria-pressed="true"] {
-  background: #e5e9df;
+  background: #1F2328;
   border-color: var(--recall-focus);
 }
 .ms-knowledge-path > span {
@@ -1009,7 +1023,7 @@ body,
   margin: 8px 0;
   padding: 10px 12px;
   border-left: 2px solid var(--recall-sage);
-  background: #eff0e9;
+  background: #1F2328;
 }
 .ms-knowledge-source {
   display: flex;
@@ -1067,14 +1081,14 @@ body,
   vector-effect: non-scaling-stroke;
 }
 .graph-node text { font-size: 1.125rem; font-weight: 500; }
-.graph-node .node-meta { font-size: .875rem; font-weight: 400; fill: #62665e; }
-.graph-node .node-orbit { fill: none; stroke: #a6ab9e; stroke-width: .75; opacity: .6; pointer-events: none; }
+.graph-node .node-meta { font-size: .875rem; font-weight: 400; fill: #E5E7EB; }
+.graph-node .node-orbit { fill: none; stroke: #3A4048; stroke-width: .75; opacity: .6; pointer-events: none; }
 .graph-node.tone-sage .node-light { fill: url(#memory-sage); }
 .graph-node.tone-copper .node-light { fill: url(#memory-copper); }
-.graph-node.tone-copper .node-orbit { stroke: #bf957c; }
+.graph-node.tone-copper .node-orbit { stroke: #505862; }
 .graph-node.tone-stone .node-light { fill: url(#memory-stone); }
 
-.empty-motif text { font: 1rem Inter, sans-serif; fill: #fff; }
+.empty-motif text { font: 1rem Inter, sans-serif; fill: #121418; }
 .ms-context { min-height: 0; max-height: 100%; overflow: auto; }
 .ms-notices {
   grid-column: 1 / -1;
@@ -1245,7 +1259,6 @@ body,
   .ms-rail { padding: 28px 16px; }
   .ms-brand { margin-bottom: 20px; }
   .ms-brand-logo { width: 72px; height: 72px; }
-  .ms-mark { font-size: 2.625rem; letter-spacing: -1.5px; }
   .ms-nav { gap: 0; }
   .ms-nav button, .ms-rail-bottom button { font-size: .8125rem; }
   .ms-rail:after { margin-top: auto; padding-top: 32px; letter-spacing: 2.5px; }
@@ -1271,7 +1284,7 @@ body,
     grid-template-columns: repeat(3, minmax(0, 1fr));
     padding: 16px 8px;
     margin: 0 0 16px;
-    border: 1px solid #e7e3dc;
+    border: 1px solid #3A4048;
     border-radius: 8px;
   }
   .ms-library-counts > div {
@@ -1289,7 +1302,6 @@ body,
 }
 @media (min-width: 1101px) and (max-width: 1300px) {
   .ms-brand-logo { width: 64px; height: 64px; }
-  .ms-mark { font-size: 2.25rem; }
   .ms-context { padding: 20px; }
   .ms-context-note { margin-bottom: 16px; padding-top: 20px; }
   .ms-context-note p { font-size: 1rem; }
@@ -1300,16 +1312,28 @@ body,
 .cloud-access { display: grid; place-items: center; padding: 24px; }
 .cloud-access .ms-context { display: flex; flex-direction: column; width: min(100%, 440px); grid-area: auto; align-self: center; }
 .cloud-access form, .cloud-access label { display: grid; gap: 12px; }
-.cloud-signout { position: fixed; bottom: 8px; left: 12px; z-index: 3; min-height: 44px; padding: 8px 12px; color: #2f2f2f; background: #faf8f3; border: 1px solid #dedbd3; border-radius: 8px; font: .75rem Inter, sans-serif; }
-.cloud-session-error { position: fixed; bottom: 56px; left: 12px; background: #faf8f3; padding: 12px; }
+.cloud-signout { position: fixed; bottom: 8px; left: 12px; z-index: 3; min-height: 44px; padding: 8px 12px; color: #E5E7EB; background: #1F2328; border: 1px solid #3A4048; border-radius: 8px; font: .75rem Inter, sans-serif; }
+.cloud-session-error { position: fixed; bottom: 56px; left: 12px; background: #1F2328; padding: 12px; }
 
-.cloud-sync-status { position: fixed; bottom: 0; right: 12px; max-width: min(70vw, 620px); padding: 4px 8px; background: #faf8f3; color: #62665e; font: .6875rem/1.4 Inter, sans-serif; z-index: 3; }
+.cloud-sync-status { position: fixed; bottom: 0; right: 12px; max-width: min(70vw, 620px); padding: 4px 8px; background: #1F2328; color: #E5E7EB; font: .6875rem/1.4 Inter, sans-serif; z-index: 3; }
 
-.cloud-local { position: fixed; bottom: 8px; left: 100px; z-index: 3; min-height: 44px; padding: 8px; background: #faf8f3; color: #2f2f2f; border: 1px solid #dedbd3; border-radius: 8px; }
+.cloud-local { position: fixed; bottom: 8px; left: 100px; z-index: 3; min-height: 44px; padding: 8px; background: #1F2328; color: #E5E7EB; border: 1px solid #3A4048; border-radius: 8px; }
 
-.cloud-import { position: fixed; bottom: 56px; left: 12px; z-index: 3; min-height: 44px; padding: 8px; color: #2f2f2f; background: #faf8f3; border: 1px solid #dedbd3; border-radius: 8px; }
-.cloud-migration { position: fixed; bottom: 108px; left: 12px; max-width: 440px; max-height: 35vh; overflow: auto; z-index: 4; background: #faf8f3; border: 1px solid #dedbd3; padding: 16px; }
+.cloud-import { position: fixed; bottom: 56px; left: 12px; z-index: 3; min-height: 44px; padding: 8px; color: #E5E7EB; background: #1F2328; border: 1px solid #3A4048; border-radius: 8px; }
+.cloud-migration { position: fixed; bottom: 108px; left: 12px; max-width: 440px; max-height: 35vh; overflow: auto; z-index: 4; background: #1F2328; border: 1px solid #3A4048; padding: 16px; }
 
-.cloud-account { position: fixed; top: 8px; right: 12px; z-index: 5; min-height: 44px; padding: 8px; color: #2f2f2f; background: #faf8f3; border: 1px solid #dedbd3; border-radius: 8px; }
-.cloud-settings { position: fixed; top: 56px; right: 12px; width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 80px); overflow: auto; padding: 24px; z-index: 12; background: #faf8f3; color: #2f2f2f; }
+.cloud-account { position: fixed; top: 8px; right: 12px; z-index: 5; min-height: 44px; padding: 8px; color: #E5E7EB; background: #1F2328; border: 1px solid #3A4048; border-radius: 8px; }
+.cloud-settings { position: fixed; top: 56px; right: 12px; width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 80px); overflow: auto; padding: 24px; z-index: 12; background: #1F2328; color: #E5E7EB; }
 .cloud-settings button { min-height: 44px; margin: 8px 0; }
+
+@supports (backdrop-filter: blur(1px)) {
+  .ms-ask,
+  .ms-memory-field,
+  .ms-context,
+  .adaptive-inspector {
+    background: var(--monolith-glass-bg);
+    border-color: var(--monolith-glass-border);
+    -webkit-backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+    backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+  }
+}

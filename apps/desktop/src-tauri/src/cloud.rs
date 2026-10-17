@@ -11,7 +11,7 @@ fn agent() -> ureq::Agent {
 fn origin(value: &str) -> Result<String,String> {
     let url = value.trim_end_matches('/');
     if !url.starts_with("https://") || url.len()>255 || url[8..].contains(['/', '@', '?', '#', '\\']) || url.chars().any(char::is_whitespace) {
-        return Err("Enter the HTTPS origin of your MeGraph server, without a path.".into());
+        return Err("Enter the HTTPS origin of your MONOLITH server, without a path.".into());
     }
     Ok(url.into())
 }
@@ -39,7 +39,7 @@ fn cloud_request_blocking(path: String, method: String, body: Option<String>) ->
     if !path.starts_with("/library/") && path!="/settings/ai" {return Err("Unsupported cloud route".into());}
     if path.contains(['#','\\']) || path.contains("..") || path.len()>2048 || !["GET","POST","PUT"].contains(&method.as_str()) {return Err("Invalid cloud request".into());}
     if body.as_ref().is_some_and(|value|value.len()>36*1024*1024) {return Err("Cloud request too large".into());}
-    let stored = crate::secrets::secret_get(KEY.into())?.ok_or("Connect this device to MeGraph first")?;
+    let stored = crate::secrets::secret_get(KEY.into())?.ok_or("Connect this device to MONOLITH first")?;
     let session:Value=serde_json::from_str(&stored).map_err(|_|"Invalid saved cloud session")?;
     let url=origin(session["url"].as_str().ok_or("Missing cloud origin")?)?;
     let token=session["token"].as_str().filter(|v|v.starts_with("rcs_")).ok_or("Invalid saved cloud credential")?;

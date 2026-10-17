@@ -1,13 +1,13 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   --ivory: var(--recall-ivory);
   --ink: var(--recall-graphite);
   --muted: var(--recall-muted);
   --line: var(--recall-divider);
   --sage: var(--recall-sage);
   --copper: var(--recall-copper);
-  --surface: #f1eee8;
-  font-family: Inter, system-ui, sans-serif;
+  --surface: var(--monolith-graphite);
+  font-family: var(--monolith-font-body);
   color: var(--ink);
   background: var(--ivory);
 }
@@ -26,7 +26,7 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: var(--monolith-font-heading);
   font-weight: 400;
   line-height: 1.2;
   margin: 0 0 16px;
@@ -188,10 +188,21 @@ svg {
 [hidden] {
   display: none !important;
 }
+@supports (backdrop-filter: blur(1px)) {
+  .search-link,
+  article,
+  details {
+    background-color: var(--monolith-glass-bg);
+    border-color: var(--monolith-glass-border);
+    -webkit-backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+    backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+  }
+}
 .phone-brand {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--line);
   padding-bottom: 8px;
   margin-bottom: 12px;
@@ -203,21 +214,21 @@ svg {
   gap: 8px;
   text-decoration: none;
   min-height: 48px;
+  min-width: 0;
 }
 .phone-brand img {
   width: 44px;
   height: 44px;
 }
 .phone-brand a span {
-  font:
-    2rem "Playfair Display",
-    Georgia,
-    serif;
-  letter-spacing: -1px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 600 clamp(0.85rem, 5vw, 1.25rem)/1.2 var(--monolith-font-heading);
+  letter-spacing: 0.025em;
 }
 .brand-signature {
   font-size: 0.625rem;
-  max-width: 100px;
+  max-width: min(100%, 120px);
   letter-spacing: 1px;
   line-height: 1.6;
   text-align: right;
@@ -308,9 +319,7 @@ svg {
 .home-signature {
   text-align: center;
   font:
-    italic 1.1875rem "Playfair Display",
-    Georgia,
-    serif;
+    italic 1.1875rem var(--monolith-font-heading);
 }
 .receipt-link {
   display: flex;
@@ -341,9 +350,7 @@ svg {
   padding: 20px;
   border-radius: 16px;
   font:
-    1.5rem/1.3 "Playfair Display",
-    Georgia,
-    serif;
+    1.5rem/1.3 var(--monolith-font-heading);
   margin: 24px 0 32px;
 }
 .ask-view form {
@@ -483,16 +490,27 @@ body[data-view="camera"] .phone-brand { margin-bottom: 4px; }
 }
 .capture-save button { margin: 0; }
 .capture-form > .fine { margin-top: 8px; }
-.field-error { color: #843625; font-size: 0.8125rem; margin: 4px 0 12px; }
+.field-error { color: #E5E7EB; font-size: 0.8125rem; margin: 4px 0 12px; }
 .field-error:empty { display: none; }
-[aria-invalid="true"] { border-color: #843625 !important; }
+[aria-invalid="true"] { border-color: #6B7280 !important; }
 .keyboard-open .phone-nav { display: none; }
 .keyboard-open .capture-save { bottom: 0; }
 .keyboard-open { padding-bottom: 24px; }
-article[data-memory] h2 { font: 400 1.5rem/1.3 "Playfair Display", serif; margin-bottom: 12px; }
+article[data-memory] h2 { font: 400 1.5rem/1.3 var(--monolith-font-heading); margin-bottom: 12px; }
 article[data-memory] h3 { font: 500 0.875rem/1.5 Inter, sans-serif; margin-top: 24px; }
 article[data-memory] > p { line-height: 1.65; }
 article[data-memory] details { margin-top: 16px; padding-top: 4px; }
 body:has(.phone-app) { padding-bottom: calc(var(--nav-height) + 24px); }
 body.keyboard-open:has(.phone-app) { padding-bottom: 24px; }
 body:not(:has(.phone-app)) { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+
+@supports (backdrop-filter: blur(1px)) {
+  .search-link,
+  article,
+  details {
+    background-color: var(--monolith-glass-bg);
+    border-color: var(--monolith-glass-border);
+    -webkit-backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+    backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
+  }
+}

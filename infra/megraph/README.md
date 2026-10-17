@@ -1,10 +1,10 @@
-# MeGraph deployment checkpoint
+# MONOLITH deployment checkpoint
 
 This Compose stack serves the **approved desktop React application** in a browser. It does not use the historical `apps/web` interface. It is a verified local deployment checkpoint, **not a production release or completion of the owner's master prompt**.
 
 ## Isolation and prerequisites
 
-Inspect the Hostinger VPS first: OS/resources, `docker ps`, existing Compose projects, reverse-proxy configuration, firewall, occupied ports, disk space, backup destination and DNS. Preserve Orloom, GridLens and every existing service. This project publishes only `127.0.0.1:18880`; PostgreSQL, API, worker and administrative enrollment are not published. The existing HTTPS proxy should route only the chosen MeGraph hostname to that loopback port. Do not replace the host proxy or bind ports 80/443 from this stack.
+Inspect the Hostinger VPS first: OS/resources, `docker ps`, existing Compose projects, reverse-proxy configuration, firewall, occupied ports, disk space, backup destination and DNS. Preserve Orloom, GridLens and every existing service. This project publishes only `127.0.0.1:18880`; PostgreSQL, API, worker and administrative enrollment are not published. The existing HTTPS proxy should route only the chosen MONOLITH hostname to that loopback port. Do not replace the host proxy or bind ports 80/443 from this stack.
 
 Required access, not available during this implementation: VPS SSH hostname/IP and user with Docker/proxy permissions; authorized SSH credentials through secure environment provisioning; intended hostname and DNS/proxy access; remote provider credentials and pinned model/prices; encrypted off-host backup destination. No Hostinger changes were made.
 
@@ -66,3 +66,5 @@ python scripts/verify-cloud-compose.py --env-file /private/test.env --override /
 ```
 
 This issues a synthetic owner, exercises the actual HTTP API and production PWA (offline capture/reload/reconnect), checks graph/edit/search/original integrity/mobile accessibility/logout, restarts the isolated database/API/worker, and compares stored revisions/hashes. It must never target a production project. Screenshots and verification metadata go to `test-results/megraph-cloud/`; no credentials are retained. Physical iPhone, installed Windows, live paid AI and physical PC-off acceptance remain separate mandatory tests.
+
+The infra/megraph path, Compose identifiers and MEGRAPH/RECALL environment names remain stable compatibility identifiers; MONOLITH is the product-facing brand.

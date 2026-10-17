@@ -68,7 +68,7 @@ export function CloudEntry({native = false, onLocal}: {native?: boolean; onLocal
     {error && <p className="cloud-session-error" role="alert">{error}</p>}
   </>;
   return <main className="ms cloud-access"><section className="ms-context">
-    <p className="ms-kicker">MEGRAPH</p><h1>Your world. Connected.</h1>
+    <p className="ms-kicker">MONOLITH</p><h1>Your world. Connected.</h1>
     <p>Your private memory, available wherever you are.</p>
     {checking ? <p role="status">Checking your session…</p> : <form onSubmit={event => {
       event.preventDefault(); setBusy(true); setError("");
@@ -77,10 +77,10 @@ export function CloudEntry({native = false, onLocal}: {native?: boolean; onLocal
         .catch(failure => setError(failure instanceof Error ? failure.message : "Sign-in failed."))
         .finally(() => setBusy(false));
     }}>
-      {native && <label>MeGraph server<input type="url" placeholder="https://your-megraph-host" value={url} onChange={event => setUrl(event.target.value)} required /></label>}
+      {native && <label>MONOLITH server<input type="url" placeholder="https://your-monolith-host" value={url} onChange={event => setUrl(event.target.value)} required /></label>}
       <label>Owner access code<input type="password" autoComplete="one-time-code" value={token} onChange={event => setToken(event.target.value)} required /></label>
       <p>Use the one-time enrollment code issued by your server administrator.</p>
-      <button disabled={busy}>{busy ? "Signing in…" : "Open MeGraph"}</button>
+      <button disabled={busy}>{busy ? "Signing in…" : "Open MONOLITH"}</button>
     </form>}
     {onLocal && <button onClick={onLocal}>Return to local library</button>}
     {error && <p role="alert">{error}</p>}

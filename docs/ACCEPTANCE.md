@@ -1,4 +1,4 @@
-# Recall — v1 Acceptance Checklist
+# MONOLITH — v1 Acceptance Checklist
 
 This is the real-device test for the [definition of done](VISION.md#definition-of-done-v1). Copy this file into a new dated section in [STATUS.md](STATUS.md), or attach a filled-in copy to the PR, each time you run it.
 
@@ -35,7 +35,7 @@ This is the real-device test for the [definition of done](VISION.md#definition-o
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| A1 | Fresh install on a machine/user without Obsidian | App opens to the ivory Capture screen. No login. | ☐ Pass ☐ Fail |
+| A1 | Fresh install on a machine/user without Obsidian | App opens to the MONOLITH capture surface in independent local mode. Cloud mode requires authentication. | ☐ Pass ☐ Fail |
 | A2 | Create a new library in an empty folder | Folder now has `Recall/Sources`, `Memories`, `History`, `_meta` | ☐ Pass ☐ Fail |
 | A3 | Look at the empty screen | No fake people, projects, counts or graph data | ☐ Pass ☐ Fail |
 | A4 | Settings: enter Jev + Claude keys, prices, budgets | Saved; keys are never shown back in full | ☐ Pass ☐ Fail |
@@ -62,14 +62,14 @@ This is the real-device test for the [definition of done](VISION.md#definition-o
 | C6 | Set the daily budget to $0.01 and process P2 | Refused with a clear budget message; P2 original still saved | ☐ Pass ☐ Fail |
 | C7 | Restore the budget, process P2 | Ready / Needs review | ☐ Pass ☐ Fail |
 
-## D. Edit (in Recall and outside it)
+## D. Edit (in MONOLITH and outside it)
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| D1 | Edit T1's note in Recall, add a sentence | Autosaves; revision appears in history | ☐ Pass ☐ Fail |
+| D1 | Edit T1's note in MONOLITH, add a sentence | Autosaves; revision appears in history | ☐ Pass ☐ Fail |
 | D2 | Restart the app | Edit is still there | ☐ Pass ☐ Fail |
-| D3 | Open T1's `.md` in Notepad, change a line, save | Recall picks up the change, and it shows in history | ☐ Pass ☐ Fail |
-| D4 | Edit the same note in Notepad **and** in Recall without refreshing | Conflict is shown; neither version is silently lost | ☐ Pass ☐ Fail |
+| D3 | Open T1's `.md` in Notepad, change a line, save | MONOLITH picks up the change, and it shows in history | ☐ Pass ☐ Fail |
+| D4 | Edit the same note in Notepad **and** in MONOLITH without refreshing | Conflict is shown; neither version is silently lost | ☐ Pass ☐ Fail |
 
 ## E. Ask (vague question)
 

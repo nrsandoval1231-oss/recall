@@ -1,16 +1,14 @@
-# Recall
+# MONOLITH
 
 A private, local-first external memory. Photograph your notes or type a brain-dump; later, ask a vague question and get the answer with the original source to prove it. Your memories live in a plain folder you own: originals, Markdown notes and append-only history.
 
 - **Desktop** (Tauri, Windows first): the adaptive Memory Surface, with Camera / Speak / Write, Ask, inspect, correct and graph.
-- **Phone**: Capture and Ask over your private Tailscale network. No login.
+- **Phone/web**: authenticated PWA cloud checkpoint plus the existing private companion; optional Windows cloud mode preserves independent local libraries. See STATUS for incomplete synchronization/processing gates.
 - **Intelligence**: Jev parses → Claude proposes organization → a deterministic writer validates and commits. Consent-gated and budget-capped. Everything except interpretation keeps working offline.
 
 ## One UI and brand vision
 
-**Locked on 2026-10-15:** warm ivory, graphite, sage and copper; editorial typography; the orbital Recall identity; photo-free interface decoration. The latest approved desktop, mobile and brand boards are the sole visual direction. [DESIGN.md](docs/DESIGN.md) records the exact references, checksums, palette, typography, logo, interaction rules and acceptance requirements.
-
-The owner-designated canonical PR #61 PNGs are committed in `docs/assets/approved/` with verified hashes. The desktop and existing phone companion now use the approved brand system; implementation evidence and remaining acceptance limits are recorded in [STATUS.md](docs/STATUS.md). Older references and historical screenshots must not guide new UI work. Captured photos and scans remain valid source evidence.
+**MONOLITH — Your world. Connected.** The [source guide and M assets](branding/monolith/v1/BRAND_GUIDE.md) are canonical by owner instruction on 2026-10-17. [DESIGN.md](docs/DESIGN.md) applies the smoky-glass black/gray identity, Sora/Inter and accessibility/evidence rules. Earlier Recall boards and MeGraph branding are superseded. Working capture, inspection, corrections, provider settings and offline behavior are preserved.
 
 ## Docs (read in this order)
 
@@ -22,7 +20,7 @@ The owner-designated canonical PR #61 PNGs are committed in `docs/assets/approve
 6. [ACCEPTANCE.md](docs/ACCEPTANCE.md): the real-device v1 checklist.
 7. [TESTING.md](docs/TESTING.md): guide for friends testing a release.
 
-`docs/history/` is frozen evidence, not design guidance. `docs/legacy-cloud/` documents the retired cloud stack.
+`docs/history/` is frozen evidence, not design guidance. `docs/legacy-cloud/` is historical documentation; the backend is reused by the active cloud checkpoint.
 
 ## Quick start
 
@@ -38,5 +36,5 @@ apps/desktop/          product: React UI + Rust core (src-tauri), includes recal
 packages/design-tokens shared approved palette, typography, spacing and semantic UI tokens
 tests/                 phone, ui, native runtime checks
 apps/web, apps/mobile, services/backend, packages/{api-client,sync,contracts}
-                       legacy cloud stack (frozen, not the product)
+                       backend reused by cloud checkpoint; historical web/mobile clients
 ```

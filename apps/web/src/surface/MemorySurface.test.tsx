@@ -127,7 +127,7 @@ async function ask(question = "Campus?") {
   fireEvent.change(screen.getByLabelText("What do you need to remember?"), {
     target: { value: question },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Ask Recall" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask MONOLITH" }));
   await screen.findByText(answer.answer!);
 }
 async function focusMemory() {
@@ -190,8 +190,8 @@ it("rejects stale Ask after navigating home", async () => {
   fireEvent.change(screen.getByLabelText("What do you need to remember?"), {
     target: { value: "Campus?" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Ask Recall" }));
-  fireEvent.click(screen.getByRole("button", { name: "Recall home" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask MONOLITH" }));
+  fireEvent.click(screen.getByRole("button", { name: "MONOLITH home" }));
   await act(async () => release(answer));
   expect(screen.queryByText(answer.answer!)).toBeNull();
 });

@@ -1,4 +1,11 @@
-/* Shared desktop and native-phone identity. See docs/DESIGN.md. */
+/* Shared MONOLITH identity tokens for desktop and the native phone surface. */
+@font-face {
+  font-family: Sora;
+  src: url("/fonts/Sora-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+}
 @font-face {
   font-family: Inter;
   src: url("/fonts/Inter-Regular.ttf") format("truetype");
@@ -6,27 +13,37 @@
   font-weight: 400 600;
   font-display: swap;
 }
-@font-face {
-  font-family: "Playfair Display";
-  src: url("/fonts/PlayfairDisplay-Regular.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400 600;
-  font-display: swap;
-}
 :root {
-  --recall-ivory: #faf8f3;
-  --recall-linen: #ebe1d9;
-  --recall-stone: #d1cbc2;
-  --recall-sage: #8c9f8f;
-  --recall-copper: #c97f5b;
-  --recall-graphite: #2f2f2f;
-  --recall-moss: #b7c4b6;
-  --recall-sand: #e7ded4;
-  --recall-blush: #f3ebe6;
-  --recall-mist: #f7f5f2;
-  --recall-muted: #62665e;
-  --recall-focus: #526650;
-  --recall-divider: #dedbd3;
-  --recall-display: "Playfair Display", Georgia, serif;
-  --recall-body: Inter, system-ui, sans-serif;
+  --monolith-obsidian: #050607;
+  --monolith-charcoal: #121418;
+  --monolith-graphite: #1f2328;
+  --monolith-slate: #3a4048;
+  --monolith-steel: #8a8f98;
+  --monolith-silver: #e5e7eb;
+  --monolith-mist: #2a2f36;
+  --monolith-smoke: #3b424c;
+  --monolith-glass: #505862;
+  --monolith-frost: #6b7280;
+  --monolith-font-heading: "Sora", sans-serif;
+  --monolith-font-body: "Inter", sans-serif;
+  --monolith-glass-bg: rgba(31, 35, 40, 0.58);
+  --monolith-glass-border: rgba(229, 231, 235, 0.13);
+  --monolith-glass-blur: 18px;
+
+  /* Compatibility aliases used by existing components; values follow MONOLITH. */
+  --recall-ivory: var(--monolith-obsidian);
+  --recall-linen: var(--monolith-charcoal);
+  --recall-stone: var(--monolith-slate);
+  --recall-sage: var(--monolith-steel);
+  --recall-copper: var(--monolith-frost);
+  --recall-graphite: var(--monolith-silver);
+  --recall-moss: var(--monolith-smoke);
+  --recall-sand: var(--monolith-mist);
+  --recall-blush: var(--monolith-charcoal);
+  --recall-mist: var(--monolith-charcoal);
+  --recall-muted: #aeb4bd;
+  --recall-focus: #bfc5ce;
+  --recall-divider: rgba(229, 231, 235, 0.13);
+  --recall-display: var(--monolith-font-heading);
+  --recall-body: var(--monolith-font-body);
 }

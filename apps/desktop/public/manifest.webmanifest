@@ -1,13 +1,13 @@
 {
   "id": "/",
-  "name": "MeGraph",
-  "short_name": "MeGraph",
+  "name": "MONOLITH",
+  "short_name": "MONOLITH",
   "description": "Your world. Connected.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#faf8f3",
-  "theme_color": "#faf8f3",
+  "background_color": "#050607",
+  "theme_color": "#050607",
   "icons": [
     {
       "src": "/brand/app-icon-192.png",

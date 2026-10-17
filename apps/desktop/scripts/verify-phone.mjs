@@ -67,7 +67,7 @@ try {
       );
     await shot("write");
     const saveBox = await page.getByRole("button", {name:"Save capture",exact:true}).boundingBox();
-    const navBox = await page.getByRole("navigation", {name:"Recall"}).boundingBox();
+    const navBox = await page.getByRole("navigation", {name:"MONOLITH"}).boundingBox();
     if (saveBox.y + saveBox.height > navBox.y) throw Error(`Save covered at ${width}`);
     await page.getByRole("link", { name: "Home", exact: true }).click();
     await page.getByRole("link", { name: /Camera Keep an original/ }).click();
@@ -94,7 +94,7 @@ try {
       .getByText("Saved in the desktop vault", { exact: true })
       .waitFor();
     await shot("detail");
-    await page.getByRole("link", { name: "Recall home" }).click();
+    await page.getByRole("link", { name: "MONOLITH home" }).click();
     await page.getByRole("link", { name: "Ask", exact: true }).click();
     await shot("ask");
     await page.getByLabel("Ask the notes").fill("quiet afternoon");

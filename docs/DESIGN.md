@@ -1,110 +1,25 @@
-# Recall — approved UI and brand
+# MONOLITH — UI and brand
 
-**Locked by Nick Sandoval on 2026-10-15. This is the repository's only UI and brand authority.** The latest three approved, photo-free boards define one design family: desktop, mobile and brand. They replace every earlier visual reference, four-panel concept, dashboard treatment, logo proposal and provisional brand direction. Do not reopen creative exploration or combine old and new treatments without a new owner decision.
+Nick's 2026-10-17 instruction, “monolith is the canonical vision. Remove anything that conflicts”, supersedes the 2026-10-15 Recall boards and the interim MeGraph identity. The source authority is [MONOLITH Brand Guide v1.0](../branding/monolith/v1/BRAND_GUIDE.md), imported unchanged from PR #65, c252475d63c31671e70c4a35b687107a6f4af8a9. This document applies that guide to the working product; it introduces no alternative design direction.
 
-[VISION.md](VISION.md) governs product scope, architecture boundaries and trust. This document governs visual identity and interaction presentation. Mockup examples never override product truth, permissions or evidence rules.
+## Identity and presentation
 
-## Exact approved references and preservation
+Name: **MONOLITH**. Tagline: **Your world. Connected.** Use the supplied geometric architectural M: white at small sizes and in navigation, metallic for hero/onboarding. Keep at least 20% of symbol width as clear space. No orbital logo, crystal, rock, slit, added circle, stretching, rotation or excessive glow. Use the source SVG assets and tokens under branding/monolith/v1; do not redraw the mark.
 
-The owner confirmed on 2026-10-15 that the exact files uploaded in [PR #61](https://github.com/nrsandoval1231-oss/recall/pull/61), commit `b4b9eebc2f88a64fcb8960b21db2f46e1f04a8a8`, are canonical. This explicit decision supersedes the earlier archive hashes. The three PNGs below are imported byte-for-byte from that PR; they have not been resized, recompressed or regenerated.
+Keep the guide's smoky-glass desktop/mobile UI, black/gray surfaces, soft translucent graph nodes and restrained imagery. Sora headings, Inter body/UI; use a readable sans-serif fallback when a font is unavailable. Obsidian #050607, charcoal #121418, graphite #1F2328, slate #3A4048, steel #8A8F98, silver #E5E7EB; glass surface rgba(31,35,40,.58), border rgba(229,231,235,.13), blur 18px. Old ivory/sage/copper and Playfair/orbital mandates are superseded. The brand guide's color token named “obsidian” is only a color, not an integration.
 
-| Role | Original attachment | PR #61 path | Repository destination |
-|---|---|---|---|
-| Desktop | `recall_a_more_human_tomorrow.png` | `docs/design/desktop-screens.png` | `docs/assets/approved/desktop.png` |
-| Mobile | `recall_a_kinder_tomorrow.png` | `docs/design/mobile-screens.png` | `docs/assets/approved/mobile.png` |
-| Brand | `recall_brand_identity_style_guide.png` | `docs/design/brand-board.png` | `docs/assets/approved/brand.png` |
+Preserve the functioning rail/search/memory-field/context structure, responsive focused tasks and all existing actions. This is identity reconciliation, not authorization for a new product architecture or removal of features. Original user photos, scans, camera previews and attachments remain untouched and inspectable. Restrained imagery never authorizes replacing original evidence or fabricated memories.
 
-All three are 1448 × 1086 pixels. Required SHA-256 values:
+## Evidence and interaction
 
-```text
-desktop.png  dbbf2e64d7f57ec09b422a94fcf6a38b0b9a670d44ad98fec10746cad10c2739
-mobile.png   e781f517c846f4cf20bc5ea623f9a4a522ead73bf81fde606b507d884cc189fe
-brand.png    f3cac65230d5d7e19f989ed4bbdb99225eacb0c7b0b85f65e0d9842966e64a1e
-```
+[VISION.md](VISION.md) governs product scope and trust. Save originals before AI; preserve drafts, consent, receipts, corrections, external edits, source citations, revision history and offline retry. Distinguish original content from interpretations and inferred links. Graph selection/layout never changes facts. No fabricated counts, progress, psychological scores, recording or unsupported synthesis. Unavailable Speak remains explicit. Cloud access follows the authenticated checkpoint in ARCHITECTURE; local-library mode remains supported.
 
-The superseded design PNG is removed from the active tree; Git history is sufficient for historical recovery. Historical screenshots, fixture names, source comments and frozen cloud UI are not visual references. Remaining old implementation is migration debt, not a competing approved direction. See [STATUS.md](STATUS.md).
+Retain keyboard access, visible focus, relationship-list alternative, meaningful status text, existing 48px targets and reduced-motion support. Check real text/background contrast (4.5:1 ordinary text), selected/disabled/error states and narrow-screen overflow. Blur needs an opaque fallback. No constant distracting animation.
 
-## Identity
+## Acceptance and historical references
 
-Recall feels calm, warm, intelligent, human and lasting: a considered home for memory, not a generic AI dashboard or a self-improvement scoring system. Use generous whitespace, quiet borders, fine orbital connections, softly shaded geometric nodes and restrained illustration. Complexity appears when it helps a real task.
+Compare source SVGs and actual rendered marks before accepting the swap. The supplied guide calls the M a vector reconstruction; owner optical approval and native installed-device acceptance remain separate gates. PR #65 does not include its locally generated brand-kit ZIP, raster masters or preview; do not claim those were verified. Runtime raster icons, when generated, must derive from the supplied SVG.
 
-- **Wordmark:** lowercase `recall`, with the refined editorial serif character shown on the approved brand board.
-- **Symbol:** the approved orbital connected-memory mark: a central memory and delicate intersecting orbits with sage/copper satellite nodes. No replacement monogram, brain, chatbot, generic infinity loop or unrelated mark.
-- **Primary brand signature:** “A more human tomorrow.” **Lead message:** “Your memories belong here.”
-- **Voice:** warm, thoughtful and clear. Product controls use direct language; operational messages never promise a psychological outcome or an unsupported capability.
-- **Logo use:** one master mark, with wordmark, symbol-only, app-icon and simplified small-size variants derived faithfully from it. Do not present a new variant as approved artwork. Production vector construction and small-size optical verification remain implementation work; the boards are not editable logo masters.
+PR #61 and docs/assets/approved boards are superseded and must not guide implementation. Historical screenshots and test evidence remain records of earlier versions, never active design instructions. Do not close or alter historical PRs as part of this reconciliation.
 
-## No photographic decoration
-
-**No real photographs in the product's branding, icons, avatars, backgrounds, ornamental cards or empty-state decoration.** No stock landscapes, photographed desks, leather, stone, devices, people or objects. Use the approved geometric/orbital language, line icons, initials where appropriate and sparse illustrated botanical accents only where the board establishes them. Do not fill the interface with illustrations merely because photos are forbidden.
-
-This rule does **not** delete or hide user evidence. A live camera preview, a photo or scan being captured, and the original source opened for inspection remain legitimate content. Use an abstract glyph in navigation and memory-list decoration; show original imagery deliberately as source evidence, not as a background or category icon. Never replace a captured original with generated artwork.
-
-## Color and typography
-
-The final brand board, not earlier verbal suggestions, determines the identity.
-
-| Token | Value | Role |
-|---|---|---|
-| Ivory | `#FAF8F3` | Main canvas |
-| Linen | `#EBE1D9` | Warm supporting surfaces |
-| Stone | `#D1CBC2` | Quiet dividers and neutral accents |
-| Sage | `#8C9F8F` | Memory nodes and restrained emphasis |
-| Copper | `#C97F5B` | Secondary accent and select orbital details |
-| Graphite | `#2F2F2F` | Primary text and high-contrast controls |
-| Moss | `#B7C4B6` | Supporting illustration |
-| Sand | `#E7DED4` | Supporting neutral |
-| Blush | `#F3EBE6` | Optional supporting surface |
-| Mist | `#F7F5F2` | Optional supporting surface |
-
-**Playfair Display** is the editorial display face; **Inter** is the interface and reading face. The former Instrument Serif proposal is superseded. Use the serif selectively for identity and major headings; controls, metadata, forms and substantive reading use the sans serif. Preserve legibility instead of copying tiny presentation-board labels.
-
-Use the board's 4 / 8 / 16 / 24 / 32 / 48 spacing scale and 4 / 8 / 16 / 24 corner-radius scale. Icons use a consistent thin line weight and optical size. Avoid decorative glass effects, heavy gradients, neon, blue-violet AI styling and excessive pill containers. Soft shading within abstract forms is allowed; photographic texture is not.
-
-Palette approval is not a blanket contrast pass. Test actual foreground/background pairs. Use graphite text on pale sage/copper surfaces, or a tested darker semantic shade where needed. Error, warning and success states retain explicit labels and non-color indicators; never hide them to maintain the palette.
-
-## Desktop composition
-
-The approved desktop board is the visual target: a restrained left navigation rail and brand, a global search field, a prominent living memory field, and a contextual right panel when useful. Search results, Ask Recall answers and memory detail share this exact visual system.
-
-The memory field uses deliberate orbital geometry and fine connections, not a photo collage, 3D solar system or indiscriminate node cloud. Map / Timeline / List represent alternate ways of exploring real memories. Keep Camera / Speak / Write immediately reachable; capture mode may bring those controls forward without forcing the entire product into the old capture-only composition.
-
-Preserve selection, viewport and navigation context across tasks. Context panels are quiet ivory surfaces rather than conspicuous glass panels. Empty libraries remain genuinely empty: an explicitly decorative motif may establish the identity, but must never masquerade as real memories or relationships. Do not ship ornamental filler panels when the underlying content is unavailable.
-
-## Mobile composition
-
-The mobile board defines the same identity at phone scale: Home; Camera, Speak and Write; Search; Ask Recall; Timeline; Memory Detail. Use focused pages, comfortable touch targets and concise navigation, not a shrunken desktop graph.
-
-The current phone companion remains Capture and Ask over the existing private connection. Other board screens are presentation targets for supported workflows, not authorization to add cloud infrastructure, accounts, public sharing or an unrelated native-app rewrite. Expose only working capabilities. Until real recording exists, Speak is visibly unavailable with an explanation.
-
-## Interaction and evidence contract
-
-| Flow | Required behavior |
-|---|---|
-| Capture | Camera / Speak / Write. No title, tag or folder required. Save original bytes before AI; preserve drafts through navigation and failures. A Windows file picker must not pretend to be a live camera. |
-| Saved / Understanding | Show actual receipts: saved, pending, reading, connecting, ready, needs review, failed or uncertain as supported. No fake progress timers or waveforms. |
-| Inspect / Correct | Keep the original and AI interpretation visibly separate; show provenance and revisions. Revision-safe edits preserve originals, external changes and human corrections. Never invent the contents of an unreadable source. |
-| Search / Ask | Clear results and evidence-backed answers with source links, dates and quotes. Label keyword-only retrieval; abstain when evidence is insufficient. No unsupported synthesis claims. |
-| Memory field | Derived from real notes, source IDs and explainable relations. Distinguish source-stated, user-confirmed, inferred and disputed links. Selection/layout changes never modify memory facts. Graphiti stays optional. |
-| Timeline | Distinguish event time, capture time and revision time. Filters change views, not historical evidence. |
-| Context / insights | Only reproducible counts or source-supported observations. Mockup percentages, gratitude/connection metrics and example memories are illustrative, not a license to invent psychological scores. |
-| Settings | Preserve library ownership, provider consent, budgets, credential protection, pairing and accessibility. No new login or public-sharing flow. |
-
-Mockup people, dates, counts, answers, likes and example collections are not real user data or new product requirements. A decorative share or social glyph does not authorize sharing or a social network. Synthetic screenshots must be labelled as such.
-
-## Accessibility and motion
-
-Use visible focus, keyboard-operable controls and a searchable relationship-list alternative to the graph. Maintain the existing 48 px/point minimum interactive target where applicable. Test text contrast and distinguish active, selected, disabled and error states without color alone. The ordinary-text target is at least 4.5:1; large text and meaningful non-text controls require their applicable contrast checks.
-
-Motion is restrained and purposeful: 120–300 ms transitions, no constant distracting orbiting. Honor reduced motion, pause hidden animation and preserve graph context. Escape dismisses an inspector before leaving its underlying task. Narrow screens must not horizontally scroll or trap controls outside the viewport.
-
-## Acceptance and change control
-
-1. Import and verify the three exact approved PNGs; do not regenerate them.
-2. Implement against the approved desktop/mobile/brand boards, not historical screenshots or existing CSS. Use real components, not a flattened mockup background.
-3. Check empty, populated, loading, offline, denied-consent, failed-provider, uncertain, conflict and disabled-feature states.
-4. Compare actual desktop captures at 1536 × 1024, 1182 × 789 and 900 × 700, and phone layouts at 390 and 430 px width. Inspect keyboard-only and reduced-motion behavior. Clearly separate browser fixtures from installed Windows and physical-iPhone evidence.
-5. Preserve capture → save → interpret/pending → inspect → correct → restart → source-backed Ask, plus graph/timeline navigation and source-photo inspection.
-6. Update the existing STATUS record with exact evidence and remaining gaps. Passing tests or approving this design does not establish visual parity, native acceptance or deployment.
-
-No competing UI specification, alternative brand kit or new design reference may be introduced without explicit owner approval. Historical records stay historical; current implementation must converge on this one vision.
+Inspect empty/populated, capture, processing/failure, editor/history, source photo, Ask, settings, offline/authentication and conflict states at desktop 1536x1024, 1182x789, 900x700 and phone 390/430 widths. Use real components and labelled synthetic fixtures. Separate automated browser checks from installed Windows, physical iPhone and live-provider evidence. Update STATUS with exact results and unresolved limits; no documentation or test pass alone establishes visual acceptance.

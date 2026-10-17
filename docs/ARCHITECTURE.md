@@ -1,8 +1,8 @@
-# Recall — Architecture
+# MONOLITH — Architecture
 
 Describes the code as it exists today. Product intent lives in [VISION.md](VISION.md). If this file drifts from the code, fix this file in the same PR.
 
-## MeGraph cloud evolution — owner decision 2026-10-17
+## MONOLITH cloud evolution — owner decision 2026-10-17
 
 The owner authorized an always-on Hostinger platform, authenticated web/PWA access, and offline Windows synchronization. This supersedes the local-only/no-login restriction below; the existing implementation description is retained for migration context. The approved React Memory Surface and native library remain the compatibility boundary. Reuse the existing FastAPI/PostgreSQL service, private write-once object storage, revocable device enrollment, provider adapters, budget enforcement and backup machinery. Do not introduce a second mobile backend or replace the desktop library.
 
@@ -40,7 +40,7 @@ Deploy configuration: `infra/megraph/compose.yml`, restricted API/worker, Postgr
                                           Recall library (a folder the user owns)
 ```
 
-There is no server, no login and no cloud dependency on the product path. Model calls (Jev, Claude) go out from the Rust process only, with the user's consent and within budget caps. API keys never reach the webview.
+Independent local-library mode needs no cloud account. The authenticated cloud mode above reuses the backend; the diagram describes local companion mode. Model calls (Jev, Claude) go out from the Rust process only, with the user's consent and within budget caps. API keys never reach the webview.
 
 ## The Recall library (on disk)
 
@@ -75,7 +75,7 @@ Uncertain provider delivery is never auto-resent; it waits for explicit review. 
 - `surface/MemoryEditor.tsx`, `editor-session.ts`: native editor with autosave, conflict and revision handling.
 - `surface/meeting-workflow.ts`, `native-librarian.ts`: drives the pipeline over IPC and reports honest states.
 - `platform/local-vault.ts`: the only bridge to native commands.
-- `scripts/verify-ui.mjs` and `scripts/verify-populated.mjs` inject labelled synthetic browser IPC for regression screenshots; production opens the real local library. The old selectable legacy-cloud entry and unused dashboard fixture components are removed.
+- `scripts/verify-ui.mjs` and `scripts/verify-populated.mjs` inject labelled synthetic browser IPC for regression screenshots; production opens the real local library or authenticated cloud adapter. The old selectable legacy-cloud entry and unused dashboard fixture components are removed.
 
 ## Phone (`src-tauri/src/phone.rs`, `bin/recall-phone.rs`)
 
@@ -88,11 +88,11 @@ A small HTTP server in the same crate. It binds the Tailscale IPv4 only (loopbac
 
 ## Shared packages
 
-`packages/design-tokens` supplies the approved palette and semantic tokens. Its `brand.css` is shared by desktop and the native phone renderer. `packages/api-client`, `packages/sync`, `packages/contracts` serve the legacy cloud stack only.
+`packages/design-tokens` supplies the approved palette and semantic tokens. Its `brand.css` is shared by desktop and the native phone renderer. `packages/api-client`, `packages/sync`, `packages/contracts` retain compatibility contracts; inspect live consumers before changing them.
 
-## Legacy (not the product)
+## Historical clients and reused backend
 
-`services/backend` (FastAPI, Postgres/pgvector, worker), `apps/web` (PWA), `apps/mobile` (Expo). The old desktop cloud entry module is unreachable from production. These sources are frozen; see [legacy-cloud/](legacy-cloud/README.md).
+`services/backend` (FastAPI, Postgres/pgvector, worker) is active in the authenticated cloud checkpoint described above. `apps/web` (historical PWA), `apps/mobile` (Expo) and the old desktop LegacyCloudEntry remain historical clients; the active browser entry is CloudEntry. Old docs in [legacy-cloud/](legacy-cloud/README.md) are migration context, not a freeze on the reused backend.
 
 ## Constraints
 

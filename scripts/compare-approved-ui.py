@@ -1,4 +1,5 @@
-"""Isolate approved board panels and make honest, uniformly scaled review sheets.
+"""Historical PR #61 replay only; not a MONOLITH acceptance check.
+Isolate superseded board panels and make uniformly scaled historical review sheets.
 Requires Pillow. No image registration, stretching, similarity score or target edits.
 """
 from pathlib import Path

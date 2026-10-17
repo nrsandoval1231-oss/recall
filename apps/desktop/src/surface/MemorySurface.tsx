@@ -1959,10 +1959,10 @@ export function MemorySurface({
       data-inspector={inspector}
       data-section={section}
     >
-      <aside className="ms-rail" aria-label="MeGraph">
+      <aside className="ms-rail" aria-label="MONOLITH">
         <div className="ms-brand">
-          <img className="ms-brand-logo" src="/brand/orbital-mark.svg" alt="" />
-          <span className="ms-mark">MeGraph</span>
+          <img className="ms-brand-logo" src="/brand/monolith-mark.svg" alt="" />
+          <span className="ms-mark">MONOLITH</span>
         </div>
         <nav className="ms-nav" aria-label="Memory">
           {RAIL.map((item) => (
@@ -2023,7 +2023,7 @@ export function MemorySurface({
             >
               <SearchIcon />
               <label className="ms-sr" htmlFor="recall-ask">
-                Ask MeGraph
+                Ask MONOLITH
               </label>
               <input
                 id="recall-ask"
@@ -2039,7 +2039,7 @@ export function MemorySurface({
             </form>
           }
           <div className="ms-greeting">
-            <img src="/brand/orbital-mark.svg" alt="" />
+            <img src="/brand/monolith-mark.svg" alt="" />
             <span>
               Your private memory.<small>Your world. Connected.</small>
             </span>
@@ -2142,7 +2142,7 @@ export function MemorySurface({
                 <span className="ms-copper-rule" />
                 <h3>Yours to keep.</h3>
                 <p>
-                  Originals stay in your MeGraph library. You can inspect,
+                  Originals stay in your MONOLITH library. You can inspect,
                   correct, and take them with you.
                 </p>
               </div>
@@ -3038,7 +3038,7 @@ function AskResults({
   return (
     <div>
       <p className="ms-kicker">ASK</p>
-      <h1>Ask MeGraph</h1>
+      <h1>Ask MONOLITH</h1>
       <p className="ms-fine">
         {KEYWORD_LABEL}
         {demo

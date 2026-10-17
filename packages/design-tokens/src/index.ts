@@ -1,39 +1,38 @@
 /**
  * Platform-neutral tokens and user-facing language shared by mobile (React Native) and
- * desktop (DOM). The owner approved the sole UI/brand direction on 2026-10-15:
- * see docs/DESIGN.md. Identity and semantic colors are distinct so consumers can
- * preserve semantic state labels, non-color indicators and capture behavior.
+ * desktop (DOM). MONOLITH's black-and-gray identity colors stay separate from
+ * semantic state labels, which retain non-color glyphs and capture behavior.
  */
 
-/** Approved identity colors; semantic shades below preserve text contrast. */
+/** MONOLITH smoky black and gray identity palette. */
 export const palette = {
-  ivory: "#FAF8F3",
-  linen: "#EBE1D9",
-  stone: "#D1CBC2",
-  sage: "#8C9F8F",
-  copper: "#C97F5B",
-  graphite: "#2F2F2F",
-  moss: "#B7C4B6",
-  sand: "#E7DED4",
-  blush: "#F3EBE6",
-  mist: "#F7F5F2",
+  ivory: "#050607",
+  linen: "#121418",
+  stone: "#3A4048",
+  sage: "#8A8F98",
+  copper: "#6B7280",
+  graphite: "#E5E7EB",
+  moss: "#3B424C",
+  sand: "#2A2F36",
+  blush: "#121418",
+  mist: "#1F2328",
 } as const;
 export const color = {
   ink: palette.graphite,
-  inkMuted: "#62665e",
+  inkMuted: "#AEB4BD",
   paper: palette.ivory,
   surface: palette.mist,
   border: palette.stone,
-  accent: "#526650",
+  accent: "#BFC5CE",
   accentText: palette.ivory,
-  success: "#426442",
-  warning: "#805329",
-  danger: "#963c30",
+  success: "#8A8F98",
+  warning: "#BFC5CE",
+  danger: "#E5E7EB",
 } as const;
 export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
 export const radius = { xs: 4, sm: 8, md: 16, lg: 24 } as const;
 export const fontFamily = {
-  display: "Playfair Display",
+  display: "Sora",
   body: "Inter",
 } as const;
 export const font = { body: 17, small: 14, title: 28, heading: 22 } as const;
@@ -105,7 +104,7 @@ export const statusPresentation: Record<CaptureStatusKey, StatusPresentation> =
       label: "Reading…",
       glyph: "◐",
       tone: "progress",
-      detail: "The original is stored. Recall is reading it.",
+      detail: "The original is stored. MONOLITH is reading it.",
     },
     ready: {
       label: "Ready",
@@ -175,8 +174,8 @@ export const toneColor: Record<StatusPresentation["tone"], string> = {
 };
 
 export const copy = {
-  appName: "Recall",
-  tagline: "Capture something you don't want to lose.",
+  appName: "MONOLITH",
+  tagline: "Your world. Connected.",
   scan: "Scan",
   save: "Save",
   retake: "Retake",

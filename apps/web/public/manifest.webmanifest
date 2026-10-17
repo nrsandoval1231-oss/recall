@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "Recall",
-  "short_name": "Recall",
-  "description": "Your life remembers itself.",
+  "name": "MONOLITH",
+  "short_name": "MONOLITH",
+  "description": "Your world. Connected.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#edeae2",
-  "theme_color": "#edeae2",
+  "background_color": "#050607",
+  "theme_color": "#050607",
   "icons": [
     {
       "src": "/icons/icon-192.png",

@@ -106,9 +106,9 @@ export function AdaptiveGraph({
         >
           <defs>
             {[
-              ["sage", "#b7c0b0", "#8a9683", "#788570"],
-              ["copper", "#dfb493", "#c18b69", "#b47d5e"],
-              ["stone", "#d4d0c7", "#b4b3aa", "#a4a59c"],
+              ["sage", "#e5e7eb", "#aeb4bd", "#6b7280"],
+              ["copper", "#bfc5ce", "#8a8f98", "#505862"],
+              ["stone", "#8a8f98", "#6b7280", "#3a4048"],
             ].map(([name, light, middle, edge]) => (
               <radialGradient key={name} id={`memory-${name}`} cx="32%" cy="28%" r="80%">
                 <stop stopColor={light} />

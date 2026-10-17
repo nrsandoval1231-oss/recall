@@ -14,7 +14,7 @@ page.on("pageerror", error => errors.push(error.message));
 try {
   await page.goto(process.env.MEGRAPH_TEST_ORIGIN || "http://127.0.0.1:1420");
   await page.getByLabel("Owner access code").fill(process.env.MEGRAPH_TEST_ENROLLMENT);
-  await page.getByRole("button", {name: "Open MeGraph", exact: true}).click();
+  await page.getByRole("button", {name: "Open MONOLITH", exact: true}).click();
   await page.getByRole("button", {name: /Write ·/}).click();
   await page.getByLabel("Your note").fill("SYNTHETIC CLOUD ACCEPTANCE: Blue pump inspected at 42 psi.");
   await page.getByRole("button", {name: "Save note", exact: true}).click();
