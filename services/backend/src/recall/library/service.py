@@ -51,6 +51,7 @@ class Mutation(BaseModel):
     captured_at: datetime | None = None
     note_path: str | None = Field(default=None, max_length=255)
     history: list[ImportedRevision] | None = Field(default=None, max_length=10000)
+    processing_consent: bool = False
 
 
 def record(row: dict[str, Any]) -> dict[str, Any]:
@@ -65,6 +66,11 @@ def record(row: dict[str, Any]) -> dict[str, Any]:
         "captured_at": row["captured_at"].isoformat(),
         "updated_at": row["updated_at"].isoformat(),
         "conflict": None,
+        "processing": row.get("processing")
+        or {
+            "state": "consent-required",
+            "message": "Original saved. Choose processing to send this source to the configured AI provider.",
+        },
     }
 
 
@@ -81,7 +87,9 @@ class LibraryService:
     def list(self, user: uuid.UUID, include_deleted: bool = False) -> list[dict[str, Any]]:
         with self.db.tx(user) as tx:
             rows = tx.all(
-                "select * from library_documents where workspace_id=%s and (%s or state='active') order by "
+                "select d.*, (select jsonb_build_object('state',p.state,'message',p.message) from library_processing p "
+                "where p.workspace_id=d.workspace_id and p.memory_id=d.id) as processing "
+                "from library_documents d where workspace_id=%s and (%s or state='active') order by "
                 "captured_at desc,id limit 10001",
                 (tx.workspace_id, include_deleted),
             )
@@ -120,7 +128,10 @@ class LibraryService:
     def mutate(self, user: uuid.UUID, change: Mutation) -> dict[str, Any]:
         if len(change.note.encode()) > 262144:
             raise validation("Note exceeds 256 KiB.")
-        digest = hashlib.sha256(change.model_dump_json().encode()).hexdigest()
+        # Preserve pre-enrichment operation fingerprints when consent is absent.
+        digest = hashlib.sha256(
+            change.model_dump_json(exclude={"processing_consent"} if not change.processing_consent else set()).encode()
+        ).hexdigest()
         with self.db.tx(user) as tx:
             if change.expected_vault_id is not None and change.expected_vault_id != tx.workspace_id:
                 raise ApiError("SCOPE_CHANGED", "The signed-in library changed. Your local edits are retained.", 409)
@@ -231,6 +242,16 @@ class LibraryService:
                     (note, state, tx.workspace_id, change.memory_id),
                 )
             row = self._get(tx, change.memory_id)
+            if change.processing_consent:
+                if change.action != "capture":
+                    raise validation("Automatic source consent applies only to a new capture.")
+                from .enrichment import authorize
+
+                authorize(tx, row)
+                row["processing"] = {
+                    "state": "pending",
+                    "message": "Original saved. Processing queued with source permission.",
+                }
             if change.action == "import" and change.history:
                 for item in change.history:
                     tx.run(

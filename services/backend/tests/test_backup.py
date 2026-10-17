@@ -1,6 +1,7 @@
 """Real PostgreSQL + original-byte restoration; synthetic private-safe material."""
 
 import json
+import tempfile
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -14,6 +15,7 @@ from fake_provider import FakeProvider
 from recall.db.backup import backup, restore
 from recall.ingestion.worker import Worker
 from recall.storage.local import LocalObjectStore
+from test_cloud_library import capture as native_capture
 from test_recall import capture_with, consent, drain
 
 pytest_plugins = ("test_recall",)
@@ -35,6 +37,14 @@ def test_restore_preserves_sources_history_graph_corrections_and_sync(
         json={"target": "summary", "text": "Pump pressure: 42 psi, recorded by Sarah."},
     )
     assert changed.status_code == 200, changed.text
+    _, queued = native_capture(user, processing_consent=True, note="SYNTHETIC queued native capture")
+    _, receipted = native_capture(user, processing_consent=True, note="SYNTHETIC source with saved proposal")
+    with psycopg.connect(ai.admin_dsn) as conn:
+        conn.execute(
+            "update library_processing set state='processing',dispatched_at=now(),lease_until=now(),"
+            "lease_token=%s,result=%s::jsonb,attempts=1 where memory_id=%s",
+            (uuid.uuid4(), json.dumps({"note": "SYNTHETIC saved proposal", "context": []}), receipted["id"]),
+        )
     tables = [
         "captures",
         "source_objects",
@@ -48,6 +58,10 @@ def test_restore_preserves_sources_history_graph_corrections_and_sync(
         "memory_overrides",
         "change_events",
         "workspaces",
+        "library_documents",
+        "library_revisions",
+        "library_operations",
+        "library_processing",
     ]
     with psycopg.connect(ai.admin_dsn) as conn:
         before = {
@@ -56,26 +70,32 @@ def test_restore_preserves_sources_history_graph_corrections_and_sync(
         }
     archive = tmp_path / "private-backup.zip"
     manifest = backup(ai.admin_dsn, ai.store, archive)
-    assert manifest["snapshot"]["schema_versions"][-1] == "0009_native_library.sql"
+    assert manifest["snapshot"]["schema_versions"][-1] == "0010_library_enrichment.sql"
+    assert all(
+        any(item["source_id"].endswith(row["id"]) for item in manifest["originals"]) for row in (queued, receipted)
+    )
     assert manifest["snapshot"]["workspace_sync_clocks"]
     owner, _ = make_database(pg_cluster, apply_migrations=False)
-    restored_store = LocalObjectStore(tmp_path / "restored-objects")
-    admin = owner.replace("recall_owner@", "postgres@")
-    assert restore(admin, restored_store, archive) == manifest
-    with psycopg.connect(admin) as conn:
-        after = {
-            table: conn.execute(f"select to_jsonb(t)::text from {table} t order by to_jsonb(t)::text").fetchall()
-            for table in tables
-        }
-    assert after == before
-    for item in manifest["originals"]:
-        assert b"".join(restored_store.iter_bytes(item["storage_key"])) == b"".join(
-            ai.store.iter_bytes(item["storage_key"])
-        )
-    with pytest.raises(ValueError, match="already exists"):
-        backup(ai.admin_dsn, ai.store, archive)
-    with pytest.raises(ValueError, match="empty destination"):
-        restore(admin, restored_store, archive)
+    # Pytest's descriptive per-test path plus the legacy object hierarchy can
+    # exceed Windows MAX_PATH. Keep this synthetic restore root short.
+    with tempfile.TemporaryDirectory(prefix="r-") as restore_root:
+        restored_store = LocalObjectStore(Path(restore_root))
+        admin = owner.replace("recall_owner@", "postgres@")
+        assert restore(admin, restored_store, archive) == manifest
+        with psycopg.connect(admin) as conn:
+            after = {
+                table: conn.execute(f"select to_jsonb(t)::text from {table} t order by to_jsonb(t)::text").fetchall()
+                for table in tables
+            }
+        assert after == before
+        for item in manifest["originals"]:
+            assert b"".join(restored_store.iter_bytes(item["storage_key"])) == b"".join(
+                ai.store.iter_bytes(item["storage_key"])
+            )
+        with pytest.raises(ValueError, match="already exists"):
+            backup(ai.admin_dsn, ai.store, archive)
+        with pytest.raises(ValueError, match="empty destination"):
+            restore(admin, restored_store, archive)
 
 
 def test_restore_rejects_traversal_before_any_database_or_storage_mutation(tmp_path: Path) -> None:

@@ -25,6 +25,42 @@ pub struct Outcome {
     pub memory_id: String,
     pub revision: u64,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Retry { intent: Intent, from_parser: String }
+fn stages(vault: &Vault, memory: &str) -> Result<(String, String, String), String> {
+    let mut attempt = 0;
+    let mut parse = stage(memory, "parse");
+    for number in 1..=2 {
+        let target = path(vault, memory, &format!("retry-{number}"))?;
+        if !target.exists() { break; }
+        let retry: Retry = serde_json::from_slice(&local_vault::read(&target, 16 * 1024)?).map_err(|_| "Invalid processing retry receipt")?;
+        if retry.intent.vault_id != vault.id || retry.intent.memory_id != memory || retry.intent.revision != 1 || retry.from_parser != parse { return Err("Processing retry identity mismatch".into()); }
+        let stored: Intent = serde_json::from_slice(&local_vault::read(&path(vault, memory, "consent")?, 16 * 1024)?).map_err(|_| "Invalid source permission")?;
+        if serde_json::to_vec(&stored).ok() != serde_json::to_vec(&retry.intent).ok() { return Err("Processing retry source mismatch".into()); }
+        attempt = number; parse = stage(memory, &format!("parse-retry-{number}"));
+    }
+    Ok((parse, stage(memory, &if attempt == 0 { "organize".into() } else { format!("organize-retry-{attempt}") }), stage(memory, &if attempt == 0 { "publish".into() } else { format!("publish-retry-{attempt}") })))
+}
+pub(crate) fn retry_allows(vault: &Vault, memory: &str, operation: &str) -> bool {
+    stages(vault, memory).is_ok_and(|(parse, organize, _)| parse != stage(memory, "parse") && (operation == parse || operation == organize || operation == processing::visual_operation(&parse)))
+}
+/// Explicit user action only. A known rejected current stage is required; an
+/// uncertain or interrupted delivery can never authorize a new identity.
+pub fn retry_rejected(vault: &Vault, memory: &str) -> Result<(), String> {
+    let intent = recoverable(vault, memory)?;
+    let (parse, organize, _) = stages(vault, memory)?;
+    let rejected = processing::status(vault, &parse).is_ok_and(|job| job.state == "failed")
+        || librarian::rejected_operation(vault, &processing::visual_operation(&parse))?
+        || librarian::rejected_operation(vault, &organize)?;
+    if !rejected { return Err("This delivery is uncertain or requires review. Check provider usage; no automatic replay is permitted.".into()); }
+    let _lock = vault.lock()?;
+    let current = stages(vault, memory)?;
+    if current.0 != parse { return Ok(()); }
+    let number = if path(vault, memory, "retry-1")?.exists() { 2 } else { 1 };
+    if path(vault, memory, "retry-2")?.exists() { return Err("Three processing attempts reached. Original retained; provider review is required.".into()); }
+    persist(&path(vault, memory, &format!("retry-{number}"))?, &Retry { intent, from_parser: parse })
+}
 fn stage(memory: &str, label: &str) -> String {
     let hash = Sha256::digest(format!("recall-phone-meeting-v1:{memory}:{label}").as_bytes());
     let mut bytes = [0_u8; 16];
@@ -135,20 +171,30 @@ fn reserve(key: String) -> Result<Option<ActiveJob>, String> {
     let mut active = ACTIVE
         .lock()
         .map_err(|_| "Processing worker state unavailable")?;
-    if active.contains(&key) {
+    if !admit(&mut active, &key)? {
         return Ok(None);
     }
+    Ok(Some(ActiveJob(key)))
+}
+fn admit(active: &mut BTreeSet<String>, key: &str) -> Result<bool, String> {
+    // The parser lock and writer are library-wide. Keep other consented
+    // sources durably pending until list/reopen dispatches them after this one.
+    let scope = key.split_once(':').map(|(scope, _)| format!("{scope}:"));
+    if active.contains(key) || scope.is_some_and(|scope| active.iter().any(|running| running.starts_with(&scope))) { return Ok(false); }
     if active.len() >= 4 {
         return Err(
             "Processing busy. Your original is saved; resume from its saved page later.".into(),
         );
     }
-    active.insert(key.clone());
-    Ok(Some(ActiveJob(key)))
+    active.insert(key.into());
+    Ok(true)
 }
 /// Bounded workers reuse deterministic parser/librarian/publication IDs. Those
 /// durable operations, not this in-process set, prevent duplicate provider calls.
 pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
+    enqueue_with(vault, intent, run)
+}
+fn enqueue_with(vault: &Vault, intent: Intent, process: impl FnOnce(&Vault, &Intent) -> Result<Outcome, String> + Send + 'static) -> Result<(), String> {
     let Some(guard) = reserve(format!("{}:{}", intent.vault_id, intent.memory_id))? else {
         return Ok(());
     };
@@ -165,8 +211,9 @@ pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
         .name("recall-phone-processing".into())
         .spawn(move || {
             let _guard = guard;
-            let outcome = run(&worker, &intent).unwrap_or_else(|error| Outcome {
-                state: "error".into(),
+            let _ = record(&worker, &Outcome { state: "processing".into(), message: "Processing the authorized source. Original retained.".into(), memory_id: intent.memory_id.clone(), revision: intent.revision });
+            let outcome = process(&worker, &intent).unwrap_or_else(|error| Outcome {
+                state: if local_contention(&error) { "pending" } else if [400,401,403,404,422,429].iter().any(|code| error.contains(&format!("HTTP {code}"))) { "failed" } else if error.to_lowercase().contains("uncertain") || error.contains("resend blocked") || error.contains("may have received") { "uncertain" } else { "failed" }.into(),
                 message: error,
                 memory_id: requested.memory_id,
                 revision: requested.revision,
@@ -178,6 +225,9 @@ pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
                 .to_string()
         })?;
     Ok(())
+}
+fn local_contention(error: &str) -> bool {
+    error == "Parser is busy; original evidence remains saved" || error == "Vault is busy in another Recall process"
 }
 fn run_with(
     vault: &Vault,
@@ -200,9 +250,7 @@ fn run_with(
     if serde_json::to_vec(&stored).ok() != serde_json::to_vec(intent).ok() {
         return Err("Companion consent identity mismatch".into());
     }
-    let parse = stage(&intent.memory_id, "parse");
-    let organize = stage(&intent.memory_id, "organize");
-    let publish = stage(&intent.memory_id, "publish");
+    let (parse, organize, publish) = stages(vault, &intent.memory_id)?;
     if let Ok(memory) = vault.publish_meeting(&parse, &organize, &publish) {
         return Ok(Outcome {
             state: if memory.state == "active" && memory.conflict.is_none() {
@@ -219,6 +267,9 @@ fn run_with(
     let snapshot = vault.processing_snapshot(&intent.memory_id, intent.revision)?;
     if snapshot.human_corrected || snapshot.source.sha256 != intent.source_sha256 {
         return Err("Companion source changed; processing stopped".into());
+    }
+    if !parser_config.ready() || !claude_config.ready {
+        return Ok(Outcome { state: "configuration-required".into(), message: "Original saved. Configure Jev and Claude keys, models, prices and budget caps in Settings. Configured means fields are present, not that a connection was verified.".into(), memory_id: intent.memory_id.clone(), revision: intent.revision });
     }
     let job = processing::parse_with_visual(
         vault,
@@ -254,10 +305,11 @@ pub fn record(vault: &Vault, outcome: &Outcome) -> Result<(), String> {
     librarian::atomic_write(&target, &bytes)
 }
 pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
+    let (parse, organize, publish) = stages(vault, memory)?;
     if let Ok(current) = vault.publish_meeting(
-        &stage(memory, "parse"),
-        &stage(memory, "organize"),
-        &stage(memory, "publish"),
+        &parse,
+        &organize,
+        &publish,
     ) {
         return Ok(Some(Outcome {
             state: if current.state == "active" && current.conflict.is_none() {
@@ -272,12 +324,22 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
         }));
     }
     let _lock = vault.lock()?;
+    let mut outcome = recorded(vault, memory)?;
+    if let Some(outcome) = outcome.as_mut() {
+        if outcome.state == "published" {
+            outcome.state = "needs_review".into();
+            outcome.message = "Native publication could not be verified; inspect the original and proposal on desktop".into();
+        }
+    }
+    Ok(outcome)
+}
+fn recorded(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
     let target = path(vault, memory, "result")?;
     match fs::symlink_metadata(&target) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(_) => Err("Companion outcome unavailable".into()),
         Ok(_) => {
-            let mut outcome: Outcome =
+            let outcome: Outcome =
                 serde_json::from_slice(&local_vault::read(&target, 16 * 1024)?)
                     .map_err(|_| "Invalid companion outcome")?;
             if outcome.memory_id != memory
@@ -285,6 +347,10 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
                 || !(1..=10000).contains(&outcome.revision)
                 || ![
                     "pending",
+                    "processing",
+                    "configuration-required",
+                    "consent-required",
+                    "failed",
                     "needs_transcription",
                     "needs_review",
                     "uncertain",
@@ -295,13 +361,57 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
             {
                 return Err("Companion outcome scope mismatch".into());
             }
-            if outcome.state == "published" {
-                outcome.state = "needs_review".into();
-                outcome.message = "Native publication could not be verified; inspect the original and proposal on desktop".into();
-            }
             Ok(Some(outcome))
         }
     }
+}
+
+/// List-time recovery never grants consent or creates new provider identities.
+/// Durable stage ledgers stop any interrupted chargeable call from being replayed.
+pub fn project(vault: &Vault, memory: &VaultMemory, resume: bool) -> Outcome {
+    project_with(vault, memory, resume, &enqueue)
+}
+fn project_with(vault: &Vault, memory: &VaultMemory, resume: bool, dispatch: &impl Fn(&Vault, Intent) -> Result<(), String>) -> Outcome {
+    let has_consent = path(vault, &memory.id, "consent").map(|p| p.exists()).unwrap_or(false);
+    if !has_consent {
+        return Outcome { state: "consent-required".into(), message: "Original saved. Choose processing before sending this source to AI.".into(), memory_id: memory.id.clone(), revision: memory.revision };
+    }
+    let key = format!("{}:{}", vault.id, memory.id);
+    let scope = format!("{}:", vault.id);
+    let (own_active, vault_active) = ACTIVE.lock().map(|active| (active.contains(&key), active.iter().any(|running| running.starts_with(&scope)))).unwrap_or((false, false));
+    if own_active {
+        return Outcome { state: "processing".into(), message: "Authorized library processing is active; original retained.".into(), memory_id: memory.id.clone(), revision: memory.revision };
+    }
+    if let Ok(Some(mut outcome)) = recorded(vault, &memory.id) {
+        if ["failed", "error", "uncertain", "needs_review"].contains(&outcome.state.as_str()) {
+            if outcome.state == "error" { outcome.state = "failed".into(); }
+            return outcome;
+        }
+        if outcome.state == "published" {
+            let verified = stages(vault, &memory.id).and_then(|(parser, organizer, publisher)| vault.publication_recorded(memory, &parser, &organizer, &publisher));
+            outcome.state = if let Ok(Some(revision)) = verified { outcome.revision = revision; "complete" } else { "needs_review" }.into();
+            if outcome.state == "needs_review" { outcome.message = "Native publication could not be verified; inspect the original and proposal on desktop".into(); }
+            return outcome;
+        }
+    }
+    // Terminal outcomes above are read without the writer. Only unfinished
+    // sources wait while a different source owns library-wide processing.
+    if vault_active {
+        return Outcome { state: "pending".into(), message: "Authorized library processing is active; original retained. Other sources wait in the durable queue.".into(), memory_id: memory.id.clone(), revision: memory.revision };
+    }
+    let outcome = status(vault, &memory.id).ok().flatten();
+    let current = outcome.unwrap_or_else(|| Outcome {
+        state: if has_consent { "pending" } else { "consent-required" }.into(),
+        message: if has_consent { "Authorized processing pending." } else { "Original saved. Choose processing before sending this source to AI." }.into(),
+        memory_id: memory.id.clone(), revision: memory.revision,
+    });
+    if resume && has_consent && matches!(current.state.as_str(), "pending" | "processing" | "configuration-required") {
+        match recoverable(vault, &memory.id) {
+            Ok(intent) => { let _ = dispatch(vault, intent); },
+            Err(message) => return Outcome { state: if local_contention(&message) { "pending" } else { "needs_review" }.into(), message, ..current },
+        }
+    }
+    Outcome { state: match current.state.as_str() { "published" => "complete", "error" => "failed", other => other }.into(), ..current }
 }
 
 #[cfg(test)]
@@ -330,6 +440,182 @@ mod tests {
     }
     use crate::jev;
     #[test]
+    fn another_active_source_preserves_terminal_outcomes_without_writer_or_replay() {
+        use std::sync::{Arc, Barrier, mpsc};
+        use std::time::{Duration, Instant};
+        for state in ["published", "failed", "uncertain", "forged"] {
+            let (_temp, vault, _, first_id) = crate::librarian::organization_tests::setup();
+            let first = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == first_id).unwrap();
+            let intent = consent(&vault, &first, true).unwrap().unwrap();
+            let parser = Parser(AtomicUsize::new(0));
+            let outcome = if state == "published" {
+                run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &crate::librarian::organization_tests::config(), &parser, &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()).unwrap()
+            } else {
+                Outcome { state: if state == "forged" { "published" } else { state }.into(), message: "Durable terminal diagnostic".into(), memory_id: first.id.clone(), revision: first.revision }
+            };
+            record(&vault, &outcome).unwrap();
+            let result_path = path(&vault, &first.id, "result").unwrap();
+            let before = fs::read(&result_path).unwrap();
+            let history = vault.history(&first.id).unwrap().len();
+            let second = vault.capture_note(&Uuid::new_v4().to_string(), &crate::meeting::tests::source().transcription).unwrap();
+            let second_intent = consent(&vault, &second, true).unwrap().unwrap();
+            let (entered, receiver) = mpsc::sync_channel(1);
+            let release = Arc::new(Barrier::new(2)); let worker_release = release.clone();
+            enqueue_with(&vault, second_intent, move |_, intent| {
+                entered.send(()).unwrap(); worker_release.wait();
+                Ok(Outcome { state: "configuration-required".into(), message: "Synthetic blocked worker finished".into(), memory_id: intent.memory_id.clone(), revision: intent.revision })
+            }).unwrap();
+            receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+            // A terminal projection must succeed even with the writer held.
+            let writer = vault.lock().unwrap();
+            let projected = project_with(&vault, &first, true, &|_, _| panic!("Terminal source must not dispatch"));
+            let expected = match state { "published" => "complete", "forged" => "needs_review", other => other };
+            assert_eq!(projected.state, expected, "{state}: {}", projected.message);
+            assert_eq!(fs::read(&result_path).unwrap(), before);
+            assert_eq!(parser.0.load(Ordering::SeqCst), usize::from(state == "published"));
+            drop(writer);
+            assert_eq!(vault.history(&first.id).unwrap().len(), history);
+            release.wait();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while ACTIVE.lock().unwrap().contains(&format!("{}:{}", vault.id, second.id)) {
+                assert!(Instant::now() < deadline); std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+    }
+    #[test]
+    fn concurrent_sources_remain_pending_and_automatically_finish_after_the_active_source() {
+        use std::sync::{Arc, Barrier, Mutex, mpsc};
+        use std::time::{Duration, Instant};
+        struct BlockingParser { calls: AtomicUsize, entered: Mutex<Option<mpsc::SyncSender<()>>>, release: Barrier }
+        impl processing::ParserTransport for BlockingParser {
+            fn parse(&self, config: &jev::JevConfig, id: &str, text: &str, sha: &str) -> Result<jev::ParsedSource, String> {
+                if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    self.entered.lock().unwrap().take().unwrap().send(()).unwrap(); self.release.wait();
+                }
+                Parser(AtomicUsize::new(0)).parse(config, id, text, sha)
+            }
+        }
+        let (temp, vault, _, first_id) = crate::librarian::organization_tests::setup();
+        let first = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == first_id).unwrap();
+        let second = vault.capture_note(&Uuid::new_v4().to_string(), &crate::meeting::tests::source().transcription).unwrap();
+        let first_intent = consent(&vault, &first, true).unwrap().unwrap(); let second_intent = consent(&vault, &second, true).unwrap().unwrap();
+        let (entered, receiver) = mpsc::sync_channel(1);
+        let parser = Arc::new(BlockingParser { calls: AtomicUsize::new(0), entered: Mutex::new(Some(entered)), release: Barrier::new(2) });
+        let first_starts = Arc::new(AtomicUsize::new(0));
+        let (resume_release, resume_gate) = mpsc::channel();
+        let mut resume_release = Some(resume_release);
+        let resume_gate = Arc::new(Mutex::new(resume_gate));
+        let dispatch = |vault: &Vault, intent: Intent| {
+            let parser = parser.clone(); let first_starts = first_starts.clone();
+            let first_id = first.id.clone(); let resume_gate = resume_gate.clone();
+            enqueue_with(vault, intent, move |v, i| {
+                if i.memory_id == first_id {
+                    if first_starts.fetch_add(1, Ordering::SeqCst) == 0 {
+                        // Yield A after its actual durable parse, before any
+                        // organizer dispatch, as ordinary writer contention can.
+                        let (parse, _, _) = stages(v, &i.memory_id)?;
+                        let job = processing::parse_with_visual(v, &processing::Config::synthetic_test_config(), &parse, &i.memory_id, i.revision, true, parser.as_ref(), None)?;
+                        assert_eq!(job.state, "parsed");
+                        return Err("Vault is busy in another Recall process".into());
+                    }
+                    // B can finish before A resumes its already-paid parse.
+                    // Keep that ordering deterministic without timing sleeps.
+                    resume_gate.lock().unwrap().recv().map_err(|_| "Synthetic test cancelled")?;
+                }
+                run_with(v, i, &processing::Config::synthetic_test_config(), &crate::librarian::organization_tests::config(), parser.as_ref(), &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude())
+            })
+        };
+        dispatch(&vault, first_intent).unwrap(); receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        dispatch(&vault, second_intent).unwrap();
+        assert_eq!(project_with(&vault, &second, false, &dispatch).state, "pending");
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 1);
+        parser.release.wait();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while ACTIVE.lock().unwrap().contains(&format!("{}:{}", vault.id, first.id)) {
+            assert!(Instant::now() < deadline); std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(recorded(&vault, &first.id).unwrap().unwrap().state, "pending");
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            std::thread::sleep(Duration::from_millis(50));
+            let reopened = Vault::open(&temp.0).unwrap();
+            // List order can dispatch B while A waits for a later refresh.
+            let b = project_with(&reopened, &second, true, &dispatch);
+            let a = project_with(&reopened, &first, true, &dispatch);
+            if a.state == "complete" && b.state == "complete" { break; }
+            if b.state == "complete" { if let Some(release) = resume_release.take() { release.send(()).unwrap(); } }
+            assert_ne!(a.state, "failed", "{}", a.message);
+            assert_ne!(b.state, "failed", "{}", b.message);
+            assert!(Instant::now() < deadline, "A={:?}; B={:?}; active={:?}; parser calls={}", a, b, ACTIVE.lock().unwrap(), parser.calls.load(Ordering::SeqCst));
+        }
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(vault.history(&first.id).unwrap().len(), 2, "A={:?}; B={:?}; active={:?}", recorded(&vault, &first.id), recorded(&vault, &second.id), ACTIVE.lock().unwrap());
+        assert_eq!(vault.history(&second.id).unwrap().len(), 2, "B={:?}", recorded(&vault, &second.id));
+        assert_eq!(project_with(&vault, &second, true, &dispatch).state, "complete");
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 2);
+        assert!(local_contention("Vault is busy in another Recall process"));
+        assert!(local_contention("Parser is busy; original evidence remains saved"));
+        assert!(!local_contention("Provider delivery is uncertain"));
+    }
+    #[test]
+    fn explicit_known_rejection_retries_are_bounded_and_uncertainty_cannot_unlock_them() {
+        struct Rejected(&'static str, AtomicUsize);
+        impl processing::ParserTransport for Rejected {
+            fn parse(&self, _: &jev::JevConfig, _: &str, _: &str, _: &str) -> Result<jev::ParsedSource, String> { self.1.fetch_add(1, Ordering::SeqCst); Err(self.0.into()) }
+        }
+        for (failure, retryable) in [("Jev HTTP 401", true), ("synthetic timeout", false)] {
+            let (temp, vault, _, memory) = crate::librarian::organization_tests::setup();
+            let saved = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == memory).unwrap();
+            let intent = consent(&vault, &saved, true).unwrap().unwrap(); let parser = Rejected(failure, AtomicUsize::new(0));
+            let config = crate::librarian::organization_tests::config();
+            let count = if retryable { 3 } else { 1 };
+            for number in 0..count {
+                let outcome = run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &config, &parser, &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()).unwrap();
+                record(&vault, &outcome).unwrap();
+                assert_eq!(outcome.state, if retryable { "failed" } else { "uncertain" });
+                if number + 1 < count { retry_rejected(&Vault::open(&temp.0).unwrap(), &memory).unwrap(); }
+            }
+            assert!(retry_rejected(&vault, &memory).is_err());
+            assert_eq!(parser.1.load(Ordering::SeqCst), count);
+            assert_eq!(vault.history(&memory).unwrap().len(), 1);
+        }
+    }
+    #[test]
+    fn known_claude_rejection_requires_explicit_retry_receipt_then_can_publish() {
+        struct RejectOnce(AtomicUsize);
+        impl librarian::OrganizationTransport for RejectOnce {
+            fn organize(&self, model: &str, key: &str, evidence: &serde_json::Value) -> std::result::Result<crate::meeting::Layout, librarian::CallError> {
+                if self.0.fetch_add(1, Ordering::SeqCst) == 0 { Err(librarian::CallError::HttpStatus(401)) }
+                else { crate::librarian::organization_tests::claude().organize(model, key, evidence) }
+            }
+        }
+        let (_temp, vault, _, memory) = crate::librarian::organization_tests::setup();
+        let saved = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == memory).unwrap();
+        let intent = consent(&vault, &saved, true).unwrap().unwrap(); let parser = Parser(AtomicUsize::new(0)); let claude = RejectOnce(AtomicUsize::new(0)); let config = crate::librarian::organization_tests::config();
+        let error = run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &config, &parser, &librarian::ClaudeTransport, &claude).unwrap_err();
+        assert!(error.contains("Credentials were rejected"));
+        retry_rejected(&vault, &memory).unwrap();
+        let outcome = run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &config, &parser, &librarian::ClaudeTransport, &claude).unwrap();
+        assert_eq!(outcome.state, "published"); assert_eq!(claude.0.load(Ordering::SeqCst), 2);
+        assert_eq!(vault.history(&memory).unwrap().len(), 2);
+    }
+    #[test]
+    fn source_authorization_survives_restart_without_authorizing_prior_captures() {
+        let (temp, vault, _, memory) = crate::librarian::organization_tests::setup();
+        let saved = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == memory).unwrap();
+        assert_eq!(project(&vault, &saved, false).state, "consent-required");
+        consent(&vault, &saved, true).unwrap().unwrap();
+        let reopened = Vault::open(&temp.0).unwrap();
+        assert_eq!(project(&reopened, &saved, false).state, "pending");
+        let other = reopened.capture_note(&Uuid::new_v4().to_string(), "SYNTHETIC unconsented old capture").unwrap();
+        assert_eq!(project(&reopened, &other, false).state, "consent-required");
+        assert!(recoverable(&reopened, &other.id).is_err());
+        let intent = recoverable(&reopened, &saved.id).unwrap();
+        let outcome = run_with(&reopened, &intent, &processing::Config::default(), &crate::librarian::organization_tests::config(), &Parser(AtomicUsize::new(0)), &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()).unwrap();
+        record(&reopened, &outcome).unwrap();
+        assert_eq!(project(&Vault::open(&temp.0).unwrap(), &saved, false).state, "configuration-required");
+    }
+    #[test]
     fn no_consent_or_missing_configuration_never_calls_provider() {
         let (t, v, _, memory) = crate::librarian::organization_tests::setup();
         let m = v
@@ -353,7 +639,7 @@ mod tests {
             &crate::librarian::organization_tests::claude(),
         )
         .unwrap();
-        assert_eq!(outcome.state, "pending");
+        assert_eq!(outcome.state, "configuration-required");
         assert_eq!(parser.0.load(Ordering::SeqCst), 0);
         record(&v, &outcome).unwrap();
         assert_eq!(
@@ -361,7 +647,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .state,
-            "pending"
+            "configuration-required"
         );
     }
     #[test]
@@ -535,16 +821,15 @@ mod tests {
 
     #[test]
     fn workers_are_bounded_deduplicated_and_release_capacity() {
-        let first_id = Uuid::new_v4().to_string();
-        let first = reserve(first_id.clone()).unwrap().unwrap();
-        assert!(reserve(first_id).unwrap().is_none());
+        let mut active = BTreeSet::new(); let first_id = Uuid::new_v4().to_string();
+        assert!(admit(&mut active, &first_id).unwrap());
+        assert!(!admit(&mut active, &first_id).unwrap());
         let others: Vec<_> = (0..3)
-            .map(|_| reserve(Uuid::new_v4().to_string()).unwrap().unwrap())
+            .map(|_| { let id = Uuid::new_v4().to_string(); assert!(admit(&mut active, &id).unwrap()); id })
             .collect();
-        assert!(reserve(Uuid::new_v4().to_string()).is_err());
-        drop(first);
-        let replacement = reserve(Uuid::new_v4().to_string()).unwrap().unwrap();
-        drop(replacement);
-        drop(others);
+        assert!(admit(&mut active, &Uuid::new_v4().to_string()).is_err());
+        active.remove(&first_id);
+        assert!(admit(&mut active, &Uuid::new_v4().to_string()).unwrap());
+        assert_eq!(others.len(), 3);
     }
 }

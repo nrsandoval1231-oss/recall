@@ -706,28 +706,33 @@ def main() -> int:
 
     store = build_object_store(settings)
     purge = PurgeWorker(settings.worker_database_url, store)
-    worker: Worker | None = None
-    if settings.ai_configured:
-        from .anthropic_provider import AnthropicProvider
+    from ..library.enrichment import LibraryWorker
 
-        assert settings.ai_api_key and settings.ai_model_id
-        provider = AnthropicProvider(
-            api_key=settings.ai_api_key,
-            model_id=settings.ai_model_id,
-            effort=settings.ai_effort,
-            refusal_fallback=settings.ai_refusal_fallback,
-        )
-        worker = Worker(settings.worker_database_url, store, settings, provider)
-        worker.open()
+    # Open the existing worker pool even without configuration so new library
+    # jobs can report configuration-required rather than remain silently queued.
+    from .anthropic_provider import AnthropicProvider
+
+    provider = AnthropicProvider(
+        api_key=settings.ai_api_key or "unconfigured",
+        model_id=settings.ai_model_id or "unconfigured",
+        effort=settings.ai_effort,
+        refusal_fallback=settings.ai_refusal_fallback,
+    )
+    worker = Worker(settings.worker_database_url, store, settings, provider)
+    worker.open()
+    library_worker = LibraryWorker(worker)
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     try:
         while not stop.is_set():
             purged = purge.run_once()
-            interpreted = worker.run_once() if worker else None
-            if purged is None and interpreted is None:
+            interpreted = worker.run_once() if worker and settings.ai_configured else None
+            enriched = library_worker.run_once()
+            if purged is None and interpreted is None and enriched is None:
                 stop.wait(5.0)
+            elif interpreted is None:
+                stop.wait(1.0)
     finally:
         if worker:
             worker.close()

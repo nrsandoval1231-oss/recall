@@ -141,6 +141,7 @@ export function ProviderSettings({ api }: { api: ProviderSettingsApi }) {
       <p>
         Recall saves and searches your notes without these. Add keys to let Jev and Claude organize captures. Keys stay in this
         computer's credential store and are never shown again. Calls stop at your budgets.
+        Configured means fields are present; no provider connection has been verified. Processing errors identify rejected credentials, model access, budgets or uncertain delivery.
       </p>
       {PROVIDERS.map((provider) => {
         const configured = provider.fields.every((f) => current(provider.id, f.name)?.source !== "missing");

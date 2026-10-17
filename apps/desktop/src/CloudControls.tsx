@@ -35,7 +35,7 @@ export function CloudControls({vault, request}: {vault: CloudVault; request: typ
       <button disabled={busy} onClick={() => void exportData()}>{busy ? "Exporting…" : "Export memories and pending edits"}</button>
       {ai && <>
         <h3>Remote AI</h3><p>{ai.explanation}</p>
-        <p>Answers use source excerpts. Image extraction and semantic indexing for this library are not yet connected.</p>
+        <p>Answers use source excerpts. Capture organization also requires permission for each source; automatic processing applies only to new captures after you enable it. Configured means key, model, prices and caps are present; connectivity is not verified.</p>
         <button disabled={busy} onClick={() => {
           setBusy(true);
           void request<AiSettings>("/settings/ai", {method: "PUT", body: JSON.stringify({enabled: !ai.enabled, expected_version: ai.version})})

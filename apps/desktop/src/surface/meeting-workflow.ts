@@ -11,6 +11,13 @@ export function hasPendingMeeting(selected: { vault_identity: string }, memory: 
   try { const raw = localStorage.getItem(intentKey(selected, memory)); if (!raw) return false; const intent = savedIntent(raw); return !intent.published && intent.revision === memory.revision && memory.state === "active" && !memory.conflict; } catch { return false; }
 }
 export async function processMeeting(vault: LocalVault, selected: { vault_id: string; vault_identity: string }, memory: VaultMemory, consent: boolean, onState: (message: string) => void, options?: { reviewRetry: boolean; acknowledgeUncertainty: boolean }): Promise<VaultMemory | null> {
+  const legacyIntent = vault.storage !== "cloud" && localStorage.getItem(intentKey(selected, memory));
+  if (vault.requestProcessing && (memory.processing || vault.storage === "cloud") && !legacyIntent && !options?.reviewRetry) {
+    if (!consent) { onState(memory.processing?.message || "Original saved. Choose processing before sending this source to AI."); return null; }
+    const outcome = await vault.requestProcessing(selected.vault_id, memory.id, memory.revision, true);
+    onState(outcome.message);
+    return null;
+  }
   if (vault.storage === "cloud") { onState("Saved on this device. Check sync status for cloud confirmation."); return null; }
   if (!consent) { onState("Saved locally. Agree before sending this source to Jev and Claude."); return null; }
   if (!vault.parse || !vault.organize || !vault.publish) throw new Error("Open the current native Recall application to organize this memory.");

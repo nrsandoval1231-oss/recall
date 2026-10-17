@@ -6,6 +6,7 @@ export interface VaultStatus {
 }
 export type VaultMemoryState = "active" | "missing" | "deleted" | "conflict";
 export interface VaultMemory {
+  processing?: ProcessingOutcome;
   state: VaultMemoryState;
   note_path: string | null;
   id: string;
@@ -17,6 +18,7 @@ export interface VaultMemory {
   updated_at: string;
   conflict: string | null;
 }
+export interface ProcessingOutcome { state: string; message: string }
 export interface VaultSource {
   bytes: number[];
   mime_type: string;
@@ -93,6 +95,7 @@ export interface KnowledgeControl { version: number; vault_id: string; enabled: 
 export interface AnswerSelection { source_id: string; revision: number; source_sha256: string; note_sha256: string; quote: string }
 export interface MemoryAnswer { sources: SourceAnswer; status: "supported" | "insufficient" | "unavailable" | "cancelled" | "stale" | string; message: string; selections: AnswerSelection[]; answer_provider: string | null }
 export interface LocalVault {
+  requestProcessing?(scope: string, memory: string, revision: number, consent: boolean): Promise<ProcessingOutcome>;
   readonly storage?: "cloud" | "local";
   exportLibrary?(expectedVaultId: string): Promise<LibraryBackup | null>;
   restoreLibrary?(): Promise<VaultStatus | null>;
@@ -128,6 +131,7 @@ export interface LocalVault {
     expectedVaultId: string,
     operationId: string,
     note: string,
+    processingConsent?: boolean,
   ): Promise<VaultMemory>;
   parse?(
     expectedVaultId: string,
@@ -170,6 +174,7 @@ export interface LocalVault {
     expectedVaultId: string,
     operationId: string,
     note: string,
+    processingConsent?: boolean,
   ): Promise<VaultMemory | null>;
   list(
     expectedVaultId: string,
@@ -287,18 +292,23 @@ export class NativeLocalVault implements LocalVault {
   openDefault() {
     return this.call<VaultStatus>("vault_open_default");
   }
-  capture(expectedVaultId: string, operationId: string, note: string) {
+  requestProcessing(expectedVaultId: string, memoryId: string, expectedRevision: number, consent: boolean) {
+    return this.call<ProcessingOutcome>("capture_processing", {expectedVaultId, memoryId, expectedRevision, consent});
+  }
+  capture(expectedVaultId: string, operationId: string, note: string, processingConsent = false) {
     return this.call<VaultMemory | null>("vault_capture", {
       expectedVaultId,
       operationId,
       note,
+      ...(processingConsent ? {processingConsent: true} : {}),
     });
   }
-  captureNote(expectedVaultId: string, operationId: string, note: string) {
+  captureNote(expectedVaultId: string, operationId: string, note: string, processingConsent = false) {
     return this.call<VaultMemory>("vault_capture_note", {
       expectedVaultId,
       operationId,
       note,
+      ...(processingConsent ? {processingConsent: true} : {}),
     });
   }
   parse(

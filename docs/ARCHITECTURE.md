@@ -68,6 +68,10 @@ Independent local-library mode needs no cloud account. The authenticated cloud m
 
 Uncertain provider delivery is never auto-resent; it waits for explicit review. Human corrections block replay of stale organization.
 
+The shared capture UI can authorize automatic processing of future captures on one device/library (off by default). Each capture persists its own source permission; changing this preference never backfills older captures. Native capture and reopen use `companion_processing` durable source/revision intents and deterministic stage IDs. Native memory responses project durable processing state; an explicit retry after a known HTTP rejection requires source-bound retry receipts, with three attempts maximum. Unknown delivery remains fenced, and old renderer intents retain their existing recovery path. Render version 3 adds general note/photo metadata; versions 1 and 2 retain historical publication bytes.
+
+Cloud native records use additive `library_processing` rows with forced RLS. The existing Python worker consumes them alongside the existing ingestion jobs; no new service is required. Source-specific authorization, workspace AI consent, configuration and the shared reservation ledger gate dispatch. A lease ownership token and source/revision check precede a durable dispatch marker. The SDK does not silently retry. Expired undispatched leases can recover; dispatched jobs without a durable result become uncertain, while saved validated results recover without another charge. Publication rechecks permission, source revision and every suggested target revision under the workspace writer lock. Human changes stop publication. Up to four relevant excerpts from a bounded candidate set accompany a source; photo descriptions and suggested connections remain explicitly unverified proposals. Automatic cloud text processing is bounded to 64,000 UTF-8 bytes, preserving larger originals for manual review.
+
 ## Desktop UI (`apps/desktop/src`)
 
 - `surface/MemorySurface.tsx`: the approved rail, global search, memory field, contextual inspector and capture bar, with Ask, history and Settings.

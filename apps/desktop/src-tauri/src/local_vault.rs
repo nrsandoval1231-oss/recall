@@ -59,6 +59,8 @@ impl KnowledgeControl {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VaultMemory {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub processing: Option<crate::companion_processing::Outcome>,
     pub id: String,
     pub revision: u64,
     pub note: String,
@@ -175,6 +177,7 @@ mod event_memory {
             updated_at: m.updated_at,
             conflict: m.conflict,
             state: "active".into(),
+            processing: None,
             note_path: None,
         })
     }
@@ -1323,6 +1326,24 @@ impl Vault {
         }
         Ok(Some(e))
     }
+    /// Read-only confirmation for progress projection while another source owns
+    /// the writer. Never publishes/reconciles a journal or trusts a cached label.
+    pub(crate) fn publication_recorded(&self, memory: &VaultMemory, parser: &str, organizer: &str, publisher: &str) -> Result<Option<u64>> {
+        let Some(event) = self.receipt(publisher)? else { return Ok(None); };
+        let binding = event.organization.as_ref().ok_or("Missing organization binding")?;
+        if event.kind != "organize" || event.memory.id != memory.id
+            || binding.parser_operation_id != parser || binding.organization_operation_id != organizer
+            || event.memory.source_sha256 != memory.source_sha256 || memory.state != "active" || memory.conflict.is_some() { return Ok(None); }
+        let records = self.records(&memory.id)?;
+        let latest = records.last().ok_or("Missing published history")?;
+        if latest.kind == "remove" || latest.memory.source_sha256 != memory.source_sha256 || latest.memory.revision < memory.revision { return Ok(None); }
+        let source = self.captured_source_while_locked(&memory.id)?;
+        let original = &records.first().ok_or("Missing original capture")?.memory;
+        let expected_sha = if absent_original(original) { hash(original.note.as_bytes()) } else { original.source_sha256.clone() };
+        if source.sha256 != expected_sha { return Ok(None); }
+        let path = self.inventory(&memory.id, memory.note_path.as_deref())?.ok_or("Published note missing")?;
+        Ok((read(&path, MAX_JSON)? == latest.markdown.as_bytes()).then_some(latest.memory.revision))
+    }
     fn current(&self, memory_id: &str, pending: &BTreeMap<String, String>) -> Result<VaultMemory> {
         if let Some(error) = pending.get(memory_id) {
             // A validated terminal tombstone remains authoritative even when a
@@ -1443,6 +1464,7 @@ impl Vault {
             updated_at: now,
             conflict: None,
             state: "active".into(),
+            processing: None,
             note_path: None,
         };
         let e = Event {
@@ -1498,6 +1520,7 @@ impl Vault {
             updated_at: now,
             conflict: None,
             state: "active".into(),
+            processing: None,
             note_path: None,
         };
         let e = Event {
@@ -1629,6 +1652,7 @@ impl Vault {
                     updated_at: String::new(),
                     conflict: Some(format!("Memory unavailable: {err}")),
                     state: "conflict".into(),
+                    processing: None,
                     note_path: None,
                 },
             };
@@ -1665,6 +1689,7 @@ impl Vault {
                     updated_at: String::new(),
                     conflict: Some(format!("Pending capture preserved: {error}")),
                     state: "conflict".into(),
+                    processing: None,
                     note_path: None,
                 });
             }

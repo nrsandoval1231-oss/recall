@@ -86,13 +86,30 @@ export function graphTitle(memory: VaultMemory) {
     }
   }
   const body = memory.note.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
-  const heading = /^#{1,2}\s+(.+)$/m.exec(body)?.[1];
+  const generatedSections = new Set([
+    "observations (source statements)",
+    "follow-ups (not confirmed commitments)",
+    "open questions and uncertainty",
+    "retracted source statements (not facts)",
+    "unresolved entity mentions",
+    "related memories",
+    "original evidence",
+  ]);
+  const heading = body
+    .split("\n")
+    .map((value) => /^#{1,2}\s+(.+)$/.exec(value.trim())?.[1])
+    .find((value) => value && !generatedSections.has(value.toLocaleLowerCase()));
   const name = (memory.source_name === "note.txt" ? "" : memory.source_name).replace(/\.[a-z0-9]+$/i, "");
   const line = body
     .split("\n")
-    .find((value) => value.trim() && !value.trim().startsWith("<!--"))
+    .find((value) => value.trim() && !value.trim().startsWith("<!--") && !value.trim().startsWith("#"))
     ?.trim();
-  return displayTitle(name || heading || line || "Untitled memory");
+  return displayTitle(heading || name || line || "Untitled memory");
+}
+export function memoryPreview(memory: VaultMemory): string {
+  const scalar = /^summary: (".*")$/m.exec(memory.note)?.[1];
+  if (scalar) { try { const parsed: unknown = JSON.parse(scalar); if (typeof parsed === "string") return parsed.slice(0, 400); } catch { /* Fall through to authored text. */ } }
+  return memory.note.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").split("\n").filter(line => line.trim() && !line.startsWith("#") && !line.startsWith("<!--")).join(" ").slice(0, 240) || "Original photo saved. Choose processing for a visual description.";
 }
 export function deriveGraph(memories: VaultMemory[]) {
   const records = memories

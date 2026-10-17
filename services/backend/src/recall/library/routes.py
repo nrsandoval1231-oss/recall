@@ -29,6 +29,13 @@ class Login(BaseModel):
     enrollment_token: str = Field(min_length=20, max_length=150)
 
 
+class ProcessingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1)
+    consent: bool
+    expected_vault_id: uuid.UUID
+
+
 def register_routes(
     app: FastAPI,
     db: Database,
@@ -120,3 +127,11 @@ def register_routes(
     @app.post("/v1/library/ask")
     def ask(body: Question, actor: who) -> dict[str, Any]:
         return library.ask(actor.user_id, body.question)
+
+    @app.post("/v1/library/memories/{memory_id}/processing")
+    def process(memory_id: uuid.UUID, body: ProcessingRequest, actor: who) -> dict[str, Any]:
+        from .enrichment import request_processing
+
+        if not body.consent:
+            raise validation("Explicit source permission is required.")
+        return request_processing(library, actor.user_id, memory_id, body.expected_revision, body.expected_vault_id)

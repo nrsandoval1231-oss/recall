@@ -72,6 +72,13 @@ it("uses authored headings or words to distinguish native notes without AI or ma
   ).toBe("north-lot");
 });
 
+it("uses a saved heading before the source filename for adaptive graph previews", () => {
+  expect(graphTitle({
+    ...row("a", "---\ntags: [personal]\n---\n# Utility delay notes\nDetails"),
+    source_name: "IMG_1042.jpg",
+  })).toBe("Utility delay notes");
+});
+
 it("bounds interpreted titles consistently without rewriting their metadata", () => {
   const note = `title: "${"x".repeat(200)}"`;
   expect(graphTitle(row("a", note)).length).toBe(80);

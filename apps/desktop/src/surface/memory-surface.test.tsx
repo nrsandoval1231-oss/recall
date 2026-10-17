@@ -111,6 +111,112 @@ const preview: LocalVault = {
   status: async () => emptyStatus,
 };
 
+it.each([
+  ["text", false], ["text", true], ["photo", false], ["photo", true],
+] as const)("reports an honest missing processing receipt for %s capture with permission %s", async (kind, permitted) => {
+  const saved = memory({processing: undefined});
+  const captureNote = vi.fn(async () => saved);
+  const capture = vi.fn(async () => saved);
+  const requestProcessing = vi.fn();
+  const client = vault({captureNote, capture, requestProcessing}, [memory()]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await screen.findByRole("button", {name: "Open original: north-lot"});
+  await user.click(screen.getByRole("button", {name: kind === "text" ? /Write.*Type a note/ : /Camera.*Import a photo/}));
+  if (permitted) await user.click(screen.getByLabelText(/Send this saved source to Jev and Claude/));
+  if (kind === "text") await user.type(screen.getByLabelText("Your note"), "SYNTHETIC receipt unavailable");
+  await user.click(screen.getByRole("button", {name: kind === "text" ? "Save note" : "Import photo"}));
+  expect(await screen.findByText(permitted ? "Original saved. Processing status is unavailable; check this saved source before retrying." : "Original saved. Choose processing before sending this source to AI.")).toBeTruthy();
+  expect(requestProcessing).not.toHaveBeenCalled();
+  expect((kind === "text" ? captureNote : capture).mock.calls[0]).toEqual(["session-token", expect.any(String), kind === "text" ? "SYNTHETIC receipt unavailable" : "", ...(permitted ? [true] : [])]);
+});
+
+it("automatic processing starts unchecked and authorizes only captures saved after opt-in", async () => {
+  const captureNote = vi.fn(async (_scope: string, id: string, note: string, permitted?: boolean) => memory({id, note, source_name: "note.txt", processing: {state: permitted ? "pending" : "consent-required", message: "Synthetic durable state"}}));
+  const client = vault({captureNote, requestProcessing: vi.fn()}, [memory()]);
+  const user = userEvent.setup();
+  render(<MemorySurface vault={client} />);
+  await screen.findByRole("button", {name: "Open original: north-lot"});
+  await user.click(screen.getByRole("button", {name: /Write · Type a note/}));
+  const automatic = screen.getByLabelText(/Automatically organize new captures/);
+  expect((automatic as HTMLInputElement).checked).toBe(false);
+  await user.click(automatic);
+  expect(client.requestProcessing).not.toHaveBeenCalled();
+  await user.type(screen.getByLabelText("Your note"), "SYNTHETIC next source");
+  await user.click(screen.getByRole("button", {name: "Save note"}));
+  await waitFor(() => expect(captureNote).toHaveBeenCalledWith("session-token", expect.any(String), "SYNTHETIC next source", true));
+  expect(client.requestProcessing).not.toHaveBeenCalled();
+});
+
+it.each(["local", "cloud"] as const)("consumes one-source permission across successive text and photo captures in %s mode", async storage => {
+  const sourcePermission = storage === "cloud" ? /Send this saved source to the configured cloud AI provider/ : /Send this saved source to Jev and Claude/;
+  const saved = (id: string, note: string) => memory({id, note, processing: {state: "pending", message: "Synthetic queued"}});
+  const captureNote = vi.fn(async (_scope: string, id: string, note: string) => saved(id, note));
+  const capture = vi.fn(async (_scope: string, id: string, note: string) => saved(id, note));
+  const client = vault({storage, captureNote, capture, requestProcessing: vi.fn()}, [memory()]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await screen.findByRole("button", {name: "Open original: north-lot"});
+  for (const kind of ["text", "photo"] as const) {
+    await user.click(screen.getByRole("button", {name: kind === "text" ? /Write · Type a note/ : /Camera · Import a photo/}));
+    const permission = screen.getByLabelText(sourcePermission);
+    expect((permission as HTMLInputElement).checked).toBe(false);
+    await user.click(permission);
+    if (kind === "text") await user.type(screen.getByLabelText("Your note"), "SYNTHETIC A");
+    await user.click(screen.getByRole("button", {name: kind === "text" ? "Save note" : "Import photo"}));
+    const calls = kind === "text" ? captureNote : capture;
+    await waitFor(() => expect(calls).toHaveBeenCalledTimes(1));
+    expect(calls.mock.calls[0]).toEqual(["session-token", expect.any(String), kind === "text" ? "SYNTHETIC A" : "", true]);
+    await user.click(screen.getByRole("button", {name: kind === "text" ? /Write · Type a note/ : /Camera · Import a photo/}));
+    expect((screen.getByLabelText(sourcePermission) as HTMLInputElement).checked).toBe(false);
+    if (kind === "text") await user.type(screen.getByLabelText("Your note"), "SYNTHETIC B");
+    await user.click(screen.getByRole("button", {name: kind === "text" ? "Save note" : "Import photo"}));
+    await waitFor(() => expect(calls).toHaveBeenCalledTimes(2));
+    expect(calls.mock.calls[1]).toEqual(["session-token", expect.any(String), kind === "text" ? "SYNTHETIC B" : ""]);
+  }
+});
+
+it("consumes a manual memory processing grant before a fresh capture and keeps frozen retry permission", async () => {
+  const initial = memory({processing: {state: "consent-required", message: "Synthetic saved"}});
+  const captureNote = vi.fn().mockRejectedValueOnce(new Error("Synthetic offline save")).mockImplementation(async (_scope, id, note) => memory({id, note}));
+  const requestProcessing = vi.fn(async () => ({state: "pending", message: "Synthetic authorized request"}));
+  const client = vault({requestProcessing, captureNote}, [initial]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  const original = await screen.findByRole("button", {name: "Open original: north-lot"});
+  expect(screen.getByRole("button", {name: /north-lot.*Gate code 48\?.*consent-required/})).toBeTruthy();
+  await user.click(original);
+  await user.click(screen.getByLabelText(/Send this source to Jev and Claude/));
+  await user.click(screen.getByRole("button", {name: "Organize this memory"}));
+  await waitFor(() => expect(requestProcessing).toHaveBeenCalledTimes(1));
+  expect((screen.getByLabelText(/Send this source to Jev and Claude/) as HTMLInputElement).checked).toBe(false);
+  await user.click(screen.getByRole("button", {name: /Write · Type a note/}));
+  const permission = screen.getByLabelText(/Send this saved source to Jev and Claude/);
+  expect((permission as HTMLInputElement).checked).toBe(false);
+  await user.click(permission);
+  await user.type(screen.getByLabelText("Your note"), "SYNTHETIC frozen retry");
+  await user.click(screen.getByRole("button", {name: "Save note"}));
+  await screen.findByText(/Synthetic offline save/);
+  expect((screen.getByLabelText(/Send this saved source to Jev and Claude/) as HTMLInputElement).checked).toBe(false);
+  await user.click(screen.getByRole("button", {name: "Retry the same note"}));
+  await waitFor(() => expect(captureNote).toHaveBeenCalledTimes(2));
+  expect(captureNote.mock.calls[0]).toEqual(captureNote.mock.calls[1]);
+  expect(captureNote.mock.calls[1]?.[3]).toBe(true);
+});
+
+it("clears one-source photo permission when the picker is cancelled", async () => {
+  const capture = vi.fn().mockResolvedValueOnce(null).mockImplementation(async (_scope, id) => memory({id}));
+  const client = vault({capture, requestProcessing: vi.fn()}, [memory()]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await screen.findByRole("button", {name: "Open original: north-lot"});
+  await user.click(screen.getByRole("button", {name: /Camera · Import a photo/}));
+  await user.click(screen.getByLabelText(/Send this saved source to Jev and Claude/));
+  await user.click(screen.getByRole("button", {name: "Import photo"}));
+  await screen.findByText("Import cancelled. Nothing was written.");
+  expect((screen.getByLabelText(/Send this saved source to Jev and Claude/) as HTMLInputElement).checked).toBe(false);
+  await user.click(screen.getByRole("button", {name: "Import photo"}));
+  await waitFor(() => expect(capture).toHaveBeenCalledTimes(2));
+  expect(capture.mock.calls[0]?.[3]).toBe(true);
+  expect(capture.mock.calls[1]?.[3]).toBeUndefined();
+});
+
 it("requires separate source consent and unchecked cost review for the retained failed organization", async () => {
   const initial = memory({ source_name: "Draft.png", note: "Utility late." });
   const parser = "22222222-2222-4222-8222-222222222222",
@@ -221,7 +327,7 @@ describe("Memory Surface", () => {
     );
     await user.click(screen.getByRole("button", { name: "Ask" }));
     expect(screen.getByText(/Markdown notes in your vault/)).toBeTruthy();
-    expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
+    expect(screen.getByText(/Gate code 48\?/, {selector: "p"})).toBeTruthy();
     await user.click(
       screen.getByRole("button", { name: "Open original: north-lot" }),
     );
@@ -472,7 +578,7 @@ describe("Memory Surface", () => {
       "laydown",
     );
     await user.click(screen.getByRole("button", { name: "Ask" }));
-    expect(screen.getByText(/Gate code 48\?/)).toBeTruthy();
+    expect(screen.getByText(/Gate code 48\?/, {selector: "p"})).toBeTruthy();
     expect(client.list).toHaveBeenCalledWith("session-token", "laydown");
   });
 
@@ -1019,6 +1125,7 @@ it("keeps failed capture intent scoped to its vault when choosing another vault"
   rawRender(<MemorySurface vault={client} />);
   await user.click(screen.getByRole("button", { name: /Write ·/ }));
   await user.type(screen.getByLabelText("Your note"), "Vault A private draft");
+  await user.click(screen.getByLabelText(/Send this saved source to Jev and Claude/));
   await user.click(screen.getByRole("button", { name: "Save note" }));
   await screen.findByRole("alert");
   const firstId = captureNote.mock.calls[0]![1];
@@ -1043,6 +1150,7 @@ it("keeps failed capture intent scoped to its vault when choosing another vault"
       `recall.desktop.capture.v1:${chosen.vault_identity}`,
     ),
   ).toContain("Vault A private draft");
+  expect(JSON.parse(sessionStorage.getItem(`recall.desktop.capture.v1:${chosen.vault_identity}`)!).processingConsent).toBe(true);
 });
 
 it("Cancel preserves the Write draft and returns keyboard focus to its bubble", async () => {
@@ -1051,6 +1159,7 @@ it("Cancel preserves the Write draft and returns keyboard focus to its bubble", 
   const write = screen.getByRole("button", { name: /Write ·/ });
   await user.click(write);
   await user.type(screen.getByLabelText("Your note"), "Unsaved draft?");
+  await user.click(screen.getByLabelText(/Send this saved source to Jev and Claude/));
   await user.click(screen.getByRole("button", { name: "Cancel" }));
   await act(
     async () =>
@@ -1058,6 +1167,7 @@ it("Cancel preserves the Write draft and returns keyboard focus to its bubble", 
   );
   expect(document.activeElement).toBe(write);
   await user.click(write);
+  expect((screen.getByLabelText(/Send this saved source to Jev and Claude/) as HTMLInputElement).checked).toBe(false);
   expect(
     (screen.getByLabelText("Your note") as HTMLTextAreaElement).value,
   ).toBe("Unsaved draft?");

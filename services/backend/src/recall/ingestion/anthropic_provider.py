@@ -61,7 +61,7 @@ class AnthropicProvider:
         refusal_fallback: bool,
         client: anthropic.Anthropic | None = None,
     ) -> None:
-        self._client = client or anthropic.Anthropic(api_key=api_key, max_retries=2, timeout=600.0)
+        self._client = client or anthropic.Anthropic(api_key=api_key, max_retries=0, timeout=600.0)
         self._model = model_id
         self._effort = effort
         self._fallback = refusal_fallback
@@ -133,7 +133,9 @@ class AnthropicProvider:
                     f"and return the full corrected JSON:\n{request.repair_note}",
                 }
             )
-        return self._call(system=INTERPRET_SYSTEM, content=content, schema=request.schema, max_tokens=64000)
+        return self._call(
+            system=request.system or INTERPRET_SYSTEM, content=content, schema=request.schema, max_tokens=64000
+        )
 
     def answer(self, request: AnswerRequest) -> ProviderResult:
         evidence = json.dumps(request.packet, ensure_ascii=False)

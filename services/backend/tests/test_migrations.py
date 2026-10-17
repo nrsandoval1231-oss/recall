@@ -48,6 +48,7 @@ MIGRATIONS = [
     "0007_provider_budget_reservations.sql",
     "0008_device_enrollment.sql",
     "0009_native_library.sql",
+    "0010_library_enrichment.sql",
 ]
 
 

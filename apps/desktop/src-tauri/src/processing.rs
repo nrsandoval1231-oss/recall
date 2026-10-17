@@ -51,7 +51,7 @@ impl Config {
             monthly_micros: amount("RECALL_JEV_MONTHLY_BUDGET_USD"),
         }
     }
-    fn ready(&self) -> bool {
+    pub(crate) fn ready(&self) -> bool {
         self.api_key
             .as_ref()
             .is_some_and(|v| !v.is_empty() && v.len() <= 4096 && !v.chars().any(char::is_control))
@@ -98,6 +98,9 @@ struct Completed {
     attempt_sha256: String,
     parsed: jev::ParsedSource,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Failure { input_sha256: String, message: String }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Transcription {
@@ -111,7 +114,7 @@ fn present_sha<'de, D: serde::Deserializer<'de>>(
 ) -> std::result::Result<Option<String>, D::Error> {
     String::deserialize(d).map(Some)
 }
-fn visual_operation(operation: &str) -> String {
+pub(crate) fn visual_operation(operation: &str) -> String {
     let hash = Sha256::digest(format!("recall-visual-v1:{operation}").as_bytes());
     let mut bytes = [0_u8; 16];
     bytes.copy_from_slice(&hash[..16]);
@@ -230,7 +233,7 @@ fn root(vault: &Vault) -> Result<PathBuf> {
     if !path.exists() {
         fs::create_dir(&path).map_err(|_| "Could not create parser state directory")?;
     }
-    for name in ["inputs", "attempts", "results", "transcriptions"] {
+    for name in ["inputs", "attempts", "results", "transcriptions", "failures"] {
         let dir = path.join(name);
         local_vault::safe(&dir)?;
         if !dir.exists() {
@@ -414,6 +417,8 @@ fn budget(vault: &Vault, dir: &Path, input: &Input, config: &Config, required: i
             }
         }
         if original.source_sha256 == input.source_sha256 && completed.is_none() {
+            let rejected = read_optional::<Failure>(&path(dir, "failures", id)?)?.is_some_and(|failure| failure.input_sha256 == digest(&json(&original).unwrap_or_default()) && [400,401,403,404,422,429].iter().any(|code| failure.message.starts_with(&format!("Jev HTTP {code}."))));
+            if rejected && crate::companion_processing::retry_allows(vault, &input.memory_id, &input.operation_id) { continue; }
             return Err(
                 "Previous parser request for this source has an uncertain outcome; review required"
                     .into(),
@@ -499,10 +504,13 @@ fn read_job(vault: &Vault, dir: &Path, input: &Input) -> Result<Job> {
                 visual.as_ref(),
             ));
         }
+        let failure = read_optional::<Failure>(&path(dir, "failures", &input.operation_id)?)?;
+        let diagnostic = failure.filter(|f| f.input_sha256 == digest(&json(input).unwrap_or_default()) && f.message.len() < 1000)
+            .map(|f| f.message).unwrap_or_else(|| "Parser outcome is uncertain; this request will not be resent. Review provider usage before a retry.".into());
         return Ok(job(
             input,
-            "uncertain",
-            "Parser outcome is uncertain; this request will not be resent",
+            if [400,401,403,404,422,429].iter().any(|code| diagnostic.contains(&format!("HTTP {code}"))) { "failed" } else { "uncertain" },
+            &diagnostic,
             Some(a),
             None,
         ));
@@ -735,6 +743,12 @@ pub fn parse_with_visual(
         max_request_bytes: 128 * 1024,
     };
     let output = transport.parse(&c, memory, text, parsed_sha);
+    if let Err(error) = &output {
+        let code = [400_u16, 401, 403, 404, 422, 429, 500, 502, 503].into_iter().find(|code| error.contains(&format!("HTTP {code}")));
+        let message = code.map(|code| format!("Jev HTTP {code}. {} Original retained; automatic resend blocked.", librarian::http_hint(code)))
+            .unwrap_or_else(|| "Parser delivery timed out, disconnected or returned an invalid response. Outcome uncertain; original retained. Review provider usage before retrying.".into());
+        immutable(&path(&dir, "failures", operation)?, &Failure { input_sha256: digest(&json(&input)?), message })?;
+    }
     if let Ok(parsed) = output {
         if jev::validate_parsed(&parsed, memory, text, parsed_sha, model).is_ok() {
             // Revalidate revision/source after the provider call before accepting derived state.
@@ -762,6 +776,25 @@ pub(crate) mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
     const NOTE: &str="Brad says maybe 5–10 MW? Utility late. Call Sarah. Need generators by Dec? Prism doing electrical? Site access north? Ask operator about gas. Crossed out: 8 MW confirmed.";
+    #[test]
+    fn durable_provider_diagnostics_distinguish_rejections_and_uncertain_delivery() {
+        struct Reject(&'static str, AtomicUsize);
+        impl ParserTransport for Reject {
+            fn parse(&self, _: &jev::JevConfig, _: &str, _: &str, _: &str) -> Result<jev::ParsedSource> {
+                self.1.fetch_add(1, Ordering::SeqCst); Err(self.0.into())
+            }
+        }
+        for (error, state, hint) in [("Jev HTTP 401", "failed", "Credentials"), ("Jev HTTP 403", "failed", "permission"), ("Jev HTTP 429", "failed", "rate limit"), ("synthetic timeout", "uncertain", "usage")] {
+            let temp = Temp::new(); let vault = temp.vault(); let id = Uuid::new_v4().to_string();
+            let memory = vault.capture_note(&id, NOTE).unwrap(); let operation = Uuid::new_v4().to_string();
+            let provider = Reject(error, AtomicUsize::new(0));
+            let first = parse_note(&vault, &Config::synthetic_test_config(), &operation, &memory.id, 1, true, &provider).unwrap();
+            assert_eq!(first.state, state); assert!(first.message.contains(hint));
+            let reopened = temp.vault();
+            let second = parse_note(&reopened, &Config::synthetic_test_config(), &operation, &memory.id, 1, true, &provider).unwrap();
+            assert_eq!(second.message, first.message); assert_eq!(provider.1.load(Ordering::SeqCst), 1);
+        }
+    }
     pub(crate) struct Temp(pub(crate) std::path::PathBuf);
     impl Temp {
         fn new() -> Self {
@@ -1037,6 +1070,24 @@ pub(crate) mod tests {
             calls: AtomicUsize::new(0),
             fail: false,
         }
+    }
+    #[test]
+    fn no_text_photo_produces_qualified_visual_metadata_without_meeting_framing() {
+        struct Scene;
+        impl librarian::ReadingTransport for Scene {
+            fn complete(&self, _: &librarian::ProviderRequest<'_>) -> std::result::Result<librarian::ProviderOutput, librarian::CallError> {
+                Ok(librarian::ProviderOutput { transcription: "Visual observation (inferred): A red synthetic cube beside a blue sphere.".into(), uncertainties: vec!["Machine visual reading; unverified interpretation".into()], model: "synthetic-visual-model".into(), input_tokens: Some(100), output_tokens: Some(100) })
+            }
+        }
+        let temp = Temp::new(); let vault = temp.vault(); let memory = photo(&vault); let operation = id();
+        let job = parse_with_visual(&vault, &configured(), &operation, &memory.id, 1, true, &parser(), Some((&crate::librarian::organization_tests::config(), &Scene))).unwrap();
+        let parsed = job.parsed.as_ref().unwrap();
+        let layout = crate::meeting::Layout { schema_version: 3, title_span: None, category: "photo".into(), observations: (0..parsed.candidates.len()).collect(), follow_ups: vec![], questions: vec![], related_memory_ids: vec![] };
+        let note = crate::meeting::render_for_evidence(&layout, parsed, &[], &job.source_sha256, job.visual.as_ref()).unwrap();
+        assert!(note.contains("red synthetic cube")); assert!(note.contains("summary:")); assert!(note.contains("inferred"));
+        assert!(note.contains("type: \"photo\"")); assert!(!note.contains("# Meeting"));
+        assert!(note.contains("Original photo")); assert!(note.contains("unreviewed machine reading"));
+        assert_eq!(vault.history(&memory.id).unwrap().len(), 1);
     }
     fn photo(v: &Vault) -> local_vault::VaultMemory {
         v.capture(

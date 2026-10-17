@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { VaultMemory } from "../platform/local-vault";
-import { deriveGraph, type GraphKind } from "./adaptive-graph";
+import { deriveGraph, memoryPreview, type GraphKind } from "./adaptive-graph";
 export function AdaptiveGraph({
   memories,
   explore,
@@ -178,7 +178,7 @@ export function AdaptiveGraph({
                 role="button"
                 aria-pressed={node.id === selected}
                 tabIndex={0}
-                aria-label={`${node.label} · ${node.tentative ? "Unresolved; " : ""}1 source · revision ${node.memory.revision}`}
+                aria-label={`${node.label} · ${node.tentative ? "Unresolved; " : ""}1 source · revision ${node.memory.revision}${node.kind === "memories" ? ` · ${memoryPreview(node.memory)} · ${node.memory.processing?.state ?? "saved"}` : ""}`}
                 onClick={() => onSelect(node.memory)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -193,6 +193,7 @@ export function AdaptiveGraph({
                   {node.tentative
                     ? "Unresolved mention; identity not confirmed"
                     : "Saved source"}
+                  {node.kind === "memories" ? ` · ${memoryPreview(node.memory)} · ${node.memory.processing?.state ?? "saved"}` : ""}
                 </title>
                 {/* Stable hit area surrounds the fine orbital ring. */}
                 <circle className="node-hit" r={node.kind === "memories" ? 38 : 24} />
