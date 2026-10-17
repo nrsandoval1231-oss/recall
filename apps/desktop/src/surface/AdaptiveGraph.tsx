@@ -178,7 +178,7 @@ export function AdaptiveGraph({
                 role="button"
                 aria-pressed={node.id === selected}
                 tabIndex={0}
-                aria-label={`${node.label} · ${node.tentative ? "Unresolved; " : ""}1 source · revision ${node.memory.revision}`}
+                aria-label={`${node.label} · ${node.tentative ? "Unresolved; " : ""}1 source · revision ${node.memory.revision}${node.kind === "memories" ? ` · ${memoryPreview(node.memory)} · ${node.memory.processing?.state ?? "saved"}` : ""}`}
                 onClick={() => onSelect(node.memory)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {

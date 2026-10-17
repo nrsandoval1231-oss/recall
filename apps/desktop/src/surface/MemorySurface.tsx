@@ -349,6 +349,7 @@ export function MemorySurface({
   const selected = selectedFrom(status);
   useEffect(() => {
     setAutomaticProcessing(selected?.vault_identity ? localStorage.getItem(`recall.automatic-processing.v1:${selected.vault_identity}`) === "true" : false);
+    setProcessingConsent(false);
   }, [selected?.vault_identity]);
   useEffect(() => {
     if (!selected || !vault.requestProcessing) return;
@@ -615,6 +616,7 @@ export function MemorySurface({
   }, [vaultSettings]);
 
   function go(next: Section) {
+    if (next !== section) setProcessingConsent(false);
     closeAttachment();
     if (
       (section === "evidence" || section === "capture") &&
@@ -1091,6 +1093,8 @@ export function MemorySurface({
 
   async function organizeMemory(memory: VaultMemory, reviewRetry = false) {
     if (!selected) return;
+    const sourceConsent = processingConsent;
+    setProcessingConsent(false);
     const scope = selected;
     organizationRequests.current.set(
       scope.vault_id,
@@ -1107,7 +1111,7 @@ export function MemorySurface({
         vault,
         scope,
         memory,
-        processingConsent,
+        sourceConsent,
         (state) => {
           if (inScope(scope.vault_id)) setProcessingState(state);
         },
@@ -1173,6 +1177,7 @@ export function MemorySurface({
       JSON.stringify(intent),
     );
     setPending(intent);
+    setProcessingConsent(false);
     setBusy(true);
     setError("");
     try {
@@ -1231,6 +1236,7 @@ export function MemorySurface({
       JSON.stringify(intent),
     );
     setPending(intent);
+    setProcessingConsent(false);
     setBusy(true);
     setError("");
     try {
@@ -1742,6 +1748,7 @@ export function MemorySurface({
     section === "people" ||
     section === "topics";
   function startCapture(kind: "photo" | "text") {
+    setProcessingConsent(false);
     inspectorTrigger.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement

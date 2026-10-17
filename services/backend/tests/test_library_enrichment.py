@@ -349,6 +349,87 @@ def test_durable_result_recovers_without_second_provider_charge(pg_cluster, jwt_
         assert worker.run_once() is None
 
 
+@pytest.mark.parametrize(
+    "scenario", ["unchanged", "legacy_failed", "corrected", "revoked", "target_changed", "committed_response_lost"]
+)
+def test_ordinary_publication_exception_preserves_receipt_and_never_charges_again(
+    pg_cluster, jwt_key, tmp_path, scenario
+):
+    with rig(pg_cluster, jwt_key, tmp_path) as (env, provider, worker):
+        user = env.user()
+        consent(user)
+        _, target = capture(user)
+        body, row = capture(user, processing_consent=True)
+        provider.connections = [
+            {"memory_id": target["id"], "evidence": body["note"], "related_evidence": target["note"]}
+        ]
+        commit = worker._commit
+
+        def fail(job, receipt):
+            if scenario == "committed_response_lost":
+                commit(job, receipt)
+            raise RuntimeError("SYNTHETIC transient publication error")
+
+        worker._commit = fail
+        worker.run_once()
+        worker._commit = commit
+        with psycopg.connect(env.admin_dsn) as conn:
+            state, receipt, dispatched, attempts = conn.execute(
+                "select state,result,dispatched_at,attempts from library_processing where memory_id=%s", (row["id"],)
+            ).fetchone()
+            assert state == ("complete" if scenario == "committed_response_lost" else "pending")
+            assert receipt is not None and dispatched is not None and attempts == 1
+            if scenario == "legacy_failed":
+                conn.execute("update library_processing set state='failed' where memory_id=%s", (row["id"],))
+        if scenario in ("corrected", "target_changed"):
+            edited = row if scenario == "corrected" else target
+            result = user.req(
+                "POST",
+                "/v1/library/mutations",
+                json={
+                    "action": "correct",
+                    "memory_id": edited["id"],
+                    "operation_id": str(uuid.uuid4()),
+                    "expected_revision": 1,
+                    "note": "SYNTHETIC human correction",
+                },
+            )
+            assert result.status_code == 200
+        elif scenario == "revoked":
+            user.req("PUT", "/v1/settings/ai", json={"enabled": False})
+        else:
+            requested = user.req(
+                "POST",
+                f"/v1/library/memories/{row['id']}/processing",
+                json={
+                    "consent": True,
+                    "expected_revision": 1,
+                    "expected_vault_id": user.req("GET", "/v1/library/status").json()["vault_id"],
+                },
+            )
+            assert requested.status_code == 200
+        worker.run_once()
+        current = status(user, row["id"])
+        assert len(provider.calls) == 1
+        if scenario == "corrected":
+            assert current["note"] == "SYNTHETIC human correction"
+            assert current["processing"]["state"] == "failed"
+        elif scenario == "target_changed":
+            assert current["revision"] == 1 and current["processing"]["state"] == "failed"
+        elif scenario == "revoked":
+            assert current["revision"] == 1 and current["processing"]["state"] == "consent-required"
+            consent(user)
+            worker.run_once()
+            assert status(user, row["id"])["processing"]["state"] == "complete"
+        else:
+            assert current["revision"] == 2 and current["processing"]["state"] == "complete"
+        assert len(provider.calls) == 1
+        with psycopg.connect(env.admin_dsn) as conn:
+            assert conn.execute(
+                "select result,dispatched_at,attempts from library_processing where memory_id=%s", (row["id"],)
+            ).fetchone() == (receipt, dispatched, 1)
+
+
 def test_wrong_model_and_revoked_workspace_permission_withhold_publication(pg_cluster, jwt_key, tmp_path):
     with rig(pg_cluster, jwt_key, tmp_path) as (env, provider, worker):
         user = env.user()

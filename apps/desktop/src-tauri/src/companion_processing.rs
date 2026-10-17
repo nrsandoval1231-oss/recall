@@ -171,20 +171,30 @@ fn reserve(key: String) -> Result<Option<ActiveJob>, String> {
     let mut active = ACTIVE
         .lock()
         .map_err(|_| "Processing worker state unavailable")?;
-    if active.contains(&key) {
+    if !admit(&mut active, &key)? {
         return Ok(None);
     }
+    Ok(Some(ActiveJob(key)))
+}
+fn admit(active: &mut BTreeSet<String>, key: &str) -> Result<bool, String> {
+    // The parser lock and writer are library-wide. Keep other consented
+    // sources durably pending until list/reopen dispatches them after this one.
+    let scope = key.split_once(':').map(|(scope, _)| format!("{scope}:"));
+    if active.contains(key) || scope.is_some_and(|scope| active.iter().any(|running| running.starts_with(&scope))) { return Ok(false); }
     if active.len() >= 4 {
         return Err(
             "Processing busy. Your original is saved; resume from its saved page later.".into(),
         );
     }
-    active.insert(key.clone());
-    Ok(Some(ActiveJob(key)))
+    active.insert(key.into());
+    Ok(true)
 }
 /// Bounded workers reuse deterministic parser/librarian/publication IDs. Those
 /// durable operations, not this in-process set, prevent duplicate provider calls.
 pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
+    enqueue_with(vault, intent, run)
+}
+fn enqueue_with(vault: &Vault, intent: Intent, process: impl FnOnce(&Vault, &Intent) -> Result<Outcome, String> + Send + 'static) -> Result<(), String> {
     let Some(guard) = reserve(format!("{}:{}", intent.vault_id, intent.memory_id))? else {
         return Ok(());
     };
@@ -202,8 +212,8 @@ pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
         .spawn(move || {
             let _guard = guard;
             let _ = record(&worker, &Outcome { state: "processing".into(), message: "Processing the authorized source. Original retained.".into(), memory_id: intent.memory_id.clone(), revision: intent.revision });
-            let outcome = run(&worker, &intent).unwrap_or_else(|error| Outcome {
-                state: if [400,401,403,404,422,429].iter().any(|code| error.contains(&format!("HTTP {code}"))) { "failed" } else if error.to_lowercase().contains("uncertain") || error.contains("resend blocked") || error.contains("may have received") { "uncertain" } else { "failed" }.into(),
+            let outcome = process(&worker, &intent).unwrap_or_else(|error| Outcome {
+                state: if local_contention(&error) { "pending" } else if [400,401,403,404,422,429].iter().any(|code| error.contains(&format!("HTTP {code}"))) { "failed" } else if error.to_lowercase().contains("uncertain") || error.contains("resend blocked") || error.contains("may have received") { "uncertain" } else { "failed" }.into(),
                 message: error,
                 memory_id: requested.memory_id,
                 revision: requested.revision,
@@ -215,6 +225,9 @@ pub fn enqueue(vault: &Vault, intent: Intent) -> Result<(), String> {
                 .to_string()
         })?;
     Ok(())
+}
+fn local_contention(error: &str) -> bool {
+    error == "Parser is busy; original evidence remains saved" || error == "Vault is busy in another Recall process"
 }
 fn run_with(
     vault: &Vault,
@@ -350,8 +363,25 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
 /// List-time recovery never grants consent or creates new provider identities.
 /// Durable stage ledgers stop any interrupted chargeable call from being replayed.
 pub fn project(vault: &Vault, memory: &VaultMemory, resume: bool) -> Outcome {
-    let outcome = status(vault, &memory.id).ok().flatten();
+    project_with(vault, memory, resume, &enqueue)
+}
+fn project_with(vault: &Vault, memory: &VaultMemory, resume: bool, dispatch: &impl Fn(&Vault, Intent) -> Result<(), String>) -> Outcome {
     let has_consent = path(vault, &memory.id, "consent").map(|p| p.exists()).unwrap_or(false);
+    if !has_consent {
+        return Outcome { state: "consent-required".into(), message: "Original saved. Choose processing before sending this source to AI.".into(), memory_id: memory.id.clone(), revision: memory.revision };
+    }
+    // Projection must not compete for the writer while a provider stage is
+    // active. Its cached result is verified once the current worker releases it.
+    if has_consent {
+        let key = format!("{}:{}", vault.id, memory.id);
+        let scope = format!("{}:", vault.id);
+        if let Ok(active) = ACTIVE.lock() {
+            if active.iter().any(|running| running.starts_with(&scope)) {
+                return Outcome { state: if active.contains(&key) { "processing" } else { "pending" }.into(), message: "Authorized library processing is active; original retained. Other sources wait in the durable queue.".into(), memory_id: memory.id.clone(), revision: memory.revision };
+            }
+        }
+    }
+    let outcome = status(vault, &memory.id).ok().flatten();
     let current = outcome.unwrap_or_else(|| Outcome {
         state: if has_consent { "pending" } else { "consent-required" }.into(),
         message: if has_consent { "Authorized processing pending." } else { "Original saved. Choose processing before sending this source to AI." }.into(),
@@ -359,8 +389,8 @@ pub fn project(vault: &Vault, memory: &VaultMemory, resume: bool) -> Outcome {
     });
     if resume && has_consent && matches!(current.state.as_str(), "pending" | "processing" | "configuration-required") {
         match recoverable(vault, &memory.id) {
-            Ok(intent) => { let _ = enqueue(vault, intent); },
-            Err(message) => return Outcome { state: "needs_review".into(), message, ..current },
+            Ok(intent) => { let _ = dispatch(vault, intent); },
+            Err(message) => return Outcome { state: if local_contention(&message) { "pending" } else { "needs_review" }.into(), message, ..current },
         }
     }
     Outcome { state: match current.state.as_str() { "published" => "complete", "error" => "failed", other => other }.into(), ..current }
@@ -391,6 +421,52 @@ mod tests {
         }
     }
     use crate::jev;
+    #[test]
+    fn concurrent_sources_remain_pending_and_automatically_finish_after_the_active_source() {
+        use std::sync::{Arc, Barrier, Mutex, mpsc};
+        use std::time::{Duration, Instant};
+        struct BlockingParser { calls: AtomicUsize, entered: Mutex<Option<mpsc::SyncSender<()>>>, release: Barrier }
+        impl processing::ParserTransport for BlockingParser {
+            fn parse(&self, config: &jev::JevConfig, id: &str, text: &str, sha: &str) -> Result<jev::ParsedSource, String> {
+                if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    self.entered.lock().unwrap().take().unwrap().send(()).unwrap(); self.release.wait();
+                }
+                Parser(AtomicUsize::new(0)).parse(config, id, text, sha)
+            }
+        }
+        let (temp, vault, _, first_id) = crate::librarian::organization_tests::setup();
+        let first = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == first_id).unwrap();
+        let second = vault.capture_note(&Uuid::new_v4().to_string(), &crate::meeting::tests::source().transcription).unwrap();
+        let first_intent = consent(&vault, &first, true).unwrap().unwrap(); let second_intent = consent(&vault, &second, true).unwrap().unwrap();
+        let (entered, receiver) = mpsc::sync_channel(1);
+        let parser = Arc::new(BlockingParser { calls: AtomicUsize::new(0), entered: Mutex::new(Some(entered)), release: Barrier::new(2) });
+        let dispatch = |vault: &Vault, intent: Intent| {
+            let parser = parser.clone();
+            enqueue_with(vault, intent, move |v, i| run_with(v, i, &processing::Config::synthetic_test_config(), &crate::librarian::organization_tests::config(), parser.as_ref(), &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()))
+        };
+        dispatch(&vault, first_intent).unwrap(); receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        dispatch(&vault, second_intent).unwrap();
+        assert_eq!(project_with(&vault, &second, false, &dispatch).state, "pending");
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 1);
+        parser.release.wait();
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            std::thread::sleep(Duration::from_millis(50));
+            let reopened = Vault::open(&temp.0).unwrap();
+            project_with(&reopened, &first, true, &dispatch);
+            let b = project_with(&reopened, &second, true, &dispatch);
+            if b.state == "complete" { break; }
+            assert_ne!(b.state, "failed", "{}", b.message);
+            assert!(Instant::now() < deadline, "{}: {}; active={:?}; parser calls={}; A={:?}; B={:?}", b.state, b.message, ACTIVE.lock().unwrap(), parser.calls.load(Ordering::SeqCst), status(&reopened, &first.id), status(&reopened, &second.id));
+        }
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(vault.history(&first.id).unwrap().len(), 2); assert_eq!(vault.history(&second.id).unwrap().len(), 2);
+        assert_eq!(project_with(&vault, &second, true, &dispatch).state, "complete");
+        assert_eq!(parser.calls.load(Ordering::SeqCst), 2);
+        assert!(local_contention("Vault is busy in another Recall process"));
+        assert!(local_contention("Parser is busy; original evidence remains saved"));
+        assert!(!local_contention("Provider delivery is uncertain"));
+    }
     #[test]
     fn explicit_known_rejection_retries_are_bounded_and_uncertainty_cannot_unlock_them() {
         struct Rejected(&'static str, AtomicUsize);
@@ -655,16 +731,15 @@ mod tests {
 
     #[test]
     fn workers_are_bounded_deduplicated_and_release_capacity() {
-        let first_id = Uuid::new_v4().to_string();
-        let first = reserve(first_id.clone()).unwrap().unwrap();
-        assert!(reserve(first_id).unwrap().is_none());
+        let mut active = BTreeSet::new(); let first_id = Uuid::new_v4().to_string();
+        assert!(admit(&mut active, &first_id).unwrap());
+        assert!(!admit(&mut active, &first_id).unwrap());
         let others: Vec<_> = (0..3)
-            .map(|_| reserve(Uuid::new_v4().to_string()).unwrap().unwrap())
+            .map(|_| { let id = Uuid::new_v4().to_string(); assert!(admit(&mut active, &id).unwrap()); id })
             .collect();
-        assert!(reserve(Uuid::new_v4().to_string()).is_err());
-        drop(first);
-        let replacement = reserve(Uuid::new_v4().to_string()).unwrap().unwrap();
-        drop(replacement);
-        drop(others);
+        assert!(admit(&mut active, &Uuid::new_v4().to_string()).is_err());
+        active.remove(&first_id);
+        assert!(admit(&mut active, &Uuid::new_v4().to_string()).unwrap());
+        assert_eq!(others.len(), 3);
     }
 }

@@ -91,22 +91,32 @@ def request_processing(
             raise ApiError("REVIEW_REQUIRED", "Human revisions are preserved. This memory requires manual review.", 409)
         authorize(tx, row)
         job = tx.one(
-            "select state,message from library_processing where workspace_id=%s and memory_id=%s",
+            "select state,message,(result is not null) as has_result from library_processing "
+            "where workspace_id=%s and memory_id=%s",
             (tx.workspace_id, memory),
         )
         assert job
         if job["state"] == "failed":
-            # Failed requests were known rejected or had a valid response; bounded explicit retry.
-            tx.run(
-                "update library_processing set state='pending',message='Retry queued.',dispatched_at=null,"
-                "result=null,updated_at=now() where workspace_id=%s and memory_id=%s and attempts<3",
-                (tx.workspace_id, memory),
-            )
+            if job["has_result"]:
+                # A result may be awaiting local publication/validation. Retrying
+                # must never discard it or create another chargeable request.
+                tx.run(
+                    "update library_processing set state='pending',message='Saved proposal queued for validation.',"
+                    "updated_at=now() where workspace_id=%s and memory_id=%s and state='failed' and result is not null",
+                    (tx.workspace_id, memory),
+                )
+            else:
+                tx.run(
+                    "update library_processing set state='pending',message='Retry queued.',dispatched_at=null,"
+                    "updated_at=now() where workspace_id=%s and memory_id=%s and state='failed' "
+                    "and result is null and attempts<3",
+                    (tx.workspace_id, memory),
+                )
             job = tx.one(
                 "select state,message from library_processing where workspace_id=%s and memory_id=%s",
                 (tx.workspace_id, memory),
             )
-        return dict(job or {})
+        return {key: job[key] for key in ("state", "message")} if job else {}
 
 
 def _safe(text: str) -> str:
@@ -243,7 +253,7 @@ class LibraryWorker:
                 (tx.workspace_id, row["id"]),
             )
         if job["result"] is not None:
-            self._commit(job, job["result"])
+            self._publish_saved(job, job["result"])
             return str(job["memory_id"])
         dispatched = False
         reservation = None
@@ -347,7 +357,7 @@ class LibraryWorker:
                     (Jsonb(receipt), tx.workspace_id, row["id"], job["lease_token"]),
                 )
             finalized = True
-            self._commit(job, receipt)
+            self._publish_saved(job, receipt)
         except processing.BudgetReservationError as error:
             with w._tx(job["workspace_id"]) as tx:
                 self._state(
@@ -365,6 +375,16 @@ class LibraryWorker:
             }
             uncertain = dispatched and result is None and not known_rejected
             with w._tx(job["workspace_id"]) as tx:
+                current = tx.one(
+                    "select state,lease_token,result from library_processing "
+                    "where workspace_id=%s and memory_id=%s for update",
+                    (tx.workspace_id, job["memory_id"]),
+                )
+                if not current or current["lease_token"] != job["lease_token"] or current["state"] == "complete":
+                    return str(job["memory_id"])
+                if current["result"] is not None:
+                    self._defer_saved(tx, job)
+                    return str(job["memory_id"])
                 if reservation and not finalized:
                     billed = result
                     if billed is None and isinstance(error, ProviderError) and any(error.usage):
@@ -398,6 +418,24 @@ class LibraryWorker:
                     ),
                 )
         return str(job["memory_id"])
+
+    def _defer_saved(self, tx: Tx, job: dict[str, Any]) -> None:
+        # A commit response can be lost after COMMIT. Never downgrade complete,
+        # a replacement lease, or a consent/source/target review decision.
+        tx.run(
+            "update library_processing set state='pending',"
+            "message='Saved proposal retained. Local publication will retry without another provider request.',"
+            "updated_at=now() where workspace_id=%s and memory_id=%s and lease_token=%s "
+            "and state='processing' and result is not null",
+            (job["workspace_id"], job["memory_id"], job["lease_token"]),
+        )
+
+    def _publish_saved(self, job: dict[str, Any], receipt: dict[str, Any]) -> None:
+        try:
+            self._commit(job, receipt)
+        except Exception:
+            with self.worker._tx(job["workspace_id"]) as tx:
+                self._defer_saved(tx, job)
 
     def _commit(self, job: dict[str, Any], receipt: dict[str, Any]) -> None:
         w = self.worker

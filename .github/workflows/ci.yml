@@ -71,13 +71,14 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev librsvg2-dev libxdo-dev libssl-dev pkg-config
       - run: npm ci
       - working-directory: apps/desktop/src-tauri
+        env: { RECALL_DISABLE_PROVIDERS: "1" }
         run: cargo test --lib -- --nocapture && cargo check
       - name: Build native phone companion
         run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --bin recall-phone
       - run: npx playwright install --with-deps chromium
       - name: Real native companion and browser offline recovery (synthetic data)
         id: phone_recovery
-        env: { TYPESAFE_API_KEY: "", RECALL_CLAUDE_API_KEY: "" }
+        env: { TYPESAFE_API_KEY: "", RECALL_CLAUDE_API_KEY: "", RECALL_DISABLE_PROVIDERS: "1" }
         run: npm run test:phone
       - name: Retain synthetic phone workflow failure evidence
         if: ${{ failure() && steps.phone_recovery.outcome == 'failure' }}
@@ -95,6 +96,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - working-directory: apps/desktop/src-tauri
+        env: { RECALL_DISABLE_PROVIDERS: "1" }
         run: cargo test --lib -- --nocapture
       - working-directory: apps/desktop/src-tauri
         run: cargo check

@@ -14,6 +14,7 @@ async function start(directory: string) {
     {
       env: {
         ...process.env,
+        RECALL_DISABLE_PROVIDERS: "1",
         TYPESAFE_API_KEY: "",
         RECALL_CLAUDE_API_KEY: "",
         RECALL_VAULT_DIR: directory,
