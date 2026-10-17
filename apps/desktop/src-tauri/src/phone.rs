@@ -365,6 +365,9 @@ fn query_contains_question(query: &str) -> bool {
 }
 
 fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
+    capture_with(root, request, &crate::companion_processing::enqueue)
+}
+fn capture_with(root: &Path, request: &PhoneRequest<'_>, dispatch: &impl Fn(&Vault, crate::companion_processing::Intent) -> Result<(), String>) -> PhoneResponse {
     let vault = match Vault::open(root) {
         Ok(vault) => vault,
         Err(err) => return vault_page(err),
@@ -402,8 +405,9 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                 return saved_processing_error(&memory.id, &error);
             }
             crate::knowledge::best_effort_refresh(&vault);
-            // A durable source receipt is independent of provider availability.
-            let receipt = || match vault.source(&memory.id) {
+            // Build the immutable-source response before a dispatched worker
+            // can own the writer. Delivery acknowledgement never depends on AI.
+            let receipt = match vault.source(&memory.id) {
                 Ok(source) => json(
                     200,
                     serde_json::json!({"format": "recall-capture-receipt-v1",
@@ -415,9 +419,9 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
             if form.process_consent {
                 match crate::companion_processing::consent(&vault, &memory, true) {
                     Ok(Some(intent)) => {
-                        if let Err(error) = crate::companion_processing::enqueue(&vault, intent) {
+                        if let Err(error) = dispatch(&vault, intent) {
                             return if receipt_requested {
-                                receipt()
+                                receipt
                             } else {
                                 saved_processing_error(&memory.id, &error)
                             };
@@ -426,7 +430,7 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                     Ok(None) => {}
                     Err(error) => {
                         return if receipt_requested {
-                            receipt()
+                            receipt
                         } else {
                             saved_processing_error(&memory.id, &error)
                         }
@@ -434,7 +438,7 @@ fn capture(root: &Path, request: &PhoneRequest<'_>) -> PhoneResponse {
                 }
             }
             if receipt_requested {
-                receipt()
+                receipt
             } else {
                 redirect(&format!("/saved/{}", memory.id))
             }
@@ -1840,6 +1844,30 @@ mod tests {
         assert!(verify_answer_sources(&vault, &[wrong_source_hash]).is_none());
     }
 
+    #[test]
+    fn consented_capture_receipt_survives_dispatched_writer_and_repeated_delivery() {
+        let dir = TempDir::new(); let vault = Vault::open(&dir.0).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let body = format!("operation_id={id}&note=Synthetic+authorized+capture&process_consent=true");
+        let headers = [("content-type", "application/x-www-form-urlencoded"), ("accept", "application/json"), ("x-recall-library-id", vault.id.as_str())];
+        let request = PhoneRequest { method: "POST", target: "/capture", headers: &headers, body: body.as_bytes() };
+        let writer = std::cell::RefCell::new(None);
+        for rejected_dispatch in [false, true] {
+            let response = capture_with(&dir.0, &request, &|v, intent| {
+                // Permission is durable before any worker may take the writer.
+                assert_eq!(serde_json::to_vec(&crate::companion_processing::recoverable(v, &id).unwrap()).unwrap(), serde_json::to_vec(&intent).unwrap());
+                writer.replace(Some(v.lock()?));
+                if rejected_dispatch { Err("Synthetic worker capacity reached".into()) } else { Ok(()) }
+            });
+            assert_eq!(response.status, 200);
+            let receipt: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+            assert_eq!(receipt["memory_id"], id); assert_eq!(receipt["state"], "received");
+            drop(writer.take());
+            assert_eq!(receipt["source_sha256"], vault.source(&id).unwrap().sha256);
+        }
+        assert_eq!(vault.history(&id).unwrap().len(), 1);
+        assert_eq!(vault.list_with_deleted("", false).unwrap().len(), 1);
+    }
     #[test]
     fn queued_capture_requires_matching_library_and_returns_durable_receipt() {
         let dir = TempDir::new();

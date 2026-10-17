@@ -404,7 +404,7 @@ test("previously authorized pending processing can resume after desktop restart 
     .getByRole("button", { name: "Resume previously authorized processing" })
     .click();
   await expect(page).toHaveURL(savedUrl);
-  await expect(page.locator("body")).toContainText("Processing: pending");
+  await expect(page.locator("body")).toContainText("Processing: configuration-required");
   await expect(page.locator("body")).toContainText("5–10 MW?");
   const originals = await readdir(join(root, "Recall/Sources"));
   expect(originals).toHaveLength(1);

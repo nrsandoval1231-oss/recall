@@ -1199,7 +1199,7 @@ export function MemorySurface({
       setCorrection(noteBody(saved));
       setNotice(vault.storage === "cloud" ? "Saved on this device with original text evidence. Check sync status for cloud confirmation." : "Saved locally with original text evidence.");
       await loadSource(scope.vault_id, saved);
-      if (vault.requestProcessing) setProcessingState(saved.processing?.message ?? "Original saved. Processing permission retained with this capture.");
+      if (vault.requestProcessing) setProcessingState(saved.processing?.message ?? (intent.processingConsent ? "Original saved. Processing status is unavailable; check this saved source before retrying." : "Original saved. Choose processing before sending this source to AI."));
       else await organizeMemory(saved);
     } catch (captureError) {
       if (inScope(scope.vault_id)) setError(message(captureError));
@@ -1266,7 +1266,7 @@ export function MemorySurface({
       setEvidenceId(saved.id);
       setCorrection(noteBody(saved));
       await loadSource(selected.vault_id, saved);
-      if (vault.requestProcessing) setProcessingState(saved.processing?.message ?? "Original saved. Processing permission retained with this capture.");
+      if (vault.requestProcessing) setProcessingState(saved.processing?.message ?? (intent.processingConsent ? "Original saved. Processing status is unavailable; check this saved source before retrying." : "Original saved. Choose processing before sending this source to AI."));
       else await organizeMemory(saved);
     } catch (importError) {
       if (inScope(selected.vault_id))
@@ -2257,7 +2257,7 @@ export function MemorySurface({
               }
               {section === "evidence" ? (
                 <>
-                  {processingState && (
+                  {processingState && !evidenceMemory?.processing && (
                     <section aria-label="Processing receipt">
                       <p role="status">{processingState}</p>
                     </section>
@@ -2403,8 +2403,8 @@ export function MemorySurface({
                           setProcessingConsent(event.target.checked)
                         }
                       />{" "}
-                      Send this saved source to Jev and Claude with up to four
-                      relevant vault excerpts. Provider charges apply.
+                      Send this saved source to {vault.storage === "cloud" ? "the configured cloud AI provider" : "Jev and Claude"} with up to four
+                      relevant library excerpts. Provider charges apply.
                     </label>
                     {captureMode === "text" && (
                       <button

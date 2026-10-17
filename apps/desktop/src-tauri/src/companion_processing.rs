@@ -324,12 +324,22 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
         }));
     }
     let _lock = vault.lock()?;
+    let mut outcome = recorded(vault, memory)?;
+    if let Some(outcome) = outcome.as_mut() {
+        if outcome.state == "published" {
+            outcome.state = "needs_review".into();
+            outcome.message = "Native publication could not be verified; inspect the original and proposal on desktop".into();
+        }
+    }
+    Ok(outcome)
+}
+fn recorded(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
     let target = path(vault, memory, "result")?;
     match fs::symlink_metadata(&target) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(_) => Err("Companion outcome unavailable".into()),
         Ok(_) => {
-            let mut outcome: Outcome =
+            let outcome: Outcome =
                 serde_json::from_slice(&local_vault::read(&target, 16 * 1024)?)
                     .map_err(|_| "Invalid companion outcome")?;
             if outcome.memory_id != memory
@@ -351,10 +361,6 @@ pub fn status(vault: &Vault, memory: &str) -> Result<Option<Outcome>, String> {
             {
                 return Err("Companion outcome scope mismatch".into());
             }
-            if outcome.state == "published" {
-                outcome.state = "needs_review".into();
-                outcome.message = "Native publication could not be verified; inspect the original and proposal on desktop".into();
-            }
             Ok(Some(outcome))
         }
     }
@@ -370,16 +376,28 @@ fn project_with(vault: &Vault, memory: &VaultMemory, resume: bool, dispatch: &im
     if !has_consent {
         return Outcome { state: "consent-required".into(), message: "Original saved. Choose processing before sending this source to AI.".into(), memory_id: memory.id.clone(), revision: memory.revision };
     }
-    // Projection must not compete for the writer while a provider stage is
-    // active. Its cached result is verified once the current worker releases it.
-    if has_consent {
-        let key = format!("{}:{}", vault.id, memory.id);
-        let scope = format!("{}:", vault.id);
-        if let Ok(active) = ACTIVE.lock() {
-            if active.iter().any(|running| running.starts_with(&scope)) {
-                return Outcome { state: if active.contains(&key) { "processing" } else { "pending" }.into(), message: "Authorized library processing is active; original retained. Other sources wait in the durable queue.".into(), memory_id: memory.id.clone(), revision: memory.revision };
-            }
+    let key = format!("{}:{}", vault.id, memory.id);
+    let scope = format!("{}:", vault.id);
+    let (own_active, vault_active) = ACTIVE.lock().map(|active| (active.contains(&key), active.iter().any(|running| running.starts_with(&scope)))).unwrap_or((false, false));
+    if own_active {
+        return Outcome { state: "processing".into(), message: "Authorized library processing is active; original retained.".into(), memory_id: memory.id.clone(), revision: memory.revision };
+    }
+    if let Ok(Some(mut outcome)) = recorded(vault, &memory.id) {
+        if ["failed", "error", "uncertain", "needs_review"].contains(&outcome.state.as_str()) {
+            if outcome.state == "error" { outcome.state = "failed".into(); }
+            return outcome;
         }
+        if outcome.state == "published" {
+            let verified = stages(vault, &memory.id).and_then(|(parser, organizer, publisher)| vault.publication_recorded(memory, &parser, &organizer, &publisher));
+            outcome.state = if let Ok(Some(revision)) = verified { outcome.revision = revision; "complete" } else { "needs_review" }.into();
+            if outcome.state == "needs_review" { outcome.message = "Native publication could not be verified; inspect the original and proposal on desktop".into(); }
+            return outcome;
+        }
+    }
+    // Terminal outcomes above are read without the writer. Only unfinished
+    // sources wait while a different source owns library-wide processing.
+    if vault_active {
+        return Outcome { state: "pending".into(), message: "Authorized library processing is active; original retained. Other sources wait in the durable queue.".into(), memory_id: memory.id.clone(), revision: memory.revision };
     }
     let outcome = status(vault, &memory.id).ok().flatten();
     let current = outcome.unwrap_or_else(|| Outcome {
@@ -421,6 +439,49 @@ mod tests {
         }
     }
     use crate::jev;
+    #[test]
+    fn another_active_source_preserves_terminal_outcomes_without_writer_or_replay() {
+        use std::sync::{Arc, Barrier, mpsc};
+        use std::time::{Duration, Instant};
+        for state in ["published", "failed", "uncertain", "forged"] {
+            let (_temp, vault, _, first_id) = crate::librarian::organization_tests::setup();
+            let first = vault.list_with_deleted("", false).unwrap().into_iter().find(|m| m.id == first_id).unwrap();
+            let intent = consent(&vault, &first, true).unwrap().unwrap();
+            let parser = Parser(AtomicUsize::new(0));
+            let outcome = if state == "published" {
+                run_with(&vault, &intent, &processing::Config::synthetic_test_config(), &crate::librarian::organization_tests::config(), &parser, &librarian::ClaudeTransport, &crate::librarian::organization_tests::claude()).unwrap()
+            } else {
+                Outcome { state: if state == "forged" { "published" } else { state }.into(), message: "Durable terminal diagnostic".into(), memory_id: first.id.clone(), revision: first.revision }
+            };
+            record(&vault, &outcome).unwrap();
+            let result_path = path(&vault, &first.id, "result").unwrap();
+            let before = fs::read(&result_path).unwrap();
+            let history = vault.history(&first.id).unwrap().len();
+            let second = vault.capture_note(&Uuid::new_v4().to_string(), &crate::meeting::tests::source().transcription).unwrap();
+            let second_intent = consent(&vault, &second, true).unwrap().unwrap();
+            let (entered, receiver) = mpsc::sync_channel(1);
+            let release = Arc::new(Barrier::new(2)); let worker_release = release.clone();
+            enqueue_with(&vault, second_intent, move |_, intent| {
+                entered.send(()).unwrap(); worker_release.wait();
+                Ok(Outcome { state: "configuration-required".into(), message: "Synthetic blocked worker finished".into(), memory_id: intent.memory_id.clone(), revision: intent.revision })
+            }).unwrap();
+            receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+            // A terminal projection must succeed even with the writer held.
+            let writer = vault.lock().unwrap();
+            let projected = project_with(&vault, &first, true, &|_, _| panic!("Terminal source must not dispatch"));
+            let expected = match state { "published" => "complete", "forged" => "needs_review", other => other };
+            assert_eq!(projected.state, expected, "{state}: {}", projected.message);
+            assert_eq!(fs::read(&result_path).unwrap(), before);
+            assert_eq!(parser.0.load(Ordering::SeqCst), usize::from(state == "published"));
+            drop(writer);
+            assert_eq!(vault.history(&first.id).unwrap().len(), history);
+            release.wait();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while ACTIVE.lock().unwrap().contains(&format!("{}:{}", vault.id, second.id)) {
+                assert!(Instant::now() < deadline); std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+    }
     #[test]
     fn concurrent_sources_remain_pending_and_automatically_finish_after_the_active_source() {
         use std::sync::{Arc, Barrier, Mutex, mpsc};

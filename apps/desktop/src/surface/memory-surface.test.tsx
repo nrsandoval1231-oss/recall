@@ -111,6 +111,25 @@ const preview: LocalVault = {
   status: async () => emptyStatus,
 };
 
+it.each([
+  ["text", false], ["text", true], ["photo", false], ["photo", true],
+] as const)("reports an honest missing processing receipt for %s capture with permission %s", async (kind, permitted) => {
+  const saved = memory({processing: undefined});
+  const captureNote = vi.fn(async () => saved);
+  const capture = vi.fn(async () => saved);
+  const requestProcessing = vi.fn();
+  const client = vault({captureNote, capture, requestProcessing}, [memory()]);
+  const user = userEvent.setup(); render(<MemorySurface vault={client} />);
+  await screen.findByRole("button", {name: "Open original: north-lot"});
+  await user.click(screen.getByRole("button", {name: kind === "text" ? /Write.*Type a note/ : /Camera.*Import a photo/}));
+  if (permitted) await user.click(screen.getByLabelText(/Send this saved source to Jev and Claude/));
+  if (kind === "text") await user.type(screen.getByLabelText("Your note"), "SYNTHETIC receipt unavailable");
+  await user.click(screen.getByRole("button", {name: kind === "text" ? "Save note" : "Import photo"}));
+  expect(await screen.findByText(permitted ? "Original saved. Processing status is unavailable; check this saved source before retrying." : "Original saved. Choose processing before sending this source to AI.")).toBeTruthy();
+  expect(requestProcessing).not.toHaveBeenCalled();
+  expect((kind === "text" ? captureNote : capture).mock.calls[0]).toEqual(["session-token", expect.any(String), kind === "text" ? "SYNTHETIC receipt unavailable" : "", ...(permitted ? [true] : [])]);
+});
+
 it("automatic processing starts unchecked and authorizes only captures saved after opt-in", async () => {
   const captureNote = vi.fn(async (_scope: string, id: string, note: string, permitted?: boolean) => memory({id, note, source_name: "note.txt", processing: {state: permitted ? "pending" : "consent-required", message: "Synthetic durable state"}}));
   const client = vault({captureNote, requestProcessing: vi.fn()}, [memory()]);
@@ -129,6 +148,7 @@ it("automatic processing starts unchecked and authorizes only captures saved aft
 });
 
 it.each(["local", "cloud"] as const)("consumes one-source permission across successive text and photo captures in %s mode", async storage => {
+  const sourcePermission = storage === "cloud" ? /Send this saved source to the configured cloud AI provider/ : /Send this saved source to Jev and Claude/;
   const saved = (id: string, note: string) => memory({id, note, processing: {state: "pending", message: "Synthetic queued"}});
   const captureNote = vi.fn(async (_scope: string, id: string, note: string) => saved(id, note));
   const capture = vi.fn(async (_scope: string, id: string, note: string) => saved(id, note));
@@ -137,7 +157,7 @@ it.each(["local", "cloud"] as const)("consumes one-source permission across succ
   await screen.findByRole("button", {name: "Open original: north-lot"});
   for (const kind of ["text", "photo"] as const) {
     await user.click(screen.getByRole("button", {name: kind === "text" ? /Write · Type a note/ : /Camera · Import a photo/}));
-    const permission = screen.getByLabelText(/Send this saved source to Jev and Claude/);
+    const permission = screen.getByLabelText(sourcePermission);
     expect((permission as HTMLInputElement).checked).toBe(false);
     await user.click(permission);
     if (kind === "text") await user.type(screen.getByLabelText("Your note"), "SYNTHETIC A");
@@ -146,7 +166,7 @@ it.each(["local", "cloud"] as const)("consumes one-source permission across succ
     await waitFor(() => expect(calls).toHaveBeenCalledTimes(1));
     expect(calls.mock.calls[0]).toEqual(["session-token", expect.any(String), kind === "text" ? "SYNTHETIC A" : "", true]);
     await user.click(screen.getByRole("button", {name: kind === "text" ? /Write · Type a note/ : /Camera · Import a photo/}));
-    expect((screen.getByLabelText(/Send this saved source to Jev and Claude/) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText(sourcePermission) as HTMLInputElement).checked).toBe(false);
     if (kind === "text") await user.type(screen.getByLabelText("Your note"), "SYNTHETIC B");
     await user.click(screen.getByRole("button", {name: kind === "text" ? "Save note" : "Import photo"}));
     await waitFor(() => expect(calls).toHaveBeenCalledTimes(2));

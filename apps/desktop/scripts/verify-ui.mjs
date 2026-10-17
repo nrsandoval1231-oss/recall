@@ -103,6 +103,7 @@ for (const [w, h] of [
               captured_at: "2026-10-13T09:14:00Z",
               updated_at: "2026-10-13T09:14:00Z",
               conflict: null,
+              processing: { state: args.processingConsent ? "pending" : "consent-required", message: args.processingConsent ? "Authorized processing pending." : "Original saved. Choose processing before sending this source to AI." },
             };
             rows = [row];
             localStorage.setItem("synthetic-row", JSON.stringify(row));
@@ -149,6 +150,20 @@ for (const [w, h] of [
               state: "parsed",
               message: "Synthetic Jev fixture",
             };
+          if (cmd === "capture_processing") {
+            if (args.consent !== true) throw Error("Synthetic AI request lacked explicit consent");
+            const setProcessing = (state, message) => {
+              rows = [{ ...rows[0], processing: {state, message} }];
+              localStorage.setItem("synthetic-row", JSON.stringify(rows[0]));
+            };
+            setProcessing("processing", "Authorized processing is active; original retained.");
+            window.__failOrganization = () => setProcessing("failed", "Synthetic HTTP 401 credentials rejected. Original retained.");
+            window.__finishOrganization = () => {
+              rows = [{ ...rows[0], revision: rows[0].revision + 1, note: `---\nrecall_id: "${id}"\ntitle: "Synthetic meeting"\ntags: ["utility"]\n---\n\n## Observations (source statements)\n- Utility late.\n\n## Unresolved entity mentions\n- "Sarah" - person candidate; identity unresolved\n\n## Open questions and uncertainty\n- Deadline unknown.` }];
+              setProcessing("complete", "Organized in Recall. Uncertainty and original evidence preserved.");
+            };
+            return rows[0].processing;
+          }
           if (cmd === "meeting_organize")
             return new Promise((resolve, reject) => {
               window.__failOrganization = () => reject(new Error("Synthetic provider unavailable. Original retained."));
@@ -261,26 +276,31 @@ for (const [w, h] of [
   await page.getByRole("tab", {name:"Note", exact:true}).click();
   await page
     .getByText(
-      "Saved locally. Agree before sending this source to Jev and Claude.",
+      /consent-required · Original saved\. Choose processing before sending this source to AI\./,
     )
     .waitFor();
+  const beforeConsent = await page.evaluate(() => window.__calls);
+  if (beforeConsent.some(cmd => /capture_processing|processing_parse|meeting_organize|meeting_publish|librarian_read/.test(cmd))) throw Error("Saving without consent invoked AI processing");
   await shot("saved");
   await page.getByLabel(/Send this source to Jev and Claude/).check();
   await page.getByRole("button", { name: "Organize this memory" }).click();
-  await page.getByText("Claude is organizing source-linked memory…").waitFor();
+  await page.getByText(/processing · Authorized processing is active/).waitFor();
   await shot("processing");
   await page.evaluate(() => window.__failOrganization());
-  await page.getByText("Synthetic provider unavailable. Original retained.", {exact:true}).waitFor();
+  await page.getByText(/failed · Synthetic HTTP 401 credentials rejected/).waitFor();
+  check(await page.getByText(/Authorized processing is active/).count() === 0, "Failed job retains stale active receipt");
   await shot("processing-failed");
+  await page.getByLabel(/Send this source to Jev and Claude/).check();
   await page.getByRole("button", {name:"Organize this memory", exact:true}).click();
-  await page.getByText("Claude is organizing source-linked memory…", {exact:true}).waitFor();
+  await page.getByText(/processing · Authorized processing is active/).waitFor();
   await page.evaluate(() => window.__finishOrganization());
   await page
     .getByText(
-      "Organized in Recall. Uncertainty and original evidence preserved.",
+      /complete · Organized in Recall\. Uncertainty and original evidence preserved\./,
     )
     .waitFor();
   await shot("ready");
+  check(await page.getByText(/Authorized processing is active/).count() === 0, "Completed job retains stale active receipt");
   check(await page.getByRole("heading", {name:"Processing your memory", exact:true}).count() === 0, "Completed processing retains active heading");
   await page
     .getByLabel("Your correction")

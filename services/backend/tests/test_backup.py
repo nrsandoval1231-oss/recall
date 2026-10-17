@@ -71,7 +71,9 @@ def test_restore_preserves_sources_history_graph_corrections_and_sync(
     archive = tmp_path / "private-backup.zip"
     manifest = backup(ai.admin_dsn, ai.store, archive)
     assert manifest["snapshot"]["schema_versions"][-1] == "0010_library_enrichment.sql"
-    assert all(any(item["source_id"].endswith(row["id"]) for item in manifest["originals"]) for row in (queued, receipted))
+    assert all(
+        any(item["source_id"].endswith(row["id"]) for item in manifest["originals"]) for row in (queued, receipted)
+    )
     assert manifest["snapshot"]["workspace_sync_clocks"]
     owner, _ = make_database(pg_cluster, apply_migrations=False)
     # Pytest's descriptive per-test path plus the legacy object hierarchy can
