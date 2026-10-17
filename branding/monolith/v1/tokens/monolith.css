@@ -1,0 +1,17 @@
+:root {
+  --monolith-obsidian: #050607;
+  --monolith-charcoal: #121418;
+  --monolith-graphite: #1F2328;
+  --monolith-slate: #3A4048;
+  --monolith-steel: #8A8F98;
+  --monolith-silver: #E5E7EB;
+  --monolith-mist: #2A2F36;
+  --monolith-smoke: #3B424C;
+  --monolith-glass: #505862;
+  --monolith-frost: #6B7280;
+  --monolith-font-heading: "Sora", sans-serif;
+  --monolith-font-body: "Inter", sans-serif;
+  --monolith-glass-bg: rgba(31,35,40,.58);
+  --monolith-glass-border: rgba(229,231,235,.13);
+  --monolith-glass-blur: 18px;
+}
