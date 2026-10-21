@@ -95,6 +95,6 @@ click("button[aria-label='Ask']")
 wait(lambda: script("return document.body.innerText.includes('Source-backed matches')"), "native source-backed retrieval")
 assert original in script("return document.body.innerText")
 screenshot("native-source-backed-ask")
-result = {"kind": "Actual Linux Tauri debug runtime + production frontend, real native filesystem; synthetic content; no Obsidian installed, no IPC mocks, no live providers", "library_id": json.loads(ROOT.joinpath("Recall/_meta/manifest.json").read_text())["vault_id"], "memory_id": memory_id, "original_sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "native_history_records": len(list(ROOT.joinpath("Recall/History", memory_id).iterdir())), "created_library": True, "captured_original": True, "autosaved_edit": True, "retrieved_original_quote": True}
+result = {"kind": "Actual Linux Tauri debug runtime + production frontend, real native filesystem; synthetic content; no IPC mocks, no live providers", "library_id": json.loads(ROOT.joinpath("Recall/_meta/manifest.json").read_text())["vault_id"], "memory_id": memory_id, "original_sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "native_history_records": len(list(ROOT.joinpath("Recall/History", memory_id).iterdir())), "created_library": True, "captured_original": True, "autosaved_edit": True, "retrieved_original_quote": True}
 (OUTPUT / "native-runtime.json").write_text(json.dumps(result, indent=2))
 print(json.dumps(result))

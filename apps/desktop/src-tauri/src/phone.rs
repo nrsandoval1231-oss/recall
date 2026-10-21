@@ -2423,16 +2423,16 @@ mod tests {
 
         let edited = fs::read_to_string(&note_path)
             .unwrap()
-            .replace("uncertain?", "Obsidian kept this?");
+            .replace("uncertain?", "Notepad kept this?");
         fs::write(&note_path, &edited).unwrap();
         let edited_ask = text(&call(
             &dir.0,
             "POST",
             "/ask",
             &[("content-type", "application/x-www-form-urlencoded")],
-            b"q=Obsidian",
+            b"q=Notepad",
         ));
-        assert!(edited_ask.contains("Obsidian kept this?"));
+        assert!(edited_ask.contains("Notepad kept this?"));
         assert!(edited_ask.contains(&format!("Recall/Sources/{id}.txt")));
         assert_eq!(fs::read_to_string(&note_path).unwrap(), edited);
     }
@@ -2457,7 +2457,7 @@ mod tests {
         let note_path = dir.0.join(format!("Recall/Memories/{id}.md"));
         let edited = fs::read_to_string(&note_path)
             .unwrap()
-            .replace("uncertain?", "Obsidian kept this?");
+            .replace("uncertain?", "Notepad kept this?");
         fs::write(&note_path, &edited).unwrap();
 
         let ask = call(
@@ -2465,13 +2465,13 @@ mod tests {
             "POST",
             "/ask",
             &[("content-type", "application/x-www-form-urlencoded")],
-            b"q=What+do+you+know+about+Obsidian%3F",
+            b"q=What+do+you+know+about+Notepad%3F",
         );
         let page = text(&ask);
         assert_eq!(ask.status, 200, "{page}");
         assert!(page.contains(KEYWORD_LABEL));
         assert!(page.contains("not a generated answer"));
-        assert!(page.contains("Obsidian kept this?"));
+        assert!(page.contains("Notepad kept this?"));
         assert!(page.contains(&format!("/sources/{id}")));
         assert!(page.contains(&format!("Recall/Memories/{id}.md")));
         assert!(page.contains(&format!("Recall/Sources/{id}.png")));
