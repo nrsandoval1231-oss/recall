@@ -29,6 +29,7 @@ const FORMAT_V5: &str = "recall-local-vault-v5";
 const FORMAT_V6: &str = "recall-local-vault-v6";
 const FORMAT_V7: &str = "recall-local-vault-v7";
 const FORMAT_V8: &str = "recall-local-vault-v8";
+const FORMAT_V9: &str = "recall-local-vault-v9";
 const MAX_PHOTO: u64 = 25 * 1024 * 1024;
 const MAX_NOTE: usize = 256 * 1024;
 const MAX_JSON: u64 = 2 * 1024 * 1024;
@@ -65,6 +66,12 @@ pub struct VaultMemory {
     pub context_repair_pending: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub imported_text: Option<ImportedText>,
+    /// Command DTO shape: absent v9 audio fields serialize as null. The on-disk
+    /// event projection (`event_memory`) omits them so v1-v8 bytes are unchanged.
+    #[serde(default)]
+    pub audio_source: Option<AudioSource>,
+    #[serde(default)]
+    pub audio_transcript: Option<AudioTranscript>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -127,6 +134,7 @@ pub struct VaultRevision {
     pub reading: Option<Reading>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organization: Option<OrganizationProposal>,
+    pub audio_transcript: Option<AudioTranscript>,
     pub recorded_at: String,
     pub origin: String,
     pub kind: String,
@@ -175,6 +183,7 @@ pub struct RetainedRevision {
     pub reading: Option<Reading>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organization: Option<OrganizationProposal>,
+    pub audio_transcript: Option<AudioTranscript>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -271,6 +280,10 @@ mod event_memory {
         conflict: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         imported_text: Option<ImportedText>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        audio_source: Option<AudioSource>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        audio_transcript: Option<AudioTranscript>,
     }
     fn present_reading<'de, D: serde::Deserializer<'de>>(
         d: D,
@@ -293,6 +306,8 @@ mod event_memory {
             updated_at: m.updated_at.clone(),
             conflict: m.conflict.clone(),
             imported_text: m.imported_text.clone(),
+            audio_source: m.audio_source.clone(),
+            audio_transcript: m.audio_transcript.clone(),
         }
         .serialize(serializer)
     }
@@ -312,6 +327,8 @@ mod event_memory {
             updated_at: m.updated_at,
             conflict: m.conflict,
             imported_text: m.imported_text,
+            audio_source: m.audio_source,
+            audio_transcript: m.audio_transcript,
             state: "active".into(),
             note_path: None,
             related_context: Vec::new(),
@@ -482,6 +499,16 @@ fn historical_texts(memory: &VaultMemory) -> Vec<(&str, &'static str, &'static s
             vec![(&memory.note, "human_note", "reported")]
         };
     }
+    if memory.audio_source.is_some() {
+        let mut candidates = Vec::new();
+        if !memory.note.trim().is_empty() {
+            candidates.push((&memory.note[..], "human_note", "reported"));
+        }
+        if let Some(spoken) = audio_current_text(memory) {
+            candidates.push(spoken);
+        }
+        return candidates;
+    }
     let mut candidates = Vec::new();
     if !memory.note.trim().is_empty() {
         candidates.push((&memory.note[..], "human_note", "reported"));
@@ -608,6 +635,43 @@ fn historical_transition(
                 HistoricalTransition::Unchanged
             }
         }
+        "human_audio_correction" => {
+            let changed_by_human = later.clone().any(|(event, _)| {
+                event.kind == "audio_transcript_correction" && event.origin.starts_with("human:")
+            });
+            let Some((text, _, _)) = historical_lane(&current.memory, selected_kind) else {
+                return if changed_by_human {
+                    HistoricalTransition::HumanSuppressed
+                } else {
+                    HistoricalTransition::SuppressedWithoutCounterpart
+                };
+            };
+            if changed_by_human && text != selected_text {
+                HistoricalTransition::HumanCorrected
+            } else {
+                HistoricalTransition::Unchanged
+            }
+        }
+        "machine_audio_transcript" => {
+            let corrected = later.clone().any(|(event, _)| {
+                event.kind == "audio_transcript_correction" && event.origin.starts_with("human:")
+            });
+            if corrected {
+                return match historical_lane(&current.memory, "human_audio_correction") {
+                    Some((text, _, _)) if !text.trim().is_empty() => {
+                        HistoricalTransition::HumanCorrected
+                    }
+                    _ => HistoricalTransition::HumanSuppressed,
+                };
+            }
+            match historical_lane(&current.memory, selected_kind) {
+                Some((text, _, _)) if text != selected_text => {
+                    HistoricalTransition::MachineReprocessed
+                }
+                Some(_) => HistoricalTransition::Unchanged,
+                None => HistoricalTransition::SuppressedWithoutCounterpart,
+            }
+        }
         "machine_reading" | "organization_proposal" => {
             let reading_correction = later.clone().any(|(event, _)| {
                 event.kind == "reading_correction" && event.origin.starts_with("human:")
@@ -650,6 +714,9 @@ fn historical_counterpart_text<'a>(
             "human_note" => historical_lane(memory, "human_note"),
             "human_reading_correction" | "machine_reading" | "organization_proposal" => {
                 historical_lane(memory, "human_reading_correction")
+            }
+            "human_audio_correction" | "machine_audio_transcript" => {
+                historical_lane(memory, "human_audio_correction")
             }
             _ => None,
         },
@@ -1532,13 +1599,29 @@ fn markdown_for(format: &str, m: &VaultMemory) -> String {
             v8_imported_markdown(m, v6_markdown(&render))
         }
         FORMAT_V8 => v6_markdown(m),
+        FORMAT_V9 if m.audio_source.is_some() => audio_markdown(m),
+        FORMAT_V9 if m.imported_text.is_some() => {
+            let mut render = m.clone();
+            render.source_name = "note.txt".into();
+            render.note.clear();
+            v8_imported_markdown(m, v6_markdown(&render))
+        }
+        FORMAT_V9 => v6_markdown(m),
         _ => markdown_v1_v3(m),
     }
 }
 fn markdown_for_event(e: &Event) -> Result<String> {
-    if [FORMAT_V7, FORMAT_V8].contains(&e.format.as_str()) {
+    if e.format == FORMAT_V9 && e.memory.audio_source.is_some() {
+        e.context_link_projection
+            .as_deref()
+            .ok_or("Missing v9 context link projection")?;
+        return Ok(audio_markdown(&e.memory));
+    }
+    if [FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()) {
         let mut render_memory = e.memory.clone();
-        if e.format == FORMAT_V8 && render_memory.imported_text.is_some() {
+        if [FORMAT_V8, FORMAT_V9].contains(&e.format.as_str())
+            && render_memory.imported_text.is_some()
+        {
             render_memory.source_name = "note.txt".into();
             render_memory.note.clear();
         }
@@ -1548,7 +1631,7 @@ fn markdown_for_event(e: &Event) -> Result<String> {
                 .as_deref()
                 .ok_or("Missing v7 context link projection")?,
         )?;
-        if e.format == FORMAT_V8 && e.memory.imported_text.is_some() {
+        if [FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()) && e.memory.imported_text.is_some() {
             rendered = v8_imported_markdown(&e.memory, rendered);
         }
         Ok(rendered)
@@ -1705,6 +1788,7 @@ impl Vault {
         let manifest: Manifest = decode(&recall.join("_meta/manifest.json"))?;
         if ![
             FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V9,
         ]
         .contains(&manifest.format.as_str())
         {
@@ -1726,7 +1810,7 @@ impl Vault {
     }
     #[cfg(test)]
     fn source_path(&self, id: &str) -> PathBuf {
-        for ext in ["png", "jpg", "webp", "txt"] {
+        for ext in ["png", "jpg", "webp", "txt", "wav"] {
             let p = self.path(&format!("Sources/{id}.{ext}"));
             if p.exists() {
                 return p;
@@ -2450,6 +2534,7 @@ impl Vault {
         let m: Manifest = decode(&self.path("_meta/manifest.json"))?;
         if ![
             FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V9,
         ]
         .contains(&m.format.as_str())
             || m.vault_id != self.id
@@ -2494,7 +2579,7 @@ impl Vault {
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
         if [
-            FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
         ]
         .contains(&manifest.format.as_str())
         {
@@ -2518,8 +2603,10 @@ impl Vault {
         let path = self.path("_meta/manifest.json");
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
-        if [FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8]
-            .contains(&manifest.format.as_str())
+        if [
+            FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
+        ]
+        .contains(&manifest.format.as_str())
         {
             return Ok(());
         }
@@ -2546,7 +2633,9 @@ impl Vault {
         let path = self.path("_meta/manifest.json");
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
-        if [FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&manifest.format.as_str()) {
+        if [FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9]
+            .contains(&manifest.format.as_str())
+        {
             return Ok(());
         }
         if ![FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4].contains(&manifest.format.as_str())
@@ -2572,7 +2661,7 @@ impl Vault {
         let path = self.path("_meta/manifest.json");
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
-        if [FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&manifest.format.as_str()) {
+        if [FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&manifest.format.as_str()) {
             return Ok(());
         }
         if ![FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5].contains(&manifest.format.as_str())
@@ -2598,11 +2687,12 @@ impl Vault {
         let path = self.path("_meta/manifest.json");
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
-        if [FORMAT_V7, FORMAT_V8].contains(&manifest.format.as_str()) {
+        if [FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&manifest.format.as_str()) {
             return Ok(());
         }
         if ![
             FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V9,
         ]
         .contains(&manifest.format.as_str())
             || manifest.vault_id != self.id
@@ -2644,6 +2734,37 @@ impl Vault {
             &stage,
             &json(&Manifest {
                 format: FORMAT_V8.into(),
+                vault_id: self.id.clone(),
+            })?,
+        )?;
+        boundary!("fence_before", &path);
+        replace(&stage, &path)?;
+        boundary!("fence_after", &path);
+        Ok(())
+    }
+    fn fence_manifest_v9(&self) -> Result<()> {
+        let path = self.path("_meta/manifest.json");
+        let bytes = read(&path, MAX_JSON)?;
+        let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
+        if manifest.format == FORMAT_V9 {
+            return Ok(());
+        }
+        if ![
+            FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+        ]
+        .contains(&manifest.format.as_str())
+            || manifest.vault_id != self.id
+        {
+            return Err("Unsupported vault writer fence".into());
+        }
+        // Preserve the exact previous manifest so older writers fail closed on
+        // v9 and the upgrade remains auditable.
+        immutable(&self.path("_meta/manifest-v8.json"), &bytes)?;
+        let stage = path.with_extension(format!("stage-{}", Uuid::new_v4()));
+        create(
+            &stage,
+            &json(&Manifest {
+                format: FORMAT_V9.into(),
                 vault_id: self.id.clone(),
             })?,
         )?;
@@ -2726,6 +2847,7 @@ impl Vault {
         note_valid(&e.memory.note)?;
         if ![
             FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V9,
         ]
         .contains(&e.format.as_str())
             || (e.format == FORMAT
@@ -2738,6 +2860,7 @@ impl Vault {
                 && e.format != FORMAT_V6
                 && e.format != FORMAT_V7
                 && e.format != FORMAT_V8
+                && e.format != FORMAT_V9
                 && (e.memory.reading.is_some()
                     || e.memory.organization.is_some()
                     || ["machine_reading", "reading_correction"].contains(&e.kind.as_str())))
@@ -2756,11 +2879,15 @@ impl Vault {
                 "reading_correction",
                 "organization",
                 "context_suppress",
+                "audio_transcription",
+                "audio_transcript_correction",
             ]
             .contains(&e.kind.as_str())
             || e.origin
                 != if ["machine_reading", "organization"].contains(&e.kind.as_str()) {
                     "machine:anthropic"
+                } else if e.kind == "audio_transcription" {
+                    "machine:whisper-local"
                 } else if e.kind == "context_suppress" {
                     "system:recall"
                 } else if e.kind == "external" {
@@ -2771,16 +2898,18 @@ impl Vault {
             || e.memory.source_sha256.len() != 64
             || e.memory.source_name.len() > 260
             || (e.memory.imported_text.is_none()
+                && e.memory.audio_source.is_none()
                 && !["png", "jpg", "webp", "txt"]
                     .contains(&e.memory.source_name.rsplit('.').next().unwrap_or("")))
             || e.memory.source_name.contains(['/', '\\', '\0'])
             || ((e.memory.source_name.to_ascii_lowercase().ends_with(".txt")
                 || e.memory.source_name.to_ascii_lowercase().ends_with(".md"))
-                && (![FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&e.format.as_str())
+                && (![FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9]
+                    .contains(&e.format.as_str())
                     || (e.memory.source_name != "note.txt" && e.memory.imported_text.is_none())
                     || e.memory.reading.is_some()))
             || (e.memory.imported_text.is_some()
-                && (e.format != FORMAT_V8
+                && (![FORMAT_V8, FORMAT_V9].contains(&e.format.as_str())
                     || e.memory.imported_text.as_ref().is_some_and(|meta| {
                         meta.original_name != e.memory.source_name
                             || meta.original_extension
@@ -2804,15 +2933,17 @@ impl Vault {
                                     || e.memory.note.chars().count() as u64
                                         != meta.semantic_characters))
                     })))
-            || (e.format != FORMAT_V8 && e.memory.imported_text.is_some())
-            || (!(e.memory.source_name.to_ascii_lowercase().ends_with(".txt")
-                || e.memory.source_name.to_ascii_lowercase().ends_with(".md"))
+            || (![FORMAT_V8, FORMAT_V9].contains(&e.format.as_str())
+                && e.memory.imported_text.is_some())
+            || (e.memory.audio_source.is_none()
+                && !(e.memory.source_name.to_ascii_lowercase().ends_with(".txt")
+                    || e.memory.source_name.to_ascii_lowercase().ends_with(".md"))
                 && !["png", "jpg", "webp"]
                     .contains(&e.memory.source_name.rsplit('.').next().unwrap_or("")))
             || e.memory.captured_at.len() != 20
             || e.memory.updated_at.len() != 20
             || markdown_for_event(e).as_deref() != Ok(e.markdown.as_str())
-            || ([FORMAT_V7, FORMAT_V8].contains(&e.format.as_str()))
+            || ([FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()))
                 != e.context_link_projection.is_some()
             || (e.memory.revision == 1) != (e.parent_sha256.is_none())
             || (e.kind == "capture") != (e.memory.revision == 1)
@@ -2837,6 +2968,8 @@ impl Vault {
                 "reading_correction",
                 "organization",
                 "context_suppress",
+                "audio_transcription",
+                "audio_transcript_correction",
             ]
             .contains(&e.kind.as_str())
                 && e.previous_markdown.is_none())
@@ -2858,13 +2991,13 @@ impl Vault {
             expected = hash(&json(&(expected, &e.expected_state))?);
         }
         if [
-            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
         ]
         .contains(&e.format.as_str())
         {
             expected = hash(&json(&(expected, &e.memory.reading))?);
         }
-        if [FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&e.format.as_str()) {
+        if [FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()) {
             expected = hash(&json(&(expected, &e.memory.organization))?);
         } else if e.memory.organization.is_some() || e.kind == "organization" {
             return Err("Organization proposals require the v6 vault fence".into());
@@ -2879,8 +3012,18 @@ impl Vault {
                 &e.memory.imported_text,
             ))?);
         }
+        if e.format == FORMAT_V9 {
+            expected = hash(&json(&(
+                expected,
+                &e.context_link_projection,
+                &e.memory.imported_text,
+                &e.memory.audio_source,
+                &e.memory.audio_transcript,
+            ))?);
+        }
         self.context_projection_valid(e)?;
         self.reading_event_valid(e)?;
+        self.audio_event_valid(e)?;
         self.organization_event_valid(e)?;
         if expected != e.payload_sha256 {
             return Err("Revision payload hash mismatch".into());
@@ -2888,7 +3031,7 @@ impl Vault {
         Ok(())
     }
     fn context_projection_valid(&self, e: &Event) -> Result<()> {
-        if ![FORMAT_V7, FORMAT_V8].contains(&e.format.as_str()) {
+        if ![FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()) {
             if e.context_link_projection.is_some() {
                 return Err("Context projection is only valid in v7 events".into());
             }
@@ -2896,7 +3039,7 @@ impl Vault {
         }
         let links = if let Some(proposal) = e.memory.organization.as_ref() {
             if (e.format == FORMAT_V7 && proposal.binding.schema_version != "2.0")
-                || (e.format == FORMAT_V8
+                || ([FORMAT_V8, FORMAT_V9].contains(&e.format.as_str())
                     && !["1.0", "2.0"].contains(&proposal.binding.schema_version.as_str()))
             {
                 return Err("v7 event requires a v2 organization binding".into());
@@ -2956,13 +3099,17 @@ impl Vault {
     fn organization_transition(&self, prev: &Event, next: &Event) -> Result<()> {
         let before = prev.memory.organization.as_ref();
         let after = next.memory.organization.as_ref();
-        if next.kind == "context_suppress" && prev.format != FORMAT_V7 {
+        if next.kind == "context_suppress"
+            && ![FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&prev.format.as_str())
+        {
             return Err("Context suppression requires a v7 parent event".into());
         }
-        if [FORMAT_V7, FORMAT_V8].contains(&prev.format.as_str()) {
-            if (prev.format == FORMAT_V8 && next.format != FORMAT_V8)
+        if [FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&prev.format.as_str()) {
+            if (prev.format == FORMAT_V9 && next.format != FORMAT_V9)
+                || (prev.format == FORMAT_V8
+                    && ![FORMAT_V8, FORMAT_V9].contains(&next.format.as_str()))
                 || (prev.format == FORMAT_V7
-                    && ![FORMAT_V7, FORMAT_V8].contains(&next.format.as_str()))
+                    && ![FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&next.format.as_str()))
             {
                 return Err("v7/v8 vault history cannot be downgraded".into());
             }
@@ -3055,6 +3202,8 @@ impl Vault {
     fn verify_source(&self, m: &VaultMemory) -> Result<VaultSource> {
         let extension = if m.imported_text.is_some() {
             "txt"
+        } else if m.audio_source.is_some() {
+            "wav"
         } else {
             m.source_name
                 .rsplit('.')
@@ -3062,13 +3211,15 @@ impl Vault {
                 .ok_or("Missing source extension")?
         };
         let expected = self.path(&format!("Sources/{}.{extension}", m.id));
-        for other in ["png", "jpg", "webp", "txt", "md"] {
+        for other in ["png", "jpg", "webp", "txt", "md", "wav"] {
             let p = self.path(&format!("Sources/{}.{other}", m.id));
             if p != expected && p.exists() {
                 return Err("Duplicate source identity".into());
             }
         }
-        let (bytes, mime): (Vec<u8>, String) = if extension == "txt" {
+        let (bytes, mime): (Vec<u8>, String) = if extension == "wav" {
+            self.verify_audio_source(m, &expected)?
+        } else if extension == "txt" {
             let bytes = read(&expected, MAX_NOTE as u64)?;
             let text = std::str::from_utf8(&bytes).map_err(fail)?;
             note_valid(text)?;
@@ -3152,6 +3303,7 @@ impl Vault {
             if let Some(prev) = out.last() {
                 self.reading_transition(prev, &e)?;
                 self.organization_transition(prev, &e)?;
+                self.audio_transition(prev, &e)?;
                 if e.parent_sha256 != Some(self.parent_hash(memory_id, index as u64)?)
                     || e.memory.source_sha256 != prev.memory.source_sha256
                     || e.memory.source_name != prev.memory.source_name
@@ -3162,20 +3314,26 @@ impl Vault {
                     || (prev.format == FORMAT_V3
                         && ![
                             FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+                            FORMAT_V9,
                         ]
                         .contains(&e.format.as_str()))
                     || (prev.format == FORMAT_V4
-                        && ![FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8]
-                            .contains(&e.format.as_str()))
+                        && ![
+                            FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
+                        ]
+                        .contains(&e.format.as_str()))
                     || (prev.format == FORMAT_V5
-                        && ![FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8]
+                        && ![FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9]
                             .contains(&e.format.as_str()))
                     || (prev.format == FORMAT_V6
-                        && ![FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&e.format.as_str()))
+                        && ![FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9]
+                            .contains(&e.format.as_str()))
                     || (prev.format == FORMAT_V7
-                        && ![FORMAT_V7, FORMAT_V8].contains(&e.format.as_str()))
-                    || (prev.format == FORMAT_V8 && e.format != FORMAT_V8)
-                    || (prev.format == FORMAT_V8 && e.format != FORMAT_V8)
+                        && ![FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()))
+                    || (prev.format == FORMAT_V8
+                        && ![FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()))
+                    || (prev.format == FORMAT_V9 && e.format != FORMAT_V9)
+                    || e.memory.audio_source != prev.memory.audio_source
                     || e.memory.imported_text != prev.memory.imported_text
                     || (["restore", "remove"].contains(&e.kind.as_str())
                         && e.memory.note != prev.memory.note)
@@ -3336,6 +3494,8 @@ impl Vault {
             .ok_or("Missing source extension")?;
         let physical_extension = if e.memory.imported_text.is_some() {
             "txt"
+        } else if e.memory.audio_source.is_some() {
+            "wav"
         } else {
             extension
         };
@@ -3371,7 +3531,7 @@ impl Vault {
         let publish_note = (!["external", "remove"].contains(&e.kind.as_str())
             && read(&note, MAX_JSON).ok().as_deref() != Some(e.markdown.as_bytes()))
             || (e.kind == "external"
-                && [FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&e.format.as_str())
+                && [FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str())
                 && read(&note, MAX_JSON).ok().as_deref() != Some(e.markdown.as_bytes()));
         additions.insert(
             self.path("Memories"),
@@ -3421,7 +3581,9 @@ impl Vault {
             return Err("Competing committed revision".into());
         }
         self.records_inner(&e.memory.id, false)?;
-        if e.format == FORMAT_V8 {
+        if e.format == FORMAT_V9 {
+            self.fence_manifest_v9()?;
+        } else if e.format == FORMAT_V8 {
             self.fence_manifest_v8()?;
         } else if e.format == FORMAT_V7 {
             self.fence_manifest_v7()?;
@@ -3460,6 +3622,7 @@ impl Vault {
             let records = self.records(&e.memory.id)?;
             let last = records.last().ok_or("Missing parent")?;
             self.reading_transition(last, e)?;
+            self.audio_transition(last, e)?;
             if last.kind == "remove"
                 || last.memory.revision != e.expected_revision
                 || e.parent_sha256 != Some(self.parent_hash(&e.memory.id, e.expected_revision)?)
@@ -3479,7 +3642,9 @@ impl Vault {
         {
             return Err("Capture history already exists".into());
         }
-        if e.format == FORMAT_V8 {
+        if e.format == FORMAT_V9 {
+            self.fence_manifest_v9()?;
+        } else if e.format == FORMAT_V8 {
             self.fence_manifest_v8()?;
         } else if e.format == FORMAT_V7 {
             self.fence_manifest_v7()?;
@@ -3541,7 +3706,7 @@ impl Vault {
         if current.as_deref() != Some(&e.markdown) {
             if e.kind == "external" {
                 let expected_draft =
-                    if [FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&e.format.as_str()) {
+                    if [FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()) {
                         e.previous_markdown.as_deref().and_then(|old| {
                             with_human_note(old, &e.memory.note, e.memory.imported_text.is_some())
                         })
@@ -3621,14 +3786,26 @@ impl Vault {
     fn commit(&self, e: &Event) -> Result<VaultMemory> {
         let mut normalized = e.clone();
         let manifest: Manifest = decode(&self.path("_meta/manifest.json"))?;
-        if e.format == FORMAT_V8 || manifest.format == FORMAT_V8 {
-            normalized.format = FORMAT_V8.into();
+        if [FORMAT_V8, FORMAT_V9].contains(&e.format.as_str())
+            || [FORMAT_V8, FORMAT_V9].contains(&manifest.format.as_str())
+        {
+            // A v9 manifest or event keeps every later mutation in the v9 envelope;
+            // older-format events are never written under a v9 writer fence.
+            normalized.format = if e.format == FORMAT_V9 || manifest.format == FORMAT_V9 {
+                FORMAT_V9
+            } else {
+                FORMAT_V8
+            }
+            .into();
             if normalized.context_link_projection.is_none() {
                 normalized.context_link_projection = if normalized.expected_revision == 0 {
                     Some(Vec::new())
                 } else {
                     Some(match self.records(&normalized.memory.id)?.last() {
-                        Some(event) if [FORMAT_V7, FORMAT_V8].contains(&event.format.as_str()) => {
+                        Some(event)
+                            if [FORMAT_V7, FORMAT_V8, FORMAT_V9]
+                                .contains(&event.format.as_str()) =>
+                        {
                             event
                                 .context_link_projection
                                 .clone()
@@ -3645,6 +3822,7 @@ impl Vault {
                 "reading_correction",
                 "remove",
                 "restore",
+                "audio_transcript_correction",
             ]
             .contains(&normalized.kind.as_str())
             {
@@ -3708,7 +3886,7 @@ impl Vault {
             normalized.format = FORMAT_V3.into();
         }
         if [
-            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
         ]
         .contains(&normalized.format.as_str())
         {
@@ -3724,7 +3902,7 @@ impl Vault {
                 canonical = hash(&json(&(canonical, &normalized.expected_state))?);
             }
             normalized.payload_sha256 = hash(&json(&(canonical, &normalized.memory.reading))?);
-            if [FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&normalized.format.as_str()) {
+            if [FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&normalized.format.as_str()) {
                 normalized.payload_sha256 = hash(&json(&(
                     normalized.payload_sha256,
                     &normalized.memory.organization,
@@ -3741,11 +3919,21 @@ impl Vault {
                     &normalized.context_link_projection,
                     &normalized.memory.imported_text,
                 ))?);
+            } else if normalized.format == FORMAT_V9 {
+                normalized.payload_sha256 = hash(&json(&(
+                    normalized.payload_sha256,
+                    &normalized.context_link_projection,
+                    &normalized.memory.imported_text,
+                    &normalized.memory.audio_source,
+                    &normalized.memory.audio_transcript,
+                ))?);
             }
         }
         let e = &normalized;
         self.preflight_capacity(e)?;
-        if e.format == FORMAT_V8 {
+        if e.format == FORMAT_V9 {
+            self.fence_manifest_v9()?;
+        } else if e.format == FORMAT_V8 {
             self.fence_manifest_v8()?;
         } else if e.format == FORMAT_V7 {
             self.fence_manifest_v7()?;
@@ -3950,6 +4138,8 @@ impl Vault {
             related_context: Vec::new(),
             context_repair_pending: false,
             imported_text: Some(meta),
+            audio_source: None,
+            audio_transcript: None,
         };
         let base = payload(
             "capture",
@@ -4026,6 +4216,8 @@ impl Vault {
             related_context: Vec::new(),
             context_repair_pending: false,
             imported_text: Some(imported_text),
+            audio_source: None,
+            audio_transcript: None,
         };
         // A source already published after interruption is completed with the same ID and no dispatch.
         let base = payload(
@@ -4208,6 +4400,8 @@ impl Vault {
             related_context: Vec::new(),
             context_repair_pending: false,
             imported_text: None,
+            audio_source: None,
+            audio_transcript: None,
         };
         let e = Event {
             format: FORMAT_V2.into(),
@@ -4281,6 +4475,8 @@ impl Vault {
             related_context: Vec::new(),
             context_repair_pending: false,
             imported_text: None,
+            audio_source: None,
+            audio_transcript: None,
         };
         let e = Event {
             format: FORMAT_V5.into(),
@@ -4339,8 +4535,12 @@ impl Vault {
             return Ok(m);
         }
         let render_format = &last.format;
-        let prefix = if [FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&render_format.as_str()) {
-            if *render_format == FORMAT_V8 && last.memory.imported_text.is_some() {
+        let prefix = if [FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9]
+            .contains(&render_format.as_str())
+        {
+            if [FORMAT_V8, FORMAT_V9].contains(&render_format.as_str())
+                && last.memory.imported_text.is_some()
+            {
                 let marker =
                     "<!-- Recall imported annotation boundary -->\n\n## Human annotation\n\n";
                 let Some(mark) = last.markdown.find(marker) else {
@@ -4399,7 +4599,7 @@ impl Vault {
         }
         let operation_id = Uuid::new_v4().to_string();
         let event_format = if [
-            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
         ]
         .contains(&render_format.as_str())
         {
@@ -4416,12 +4616,12 @@ impl Vault {
             &m.source_name,
         )?;
         if [
-            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
         ]
         .contains(&event_format)
         {
             external_payload = hash(&json(&(external_payload, &m.reading))?);
-            if [FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&event_format) {
+            if [FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&event_format) {
                 external_payload = hash(&json(&(external_payload, &m.organization))?);
             }
         }
@@ -4508,6 +4708,8 @@ impl Vault {
                     related_context: Vec::new(),
                     context_repair_pending: false,
                     imported_text: None,
+                    audio_source: None,
+                    audio_transcript: None,
                 },
             };
             if m.state == "deleted" && !include_deleted {
@@ -4531,6 +4733,12 @@ impl Vault {
             } else {
                 String::new()
             };
+            let spoken = m
+                .audio_transcript
+                .as_ref()
+                .and_then(|_| audio_current_text(&m))
+                .map(|(text, _, _)| text.to_lowercase())
+                .unwrap_or_default();
             let organized = m
                 .organization
                 .as_ref()
@@ -4546,6 +4754,7 @@ impl Vault {
                             || reading.contains(term)
                             || structured.contains(term)
                             || organized.contains(term)
+                            || spoken.contains(term)
                             || filename.contains(term)
                             || note_filename.contains(term)
                     }))
@@ -4574,6 +4783,8 @@ impl Vault {
                     related_context: Vec::new(),
                     context_repair_pending: false,
                     imported_text: None,
+                    audio_source: None,
+                    audio_transcript: None,
                 });
             }
         }
@@ -4606,7 +4817,10 @@ impl Vault {
             return Ok((Vec::new(), false));
         }
         let records = self.records(&source.id)?;
-        let Some(event) = records.last().filter(|event| event.format == FORMAT_V7) else {
+        let Some(event) = records
+            .last()
+            .filter(|event| [FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&event.format.as_str()))
+        else {
             return Ok((Vec::new(), false));
         };
         let Some(links) = proposal.result.related_context.as_ref() else {
@@ -4682,7 +4896,9 @@ impl Vault {
             let Some(last) = records.last() else {
                 continue;
             };
-            if last.format != FORMAT_V7 || last.kind == "remove" {
+            if ![FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&last.format.as_str())
+                || last.kind == "remove"
+            {
                 continue;
             }
             let Some(previous) = last.context_link_projection.as_ref() else {
@@ -5066,6 +5282,7 @@ impl Vault {
                 note: event.memory.note.clone(),
                 reading: event.memory.reading.clone(),
                 organization: event.memory.organization.clone(),
+                audio_transcript: event.memory.audio_transcript.clone(),
             },
             original,
         })
@@ -5092,79 +5309,94 @@ impl Vault {
                 continue;
             }
             let mut alternate_reading = None;
-            let (text, evidence_kind, epistemic_state) =
-                if memory.source_name == "note.txt" || memory.imported_text.is_some() {
-                    (
-                        memory.note.clone(),
-                        if memory.revision > 1 {
-                            "human_note"
-                        } else {
-                            "text_source"
-                        },
-                        "reported",
-                    )
-                } else if !memory.note.trim().is_empty() {
-                    let annotation = memory.note.clone();
-                    if let Some(reading) = memory
-                        .reading
+            let (text, evidence_kind, epistemic_state) = if memory.audio_source.is_some() {
+                let spoken = audio_current_text(&memory).map(|(t, k, s)| (t.to_owned(), k, s));
+                if !memory.note.trim().is_empty() {
+                    if let Some((spoken_text, kind, state)) = spoken {
+                        alternate_reading = Some(AskEvidenceChoice {
+                            text: spoken_text,
+                            evidence_kind: kind.into(),
+                            epistemic_state: state.into(),
+                        });
+                    }
+                    (memory.note.clone(), "human_note", "reported")
+                } else if let Some((spoken_text, kind, state)) = spoken {
+                    (spoken_text, kind, state)
+                } else {
+                    continue;
+                }
+            } else if memory.source_name == "note.txt" || memory.imported_text.is_some() {
+                (
+                    memory.note.clone(),
+                    if memory.revision > 1 {
+                        "human_note"
+                    } else {
+                        "text_source"
+                    },
+                    "reported",
+                )
+            } else if !memory.note.trim().is_empty() {
+                let annotation = memory.note.clone();
+                if let Some(reading) = memory
+                    .reading
+                    .as_ref()
+                    .filter(|r| r.machine.validate().is_ok())
+                {
+                    let effective = reading.effective_text();
+                    if !effective.trim().is_empty() {
+                        alternate_reading = Some(AskEvidenceChoice {
+                            text: effective.to_owned(),
+                            evidence_kind: if reading.human_correction.is_some() {
+                                "human_reading_correction"
+                            } else {
+                                "machine_reading"
+                            }
+                            .into(),
+                            epistemic_state: if reading.human_correction.is_some() {
+                                "reported"
+                            } else {
+                                "unreviewed"
+                            }
+                            .into(),
+                        });
+                    }
+                }
+                if alternate_reading.is_none() {
+                    if let Some(organization) = memory
+                        .organization
                         .as_ref()
-                        .filter(|r| r.machine.validate().is_ok())
+                        .filter(|o| !o.suppressed && o.review_state == "unreviewed")
                     {
-                        let effective = reading.effective_text();
-                        if !effective.trim().is_empty() {
+                        let transcript = organization.result.extraction["pages"][0]
+                            ["transcription"]
+                            .as_str()
+                            .unwrap_or("");
+                        if !transcript.trim().is_empty() {
                             alternate_reading = Some(AskEvidenceChoice {
-                                text: effective.to_owned(),
-                                evidence_kind: if reading.human_correction.is_some() {
-                                    "human_reading_correction"
-                                } else {
-                                    "machine_reading"
-                                }
-                                .into(),
-                                epistemic_state: if reading.human_correction.is_some() {
-                                    "reported"
-                                } else {
-                                    "unreviewed"
-                                }
-                                .into(),
+                                text: transcript.into(),
+                                evidence_kind: "organization_proposal".into(),
+                                epistemic_state: "unreviewed".into(),
                             });
                         }
                     }
-                    if alternate_reading.is_none() {
-                        if let Some(organization) = memory
-                            .organization
-                            .as_ref()
-                            .filter(|o| !o.suppressed && o.review_state == "unreviewed")
-                        {
-                            let transcript = organization.result.extraction["pages"][0]
-                                ["transcription"]
-                                .as_str()
-                                .unwrap_or("");
-                            if !transcript.trim().is_empty() {
-                                alternate_reading = Some(AskEvidenceChoice {
-                                    text: transcript.into(),
-                                    evidence_kind: "organization_proposal".into(),
-                                    epistemic_state: "unreviewed".into(),
-                                });
-                            }
-                        }
-                    }
-                    (annotation, "human_note", "reported")
-                } else if let Some(reading) = memory.reading.as_ref() {
-                    if reading.machine.validate().is_err() {
-                        continue;
-                    }
-                    let effective = reading.effective_text();
-                    if effective.trim().is_empty() {
-                        continue;
-                    }
-                    if reading.human_correction.is_some() {
-                        (effective.to_owned(), "human_reading_correction", "reported")
-                    } else {
-                        (effective.to_owned(), "machine_reading", "unreviewed")
-                    }
-                } else {
+                }
+                (annotation, "human_note", "reported")
+            } else if let Some(reading) = memory.reading.as_ref() {
+                if reading.machine.validate().is_err() {
                     continue;
-                };
+                }
+                let effective = reading.effective_text();
+                if effective.trim().is_empty() {
+                    continue;
+                }
+                if reading.human_correction.is_some() {
+                    (effective.to_owned(), "human_reading_correction", "reported")
+                } else {
+                    (effective.to_owned(), "machine_reading", "unreviewed")
+                }
+            } else {
+                continue;
+            };
             if text.trim().is_empty() {
                 continue;
             }
@@ -5184,6 +5416,10 @@ impl Vault {
                         );
                     }
                 }
+            }
+            if let Some((spoken_text, _, _)) = audio_current_text(&memory) {
+                ranking_text.push(' ');
+                ranking_text.push_str(spoken_text);
             }
             if let Some(organization) = memory
                 .organization
@@ -5220,7 +5456,9 @@ impl Vault {
         let mut eligible: Vec<AskCandidate> = self
             .ask_candidates_locked(pending)?
             .into_iter()
-            .filter(|candidate| candidate.memory.id != source.id)
+            .filter(|candidate| {
+                candidate.memory.id != source.id && candidate.memory.audio_source.is_none()
+            })
             .collect();
         let eligible_count = eligible.len() as u64;
         let terms: BTreeSet<String> = source
@@ -5563,6 +5801,7 @@ impl Vault {
                 note: e.memory.note,
                 reading: e.memory.reading,
                 organization: e.memory.organization,
+                audio_transcript: e.memory.audio_transcript,
                 recorded_at: e.memory.updated_at,
                 origin: e.origin,
                 kind: e.kind,
@@ -5676,7 +5915,17 @@ impl LocalVaultState {
         })
     }
     pub fn select_path(&self, root: &Path) -> Result<VaultStatus> {
+        self.select_path_if(root, || Ok(()))
+    }
+    /// Like `select_path`, but `precheck` runs while the selection mutex is held, so a
+    /// condition verified there cannot change before the swap.
+    pub fn select_path_if(
+        &self,
+        root: &Path,
+        precheck: impl FnOnce() -> Result<()>,
+    ) -> Result<VaultStatus> {
         let mut selected = self.selected.lock().map_err(fail)?;
+        precheck()?;
         let v = Vault::open(root)?;
         {
             let _lock = v.lock()?;
@@ -5745,6 +5994,15 @@ impl LocalVaultState {
 #[path = "reading_storage.rs"]
 mod reading_storage;
 pub use reading_storage::ReadingOperation;
+#[path = "local_vault_audio.rs"]
+mod audio_storage;
+use audio_storage::{audio_current_text, audio_markdown};
+#[cfg(test)]
+pub use audio_storage::{classify_machine_output, AudioMachineTranscript};
+pub use audio_storage::{
+    read_wav_import, utc_now, AsrIdentity, AsrPhase, AsrResult, AudioSegment, AudioSource,
+    AudioTranscript, RMS_GATE,
+};
 
 #[cfg(test)]
 #[path = "local_vault_tests.rs"]

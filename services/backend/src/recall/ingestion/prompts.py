@@ -47,6 +47,13 @@ support it. Every sentence must cite at least one provided id. Use no outside kn
 happened. Mention dates only as written in the evidence.
 - `limitations`: what the evidence does not show (for example, no later confirmation was found).
 - If evidence conflicts, say so and cite both sides.
+- Items of kind `machine_audio_transcript` (epistemic_state `unreviewed`) are automatic speech \
+recognition output that no person has checked. It can mishear words, names, numbers and units. Treat \
+it as untrusted machine transcription: say that the transcript reads or suggests something, never state \
+its content as verified fact or as the person's exact words, and never turn an uncertain or garbled \
+passage into a confident identity or number. Items of kind `human_audio_correction` are the person's own \
+corrected transcript wording and take precedence over a machine transcript of the same recording; if \
+both are present and differ, rely on the correction and cite it.
 - History items may carry recorded_at, valid_from, valid_to, supersedes_claim_id and history_status. \
 These are canonical metadata, not dates inferred from the handwriting. Clearly distinguish an earlier \
 record from a current claim; do not present retracted or superseded history as current truth. When asked \

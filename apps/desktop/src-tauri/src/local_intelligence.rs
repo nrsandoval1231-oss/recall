@@ -282,7 +282,12 @@ impl AskRequest {
                 || !timezone_timestamp(&e.captured_at)
                 || !matches!(
                     e.evidence_kind.as_str(),
-                    "text_source" | "human_note" | "human_reading_correction" | "machine_reading"
+                    "text_source"
+                        | "human_note"
+                        | "human_reading_correction"
+                        | "machine_reading"
+                        | "machine_audio_transcript"
+                        | "human_audio_correction"
                 )
                 || !matches!(
                     e.epistemic_state.as_str(),
@@ -2153,6 +2158,8 @@ mod tests {
                 related_context: Vec::new(),
                 context_repair_pending: false,
                 imported_text: None,
+                audio_source: None,
+                audio_transcript: None,
             },
             text: text.into(),
             evidence_kind: "text_source".into(),
@@ -2233,6 +2240,81 @@ mod tests {
         assert_eq!(coverage.selected_count, 2);
         assert!(!coverage.limited);
         assert_eq!(evidence.len(), 2);
+    }
+    #[test]
+    fn audio_evidence_enters_current_ask_only_through_verified_eligible_candidates() {
+        use crate::audio_wav::fixtures::synthetic_wav;
+        let dir = std::env::temp_dir().join(format!(
+            "recall-synthetic-ask-audio-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let vault = Vault::open(&dir).unwrap();
+        let memory = vault
+            .audio_commit_capture(
+                &uuid::Uuid::new_v4().to_string(),
+                &synthetic_wav(16_000, 1, 16_000),
+                "recorded",
+                None,
+            )
+            .unwrap();
+        // Saved but untranscribed audio is never evidence.
+        assert!(vault.ask_candidates().unwrap().is_empty());
+        let machine = crate::local_vault::AudioMachineTranscript {
+            operation_id: uuid::Uuid::new_v4().to_string(),
+            source_sha256: memory.source_sha256.clone(),
+            source_revision: 1,
+            runtime_source_commit: "d".repeat(40),
+            runtime_binary_sha256: "a".repeat(64),
+            model_sha256: "b".repeat(64),
+            derivative_sha256: "c".repeat(64),
+            transform_version: crate::audio_wav::TRANSFORM_VERSION.into(),
+            output_sha256: "e".repeat(64),
+            text: "Remember to call the dentist tomorrow.".into(),
+            segments: None,
+            input_rms_pcm16: 2800.0,
+            quality_flags: Vec::new(),
+            eligibility: "eligible".into(),
+            quality_state: "machine_unreviewed".into(),
+        };
+        vault
+            .audio_apply_machine_transcript(&memory.id, machine)
+            .unwrap();
+        let candidates = vault.ask_candidates().unwrap();
+        let (selected, coverage, evidence) = select(&candidates, "When do I call the dentist?");
+        assert_eq!((coverage.eligible_count, coverage.selected_count), (1, 1));
+        assert_eq!(evidence[0].evidence_kind, "machine_audio_transcript");
+        assert_eq!(evidence[0].epistemic_state, "unreviewed");
+        assert_eq!(evidence[0].source_sha256, memory.source_sha256);
+        let ask = request(
+            "00000000-0000-4000-8000-000000000001",
+            &vault.id,
+            "When do I call the dentist?",
+            coverage,
+            evidence,
+        )
+        .expect("native Ask validation accepts audio evidence kinds");
+        assert!(evidence_matches_candidates(&candidates, &ask));
+        assert_eq!(
+            selected[0].memory.audio_source.as_ref().unwrap().media_type,
+            "audio/wav"
+        );
+        // A later human correction changes the evidence, invalidating the old selection.
+        let corrected = vault
+            .audio_correct(
+                &memory.id,
+                2,
+                &uuid::Uuid::new_v4().to_string(),
+                "Call the dentist on Friday.",
+            )
+            .unwrap();
+        assert_eq!(corrected.revision, 3);
+        let current = vault.ask_candidates().unwrap();
+        assert!(!evidence_matches_candidates(&current, &ask));
+        let (_, _, now) = select(&current, "dentist");
+        assert_eq!(now[0].evidence_kind, "human_audio_correction");
+        assert_eq!(now[0].epistemic_state, "reported");
+        let _ = fs::remove_dir_all(dir);
     }
     #[test]
     fn photo_choice_prefers_query_match_and_effective_reading_on_ties() {

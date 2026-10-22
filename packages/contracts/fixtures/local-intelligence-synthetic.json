@@ -1,5 +1,5 @@
 {
-  "description": "Synthetic v1 local-vault Ask wire and canonical digest fixtures. No private data.",
+  "description": "Synthetic v1 local-vault Ask wire and canonical digest fixtures (including synthetic audio transcript evidence). No private data.",
   "requests": [
     {
       "name": "transformer-question",
@@ -58,6 +58,68 @@
       },
       "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-10-09T12:00:00Z\",\"citation_id\":\"c1\",\"epistemic_state\":\"uncertain\",\"evidence_kind\":\"human_note\",\"excerpt\":\"Met Ana in Zürich — name uncertain.\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":4,\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000001\",\"question\":\"Who did I meet in Zürich? 📝\",\"schema_version\":\"1.0\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
       "sha256": "83da2e4f0dfcfb7ee7ade51d27a25c79356cf13c0dc30673dd5d45a570683b8c"
+    },
+    {
+      "name": "audio-machine-transcript-question",
+      "request": {
+        "schema_version": "1.0",
+        "operation_id": "00000000-0000-4000-8000-000000000021",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "What did the synthetic voice memo say about the pump?",
+        "coverage": {
+          "eligible_count": 1,
+          "selected_count": 1,
+          "limited": false,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 1,
+            "source_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "captured_at": "2026-10-09T12:00:00Z",
+            "evidence_kind": "machine_audio_transcript",
+            "epistemic_state": "unreviewed",
+            "excerpt": "Synthetic recording: the pump reads maybe forty two psi, name sounds like Dana."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-10-09T12:00:00Z\",\"citation_id\":\"c1\",\"epistemic_state\":\"unreviewed\",\"evidence_kind\":\"machine_audio_transcript\",\"excerpt\":\"Synthetic recording: the pump reads maybe forty two psi, name sounds like Dana.\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":1,\"source_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000021\",\"question\":\"What did the synthetic voice memo say about the pump?\",\"schema_version\":\"1.0\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "d1256149fcedeed5425136c5caad5bde1b4fe02af607c724067936d8e806e40f"
+    },
+    {
+      "name": "audio-human-correction-question",
+      "request": {
+        "schema_version": "1.0",
+        "operation_id": "00000000-0000-4000-8000-000000000022",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "What did the synthetic voice memo say about the pump?",
+        "coverage": {
+          "eligible_count": 1,
+          "selected_count": 1,
+          "limited": false,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 2,
+            "source_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "captured_at": "2026-10-09T12:00:00Z",
+            "evidence_kind": "human_audio_correction",
+            "epistemic_state": "reported",
+            "excerpt": "Synthetic recording: the pump reads 42 psi; the contact is Dana (surname unknown)."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-10-09T12:00:00Z\",\"citation_id\":\"c1\",\"epistemic_state\":\"reported\",\"evidence_kind\":\"human_audio_correction\",\"excerpt\":\"Synthetic recording: the pump reads 42 psi; the contact is Dana (surname unknown).\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":2,\"source_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000022\",\"question\":\"What did the synthetic voice memo say about the pump?\",\"schema_version\":\"1.0\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "63174673df7014136f48fc1cc5c911f6c42149acc78684067140e3c06e41cff7"
     }
-  ]
+  ],
+  "audio_label_pairing": {
+    "machine_audio_transcript": "unreviewed",
+    "human_audio_correction": "reported"
+  }
 }

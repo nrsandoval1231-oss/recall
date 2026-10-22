@@ -12,7 +12,7 @@
   "app": {
     "windows": [{ "title": "Recall", "width": 1100, "height": 780, "minWidth": 720, "minHeight": 560 }],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:8000 http://127.0.0.1:8000"
+      "csp": "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:8000 http://127.0.0.1:8000"
     }
   },
   "bundle": {
@@ -21,13 +21,13 @@
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "externalBin": ["binaries/whisper-cli"],
     "resources": {
-      "voice-assets/ggml-base.bin": "voice/ggml-base.bin",
-      "voice-assets/whisper.dll": "voice/whisper.dll",
-      "voice-assets/ggml.dll": "voice/ggml.dll",
-      "voice-assets/ggml-cpu.dll": "voice/ggml-cpu.dll",
-      "voice-assets/ggml-base.dll": "voice/ggml-base.dll",
-      "voice-assets/WHISPER-LICENSE.txt": "voice/WHISPER-LICENSE.txt",
-      "voice-assets/MODEL-CARD.txt": "voice/MODEL-CARD.txt"
+      "voice-assets/ggml-base.bin": "resources/models/ggml-base.bin",
+      "voice-assets/whisper.dll": "",
+      "voice-assets/ggml.dll": "",
+      "voice-assets/ggml-cpu.dll": "",
+      "voice-assets/ggml-base.dll": "",
+      "voice-assets/WHISPER-LICENSE.txt": "resources/licenses/WHISPER-LICENSE.txt",
+      "voice-assets/MODEL-CARD.txt": "resources/licenses/MODEL-CARD.txt"
     },
     "windows": { "nsis": { "installMode": "currentUser" } }
   }

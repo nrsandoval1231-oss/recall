@@ -2,6 +2,8 @@
 
 ## Active continuation — VOICE-01 native implementation
 
+Update 2026-10-22: a native/UI/Ask-wire VOICE-01 candidate exists (Record/Stop, local transcription, correction, cited playback) with synthetic and fixture evidence only; it is not accepted. Audio automatic organization, installed Windows/microphone proof and independent review remain open. See [CURRENT_STATE](../.agent/CURRENT_STATE.md).
+
 Ask and automatic future text/photo organization have bounded independent acceptance. Current evidence-backed links within the vault also have bounded acceptance. Anchored retained historical Ask also has bounded independent acceptance. UTF-8 .txt/.md import has bounded independent acceptance at 2aa36435. The active frontier is native Record/Stop implementation after pinned offline speech and packaging feasibility passed on the tested host. [CONTEXT-01](../.agent/CONTEXT-01.md) adds bounded excerpts, a fresh purpose-policy opt-in and a v7 journaled link projection. It preserves source-first capture and requires no per-note approval. The accepted [HISTORY-01 packet](../.agent/HISTORY-01.md) handles anchored historical questions and correction counterpoints. [TEXT-FILE-01](../.agent/TEXT-FILE-01.md) is accepted; proceed with [VOICE-01](../.agent/VOICE-01.md), then remaining input/device work. Live provider, installed-device and held-out quality gates remain separate.
 
 ## Accepted bounded Ask — INTELLIGENCE-01

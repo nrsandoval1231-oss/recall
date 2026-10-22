@@ -126,6 +126,24 @@ it("organization commands use native capability, remembered consent epoch, selec
   ]);
 });
 
+it("audio commands carry only the selected session, UUIDs, action and text, and preserve the frozen DTO", async () => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+  const vault = new NativeLocalVault();
+  const dto = { schema_version: "1.0", operation_id: "op", vault_id: "stable", state: "saved_local", memory: null, error_code: null, limit_reason: "duration_limit", source_sample_rate_hz: 48000, source_channels: 2 };
+  vi.mocked(invoke).mockResolvedValueOnce(dto);
+  expect(await vault.audioStart("session", "op")).toEqual(dto);
+  await vault.audioStop("session", "op"); await vault.audioStatus("session", "op"); await vault.audioRecover("session", "op", "discard");
+  await vault.audioCorrect("session", "memory", 2, "fix-op", "typed words"); await vault.importWav("session", "wav-op");
+  expect(vi.mocked(invoke).mock.calls).toEqual([
+    ["vault_audio_start", { expectedVaultId: "session", operationId: "op" }],
+    ["vault_audio_stop", { expectedVaultId: "session", operationId: "op" }],
+    ["vault_audio_status", { expectedVaultId: "session", operationId: "op" }],
+    ["vault_audio_recover", { expectedVaultId: "session", operationId: "op", action: "discard" }],
+    ["vault_audio_correct", { expectedVaultId: "session", memoryId: "memory", expectedRevision: 2, operationId: "fix-op", text: "typed words" }],
+    ["vault_import_wav", { expectedVaultId: "session", operationId: "wav-op" }],
+  ]);
+});
+
 it("an empty human reading correction takes precedence over machine text", async () => {
   const { effectiveReading } = await import("./local-vault");
   const reading = { human_correction: "", machine: { result: { extraction: { pages: [{ transcription: "machine" }] } } } };

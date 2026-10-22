@@ -1,3 +1,6 @@
+mod audio_asr;
+mod audio_wav;
+mod local_audio;
 mod local_intelligence;
 mod local_intelligence_transport;
 mod local_organization;
@@ -201,16 +204,21 @@ fn vault_status(
 #[tauri::command]
 fn vault_select(
     state: tauri::State<'_, local_vault::LocalVaultState>,
+    audio: tauri::State<'_, local_audio::AudioState>,
 ) -> Result<Option<local_vault::VaultStatus>, String> {
+    // A recording is bound to its vault; never allow a switch to redirect it.
+    audio.ensure_idle()?;
     let Some(root) = rfd::FileDialog::new()
         .set_title("Choose your Obsidian vault folder")
         .pick_folder()
     else {
         return Ok(None);
     };
-    let selected = state.select_path(&root)?;
+    // Re-checked under the selection mutex: the picker may have taken a while.
+    let selected = state.select_path_if(&root, || audio.ensure_idle())?;
     if let Some(vault_id) = selected.vault_id.as_deref() {
         if let Ok(guard) = state.session(vault_id) {
+            audio.resume_pending(&guard);
             local_organization::schedule_pending(guard);
         }
     }
@@ -393,11 +401,26 @@ pub fn run() {
                 data_dir.join("selected-vault.json"),
             ));
             app.manage(NativeState(store));
+            // The recognizer runs only from the installed app's own pinned assets.
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                .unwrap_or_default();
+            app.manage(local_audio::AudioState::new(
+                data_dir.join("audio-stage"),
+                std::sync::Arc::new(local_audio::CpalBackend),
+                std::sync::Arc::new(audio_asr::SidecarEngine::production(
+                    exe_dir,
+                    app.path().resource_dir().ok(),
+                )),
+            ));
             app.manage(ManagedExportState::default());
             let vault_state = app.state::<local_vault::LocalVaultState>();
             if let Ok(status) = vault_state.status() {
                 if let Some(token) = status.vault_id {
                     if let Ok(guard) = vault_state.session(&token) {
+                        app.state::<local_audio::AudioState>()
+                            .resume_pending(&guard);
                         local_organization::schedule_pending(guard);
                     }
                 }
@@ -443,6 +466,12 @@ pub fn run() {
             vault_remove,
             vault_rebuild,
             vault_source,
+            local_audio::vault_audio_start,
+            local_audio::vault_audio_stop,
+            local_audio::vault_audio_status,
+            local_audio::vault_audio_recover,
+            local_audio::vault_audio_correct,
+            local_audio::vault_import_wav,
             vault_related_memory,
             vault_history,
             secrets::secret_get,

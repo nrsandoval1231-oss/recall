@@ -43,7 +43,20 @@ _SHA = re.compile(r"^[0-9a-f]{64}$")
 _DATE = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$"
 )
-_EVIDENCE_KINDS = {"text_source", "human_note", "human_reading_correction", "machine_reading"}
+# Audio lanes are the only kinds whose epistemic state is pinned: an automatic transcript is always
+# `unreviewed` and a person's transcript correction is always `reported`. Any other pairing is rejected.
+_AUDIO_KIND_STATES = {"machine_audio_transcript": "unreviewed", "human_audio_correction": "reported"}
+_EVIDENCE_KINDS = {
+    "text_source",
+    "human_note",
+    "human_reading_correction",
+    "machine_reading",
+    *_AUDIO_KIND_STATES,
+}
+_UNREVIEWED_AUDIO_LIMITATION = (
+    "Some cited evidence is an automatic audio transcript that no person has reviewed; "
+    "it may contain recognition errors."
+)
 _EPISTEMIC_STATES = {"reported", "uncertain", "question", "unreviewed"}
 
 
@@ -201,6 +214,9 @@ def parse_request(raw: bytes) -> tuple[dict[str, Any], str]:
             or item["epistemic_state"] not in _EPISTEMIC_STATES
         ):
             raise validation("Ask evidence labels are invalid.")
+        required_state = _AUDIO_KIND_STATES.get(item["evidence_kind"])
+        if required_state is not None and item["epistemic_state"] != required_state:
+            raise validation("Ask evidence labels are invalid.")
         if not _byte_length(item["excerpt"], 1, MAX_EXCERPT_BYTES):
             raise validation("Ask excerpts must be 1 to 1500 UTF-8 bytes.")
         if version == "2.0":
@@ -293,6 +309,28 @@ def _validate_history_pairs(histories: dict[str, list[dict[str, Any]]], mode: st
             raise validation("Later-corrected evidence requires its current counterpart.")
         elif "current_counterpart" in roles and "as_of_later_corrected" not in roles:
             raise validation("Current counterpart requires later-corrected evidence.")
+        _validate_audio_history_pair(items)
+
+
+def _validate_audio_history_pair(items: list[dict[str, Any]]) -> None:
+    """An audio memory's retained lane never mixes with other lanes; a human correction overrides it."""
+    audio = [x["evidence_kind"] in _AUDIO_KIND_STATES for x in items]
+    if not any(audio):
+        return
+    if not all(audio):
+        raise validation("Audio evidence cannot be paired with non-audio evidence.")
+    if len(items) != 2:
+        return
+    counterpart = next((x for x in items if x["history_status"] == "current_counterpart"), None)
+    earlier = next((x for x in items if x["history_status"] != "current_counterpart"), None)
+    if counterpart is None or earlier is None:
+        raise validation("Historical comparison evidence must be paired.")
+    if earlier["history_status"] == "as_of_later_corrected":
+        # A later human transcript correction is the only audio change that supersedes retained wording.
+        if counterpart["evidence_kind"] != "human_audio_correction":
+            raise validation("A corrected audio transcript requires its human correction counterpart.")
+    elif counterpart["evidence_kind"] != earlier["evidence_kind"]:
+        raise validation("Audio evidence pairs must keep the same transcript lane unless corrected.")
 
 
 @dataclass(frozen=True)
@@ -869,7 +907,7 @@ class LocalIntelligenceService:
                 result_body = {
                     "status": verified["status"],
                     "sentences": verified["sentences"],
-                    "limitations": verified["limitations"],
+                    "limitations": self._audio_limitations(hits, verified),
                 }
                 if request["schema_version"] == "2.0":
                     result_body = self._enforce_history_answer(request, hits, result_body)
@@ -924,6 +962,20 @@ class LocalIntelligenceService:
                 if self.consent_decision(tx) != (True, consent_policy_version, consent_version):
                     raise forbidden("Ask consent is unavailable.")
         return self.recover(grant, operation)
+
+    @staticmethod
+    def _audio_limitations(hits: list[dict[str, Any]], verified: dict[str, Any]) -> list[str]:
+        """Deterministically disclose reliance on an unreviewed machine audio transcript."""
+        by_id = {f"c{i}": hit for i, hit in enumerate(hits, 1)}
+        limitations = list(verified["limitations"])
+        relies = any(
+            by_id[cid]["evidence_kind"] == "machine_audio_transcript"
+            for sentence in verified["sentences"]
+            for cid in sentence["citation_ids"]
+        )
+        if relies and _UNREVIEWED_AUDIO_LIMITATION not in limitations:
+            limitations = [_UNREVIEWED_AUDIO_LIMITATION, *limitations][:6]
+        return limitations
 
     @staticmethod
     def _enforce_history_answer(

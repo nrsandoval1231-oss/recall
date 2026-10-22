@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import type { AskOutcome, HistoryAskOutcome, HistoryCitation, HistoryCapability, OrganizationCapability, OrganizationOperation, OrganizationProposal, ReadingOperation, VaultMemory, VaultReading, VaultRevision, VaultStatus } from "../../apps/desktop/src/platform/local-vault";
+import type { AskOutcome, AudioOperationStatus, HistoryAskOutcome, HistoryCitation, HistoryCapability, OrganizationCapability, OrganizationOperation, OrganizationProposal, ReadingOperation, VaultMemory, VaultReading, VaultRevision, VaultStatus } from "../../apps/desktop/src/platform/local-vault";
 
 // Test-only native command boundary. This is neither a filesystem nor a production mode.
 // Browser storage below simulates native restart; Rust tests establish real disk durability.
@@ -8,16 +8,17 @@ export async function installVaultFixture(page: Page) {
     const key = "synthetic.test.native";
     type Receipt = { command: string; payload: string; memoryId: string };
     type Temporal = { mode: "as_of" | "compare_to_current"; start_utc: string; end_exclusive_utc: string; display_date: string; display_timezone: string };
-    type State = { status: VaultStatus; memories: VaultMemory[]; history: Record<string, VaultRevision[]>; receipts: Record<string, Receipt>; readings: Record<string, ReadingOperation>; organizations: Record<string, OrganizationOperation>; organizationEnabled: boolean; organizationReady: boolean; organizationEpoch: number; asks: Record<string, { question: string; outcome: AskOutcome }>; historyEnabled: boolean; historyVersion: number; historyAsks: Record<string, { question: string; temporal: Temporal; outcome: HistoryAskOutcome }>; sources: Record<string, { bytes: number[]; mime_type: string; sha256: string }> };
-    const empty: State = { status: { root: null, vault_id: null, vault_identity: null }, memories: [], history: {}, receipts: {}, readings: {}, organizations: {}, organizationEnabled: false, organizationReady: false, organizationEpoch: 0, asks: {}, historyEnabled: false, historyVersion: 0, historyAsks: {}, sources: {} };
+    type State = { status: VaultStatus; memories: VaultMemory[]; history: Record<string, VaultRevision[]>; receipts: Record<string, Receipt>; readings: Record<string, ReadingOperation>; organizations: Record<string, OrganizationOperation>; organizationEnabled: boolean; organizationReady: boolean; organizationEpoch: number; asks: Record<string, { question: string; outcome: AskOutcome }>; historyEnabled: boolean; historyVersion: number; historyAsks: Record<string, { question: string; temporal: Temporal; outcome: HistoryAskOutcome }>; sources: Record<string, { bytes: number[]; mime_type: string; sha256: string }>; audio: Record<string, { phase: "recording" | "saved"; memoryId: string | null }> };
+    const empty: State = { status: { root: null, vault_id: null, vault_identity: null }, memories: [], history: {}, receipts: {}, readings: {}, organizations: {}, organizationEnabled: false, organizationReady: false, organizationEpoch: 0, asks: {}, historyEnabled: false, historyVersion: 0, historyAsks: {}, sources: {}, audio: {} };
     const state: State = JSON.parse(localStorage.getItem(key) || JSON.stringify(empty));
     state.receipts ??= {};
     state.readings ??= {};
     state.asks ??= {};
     state.historyEnabled ??= false; state.historyVersion ??= 0; state.historyAsks ??= {};
     state.sources ??= {};
+    state.audio ??= {};
     state.organizations ??= {}; state.organizationEnabled ??= false; state.organizationReady ??= false; state.organizationEpoch ??= 0;
-    const control = { diagnosticReading: false, readingEnabled: false, askEnabled: false, unknownAsk: false, unknownHistoryAsk: false, delayAsk: false, askPending: false, releaseAsk: () => {}, askPairingState: "disconnected", delayReading: false, readingPending: false, releaseReading: () => {}, unknownReading: false, failRemovalOnce: false, failRebuildOnce: false, delayRemoval: false, removalPending: false, releaseRemoval: () => {}, cancelCapture: false, cancelFileImport: false, failFileImportAfterCommit: false, cancelSelect: false, conflict: false, switchVault: false, delaySource: false, sourcePending: false, releaseSource: () => {}, organizationNeedsSetup: false, organizationUnknown: false, relatedTargetId: null as string | null, finishOrganization: (_memoryId: string) => {}, calls: [] as { command: string; args: Record<string, unknown> }[], importCalls: JSON.parse(localStorage.getItem("synthetic.test.importCalls") || "[]") as { command: string; args: Record<string, unknown> }[] };
+    const control = { diagnosticReading: false, readingEnabled: false, askEnabled: false, unknownAsk: false, unknownHistoryAsk: false, delayAsk: false, askPending: false, releaseAsk: () => {}, askPairingState: "disconnected", audioDenied: false, audioTranscribe: false, delayReading: false, readingPending: false, releaseReading: () => {}, unknownReading: false, failRemovalOnce: false, failRebuildOnce: false, delayRemoval: false, removalPending: false, releaseRemoval: () => {}, cancelCapture: false, cancelFileImport: false, failFileImportAfterCommit: false, cancelSelect: false, conflict: false, switchVault: false, delaySource: false, sourcePending: false, releaseSource: () => {}, organizationNeedsSetup: false, organizationUnknown: false, relatedTargetId: null as string | null, finishOrganization: (_memoryId: string) => {}, calls: [] as { command: string; args: Record<string, unknown> }[], importCalls: JSON.parse(localStorage.getItem("synthetic.test.importCalls") || "[]") as { command: string; args: Record<string, unknown> }[] };
     Object.assign(window, { syntheticVault: control });
     const save = () => localStorage.setItem(key, JSON.stringify(state));
     const now = "2026-10-08T12:00:00Z";
@@ -85,7 +86,7 @@ export async function installVaultFixture(page: Page) {
         const id = control.switchVault ? "b" : "a";
         state.status = { root: `/synthetic/vault-${id}`, vault_id: crypto.randomUUID(), vault_identity: `synthetic-${id}` };
         for (const op of Object.values(state.readings)) if (!["committed", "cancelled", "failed", "expired"].includes(op.state)) op.state = "cancelled";
-        if (control.switchVault) { state.memories = []; state.history = {}; state.receipts = {}; state.readings = {}; state.organizations = {}; state.organizationEnabled = false; state.organizationReady = false; state.organizationEpoch = 0; state.asks = {}; state.historyEnabled = false; state.historyVersion = 0; state.historyAsks = {}; state.sources = {}; }
+        if (control.switchVault) { state.memories = []; state.history = {}; state.receipts = {}; state.readings = {}; state.organizations = {}; state.organizationEnabled = false; state.organizationReady = false; state.organizationEpoch = 0; state.asks = {}; state.historyEnabled = false; state.historyVersion = 0; state.historyAsks = {}; state.sources = {}; state.audio = {}; }
         save(); return state.status;
       }
       if (args.expectedVaultId !== state.status.vault_id) throw new Error("Stale vault session");
@@ -209,6 +210,38 @@ export async function installVaultFixture(page: Page) {
         const reading: VaultReading = { machine: { request: { binding: { schema_version: "1.0", operation_id: id, vault_id: state.status.vault_identity!, memory_id: m.id, source_id: m.id, source_sha256: hash, expected_revision: op.expected_revision, captured_at: m.captured_at }, media_type: "image/png" }, result: { provider: "anthropic", model_id: "synthetic-claude", review_state: "unreviewed", input_manifest_sha256: "b".repeat(64), derivative: { sha256: "c".repeat(64), transform_version: "jpeg-rgb-exif-orient-v1", media_type: "image/jpeg" }, extraction: { schema_version: "1.1", capture_id: id, input_manifest_sha256: "b".repeat(64), summary: "The source mentions seedlings; the count is unclear.", summary_evidence: [{ page_id: m.id, quote: "SYNTHETIC seedlings 12?" }], pages: [{ page_id: m.id, ordinal: 1, transcription: "SYNTHETIC seedlings 12?", legibility: "mixed" }], mentions: [], statements: [{ temporal_text: "after the storm", evidence: [{ page_id: m.id, quote: "rain had cleared" }] }], action_suggestions: [], uncertainties: [{ kind: "illegible", description: "The number may be 12; the question mark remains unresolved.", evidence: [{ page_id: m.id, quote: "12?" }] }] }, validation_notes: [] } }, human_correction: m.reading?.human_correction ?? null };
         m.reading = reading; m.revision++; op.state = "committed"; state.history[m.id]!.push({ revision: m.revision, note: m.note, reading: structuredClone(reading), recorded_at: now, origin: "machine:anthropic", kind: "machine_reading" }); save(); return { operation: op, memory: m };
       }
+      // Synthetic audio: a 0.1 s silent 16 kHz mono WAV generated here in test code, never by the application.
+      function audioStatus(op: string, over: Partial<AudioOperationStatus> = {}): AudioOperationStatus {
+        return { schema_version: "1.0", operation_id: op, vault_id: state.status.vault_identity!, state: "recording", memory: null, error_code: null, limit_reason: null, source_sample_rate_hz: 16000, source_channels: 1, ...over };
+      }
+      if (command === "vault_audio_start") {
+        const op = String(args.operationId); const prior = state.audio[op];
+        if (prior) return audioStatus(op, { state: prior.phase === "recording" ? "recording" : "saved_local", memory: state.memories.find(m => m.id === prior.memoryId) ?? null });
+        if (control.audioDenied) return audioStatus(op, { state: "failed", error_code: "permission_denied" });
+        state.audio[op] = { phase: "recording", memoryId: null }; save(); return audioStatus(op);
+      }
+      if (command === "vault_audio_stop" || command === "vault_audio_status") {
+        const op = String(args.operationId); const entry = state.audio[op];
+        if (!entry) throw new Error("Unknown audio operation");
+        if (command === "vault_audio_status" && entry.phase === "recording") return audioStatus(op);
+        if (entry.phase === "recording") {
+          const rate = 16000, frames = 1600, wav = new Uint8Array(44 + frames * 2), view = new DataView(wav.buffer);
+          const tag = (offset: number, text: string) => { for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)); };
+          tag(0, "RIFF"); view.setUint32(4, 36 + frames * 2, true); tag(8, "WAVEfmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); tag(36, "data"); view.setUint32(40, frames * 2, true);
+          const bytes = Array.from(wav); const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", wav)), b => b.toString(16).padStart(2, "0")).join("");
+          const m: VaultMemory = { id: op, revision: 1, note: "", source_name: "SYNTHETIC-recording.wav", source_sha256: sha, captured_at: now, updated_at: now, conflict: null, state: "active", note_path: "synthetic-recording.md", audio_source: { capture_origin: "recorded", original_name: null, media_type: "audio/wav", source_sha256: sha, source_bytes: bytes.length, sample_rate_hz: 16000, channels: 1, pcm_bits: 16, duration_ms: 100 }, audio_transcript: null };
+          state.memories.push(m); state.sources[op] = { bytes, mime_type: "audio/wav", sha256: sha }; state.history[op] = [{ revision: 1, note: "", recorded_at: now, origin: "human:recall", kind: "capture" }];
+          entry.phase = "saved"; entry.memoryId = op; save();
+          return audioStatus(op, { state: "saved_local", memory: structuredClone(m) });
+        }
+        const m = state.memories.find(item => item.id === entry.memoryId)!;
+        if (!m.audio_transcript && control.audioTranscribe) {
+          const hash = "e".repeat(64);
+          m.audio_transcript = { machine: { operation_id: crypto.randomUUID(), source_sha256: m.source_sha256, source_revision: 1, runtime_source_commit: "d".repeat(40), runtime_binary_sha256: hash, model_sha256: hash, derivative_sha256: hash, transform_version: "pcm16-mono-16khz-rubato-fft-v1", output_sha256: hash, text: "SYNTHETIC remember to water the seedlings.", segments: null, input_rms_pcm16: 1200, quality_flags: [], eligibility: "eligible", quality_state: "machine_unreviewed" }, human_correction: null };
+          m.revision++; state.history[m.id]!.push({ revision: m.revision, note: "", recorded_at: now, origin: "machine:local", kind: "machine_audio_transcript" }); save();
+        }
+        return audioStatus(op, { state: m.audio_transcript ? "transcribed" : command === "vault_audio_stop" ? "saved_local" : "transcription_processing", memory: structuredClone(m) });
+      }
       // Durable native receipts are simulated separately from the renderer's persisted intent.
       const operation = typeof args.operationId === "string" ? args.operationId : null;
       const payload = JSON.stringify({ memoryId: args.memoryId, expectedRevision: args.expectedRevision, expectedState: args.expectedState, note: args.note, text: args.text });
@@ -256,12 +289,18 @@ export async function installVaultFixture(page: Page) {
         return projection("", args.includeDeleted === true);
       }
       const memory = state.memories.find(m => m.id === args.memoryId);
-      if (["vault_correct", "vault_correct_reading", "vault_history", "vault_source", "vault_restore_note", "vault_remove"].includes(command) && !memory) throw new Error("Unknown memory ID");
+      if (["vault_correct", "vault_correct_reading", "vault_audio_correct", "vault_history", "vault_source", "vault_restore_note", "vault_remove"].includes(command) && !memory) throw new Error("Unknown memory ID");
       if (command === "vault_correct_reading") {
         const m = memory!; if (m.state !== "active" || m.conflict || !m.reading) throw new Error("Memory not eligible for reading correction");
         if (control.conflict) { control.conflict = false; m.note = "SYNTHETIC external annotation"; m.revision++; state.history[m.id]!.push({ revision: m.revision, note: m.note, reading: structuredClone(m.reading), recorded_at: now, origin: "human:obsidian", kind: "external" }); save(); throw new Error("Revision conflict: review latest reading"); }
         if (args.expectedRevision !== m.revision) throw new Error("Revision conflict");
         m.reading.human_correction = String(args.text); m.revision++; state.history[m.id]!.push({ revision: m.revision, note: m.note, reading: structuredClone(m.reading), recorded_at: now, origin: "human:recall", kind: "reading_correction" }); return remember(m);
+      }
+      if (command === "vault_audio_correct") {
+        const m = memory!; if (m.state !== "active" || m.conflict || !m.audio_transcript) throw new Error("There is no machine transcript to correct yet");
+        if (args.expectedRevision !== m.revision) throw new Error("Conflict: the recording changed. Refresh, review it, then retry your correction");
+        m.audio_transcript.human_correction = { operation_id: String(args.operationId), text: String(args.text), corrected_at: now }; m.revision++;
+        state.history[m.id]!.push({ revision: m.revision, note: "", recorded_at: now, origin: "human:recall", kind: "audio_transcript_correction" }); return remember(m);
       }
       if (command === "vault_correct") {
         const m = memory!;

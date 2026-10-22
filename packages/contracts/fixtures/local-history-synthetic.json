@@ -1,5 +1,5 @@
 {
-  "description": "Synthetic v1/v2 local history Ask wire, canonical bytes and digest fixtures. No private data.",
+  "description": "Synthetic v1/v2 local history Ask wire, canonical bytes and digest fixtures (including synthetic audio transcript correction history). No private data.",
   "requests": [
     {
       "name": "transformer-question",
@@ -137,6 +137,68 @@
       },
       "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":2,\"limited\":false,\"selected_count\":2,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-09-30T12:00:00Z\",\"citation_id\":\"c1\",\"current_revision\":3,\"epistemic_state\":\"uncertain\",\"event_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_kind\":\"human_note\",\"excerpt\":\"I thought the café was in Zürich — perhaps.\",\"history_status\":\"as_of_later_corrected\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":2,\"recorded_at\":\"2026-10-01T12:00:00Z\",\"source_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},{\"captured_at\":\"2026-09-30T12:00:00Z\",\"citation_id\":\"c2\",\"current_revision\":3,\"epistemic_state\":\"reported\",\"event_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"evidence_kind\":\"human_note\",\"excerpt\":\"The café was in Geneva.\",\"history_status\":\"current_counterpart\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":3,\"recorded_at\":\"2026-10-03T10:00:00Z\",\"source_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000012\",\"question\":\"What changed since October 1, 2026?\",\"schema_version\":\"2.0\",\"temporal\":{\"display_date\":\"2026-10-01\",\"display_timezone\":\"America/Chicago\",\"end_exclusive_utc\":\"2026-10-02T05:00:00Z\",\"mode\":\"compare_to_current\",\"start_utc\":\"2026-10-01T05:00:00Z\"},\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
       "sha256": "1b1a74f9d7bae019a19ed6833fdda4775f195e4871691b72c5200ebc649dea1a",
+      "expected": {
+        "receipt_schema_version": "1.0",
+        "result_status": "answered",
+        "citation_ids": [
+          "c1",
+          "c2"
+        ]
+      }
+    },
+    {
+      "name": "history-audio-correction-paired",
+      "request": {
+        "schema_version": "2.0",
+        "operation_id": "00000000-0000-4000-8000-000000000023",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "What did the synthetic voice memo say about the pump on October 1, 2026?",
+        "temporal": {
+          "mode": "as_of",
+          "start_utc": "2026-10-01T05:00:00Z",
+          "end_exclusive_utc": "2026-10-02T05:00:00Z",
+          "display_date": "2026-10-01",
+          "display_timezone": "America/Chicago"
+        },
+        "coverage": {
+          "eligible_count": 2,
+          "selected_count": 2,
+          "limited": false,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 2,
+            "event_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "captured_at": "2026-09-30T12:00:00Z",
+            "recorded_at": "2026-10-01T12:00:00Z",
+            "current_revision": 3,
+            "history_status": "as_of_later_corrected",
+            "evidence_kind": "machine_audio_transcript",
+            "epistemic_state": "unreviewed",
+            "excerpt": "Synthetic recording: the pump reads maybe forty two psi."
+          },
+          {
+            "citation_id": "c2",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 3,
+            "event_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "captured_at": "2026-09-30T12:00:00Z",
+            "recorded_at": "2026-10-03T10:00:00Z",
+            "current_revision": 3,
+            "history_status": "current_counterpart",
+            "evidence_kind": "human_audio_correction",
+            "epistemic_state": "reported",
+            "excerpt": "Synthetic recording: the pump reads 42 psi."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":2,\"limited\":false,\"selected_count\":2,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-09-30T12:00:00Z\",\"citation_id\":\"c1\",\"current_revision\":3,\"epistemic_state\":\"unreviewed\",\"event_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_kind\":\"machine_audio_transcript\",\"excerpt\":\"Synthetic recording: the pump reads maybe forty two psi.\",\"history_status\":\"as_of_later_corrected\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":2,\"recorded_at\":\"2026-10-01T12:00:00Z\",\"source_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},{\"captured_at\":\"2026-09-30T12:00:00Z\",\"citation_id\":\"c2\",\"current_revision\":3,\"epistemic_state\":\"reported\",\"event_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"evidence_kind\":\"human_audio_correction\",\"excerpt\":\"Synthetic recording: the pump reads 42 psi.\",\"history_status\":\"current_counterpart\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":3,\"recorded_at\":\"2026-10-03T10:00:00Z\",\"source_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000023\",\"question\":\"What did the synthetic voice memo say about the pump on October 1, 2026?\",\"schema_version\":\"2.0\",\"temporal\":{\"display_date\":\"2026-10-01\",\"display_timezone\":\"America/Chicago\",\"end_exclusive_utc\":\"2026-10-02T05:00:00Z\",\"mode\":\"as_of\",\"start_utc\":\"2026-10-01T05:00:00Z\"},\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "ff803f30f9a22cd824c8b692659d9720806cca9833d7ec6b29e164692ed1f10d",
       "expected": {
         "receipt_schema_version": "1.0",
         "result_status": "answered",

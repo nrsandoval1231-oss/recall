@@ -771,3 +771,238 @@ def test_completed_receipts_cannot_resurrect_after_consent_reopt_in_or_policy_ch
     assert new_policy_decision is not None and new_policy_decision[0] == policy_v2
     assert first_decision[1] < new_policy_decision[1]
     db.close()
+
+
+# --- Audio transcript evidence (synthetic only; no audio, consent, route or organization changes) ---------------------
+
+_FIXTURES = Path(__file__).resolve().parents[3] / "packages/contracts/fixtures"
+
+
+def _fixture_request(filename: str, name: str) -> dict[str, Any]:
+    fixture = json.loads((_FIXTURES / filename).read_text(encoding="utf-8"))
+    return copy.deepcopy(next(entry["request"] for entry in fixture["requests"] if entry["name"] == name))
+
+
+def _parse(request: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    return parse_request(json.dumps(request, ensure_ascii=False).encode())
+
+
+def _audio_v1(kind: str, state: str) -> dict[str, Any]:
+    request = _fixture_request("local-intelligence-synthetic.json", "audio-machine-transcript-question")
+    request["evidence"][0].update(evidence_kind=kind, epistemic_state=state)
+    return request
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "state"),
+    [
+        ("audio-machine-transcript-question", "machine_audio_transcript", "unreviewed"),
+        ("audio-human-correction-question", "human_audio_correction", "reported"),
+    ],
+)
+def test_audio_kinds_are_accepted_only_with_their_pinned_epistemic_state(name: str, kind: str, state: str) -> None:
+    request = _fixture_request("local-intelligence-synthetic.json", name)
+    assert request["evidence"][0]["evidence_kind"] == kind
+    assert request["evidence"][0]["epistemic_state"] == state
+    parsed, digest_value = _parse(request)
+    assert parsed["evidence"][0]["evidence_kind"] == kind
+    assert len(digest_value) == 64
+
+
+@pytest.mark.parametrize(
+    ("kind", "state"),
+    [
+        ("machine_audio_transcript", "reported"),
+        ("machine_audio_transcript", "uncertain"),
+        ("machine_audio_transcript", "question"),
+        ("human_audio_correction", "unreviewed"),
+        ("human_audio_correction", "uncertain"),
+        ("human_audio_correction", "question"),
+    ],
+)
+def test_audio_kinds_with_mismatched_epistemic_state_are_rejected(kind: str, state: str) -> None:
+    with pytest.raises(ApiError) as caught:
+        _parse(_audio_v1(kind, state))
+    assert "Ask evidence labels are invalid" in str(caught.value.message)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "machine_audio",
+        "audio_transcript",
+        "human_audio",
+        "machine_audio_reading",
+        "voice_note",
+        "",
+        "MACHINE_AUDIO_TRANSCRIPT",
+    ],
+)
+def test_unknown_and_near_miss_evidence_kinds_are_still_rejected(kind: str) -> None:
+    with pytest.raises(ApiError) as caught:
+        _parse(_audio_v1(kind, "unreviewed"))
+    assert "Ask evidence labels are invalid" in str(caught.value.message)
+
+
+def test_non_string_evidence_kind_is_rejected() -> None:
+    request = _audio_v1("machine_audio_transcript", "unreviewed")
+    request["evidence"][0]["evidence_kind"] = 7
+    with pytest.raises(ApiError):
+        _parse(request)
+
+
+def test_existing_evidence_kind_and_state_acceptance_is_unchanged() -> None:
+    for kind, state in (
+        ("text_source", "reported"),
+        ("human_note", "question"),
+        ("human_reading_correction", "reported"),
+        ("machine_reading", "unreviewed"),
+    ):
+        assert _parse(_audio_v1(kind, state))[0]["evidence"][0]["evidence_kind"] == kind
+
+
+def _history_audio() -> dict[str, Any]:
+    return _fixture_request("local-history-synthetic.json", "history-audio-correction-paired")
+
+
+def test_audio_history_fixture_has_canonical_digest_and_pairs_machine_with_human_correction() -> None:
+    fixture = json.loads((_FIXTURES / "local-history-synthetic.json").read_text(encoding="utf-8"))
+    item = next(entry for entry in fixture["requests"] if entry["name"] == "history-audio-correction-paired")
+    raw = json.dumps(item["request"], ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    assert raw.decode() == item["canonical_json_utf8"]
+    assert hashlib.sha256(raw).hexdigest() == item["sha256"] == parse_request(raw)[1]
+    kinds = {(x["history_status"], x["evidence_kind"], x["epistemic_state"]) for x in item["request"]["evidence"]}
+    assert kinds == {
+        ("as_of_later_corrected", "machine_audio_transcript", "unreviewed"),
+        ("current_counterpart", "human_audio_correction", "reported"),
+    }
+
+
+def test_audio_history_correction_must_pair_with_the_human_correction_lane() -> None:
+    request = _history_audio()
+    assert _parse(request)[0]["temporal"]["mode"] == "as_of"
+    # The retained machine reading was corrected, so the counterpart cannot be another machine reading.
+    machine_counterpart = copy.deepcopy(request)
+    machine_counterpart["evidence"][1].update(evidence_kind="machine_audio_transcript", epistemic_state="unreviewed")
+    with pytest.raises(ApiError):
+        _parse(machine_counterpart)
+    # Nor can a non-audio lane stand in for the human correction.
+    other_lane = copy.deepcopy(request)
+    other_lane["evidence"][1].update(evidence_kind="human_note", epistemic_state="reported")
+    with pytest.raises(ApiError):
+        _parse(other_lane)
+    mixed = copy.deepcopy(request)
+    mixed["evidence"][0].update(evidence_kind="machine_reading", epistemic_state="unreviewed")
+    with pytest.raises(ApiError):
+        _parse(mixed)
+    # Pinned audio states still apply inside a correctly shaped pair.
+    bad_state = copy.deepcopy(request)
+    bad_state["evidence"][1]["epistemic_state"] = "unreviewed"
+    with pytest.raises(ApiError):
+        _parse(bad_state)
+    # Existing text-lane history pairs stay valid.
+    assert _parse(_fixture_request("local-history-synthetic.json", "history-comparison-paired"))[1]
+
+
+def test_audio_history_comparison_allows_same_lane_reprocessing_but_not_lane_switching() -> None:
+    request = _history_audio()
+    request["temporal"]["mode"] = "compare_to_current"
+    request["evidence"][0]["history_status"] = "as_of"
+    request["evidence"][1].update(evidence_kind="machine_audio_transcript", epistemic_state="unreviewed")
+    request["evidence"][1]["excerpt"] = "Synthetic recording: the pump reads forty five psi."
+    assert _parse(request)[0]["evidence"][1]["evidence_kind"] == "machine_audio_transcript"
+    # A human correction never reverts to a machine reading.
+    reverted = copy.deepcopy(request)
+    reverted["evidence"][0].update(evidence_kind="human_audio_correction", epistemic_state="reported")
+    with pytest.raises(ApiError):
+        _parse(reverted)
+    # A comparison that still lacks its counterpart is rejected exactly as before.
+    unpaired = copy.deepcopy(request)
+    unpaired["evidence"].pop()
+    unpaired["coverage"].update(eligible_count=1, selected_count=1)
+    with pytest.raises(ApiError):
+        _parse(unpaired)
+
+
+def _audio_hits(kind: str = "machine_audio_transcript", state: str = "unreviewed") -> list[dict[str, Any]]:
+    return LocalIntelligenceService._request_hits(_parse(_audio_v1(kind, state))[0])
+
+
+def test_audio_evidence_is_presented_as_untrusted_unreviewed_machine_transcription() -> None:
+    from recall.ingestion.prompts import ANSWER_SYSTEM
+    from recall.retrieval.ask import answer_max_input_tokens, build_packet
+
+    machine = build_packet(_audio_hits())[0]
+    assert machine["kind"] == "machine_audio_transcript" and machine["epistemic_state"] == "unreviewed"
+    assert "Unreviewed" in machine["handling"] and "not verified fact" in machine["handling"]
+    human = build_packet(_audio_hits("human_audio_correction", "reported"))[0]
+    assert human["kind"] == "human_audio_correction" and "overrides the machine transcript" in human["handling"]
+    # Other kinds keep their exact packet shape, and the token bound is computed over the real packet.
+    text_hits = _audio_hits("human_note", "reported")
+    assert "handling" not in build_packet(text_hits)[0]
+    assert answer_max_input_tokens("q", _audio_hits()) > answer_max_input_tokens("q", text_hits)
+    assert "`machine_audio_transcript`" in ANSWER_SYSTEM and "untrusted machine transcription" in ANSWER_SYSTEM
+    assert "never state" in ANSWER_SYSTEM and "`human_audio_correction`" in ANSWER_SYSTEM
+
+
+def test_citations_to_audio_evidence_are_quote_validated_against_the_supplied_excerpt() -> None:
+    from recall.retrieval.ask import verify_answer
+
+    hits = _audio_hits()
+    excerpt = hits[0]["excerpt"]
+    answered = json.dumps(
+        {
+            "status": "answered",
+            "sentences": [{"text": "The transcript suggests a pump reading.", "citation_ids": ["c1"]}],
+            "limitations": [],
+        }
+    )
+    verified = verify_answer(answered, hits)
+    assert verified is not None
+    citation = verified["citations"][0]
+    assert citation["quote"] == excerpt[:300] and citation["quote"] in excerpt
+    assert citation["kind"] == "machine_audio_transcript" and citation["epistemic_state"] == "unreviewed"
+    # An invented or out-of-packet citation rejects the whole answer, exactly as for other evidence.
+    assert verify_answer(answered.replace('"c1"', '"c2"'), hits) is None
+    # The model cannot supply its own quote or evidence fields.
+    forged = json.dumps(
+        {
+            "status": "answered",
+            "sentences": [{"text": "x", "citation_ids": ["c1"], "quote": "invented words"}],
+            "limitations": [],
+        }
+    )
+    assert verify_answer(forged, hits) is None
+
+
+def test_reliance_on_machine_audio_transcript_adds_one_deterministic_limitation() -> None:
+    hits = _audio_hits()
+    verified = {
+        "status": "answered",
+        "sentences": [{"text": "It suggests a reading.", "citation_ids": ["c1"]}],
+        "limitations": ["Model limitation."],
+    }
+    limitations = LocalIntelligenceService._audio_limitations(hits, verified)
+    assert limitations[0].startswith("Some cited evidence is an automatic audio transcript")
+    assert limitations[1:] == ["Model limitation."]
+    assert LocalIntelligenceService._audio_limitations(hits, {**verified, "limitations": limitations}) == limitations
+    full = {**verified, "limitations": [f"limit {i}" for i in range(6)]}
+    capped = LocalIntelligenceService._audio_limitations(hits, full)
+    assert len(capped) == 6 and capped[0] == limitations[0] and all(len(x) <= 500 for x in capped)
+    human = _audio_hits("human_audio_correction", "reported")
+    assert LocalIntelligenceService._audio_limitations(human, verified) == ["Model limitation."]
+    text = _audio_hits("human_note", "reported")
+    assert LocalIntelligenceService._audio_limitations(text, verified) == ["Model limitation."]
+
+
+def test_abstention_over_audio_evidence_is_unchanged() -> None:
+    from recall.retrieval.ask import verify_answer
+
+    hits = _audio_hits()
+    raw = json.dumps({"status": "insufficient_evidence", "sentences": [], "limitations": ["Transcript unclear."]})
+    verified = verify_answer(raw, hits)
+    assert verified is not None
+    assert verified["status"] == "insufficient_evidence" and verified["sentences"] == [] and verified["citations"] == []
+    assert LocalIntelligenceService._audio_limitations(hits, verified) == ["Transcript unclear."]
+    # An answered status without sentences is still unverifiable.
+    assert verify_answer(json.dumps({"status": "answered", "sentences": [], "limitations": []}), hits) is None

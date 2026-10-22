@@ -16,7 +16,7 @@ impl Vault {
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
         if [
-            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
         ]
         .contains(&manifest.format.as_str())
         {
@@ -700,18 +700,23 @@ impl Vault {
     pub(super) fn reading_transition(&self, prev: &Event, next: &Event) -> Result<()> {
         if (prev.format == FORMAT_V3
             && ![
-                FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+                FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
             ]
             .contains(&next.format.as_str()))
             || (prev.format == FORMAT_V4
-                && ![FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8]
-                    .contains(&next.format.as_str()))
+                && ![
+                    FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9,
+                ]
+                .contains(&next.format.as_str()))
             || (prev.format == FORMAT_V5
-                && ![FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&next.format.as_str()))
+                && ![FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9]
+                    .contains(&next.format.as_str()))
             || (prev.format == FORMAT_V6
-                && ![FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&next.format.as_str()))
-            || (prev.format == FORMAT_V7 && ![FORMAT_V7, FORMAT_V8].contains(&next.format.as_str()))
-            || (prev.format == FORMAT_V8 && next.format != FORMAT_V8)
+                && ![FORMAT_V6, FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&next.format.as_str()))
+            || (prev.format == FORMAT_V7
+                && ![FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&next.format.as_str()))
+            || (prev.format == FORMAT_V9 && next.format != FORMAT_V9)
+            || (prev.format == FORMAT_V8 && ![FORMAT_V8, FORMAT_V9].contains(&next.format.as_str()))
         {
             return Err("Reading history format downgrade".into());
         }

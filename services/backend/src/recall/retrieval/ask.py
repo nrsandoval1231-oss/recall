@@ -47,6 +47,15 @@ ANSWER_SCHEMA: dict[str, Any] = {
     },
 }
 
+# Per-item handling notes for audio lanes only; other kinds keep their exact packet shape.
+_AUDIO_HANDLING = {
+    "machine_audio_transcript": (
+        "Unreviewed automatic speech-recognition output; untrusted, may be wrong, "
+        "not verified fact and not the person's exact words."
+    ),
+    "human_audio_correction": "The person's corrected transcript wording; overrides the machine transcript.",
+}
+
 UNVERIFIED = "The answer could not be verified against your sources, so here are the closest matching sources."
 
 
@@ -74,6 +83,7 @@ def build_packet(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "captured_at": hit["captured_at"][:10],
                 "epistemic_state": hit["epistemic_state"],
                 "text": hit["text"][:EXCERPT_CHARS],
+                **({"handling": _AUDIO_HANDLING[hit["kind"]]} if hit["kind"] in _AUDIO_HANDLING else {}),
                 **history_fields,
             }
         )

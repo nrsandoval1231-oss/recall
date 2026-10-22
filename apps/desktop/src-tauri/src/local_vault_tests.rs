@@ -5359,3 +5359,83 @@ fn reading_human_edit_before_resolution_marker_remains_a_preserved_conflict() {
     assert_eq!(f.vault().list("").unwrap()[0].state, "conflict");
     assert_eq!(fs::read_to_string(v.note_path(&m.id)).unwrap(), expected);
 }
+
+/// Related-memory links must work under every manifest that carries the context
+/// projection (v7, v8 after a text-file import, v9 after an audio capture).
+#[test]
+fn related_links_work_and_are_suppressed_under_v7_v8_and_v9_manifests() {
+    for (label, target_removed) in [("v8", false), ("v8", true), ("v9", false), ("v9", true)] {
+        let f = Fixture::new();
+        let v = f.vault();
+        match label {
+            "v8" => v.fence_manifest_v8().unwrap(),
+            _ => v.fence_manifest_v9().unwrap(),
+        }
+        let (source, target) = publish_synthetic_related_pair(&v);
+        let expected_format = if label == "v8" { FORMAT_V8 } else { FORMAT_V9 };
+        let view = |v: &Vault| {
+            v.list("")
+                .unwrap()
+                .into_iter()
+                .find(|m| m.id == source.id)
+                .unwrap()
+        };
+        let linked = view(&v);
+        assert_eq!(linked.related_context.len(), 1, "{label}: UI link visible");
+        assert_eq!(linked.related_context[0].target_memory_id, target.id);
+        let last = v.records(&source.id).unwrap().pop().unwrap();
+        assert_eq!(last.format, expected_format);
+        assert_eq!(last.context_link_projection.as_ref().unwrap().len(), 1);
+        let published = fs::read_to_string(v.note_path(&source.id)).unwrap();
+        assert!(
+            published.contains("Possibly related (unreviewed)"),
+            "{label}: note link"
+        );
+        assert_eq!(
+            v.related_memory(&source.id, &target.id)
+                .unwrap()
+                .original
+                .sha256,
+            target.source_sha256
+        );
+        if target_removed {
+            v.remove(&target.id, target.revision, &op(), "active")
+                .unwrap();
+        } else {
+            v.correct(
+                &target.id,
+                target.revision,
+                &op(),
+                "Human corrected target.",
+            )
+            .unwrap();
+        }
+        assert!(v.related_memory(&source.id, &target.id).is_err(), "{label}");
+        assert!(view(&v).related_context.is_empty(), "{label}: UI link gone");
+        let after = v.records(&source.id).unwrap().pop().unwrap();
+        assert_eq!(after.kind, "context_suppress", "{label}");
+        assert_eq!(
+            after.format, expected_format,
+            "{label}: suppression keeps the envelope"
+        );
+        assert!(after
+            .context_link_projection
+            .as_ref()
+            .unwrap()
+            .iter()
+            .all(|e| e.suppressed));
+        assert!(
+            !fs::read_to_string(v.note_path(&source.id))
+                .unwrap()
+                .contains("Possibly related (unreviewed)"),
+            "{label}: note link gone"
+        );
+        // History replays from a fresh open.
+        assert!(f
+            .vault()
+            .list_with_deleted("", true)
+            .unwrap()
+            .iter()
+            .all(|m| m.conflict.is_none()));
+    }
+}
