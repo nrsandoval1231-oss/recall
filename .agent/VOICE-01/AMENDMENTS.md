@@ -8,7 +8,7 @@ The draft listed sole `[Music]` / `[BLANK_AUDIO]` as ineligible. The pinned runt
 
 ## A2. Asset layout follows the F0-proven installed layout
 
-The four runtime DLLs install beside `whisper-cli.exe` (resource destination `""`, install root); the model installs at `resources/models/ggml-base.bin`; notices at `resources/licenses/`. Native requires the DLL directory to equal the sidecar's parent and hash-verifies all files against the compiled-in manifest before each launch. An installer build and installed-layout proof are tracked separately from this amendment.
+The four runtime DLLs install beside `whisper-cli.exe` (resource destination `""`, install root); the model installs at `resources/models/ggml-base.bin`; notices at `resources/licenses/`. Native requires the DLL directory to equal the sidecar's parent and hash-verifies all files against the compiled-in manifest before each launch. Verified 2026-10-22 at script level: an unsigned release NSIS build (SHA256 `8389f56b22b23ea10316bef2714255131ff28852ee4644e967b1ddf137f8cfb4`, not installed) generated `installer.nsi` placing `whisper-cli.exe` and the four DLLs at `$INSTDIR` beside `recall-desktop.exe`, the model at `resources\models\ggml-base.bin` and notices at `resources\licenses\`; the staged DLL, CLI and model hashes match the manifest. Running an installed copy and launching the sidecar from it remain unproven.
 
 ## A3. Content-Security-Policy
 
