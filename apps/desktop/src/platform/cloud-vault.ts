@@ -42,6 +42,10 @@ export async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes))), x => x.toString(16).padStart(2, "0")).join("");
 }
 
+/** One memory whose local edits the cloud refused. `remote` is null while the cloud version is unreachable. */
+export interface ConflictReview { memory: string; operations: number; error: string; local: VaultMemory; remote: VaultMemory | null }
+export type ConflictChoice = {kind: "mine"} | {kind: "cloud"} | {kind: "merged"; note: string};
+
 export class CloudVault implements LocalVault {
   readonly storage = "cloud" as const;
   readonly available = true;
@@ -117,6 +121,53 @@ export class CloudVault implements LocalVault {
       warning: "Device export; null history means it was unavailable. Not a complete server backup."};
   }
   async conflicts() { return this.scope ? (await this.store.pending(this.scope)).filter(row => row.error) : []; }
+  async conflictReviews(): Promise<ConflictReview[]> {
+    const blocked = await this.conflicts();
+    if (!blocked.length) return [];
+    const scope = this.scope!;
+    const local = await this.store.list(scope);
+    let remote: VaultMemory[] = [];
+    try { remote = await this.request<VaultMemory[]>("/library/memories?include_deleted=true"); } catch { /* reviewed read-only while offline */ }
+    const reviews: ConflictReview[] = [];
+    for (const memory of new Set(blocked.map(row => row.memory))) {
+      const mine = local.find(row => row.id === memory);
+      if (mine) reviews.push({memory, operations: (await this.store.pending(scope)).filter(row => row.memory === memory).length, error: blocked.find(row => row.memory === memory)!.error!, local: mine, remote: remote.find(row => row.id === memory) ?? null});
+    }
+    return reviews;
+  }
+  /**
+   * Explicit user resolution. Nothing is silently overwritten: "mine"/"merged" append new revisions on top of
+   * the current cloud revision (the cloud text stays in history); "cloud" adopts the cloud record and drops the
+   * reviewed local edits, which is why the UI shows them and asks first.
+   */
+  async resolveConflict(memory: string, choice: ConflictChoice): Promise<VaultMemory> {
+    if (!this.scope) await this.status();
+    const scope = this.scope!;
+    const remote = (await this.request<VaultMemory[]>("/library/memories?include_deleted=true")).find(row => row.id === memory);
+    const local = (await this.store.list(scope)).find(row => row.id === memory);
+    if (!remote || !local) throw new Error("The cloud version is unavailable. Your edits are retained.");
+    const mutations: CloudMutation[] = [];
+    let revision = remote.revision;
+    const add = (action: CloudMutation["action"], note?: string) => {
+      mutations.push({operation_id: crypto.randomUUID(), memory_id: memory, action, expected_revision: revision++, expected_vault_id: scope, ...(note === undefined ? {} : {note})});
+    };
+    const removing = choice.kind === "mine" && local.state === "deleted";
+    const note = choice.kind === "merged" ? choice.note : local.note;
+    if (choice.kind !== "cloud") {
+      if (removing) { if (remote.state !== "deleted") add("remove"); }
+      else {
+        if (remote.state === "deleted") add("restore");
+        if (remote.state === "deleted" || note !== remote.note) add("correct", note);
+      }
+    }
+    const record: VaultMemory = mutations.length
+      ? {...remote, revision, state: removing ? "deleted" : "active", note: removing ? remote.note : note, updated_at: new Date().toISOString(), conflict: null}
+      : remote;
+    await this.store.resolve(scope, memory, record, mutations);
+    this.notify(mutations.length ? "Resolution saved on this device. Sync pending." : "Using the cloud version.");
+    void this.synchronize();
+    return record;
+  }
 
   private async check(scope: string) {
     if (!this.scope) await this.status();

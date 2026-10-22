@@ -1601,6 +1601,39 @@ mod tests {
     }
 
     #[test]
+    fn cloud_conflict_resolution_rebases_or_adopts_cloud_and_refuses_unconflicted() {
+        let (store, base) = temp_store("cloud-resolve");
+        let scope = WORKSPACE_ID;
+        let id = SOURCE_ID;
+        let op = |n: &str, rev: i64| serde_json::json!({"operation_id": n, "memory_id": id, "expected_revision": rev, "action": "correct", "note": "SYNTHETIC mine"});
+        let first = serde_json::json!({"id": id, "revision": 1, "note": "SYNTHETIC original"});
+        store.cloud_cache("commit", scope, serde_json::json!({"record": first, "source": {"bytes": [7]}, "mutation": {"operation_id": id, "memory_id": id, "expected_revision": 0, "action": "capture"}})).unwrap();
+        let cloud = serde_json::json!({"id": id, "revision": 3, "note": "SYNTHETIC cloud"});
+        // No conflict recorded yet: resolution is refused and nothing changes.
+        assert!(store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": cloud, "mutations": []})).is_err());
+        assert_eq!(store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap().as_array().unwrap().len(), 1);
+        store.cloud_cache("conflict", scope, serde_json::json!({"operation": id, "error": "Concurrent edit"})).unwrap();
+        // A rebase chain must start exactly one revision after the cloud record minus its length.
+        let bad = serde_json::json!({"id": id, "revision": 9, "note": "SYNTHETIC mine"});
+        assert!(store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": bad, "mutations": [op(USER_ID, 3)]})).is_err());
+        assert_eq!(store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap()[0]["error"], "Concurrent edit");
+        let mine = serde_json::json!({"id": id, "revision": 4, "note": "SYNTHETIC mine"});
+        store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": mine, "mutations": [op(USER_ID, 3)]})).unwrap();
+        let pending = store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap();
+        assert_eq!(pending.as_array().unwrap().len(), 1);
+        assert_eq!(pending[0]["operation"], USER_ID);
+        assert!(pending[0]["error"].is_null());
+        assert_eq!(store.cloud_cache("list", scope, serde_json::Value::Null).unwrap()[0]["note"], "SYNTHETIC mine");
+        store.cloud_cache("conflict", scope, serde_json::json!({"operation": USER_ID, "error": "Again"})).unwrap();
+        store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": cloud, "mutations": []})).unwrap();
+        assert_eq!(store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap(), serde_json::json!([]));
+        assert_eq!(store.cloud_cache("list", scope, serde_json::Value::Null).unwrap()[0]["note"], "SYNTHETIC cloud");
+        assert_eq!(store.cloud_cache("source", scope, serde_json::json!({"id": id})).unwrap()["bytes"], serde_json::json!([7]));
+        drop(store);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn fts_latency_metric_for_one_thousand_synthetic_records() {
         let s = NativeStore::memory().unwrap();
         let records = (0..1000)
@@ -1670,6 +1703,30 @@ impl NativeStore {
             },
             "conflict" => {
                 tx.execute("UPDATE cloud_operations SET error=?3 WHERE scope=?1 AND operation=?2",params![scope,text("operation")?,text("error")?])?;
+                serde_json::Value::Null
+            },
+            "resolve" => {
+                // Explicit conflict resolution: replaces every pending edit for one conflicted memory
+                // with the cloud record (no mutations) or a rebase chain on top of it.
+                let id = text("memory")?;
+                Self::uuid_ok(id)?;
+                let record = payload.get("record").ok_or(StoreError::InvalidIdentifier)?;
+                if record.get("id").and_then(serde_json::Value::as_str) != Some(id) { return Err(StoreError::InvalidIdentifier); }
+                let revision = record.get("revision").and_then(serde_json::Value::as_i64).filter(|v|*v>0).ok_or(StoreError::InvalidIdentifier)?;
+                let mutations = payload.get("mutations").and_then(serde_json::Value::as_array).ok_or(StoreError::InvalidIdentifier)?;
+                let blocked:i64=tx.query_row("SELECT count(*) FROM cloud_operations WHERE scope=?1 AND memory=?2 AND error IS NOT NULL",params![scope,id],|row|row.get(0))?;
+                if blocked == 0 { return Err(StoreError::InvalidIdentifier); }
+                tx.execute("DELETE FROM cloud_operations WHERE scope=?1 AND memory=?2",params![scope,id])?;
+                let mut expected = revision - mutations.len() as i64;
+                for mutation in mutations {
+                    let op = mutation.get("operation_id").and_then(serde_json::Value::as_str).ok_or(StoreError::InvalidIdentifier)?;
+                    Self::uuid_ok(op)?;
+                    if mutation.get("memory_id").and_then(serde_json::Value::as_str) != Some(id) || mutation.get("expected_revision").and_then(serde_json::Value::as_i64) != Some(expected) { return Err(StoreError::InvalidIdentifier); }
+                    tx.execute("INSERT INTO cloud_operations(scope,operation,memory,body) VALUES(?1,?2,?3,?4)",params![scope,op,id,serde_json::to_string(mutation)?])?;
+                    expected += 1;
+                }
+                let source: Option<String> = tx.query_row("SELECT source FROM cloud_documents WHERE scope=?1 AND id=?2",params![scope,id],|row|row.get(0)).optional()?.flatten();
+                tx.execute("INSERT INTO cloud_documents(scope,id,record,source) VALUES(?1,?2,?3,?4) ON CONFLICT(scope,id) DO UPDATE SET record=excluded.record,source=excluded.source",params![scope,id,serde_json::to_string(record)?,source])?;
                 serde_json::Value::Null
             },
             "commit" | "remote" | "accept" => {
