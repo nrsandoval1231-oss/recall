@@ -2,7 +2,7 @@
   "name": "recall",
   "private": true,
   "version": "0.1.0",
-  "description": "Recall monorepo (RCL-001: trusted capture)",
+  "description": "MONOLITH monorepo (internal package names retain the Recall namespace)",
   "type": "module",
   "workspaces": [
     "packages/*",

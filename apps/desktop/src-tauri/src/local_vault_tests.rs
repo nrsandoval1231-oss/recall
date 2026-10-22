@@ -94,11 +94,11 @@ fn text_note_preserves_a_readable_original_without_ai_or_an_external_editor() {
         fs::read_dir(f.0.join("Recall/Sources")).unwrap().count(),
         1
     );
-    let edited = markdown.replace("uncertain?", "Obsidian kept this?");
+    let edited = markdown.replace("uncertain?", "Notepad kept this?");
     fs::write(&path, &edited).unwrap();
-    let listed = v.list("Obsidian").unwrap();
+    let listed = v.list("Notepad").unwrap();
     assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].note, "pump house valve, Obsidian kept this?");
+    assert_eq!(listed[0].note, "pump house valve, Notepad kept this?");
     assert_eq!(listed[0].state, "active");
     assert!(listed[0].conflict.is_none());
     assert_eq!(fs::read_to_string(&path).unwrap(), edited);
@@ -141,12 +141,12 @@ fn direct_edit_ingests_and_stale_correction_preserves_disk() {
     let p = v.note_path(&m.id);
     let edited = fs::read_to_string(&p)
         .unwrap()
-        .replace("base", "Obsidian uncertain?");
+        .replace("base", "Notepad uncertain?");
     fs::write(&p, &edited).unwrap();
     assert!(v.correct(&m.id, 1, &op(), "Recall draft").is_err());
     let listed = v.list("").unwrap();
     assert_eq!(listed[0].revision, 2);
-    assert_eq!(listed[0].note, "Obsidian uncertain?");
+    assert_eq!(listed[0].note, "Notepad uncertain?");
     assert_eq!(fs::read_to_string(p).unwrap(), edited);
     assert_eq!(v.history(&m.id).unwrap().len(), 2);
 }
@@ -237,7 +237,7 @@ fn late_write_to_preserved_editor_inode_is_diagnosed() {
         .unwrap();
     v.correct(&m.id, 1, &op(), "Recall changed").unwrap();
     editor.seek(SeekFrom::Start(0)).unwrap();
-    editor.write_all(b"LATE OBSIDIAN DRAFT").unwrap();
+    editor.write_all(b"LATE EXTERNAL DRAFT").unwrap();
     editor.sync_all().unwrap();
     assert!(v.list("").unwrap()[0].conflict.is_some());
     assert!(v.source(&m.id).is_err());
