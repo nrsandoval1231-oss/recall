@@ -1,0 +1,20 @@
+{
+  "fixture": "SYNTHETIC ONLY — no user capture data",
+  "schema_version": "1.0",
+  "body_text": "Café — déjà vu",
+  "binding": {
+    "schema_version": "1.0",
+    "operation_id": "00000000-0000-4000-8000-000000000011",
+    "vault_id": "00000000-0000-4000-8000-000000000002",
+    "memory_id": "00000000-0000-4000-8000-000000000003",
+    "source_kind": "text",
+    "source_sha256": "ce64bc32f98c5671c41b71b39836c2359b80cd682fb89d4b18e29d4eb239a4f7",
+    "expected_revision": 1,
+    "input_sha256": "ce64bc32f98c5671c41b71b39836c2359b80cd682fb89d4b18e29d4eb239a4f7",
+    "consent_epoch": 1,
+    "captured_at": "2026-10-09T12:00:00Z"
+  },
+  "media_type": "text/plain; charset=utf-8",
+  "canonical_payload_json": "{\"binding\":{\"captured_at\":\"2026-10-09T12:00:00Z\",\"consent_epoch\":1,\"expected_revision\":1,\"input_sha256\":\"ce64bc32f98c5671c41b71b39836c2359b80cd682fb89d4b18e29d4eb239a4f7\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"operation_id\":\"00000000-0000-4000-8000-000000000011\",\"schema_version\":\"1.0\",\"source_kind\":\"text\",\"source_sha256\":\"ce64bc32f98c5671c41b71b39836c2359b80cd682fb89d4b18e29d4eb239a4f7\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"},\"input_sha256\":\"ce64bc32f98c5671c41b71b39836c2359b80cd682fb89d4b18e29d4eb239a4f7\",\"media_type\":\"text/plain; charset=utf-8\"}",
+  "payload_sha256": "481646ee70a86c27a69a68c0e29b054b572c602b6d91a20d11401cfcfb94c420"
+}

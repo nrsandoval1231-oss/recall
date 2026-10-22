@@ -1,0 +1,38 @@
+{
+  "fixture": "SYNTHETIC ONLY — no user capture data",
+  "schema_version": "2.0",
+  "body_text": "Project Lantern — réunion sur la résilience du réseau.",
+  "binding": {
+    "schema_version": "2.0",
+    "operation_id": "00000000-0000-4000-8000-000000000011",
+    "vault_id": "00000000-0000-4000-8000-000000000002",
+    "memory_id": "00000000-0000-4000-8000-000000000003",
+    "source_kind": "text",
+    "source_sha256": "fedccc85df8e788403023857266838cbda70cc83fc911d718a328c9525d8d5d7",
+    "expected_revision": 1,
+    "input_sha256": "1a92ef8bf02e76c30ee2a0771328915aed374165ae421fbb4c12c2893216e871",
+    "consent_epoch": 2,
+    "captured_at": "2026-10-09T12:00:00Z",
+    "context_coverage": {
+      "eligible_count": 1,
+      "selected_count": 1,
+      "limited": false,
+      "truncated_count": 0
+    },
+    "context": [
+      {
+        "memory_id": "00000000-0000-4000-8000-000000000004",
+        "memory_revision": 2,
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_kind": "human_note",
+        "epistemic_state": "reported",
+        "excerpt": "Project Lantern scope includes backup power."
+      }
+    ]
+  },
+  "media_type": "text/plain; charset=utf-8",
+  "canonical_binding_utf8": "{\"schema_version\":\"2.0\",\"operation_id\":\"00000000-0000-4000-8000-000000000011\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"source_kind\":\"text\",\"source_sha256\":\"fedccc85df8e788403023857266838cbda70cc83fc911d718a328c9525d8d5d7\",\"expected_revision\":1,\"input_sha256\":\"1a92ef8bf02e76c30ee2a0771328915aed374165ae421fbb4c12c2893216e871\",\"consent_epoch\":2,\"captured_at\":\"2026-10-09T12:00:00Z\",\"context_coverage\":{\"eligible_count\":1,\"selected_count\":1,\"limited\":false,\"truncated_count\":0},\"context\":[{\"memory_id\":\"00000000-0000-4000-8000-000000000004\",\"memory_revision\":2,\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_kind\":\"human_note\",\"epistemic_state\":\"reported\",\"excerpt\":\"Project Lantern scope includes backup power.\"}]}",
+  "organization_header": "v2.eyJzY2hlbWFfdmVyc2lvbiI6IjIuMCIsIm9wZXJhdGlvbl9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAxMSIsInZhdWx0X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwibWVtb3J5X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwic291cmNlX2tpbmQiOiJ0ZXh0Iiwic291cmNlX3NoYTI1NiI6ImZlZGNjYzg1ZGY4ZTc4ODQwMzAyMzg1NzI2NjgzOGNiZGE3MGNjODNmYzkxMWQ3MThhMzI4Yzk1MjVkOGQ1ZDciLCJleHBlY3RlZF9yZXZpc2lvbiI6MSwiaW5wdXRfc2hhMjU2IjoiMWE5MmVmOGJmMDJlNzZjMzBlZTJhMDc3MTMyODkxNWFlZDM3NDE2NWFlNDIxZmJiNGMxMmMyODkzMjE2ZTg3MSIsImNvbnNlbnRfZXBvY2giOjIsImNhcHR1cmVkX2F0IjoiMjAyNi0xMC0wOVQxMjowMDowMFoiLCJjb250ZXh0X2NvdmVyYWdlIjp7ImVsaWdpYmxlX2NvdW50IjoxLCJzZWxlY3RlZF9jb3VudCI6MSwibGltaXRlZCI6ZmFsc2UsInRydW5jYXRlZF9jb3VudCI6MH0sImNvbnRleHQiOlt7Im1lbW9yeV9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwNCIsIm1lbW9yeV9yZXZpc2lvbiI6Miwic291cmNlX3NoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJldmlkZW5jZV9raW5kIjoiaHVtYW5fbm90ZSIsImVwaXN0ZW1pY19zdGF0ZSI6InJlcG9ydGVkIiwiZXhjZXJwdCI6IlByb2plY3QgTGFudGVybiBzY29wZSBpbmNsdWRlcyBiYWNrdXAgcG93ZXIuIn1dfQ",
+  "canonical_payload_json": "{\"binding\":{\"captured_at\":\"2026-10-09T12:00:00Z\",\"consent_epoch\":2,\"context\":[{\"epistemic_state\":\"reported\",\"evidence_kind\":\"human_note\",\"excerpt\":\"Project Lantern scope includes backup power.\",\"memory_id\":\"00000000-0000-4000-8000-000000000004\",\"memory_revision\":2,\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"context_coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"expected_revision\":1,\"input_sha256\":\"1a92ef8bf02e76c30ee2a0771328915aed374165ae421fbb4c12c2893216e871\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"operation_id\":\"00000000-0000-4000-8000-000000000011\",\"schema_version\":\"2.0\",\"source_kind\":\"text\",\"source_sha256\":\"fedccc85df8e788403023857266838cbda70cc83fc911d718a328c9525d8d5d7\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"},\"input_sha256\":\"1a92ef8bf02e76c30ee2a0771328915aed374165ae421fbb4c12c2893216e871\",\"media_type\":\"text/plain; charset=utf-8\"}",
+  "payload_sha256": "8f0ff763ab3d0e0e00782e1fbb3f8723b798aa8a72b8308fd40e6bbc91484dfd"
+}

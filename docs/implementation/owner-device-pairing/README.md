@@ -1,5 +1,11 @@
 # Owner-approved photo inference pairing
 
+> Current product direction is in [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), and [roadmap](../../ROADMAP.md); this document preserves only the named historical candidate evidence.
+
+
+> Historical owner-device pairing evidence and boundaries. This remains a bounded inference-only path, not general synchronization or product acceptance; see canonical PRD and roadmap.
+
+
 PAIR-01 connects one selected vault to one existing owner/workspace for Claude photo inference. It does not add account sign-in, public enrollment, capture access, Ask, sync, or vault access. Local capture, annotation, evidence and keyword search remain available without connection.
 
 The desktop generates a device UUID and 32-byte random secret, writes pending material to the OS keyring before showing a SHA-256 fingerprint, device ID and vault ID. The renderer never receives the secret or service origin. A trusted operator uses the owner-only RECALL_MIGRATION_DATABASE_URL command below to create a single-use invitation bound to that fingerprint, exact vault/device IDs and an existing workspace owner. Claim sends the pending secret over the compile-time fixed HTTPS origin; the API hashes it, consumes the invitation in one transaction and stores only the hash in a revocable grant. Native verifies authenticated status and exact device/vault/inference scope before storing the reading connection.

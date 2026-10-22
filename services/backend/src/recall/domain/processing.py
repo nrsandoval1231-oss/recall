@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from ..config import Settings
@@ -95,6 +96,7 @@ def reserve_provider_budget(
     model_id: str,
     max_input_tokens: int,
     max_output_tokens: int,
+    consent_check: Callable[[Tx, Settings], bool] | None = None,
 ) -> uuid.UUID:
     """Reserve a conservative, durable maximum before an interpretation or Ask call.
 
@@ -102,9 +104,9 @@ def reserve_provider_budget(
     historical; its aggregate spend function intentionally covers every AI provider so separate
     callers cannot pass the budget check concurrently.
     """
-    if purpose not in ("interpret", "repair", "answer") or max_input_tokens < 0 or max_output_tokens < 0:
+    if purpose not in ("interpret", "repair", "answer", "organize") or max_input_tokens < 0 or max_output_tokens < 0:
         raise ValueError("invalid provider reservation")
-    if not consent_active(tx, settings):
+    if not (consent_check or consent_active)(tx, settings):
         raise BudgetReservationError("CONSENT_REQUIRED")
     tx.run("select pg_advisory_xact_lock(7402007)")
     day, month = spend(tx)

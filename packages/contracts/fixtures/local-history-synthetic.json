@@ -1,0 +1,183 @@
+{
+  "description": "Synthetic v1/v2 local history Ask wire, canonical bytes and digest fixtures. No private data.",
+  "requests": [
+    {
+      "name": "transformer-question",
+      "request": {
+        "schema_version": "1.0",
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "Who was the transformer person in Houston?",
+        "coverage": {
+          "eligible_count": 1,
+          "selected_count": 1,
+          "limited": false,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 4,
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "captured_at": "2026-10-09T12:00:00Z",
+            "evidence_kind": "human_note",
+            "epistemic_state": "reported",
+            "excerpt": "Met a transformer specialist in Houston; first name uncertain."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-10-09T12:00:00Z\",\"citation_id\":\"c1\",\"epistemic_state\":\"reported\",\"evidence_kind\":\"human_note\",\"excerpt\":\"Met a transformer specialist in Houston; first name uncertain.\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":4,\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000001\",\"question\":\"Who was the transformer person in Houston?\",\"schema_version\":\"1.0\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "8acc8e72c5d6bcddfaf436b4f214a37018c4ec1e126981459aec5400d0204e6c",
+      "expected": {
+        "receipt_schema_version": "1.0",
+        "result_status": "answered",
+        "citation_ids": [
+          "c1"
+        ]
+      }
+    },
+    {
+      "name": "history-as-of-unicode",
+      "request": {
+        "schema_version": "2.0",
+        "operation_id": "00000000-0000-4000-8000-000000000011",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "What did I know on October 1, 2026?",
+        "temporal": {
+          "mode": "as_of",
+          "start_utc": "2026-10-01T05:00:00Z",
+          "end_exclusive_utc": "2026-10-02T05:00:00Z",
+          "display_date": "2026-10-01",
+          "display_timezone": "America/Chicago"
+        },
+        "coverage": {
+          "eligible_count": 1,
+          "selected_count": 1,
+          "limited": false,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 2,
+            "event_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "captured_at": "2026-09-30T12:00:00Z",
+            "recorded_at": "2026-10-01T12:00:00Z",
+            "current_revision": 3,
+            "history_status": "as_of",
+            "evidence_kind": "human_note",
+            "epistemic_state": "reported",
+            "excerpt": "The remembered wording — Zürich, café ☕."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-09-30T12:00:00Z\",\"citation_id\":\"c1\",\"current_revision\":3,\"epistemic_state\":\"reported\",\"event_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_kind\":\"human_note\",\"excerpt\":\"The remembered wording — Zürich, café ☕.\",\"history_status\":\"as_of\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":2,\"recorded_at\":\"2026-10-01T12:00:00Z\",\"source_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000011\",\"question\":\"What did I know on October 1, 2026?\",\"schema_version\":\"2.0\",\"temporal\":{\"display_date\":\"2026-10-01\",\"display_timezone\":\"America/Chicago\",\"end_exclusive_utc\":\"2026-10-02T05:00:00Z\",\"mode\":\"as_of\",\"start_utc\":\"2026-10-01T05:00:00Z\"},\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "a6b56923bd65f44145f03c151c254dea1a36718c5acfb29e7616b7cfb05a0357",
+      "expected": {
+        "receipt_schema_version": "1.0",
+        "result_status": "answered",
+        "citation_ids": [
+          "c1"
+        ]
+      }
+    },
+    {
+      "name": "history-comparison-paired",
+      "request": {
+        "schema_version": "2.0",
+        "operation_id": "00000000-0000-4000-8000-000000000012",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "What changed since October 1, 2026?",
+        "temporal": {
+          "mode": "compare_to_current",
+          "start_utc": "2026-10-01T05:00:00Z",
+          "end_exclusive_utc": "2026-10-02T05:00:00Z",
+          "display_date": "2026-10-01",
+          "display_timezone": "America/Chicago"
+        },
+        "coverage": {
+          "eligible_count": 2,
+          "selected_count": 2,
+          "limited": false,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 2,
+            "event_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "captured_at": "2026-09-30T12:00:00Z",
+            "recorded_at": "2026-10-01T12:00:00Z",
+            "current_revision": 3,
+            "history_status": "as_of_later_corrected",
+            "evidence_kind": "human_note",
+            "epistemic_state": "uncertain",
+            "excerpt": "I thought the café was in Zürich — perhaps."
+          },
+          {
+            "citation_id": "c2",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 3,
+            "event_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "captured_at": "2026-09-30T12:00:00Z",
+            "recorded_at": "2026-10-03T10:00:00Z",
+            "current_revision": 3,
+            "history_status": "current_counterpart",
+            "evidence_kind": "human_note",
+            "epistemic_state": "reported",
+            "excerpt": "The café was in Geneva."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":2,\"limited\":false,\"selected_count\":2,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-09-30T12:00:00Z\",\"citation_id\":\"c1\",\"current_revision\":3,\"epistemic_state\":\"uncertain\",\"event_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_kind\":\"human_note\",\"excerpt\":\"I thought the café was in Zürich — perhaps.\",\"history_status\":\"as_of_later_corrected\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":2,\"recorded_at\":\"2026-10-01T12:00:00Z\",\"source_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},{\"captured_at\":\"2026-09-30T12:00:00Z\",\"citation_id\":\"c2\",\"current_revision\":3,\"epistemic_state\":\"reported\",\"event_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"evidence_kind\":\"human_note\",\"excerpt\":\"The café was in Geneva.\",\"history_status\":\"current_counterpart\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":3,\"recorded_at\":\"2026-10-03T10:00:00Z\",\"source_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000012\",\"question\":\"What changed since October 1, 2026?\",\"schema_version\":\"2.0\",\"temporal\":{\"display_date\":\"2026-10-01\",\"display_timezone\":\"America/Chicago\",\"end_exclusive_utc\":\"2026-10-02T05:00:00Z\",\"mode\":\"compare_to_current\",\"start_utc\":\"2026-10-01T05:00:00Z\"},\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "1b1a74f9d7bae019a19ed6833fdda4775f195e4871691b72c5200ebc649dea1a",
+      "expected": {
+        "receipt_schema_version": "1.0",
+        "result_status": "answered",
+        "citation_ids": [
+          "c1",
+          "c2"
+        ]
+      }
+    }
+  ],
+  "capability_dtos": {
+    "legacy_v1_missing": {
+      "scope": "vault_intelligence",
+      "consent": "missing",
+      "enabled": false
+    },
+    "legacy_v1_active": {
+      "scope": "vault_intelligence",
+      "consent": "active",
+      "enabled": true
+    },
+    "history_missing": {
+      "scope": "vault_intelligence",
+      "history_consent": "missing",
+      "history_enabled": false,
+      "consent_version": 0,
+      "history_policy_version": "ask-history-v1|<ai_policy_version>"
+    },
+    "history_active": {
+      "scope": "vault_intelligence",
+      "history_consent": "active",
+      "history_enabled": true,
+      "consent_version": 2,
+      "history_policy_version": "ask-history-v1|<ai_policy_version>"
+    },
+    "history_outdated": {
+      "scope": "vault_intelligence",
+      "history_consent": "outdated",
+      "history_enabled": false,
+      "consent_version": 1,
+      "history_policy_version": "ask-history-v1|<ai_policy_version>"
+    }
+  }
+}

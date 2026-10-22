@@ -1,0 +1,29 @@
+{
+  "packet": "INTELLIGENCE-01",
+  "reviewer": "Independent Sol /root/ask_review",
+  "verdict": "PASS",
+  "candidate_sha256": "4376965f5ff264fa023e02b9b9f941f4b20bdae51054b7fbded19f9394330dbe",
+  "base_head": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "scope": "Bounded local-vault Ask implementation over accepted REALIGN-01 and TEXT-01 predecessors; parent Finish Contract remains open.",
+  "findings": [
+    {
+      "id": "ASK-R1",
+      "status": "FIXED_AND_REVIEWED",
+      "evidence": "Nonempty receipt persists consent policy and decision version; GET and same-operation POST compare both to current active consent, permanently clear a mismatched completed result, and do not redispatch. Real-PostgreSQL regression covers revoke/re-opt-in without an intervening read, same-operation POST before GET, changed policy, and fresh operation under the new policy."
+    },
+    {
+      "id": "ASK-R2",
+      "status": "FIXED_AND_REVIEWED",
+      "evidence": "Native STALE_EVIDENCE remains a failed operation with no answer. AskPanel maps that exact code to a source-changed explanation and an explicit new Ask; client regression proves question retention, no answer/citation, and the fresh-attempt control. The canonical DTO contract permits this failed-operation representation."
+    }
+  ],
+  "independent_checks": [
+    "node .agent/INTELLIGENCE-01/freeze.mjs check: exit 0, digest 4376965f5ff264fa023e02b9b9f941f4b20bdae51054b7fbded19f9394330dbe, repeated after inspection",
+    "Reviewed seven-file review-repair delta, backend grant/consent/receipt paths, migration constraints, native stale branch, UI mapping, focused regressions, and recorded final gate logs/results",
+    "Backend final log: 376 passed, 3 skipped, 1 WSL Docker Desktop wrapper failure; exact Windows Compose test 1 passed",
+    "Client final result: check and bundle exit 0; 277 unit tests reported, lint/typecheck passed; local browser final result: 42 passed",
+    "Native inputs unchanged since recorded Windows 199 and WSL 201 test/check gates; legacy web inputs unchanged since recorded 42 browser checks"
+  ],
+  "acceptance_boundary": "PASS is limited to the frozen INTELLIGENCE-01 implementation candidate. The unsigned NSIS installer was built but not installed. No live provider, new grants, deployment, iPhone run, held-out relevance/entailment acceptance, migration, or parent Finish Contract completion was established.",
+  "next_direction": "Record bounded Ask acceptance and advance the next READY product node under the Work Graph. Preserve the live and parent gates as open; do not infer authorization for provider activation, merge, or deployment."
+}

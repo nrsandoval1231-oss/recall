@@ -1,4 +1,65 @@
-# Memory API — V1 contract
+# Recall API contracts
+
+## Text-file import — TEXT-FILE-01
+
+Native `vault_import_text_file({ expectedVaultId, operationId })` owns the one-file picker and returns a saved `VaultMemory` or `null` for cancellation. The renderer supplies neither a path nor file bytes. Keep the operation ID through uncertain outcomes and retry: an existing receipt or recoverable import returns the same memory without reopening the picker; a staged import without its source requires the same basename and bytes on reselection.
+
+Imported memories add optional `imported_text` provenance: `original_name`, `original_extension`, `source_media_type`, `semantic_sha256`, `semantic_bytes`, and `semantic_characters`. The exact original remains an inert `.txt` attachment, including BOM and line endings. The existing source command returns its bytes as `text/plain; charset=utf-8`; the original filename is display data. One leading UTF-8 BOM is omitted only from the initial semantic text. No original Markdown frontmatter becomes Recall metadata.
+
+The existing text organization wire and consent remain unchanged. Capture accepts at most 256 KiB; the smaller 30,000-character/120,000-byte organization limits still apply. A larger valid capture stays local and searchable with an honest skipped-processing state. See the [accepted packet](../.agent/TEXT-FILE-01.md) and [exact acceptance](../.agent/TEXT-FILE-01/COMPLETION.json).
+
+## Historical local Ask — HISTORY-01 accepted contract
+
+The existing `POST /v1/local-intelligence/ask` accepts a strict v2 request for retained history; current v1 requests and receipt wrappers retain their original shape. V2 adds `temporal` with mode (`as_of` or `compare_to_current`), UTC local-day boundaries, display date and timezone. Each evidence item adds its exact journal `event_sha256`, `recorded_at`, `current_revision` and role (`as_of`, `as_of_later_corrected`, `current_counterpart`). Paired items must share source/current identity; later-corrected evidence requires its current counterpoint. Existing eight-item, 1,500-byte excerpt and 32-KiB request bounds still apply. Canonical digests bind the complete request.
+
+Legacy `GET /v1/local-intelligence/capability` remains exactly `scope`, `consent`, `enabled`. Separate protected `GET /v1/local-intelligence/history-capability` returns `scope`, `history_consent`, `history_enabled`, `consent_version`, `history_policy_version`. Owner-authorized `POST /v1/local-intelligence/ask/consent` takes exactly `enable_history` and `expected_version` and returns that history-only capability. Check grant and owner before reading the body, and recheck the exact grant in the mutation transaction. A stale version conflicts. This workspace-purpose decision does not grant device/vault access.
+
+Native historical citations return the exact retained revision, the request-bound excerpt and verified original bytes. The retained revision includes its note, reading and optional organization proposal so automatically organized photos remain readable in history. Human corrections suppress stale machine interpretations; if a required current correction has no eligible text, omit the entire past/current pair.
+
+Historical comparison preserves the evidence kind: machine re-reading is an unreviewed machine change, not a human correction. Only an explicit correction of the selected content earns the later-corrected role. An unrelated photo annotation cannot substitute for a missing transcription counterpart; suppressed claims without a corresponding correction are omitted.
+
+See the [active packet](../.agent/HISTORY-01.md), [compatibility decision](../.agent/HISTORY-01-CAPABILITY-ADDENDUM.md) and [synthetic wire fixture](../packages/contracts/fixtures/local-history-synthetic.json). This contract has bounded independent local acceptance at d506c8de; live quality and installed-device gates remain open.
+
+## Related context — CONTEXT-01 bounded acceptance
+
+The existing organization routes accept a version 2 binding with `context_coverage` and at most three current-memory excerpts of at most 256 UTF-8 bytes each. `X-Recall-Organization` is `v2.` plus unpadded base64url UTF-8 JSON, at most 3,072 ASCII bytes and 2,300 decoded bytes. The raw source body and existing limits are unchanged. Recursively sorted compact JSON over binding, media type and input hash still defines operation identity; context is included. Strict parsing rejects malformed, duplicate or unknown fields before source-body processing. See the [shared Unicode fixture](../packages/contracts/fixtures/local-context-synthetic.json).
+
+The `organize-v2` policy requires a new explicit decision before transmitting prior-vault excerpts. Version 1 receipts remain readable; their queued operations are not silently enrolled under a new fence. One provider result contains validated source extraction and `related_context` entries with only a supplied target ID and exact source/target quotes. No model path or identity edge is accepted. Context contributes to budget admission; unknown effects recover the same operation.
+
+Native `vault_related_memory(expectedVaultId, sourceMemoryId, targetMemoryId)` validates a current source link, target revision/hash/excerpt/path and immutable original under one selected-session/vault lock. It returns target identity/revision/source metadata, native basename and verified original bytes. The UI accepts no filesystem path and rejects changed follow-up state. Current memory DTOs may expose eligible `related_context` and `context_repair_pending`; the latter means suppression could not be safely committed, not that background work is running. Full contract and acceptance: [CONTEXT-01](../.agent/CONTEXT-01.md).
+
+## Automatic local organization — accepted version 1 contract
+
+This contract uses the protected `vault_intelligence` grant and a separate, revocable `organize` consent keyed by exact workspace/device/vault association. Each association opts in independently; its consent epoch cannot authorize or stale another association's queue. Ask consent and selected-photo consent do not authorize it. Source-local version 1 has [bounded independent acceptance](../.agent/ORGANIZE-01/REVIEW.json); version 2 above is the active extension.
+
+| Route | Request | Result |
+| --- | --- | --- |
+| `GET /v1/local-intelligence/organization-capability` | Exact scoped bearer | Configured provider/policy, consent state, epoch and availability |
+| `POST /v1/local-intelligence/organization-consent` | Strict policy echo, enabled decision and expected epoch | Updated capability; stale decisions reject |
+| `POST /v1/local-intelligence/organizations` | Strict `X-Recall-Organization` binding plus raw text or photo bytes | Bound receipt; no canonical server memory |
+| `GET /v1/local-intelligence/organizations/{operation_id}` | Same scoped bearer and operation | Recovery receipt or authenticated absence |
+
+The [version 1 packet](../.agent/ORGANIZE-01.md) specifies the exact wire, bounds, receipt and consent rules; the [shared Unicode fixture](../packages/contracts/fixtures/local-organization-synthetic.json) binds Python and Rust canonicalization. Text uses its exact current human text, with immutable original hash retained separately; photo uses verified original bytes and a bounded service-generated derivative. The text model supplies semantic proposals only. Software attaches the exact submitted transcription and validates source quotations before full extraction validation.
+
+The native future-capture fence is established only after explicit consent succeeds. No backlog is enrolled. Source and journal durability precede dispatch, and capture does not wait for inference. Consent policy/epoch, grant, source, revision and connection are rechecked; changed or revoked decisions cannot release old private results. Unknown effects recover the same operation before any resend. Result content expires within 24 hours while accounting and replay tombstones remain. Native publication is journaled into the owner vault; later human edits suppress stale machine semantics.
+
+Native command responses additionally expose `local_readiness` (`ready`, `needs_setup`, `off`, `unknown`) and `automatic_enabled`; these are local fields, not additions to the service wire. Server permission alone cannot mean the device is ready. Explicit `vault_reconcile_organization_consent(expectedVaultId)` finishes interrupted setup under the current connection and establishes a new future-only marker. An ambiguous consent POST succeeds only when authenticated recovery proves the exact next decision epoch and requested consent state; server `enabled` describes availability and cannot prove the permission decision. Commands use an opaque selection token, while returned `vault_id` identifies the permanent vault. Background work rechecks the live selection, and publication cannot race a vault switch.
+
+## Local vault Ask — INTELLIGENCE-01
+
+This is a separate inference-profile contract; legacy cloud Ask and photo-only authorization are unchanged. Only a current `vault_intelligence` bearer grant for the exact owner/workspace/device/vault may access it. New grants and versioned Ask consent are default-disabled and must be explicitly provisioned by the owner-controlled operator path.
+
+| Route | Request | Result |
+| --- | --- | --- |
+| `GET /v1/local-intelligence/capability` | Exact scoped bearer | `scope`, `consent` (`active`/`missing`), `enabled` |
+| `POST /v1/local-intelligence/ask` | Strict JSON question/evidence packet | Bound receipt; 202 for in-flight/unknown, 200 for terminal |
+| `GET /v1/local-intelligence/ask/{operation_id}` | Same scoped bearer/operation | Recovery receipt; authenticated 404 only for absent receipt |
+
+The exact request/receipt schemas and canonical digest algorithm are in [INTELLIGENCE-01](../.agent/INTELLIGENCE-01.md#exact-ask-wire-contract-json-v1); [the shared synthetic fixture](../packages/contracts/fixtures/local-intelligence-synthetic.json) is consumed by both native and backend tests. The request has schema version, canonical UUID operation/vault IDs, a 1–2,000 UTF-8-byte question, coverage and at most eight evidence items. Each carries a sequential citation ID, memory ID/revision, source SHA-256, capture time, evidence kind, epistemic state and exact 1–1,500-byte excerpt. Total body is at most 32 KiB. Reject duplicate/unknown keys, invalid Unicode, noninteger numeric forms and invalid coverage. Recursively sorted compact UTF-8 JSON defines the digest.
+
+Receipt fields are `schema_version`, `operation_id`, `vault_id`, `payload_sha256`, `state`, `result`, `error_code`. States: `in_flight`, `unknown`, `complete`, `failed`, `expired`. Only complete receipts carry a result (`answered`, `ambiguous` or `insufficient_evidence`) with individually cited sentences and limitations. IDs must refer to the submitted packet. Invalid model output cannot become an answer. Same operation/digest replays; a changed digest conflicts. Unknown provider effects retain the budget hold and never authorize automatic redispatch. Expired results leave tombstones, not a resend-enabling 404.
+
+Authorization precedes body reading and is rechecked before dispatch and private response. Current purpose consent is distinct from photo consent. Each nonempty receipt records its admitted consent policy and decision version; recovery and replay cannot release a prior answer after that decision changes, even if permission is later renewed. Invalidated results are discarded while idempotency and accounting metadata remain. Native revalidates sources/revisions/effective text and connection after recovery before mapping citation IDs to vault memories; stale evidence has no answer. Service results are operational and expire within 24 hours. No legacy memory query, canonical memory write or full-vault upload occurs.
 
 ## Required Obsidian architecture boundary
 

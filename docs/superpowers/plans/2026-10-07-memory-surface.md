@@ -1,5 +1,8 @@
 # Canonical Memory Surface implementation plan
 
+> Historical plan/design record. It preserves its original approved scope and evidence; it is not current dispatch. Current direction is governed by [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), [roadmap](../../ROADMAP.md), and [documentation map](../../DOCUMENTATION-MAP.md).
+
+
 **Goal:** Deliver RCL-005A in the active browser pilot with evidence underneath, understanding above it, and reversible focus through depth.
 **Spec:** `docs/UX-SPEC.md`, as approved in PR #7 (`b205d61`).
 **Architecture:** DOM/CSS boards over existing authenticated API contracts. A bounded focus stack restores question, temporal state, and scroll/focus. Capture continues using workspace-scoped IndexedDB drafts and verified finalization. No backend architecture change.

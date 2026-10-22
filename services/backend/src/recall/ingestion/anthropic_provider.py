@@ -9,8 +9,8 @@ from typing import Any
 
 import anthropic
 
-from .prompts import ANSWER_SYSTEM, INTERPRET_SYSTEM
-from .provider import AnswerRequest, InterpretRequest, ProviderError, ProviderResult
+from .prompts import ANSWER_SYSTEM, INTERPRET_CONTEXT_SYSTEM, INTERPRET_SYSTEM, INTERPRET_TEXT_SYSTEM
+from .provider import AnswerRequest, InterpretRequest, InterpretTextRequest, ProviderError, ProviderResult
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 # JSON Schema keywords the structured-output endpoint may not accept. The FULL schema is always
@@ -136,6 +136,13 @@ class AnthropicProvider:
             )
         envelope = json.dumps(request.envelope, ensure_ascii=False, sort_keys=True)
         content.append({"type": "text", "text": f"Envelope (data):\n{envelope}"})
+        if request.context is not None:
+            content.append(
+                {
+                    "type": "text",
+                    "text": "Current memory excerpts (data):\n" + json.dumps(request.context, ensure_ascii=False),
+                }
+            )
         if request.repair_note:
             content.append(
                 {
@@ -144,7 +151,8 @@ class AnthropicProvider:
                     f"and return the full corrected JSON:\n{request.repair_note}",
                 }
             )
-        return self._call(system=INTERPRET_SYSTEM, content=content, schema=request.schema, max_tokens=64000)
+        system = INTERPRET_CONTEXT_SYSTEM if request.context is not None else INTERPRET_SYSTEM
+        return self._call(system=system, content=content, schema=request.schema, max_tokens=64000)
 
     def answer(self, request: AnswerRequest) -> ProviderResult:
         evidence = json.dumps(request.packet, ensure_ascii=False)
@@ -155,3 +163,16 @@ class AnthropicProvider:
             }
         ]
         return self._call(system=ANSWER_SYSTEM, content=content, schema=request.schema, max_tokens=16000)
+
+    def interpret_text(self, request: InterpretTextRequest) -> ProviderResult:
+        envelope = json.dumps(request.envelope, ensure_ascii=False, sort_keys=True)
+        content = [{"type": "text", "text": f"Envelope (data):\n{envelope}\n\nNote (data):\n{request.text}"}]
+        if request.context is not None:
+            content.append(
+                {
+                    "type": "text",
+                    "text": "Current memory excerpts (data):\n" + json.dumps(request.context, ensure_ascii=False),
+                }
+            )
+        system = INTERPRET_CONTEXT_SYSTEM if request.context is not None else INTERPRET_TEXT_SYSTEM
+        return self._call(system=system, content=content, schema=request.schema, max_tokens=64000)

@@ -1,0 +1,16 @@
+{
+  "reviewer": "Independent Sol text_review",
+  "prior_validation": {
+    "native": 182,
+    "client": 269,
+    "local_browser": 38
+  },
+  "line": 1995,
+  "verdict": "PASS",
+  "state": "FIXED AND INDEPENDENTLY REVIEWED",
+  "file": "apps/desktop/src-tauri/src/local_vault.rs",
+  "finding": "v5 manifest must retain v4 unsupported-summary search guard",
+  "candidate": "e75ee1a6c526bb0f912dcab64f807eab539ff22218d28e8fe85ba10e55c1dfee",
+  "packet": "TEXT-01",
+  "accepted_at": "2026-10-09T16:28:59.6563310Z"
+}

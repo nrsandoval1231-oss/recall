@@ -1,5 +1,8 @@
 # Selected-photo Claude reading
 
+> Historical plan/design record. It preserves its original approved scope and evidence; it is not current dispatch. Current direction is governed by [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), [roadmap](../../ROADMAP.md), and [documentation map](../../DOCUMENTATION-MAP.md).
+
+
 The owner selected Claude full-page vision as the primary photo-reading path and authorized implementation, synthetic tests and a stacked draft PR. This bounded design extends the no-sign-in local vault; it does not enable a service, enroll devices or authorize paid calls.
 
 ## Experience and authority

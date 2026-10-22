@@ -1,0 +1,71 @@
+{
+  "packet": "ORGANIZE-01",
+  "status": "ACCEPTED_BOUNDED_LOCAL",
+  "base_sha": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "candidate_sha256": "c6ba102968d9c4b6513d5a4f8c9a0cbe446293563249ce6ba1078cc24d777b82",
+  "baseline_sha256": "4376965f5ff264fa023e02b9b9f941f4b20bdae51054b7fbded19f9394330dbe",
+  "scope": "Remembered future-only text/photo organization, source-first native queue, v6 Obsidian proposals, correction-safe current projections and capture-first UI",
+  "validation": {
+    "windows_native": "217 tests passed; locked all-target check passed on c6ba1029",
+    "wsl_native": "219 tests passed; fmt and locked all-target check passed on c6ba1029",
+    "client": "npm run check passed: lint, typecheck, 288 unit tests; desktop production build passed on c6ba1029",
+    "browser": "46 local browser and 42 legacy web browser passed on c6ba1029",
+    "backend_static": "Ruff check/format passed (97 files); mypy passed (54 source files)",
+    "backend_full": "385 passed, 3 explicitly skipped, 1 WSL Docker wrapper failure; exact same offline Compose test passed separately on Windows",
+    "backend_skips": [
+      "Two explicitly opt-in live Claude batches",
+      "Isolated DO-OPS Docker database unavailable"
+    ],
+    "docs": "49 changed active Markdown files checked; no broken local file links; historical archives and anchor existence excluded",
+    "installer": "Unsigned NSIS build passed on c6ba1029, retained Recall-c6ba1029-x64-setup.exe SHA256 937a7b61f518507d4eb68ba2d4d8db8d1769c363b8bf280179340eddc52c6be9, 4850368 bytes. Not installed.",
+    "candidate_integrity": "Freeze checks passed around final native/client/browser/build groups. one-decision-delta.json proves only one native implementation and two test changes; backend and its inputs byte-identical to prior validated candidate, retained backend evidence applies."
+  },
+  "evidence": [
+    "candidate.json",
+    "delta.json",
+    "windows-final.result.json",
+    "wsl-final.result.json",
+    "client-final.result.json",
+    "browser-final.result.json",
+    "backend-final.result.json",
+    "docs-links.json",
+    "native-completion.json",
+    "backend-completion.json",
+    "ui-completion.json",
+    "installer-final.result.json",
+    "windows-bundle-artifact.json",
+    "native-review-repair.json",
+    "ui-review-repair.json",
+    "review-repair-delta.json",
+    "source-b4595729f8d33c82760b878dedad7a4489b5d05c573c75e8f78711ad9cf607e7.zip",
+    "test-only-delta.json",
+    "test-repair-final.result.json",
+    "source-1e323bba4029c20cc663546a740504c46c8d883c50c32532dac6abb51bd84a7e.zip",
+    "one-decision-repair.json",
+    "one-decision-delta.json",
+    "source-c6ba102968d9c4b6513d5a4f8c9a0cbe446293563249ce6ba1078cc24d777b82.zip"
+  ],
+  "retained_failures": [
+    "Initial full backend development run: WSL Docker wrapper, wrong-host esbuild and stale route inventory; corrected environment/inventory, final results above",
+    "Controller evidence-script ESLint errors; scripts fixed, app source unchanged, client check rerun passed",
+    "Bounded native/UI/backend development repairs and failures retained in lane artifacts",
+    "b459 local browser 40/44 and first test repair 40/44 retained; corrected synthetic identity/disclosure test assumptions, final44/44",
+    "Second review rejects 1e323bba: ORG-R5 ordinary enable did not set future marker; second-review artifacts retained"
+  ],
+  "open": [
+    "Live provider/held-out handwriting and recall quality",
+    "Installed Windows and iPhone acceptance",
+    "Grounded context links and historical retrieval",
+    "Voice/files/phone transport",
+    "Full Finish Contract"
+  ],
+  "authority": "No new real grant or consent activation, live provider call, spending, real-data migration, push, merge or deployment. Work remains uncommitted.",
+  "rejected_candidate": "77f6430f124952f43b4cb3dc69e6b3a3d3d393d3c4b34707e8dd86aeb3442618",
+  "review_repairs": [
+    "ORG-R0 permanent vault identity vs selection token in native-shaped UI fixtures",
+    "ORG-R1 oversize sources remain local and do not block queued work",
+    "ORG-R2 live selection guard and atomic selected-session promotion",
+    "ORG-R3 explicit local readiness/reconciliation and exact decision epoch proof",
+    "ORG-R4 plain focused-note language and one original action"
+  ]
+}

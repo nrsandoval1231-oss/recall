@@ -1,0 +1,33 @@
+{
+  "packet": "CONTEXT-01",
+  "role": "independent Sol reviewer",
+  "verdict": "PASS",
+  "candidate": "4ec20fdb1a4047ff1fbe03b50b0582c3fa3bf355edb4c6a913715de2f4d7a245",
+  "base_head": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "accepted_baseline": "c6ba102968d9c4b6513d5a4f8c9a0cbe446293563249ce6ba1078cc24d777b82",
+  "started_utc": "UNKNOWN",
+  "finished_utc": "2026-10-09T23:54:01Z",
+  "findings": [],
+  "prior_review": {
+    "retained_at": ".agent/CONTEXT-01/first-review/REVIEW.json",
+    "CTX-R1": "Resolved for v7 source correction, removal and missing-note restore. The prior review inferred a downgrade from the writer's FORMAT_V2 draft, but commit() already normalizes it to the v7 manifest before validation. The actual failures involved v7 projection suppression and removal precondition handling. Direct production regressions now prove correct/remove/restore, retained history and monotone suppression.",
+    "CTX-R2": "Resolved for v7 photo reading correction. The prior review inferred a downgrade from the writer's FORMAT_V3 draft; commit() normalizes it to v7. The actual repair keeps v7 in reading setup's supported manifest fence and verifies correction, hash/projection, effective human reading and replay.",
+    "CTX-R3": "Resolved: v2 JSON is narrowed to a dictionary before validation/return. Full strict mypy passes without changing the v1/v2 wire parser.",
+    "CTX-R4": "Resolved additional second-capture failure found during repair: a later v7 capture has an empty projection, and only its first valid v2 organization may publish the initial bound projection. Established projections still reject insertion, retargeting, basename change and revival."
+  },
+  "independent_review": [
+    "Read AGENTS.md, canonical PRD/architecture/roadmap, Finish Contract, CONTEXT-01 packet, corrected replay addendum and v7 repeated-capture repair addendum. Inspected native/backend repair artifacts and changed ROADMAP status paragraphs.",
+    "Inspected actual commit() normalization, v7 event/hash/replay checks, organization transition initialization and monotonic rules, source correction/removal/restore/reading paths, current target and click revalidation, backend v2 wire/consent/budget validation and UI disclosure.",
+    "Reviewed direct native production regressions for v7 source correct/remove/restore/reading, second capture and organization, and negative insertion/retarget/rename/revival. Existing tests retain external target rename, interrupted repair, source conflict and current-link checks.",
+    "Independently rehashed all 447 files in candidate.json: zero mismatches. node .agent/CONTEXT-01/freeze.mjs check returned candidate unchanged at 4ec20fdb1a4047ff1fbe03b50b0582c3fa3bf355edb4c6a913715de2f4d7a245.",
+    "Independently SHA-256 checked retained unsigned installer .agent/CONTEXT-01/Recall-4ec20fdb-x64-setup.exe: ed4347f79493ebda1608fe8ab262ceea6049568b2f3ec3d900d31087874f6bf9. It was built, not installed."
+  ],
+  "validation": {
+    "native": "Windows 229 tests and all-target check PASS; WSL 231 tests, fmt and all-target check PASS.",
+    "client_browser": "Client 298 tests, lint, typecheck and desktop build PASS; local browser 48 and legacy web browser 42 PASS.",
+    "backend": "Ruff check/format and full strict mypy PASS; pytest 387 passed, 3 skipped and 1 WSL Docker Compose wrapper failure. The exact Compose test passed on Windows. This platform-split result is bounded; the WSL suite is not represented as fully green.",
+    "delivery": "Unsigned NSIS installer build PASS; retained 4,895,937-byte artifact hash checked. Diff check PASS; 54 changed active Markdown links checked with zero broken links."
+  },
+  "acceptance_boundary": "PASS accepts only the bounded synthetic/local current-related-memory CONTEXT-01 candidate. No real grant or opt-in activation, live provider/proxy header proof, real-vault semantic quality, installed Windows, phone, historical/as-of retrieval, voice/files, migration, deployment, merge or parent Finish Contract completion is established.",
+  "next_direction": "Record bounded acceptance at this exact manifest; continue the dependency-aware Work Graph with the next READY historical retrieval or remaining input/device packet. Keep live, hardware, distribution and parent-product gates open."
+}

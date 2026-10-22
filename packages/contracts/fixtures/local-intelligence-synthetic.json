@@ -1,0 +1,63 @@
+{
+  "description": "Synthetic v1 local-vault Ask wire and canonical digest fixtures. No private data.",
+  "requests": [
+    {
+      "name": "transformer-question",
+      "request": {
+        "schema_version": "1.0",
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "Who was the transformer person in Houston?",
+        "coverage": {
+          "eligible_count": 1,
+          "selected_count": 1,
+          "limited": false,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 4,
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "captured_at": "2026-10-09T12:00:00Z",
+            "evidence_kind": "human_note",
+            "epistemic_state": "reported",
+            "excerpt": "Met a transformer specialist in Houston; first name uncertain."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-10-09T12:00:00Z\",\"citation_id\":\"c1\",\"epistemic_state\":\"reported\",\"evidence_kind\":\"human_note\",\"excerpt\":\"Met a transformer specialist in Houston; first name uncertain.\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":4,\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000001\",\"question\":\"Who was the transformer person in Houston?\",\"schema_version\":\"1.0\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "8acc8e72c5d6bcddfaf436b4f214a37018c4ec1e126981459aec5400d0204e6c"
+    },
+    {
+      "name": "unicode-question",
+      "request": {
+        "schema_version": "1.0",
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "question": "Who did I meet in Zürich? 📝",
+        "coverage": {
+          "eligible_count": 1,
+          "limited": false,
+          "selected_count": 1,
+          "truncated_count": 0
+        },
+        "evidence": [
+          {
+            "citation_id": "c1",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "memory_revision": 4,
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "captured_at": "2026-10-09T12:00:00Z",
+            "evidence_kind": "human_note",
+            "epistemic_state": "uncertain",
+            "excerpt": "Met Ana in Zürich — name uncertain."
+          }
+        ]
+      },
+      "canonical_json_utf8": "{\"coverage\":{\"eligible_count\":1,\"limited\":false,\"selected_count\":1,\"truncated_count\":0},\"evidence\":[{\"captured_at\":\"2026-10-09T12:00:00Z\",\"citation_id\":\"c1\",\"epistemic_state\":\"uncertain\",\"evidence_kind\":\"human_note\",\"excerpt\":\"Met Ana in Zürich — name uncertain.\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"memory_revision\":4,\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"operation_id\":\"00000000-0000-4000-8000-000000000001\",\"question\":\"Who did I meet in Zürich? 📝\",\"schema_version\":\"1.0\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\"}",
+      "sha256": "83da2e4f0dfcfb7ee7ade51d27a25c79356cf13c0dc30673dd5d45a570683b8c"
+    }
+  ]
+}

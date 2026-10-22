@@ -1,0 +1,35 @@
+{
+  "final_verdict": "PASS_BOUNDED_REALIGNMENT",
+  "reviewer": "Independent Sol /root/final_review",
+  "verdict": "PASS",
+  "scope": "source/docs; .agent bookkeeping excluded",
+  "candidate": "e68575350c82bb0803921f316eda3b2724e945377f985d9d9a33de5c1967b540",
+  "findings": [
+    {
+      "status": "FIXED_AND_REVIEWED",
+      "id": "R1",
+      "finding": "Nonempty summary could enter current projection without source evidence",
+      "repair": "Strict new receipt validation; suppress unsupported historical summary in v4 renderer/current search/UI while preserving historical validation and v1-v3 rendering"
+    },
+    {
+      "status": "WITHDRAWN",
+      "id": "R0",
+      "finding": "Suspected external-event payload hash mismatch",
+      "reason": "commit canonicalizes and rehashes v3/v4 payload before journaling; no implementation change"
+    }
+  ],
+  "packet": "REALIGN-01",
+  "accepted_at": "2026-10-09T15:11:41.3687296Z",
+  "independent_checks": [
+    "freeze.mjs check exit0",
+    "git diff --check exit0",
+    "Actual source/docs diff and final doc-only delta reviewed"
+  ],
+  "limitations": [
+    "Grounded local natural-language Ask",
+    "Text/voice/file adapters",
+    "Context-aware cross-memory organization",
+    "Phone transport",
+    "Installed-device and live-quality acceptance"
+  ]
+}

@@ -17,10 +17,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from ..config import Settings, get_settings
 from ..db.database import Database
 from ..errors import ApiError
+from ..ingestion.local_intelligence import (
+    IntelligenceAuthorizer,
+    LocalIntelligenceService,
+    vault_intelligence_pairing_routes,
+)
+from ..ingestion.local_organization import LocalOrganizationService
 from ..ingestion.local_reading import LocalReadingService
 from ..ingestion.provider import Provider
 from ..pairing import DatabaseDeviceAuthorizer, pairing_routes
 from .app import RequestIdMiddleware
+from .local_intelligence import register_routes as register_local_intelligence_routes
+from .local_organization import register_routes as register_local_organization_routes
 from .local_reading import register_routes as register_local_reading_routes
 
 log = logging.getLogger("recall.inference")
@@ -49,6 +57,8 @@ def create_inference_app(
             max_retries=0,
         )
     readings = LocalReadingService(db, settings, DatabaseDeviceAuthorizer(db), provider)
+    intelligence = LocalIntelligenceService(db, settings, IntelligenceAuthorizer(db), provider)
+    organization = LocalOrganizationService(db, settings, IntelligenceAuthorizer(db), provider)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -56,6 +66,8 @@ def create_inference_app(
             db.open()
         db.assert_least_privilege()
         await asyncio.to_thread(readings.expire)
+        await asyncio.to_thread(intelligence.expire)
+        await asyncio.to_thread(organization.expire)
         stop = asyncio.Event()
 
         async def janitor() -> None:
@@ -65,6 +77,8 @@ def create_inference_app(
                 except TimeoutError:
                     try:
                         await asyncio.to_thread(readings.expire)
+                        await asyncio.to_thread(intelligence.expire)
+                        await asyncio.to_thread(organization.expire)
                     except Exception:
                         log.error("receipt retention maintenance failed")
 
@@ -139,7 +153,10 @@ def create_inference_app(
         return {"status": "ready"}
 
     pairing_routes(app, db)
+    vault_intelligence_pairing_routes(app, db)
     register_local_reading_routes(app, readings)
+    register_local_intelligence_routes(app, intelligence)
+    register_local_organization_routes(app, organization)
     return app
 
 

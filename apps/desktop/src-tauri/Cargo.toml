@@ -29,6 +29,8 @@ uuid = { version = "1", features = ["v4"] }
 rfd = "0.15.4"
 reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls"] }
 zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
+rubato = "=5.0.1"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+cpal = "=0.18.2"

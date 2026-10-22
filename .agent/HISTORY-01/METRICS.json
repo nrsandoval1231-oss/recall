@@ -1,0 +1,28 @@
+{
+  "packet": "HISTORY-01",
+  "planning_started_utc": "UNKNOWN",
+  "build_started_utc": "UNKNOWN; exact dispatch timestamp not measured",
+  "lane": "Sequential backend/native/UI Luna; Terra orchestration repair; Luna independent regression repair; Sol architecture and independent review",
+  "tokens": "UNKNOWN",
+  "config_identity": "AGENTS named roles; runtime model load not independently measured",
+  "repair_count": "UNKNOWN total; pre-freeze corrections and failed attempts retained in EPISODE and lane artifacts",
+  "elapsed_to_accepted": "UNKNOWN: build-start timestamp was not captured; exact gate durations retained",
+  "speedup": "UNKNOWN",
+  "rejected_exact_candidates": [
+    "e0932e1b708693b65edf35f53c52bd8f3800b1173ec0b438d36475938aab2114",
+    "51830aaf8054764803d24b0d0234337d75b6e72ca4f7b35aeae5139d0e94ab0f",
+    "02c38c6b26ea899c3051ee0661d6f31630f8e61217e84ee003a7dbc0862afdd4",
+    "90056bae82b88cbfa39e7ca3816618b35503d1e36f123a99592467dfa97472d8"
+  ],
+  "accepted_candidate": "d506c8de2e6c1ebeffc307874e54459b02eead020360b2d06884fd866d309408",
+  "accepted_at_utc": "2026-10-10T02:03:10Z",
+  "independent_review_repairs": 3,
+  "final_validation_receipts": [
+    "windows-final.result.json",
+    "wsl-final.result.json",
+    "backend-final.result.json",
+    "client-final.result.json",
+    "browser-final.result.json",
+    "installer-final.result.json"
+  ]
+}

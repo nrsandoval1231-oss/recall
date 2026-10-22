@@ -15,6 +15,7 @@ async function patchMemory(page: Page, patch: Partial<VaultMemory>) {
   }, patch);
   await page.reload();
 }
+async function memoryTool(page: Page, name: "Removed items" | "Rebuild local search") { await page.getByText("Memory tools", { exact: true }).locator("xpath=..").evaluate((el: HTMLDetailsElement) => { el.open = true; }); await page.getByRole("button", { name, exact: true }).click(); }
 async function accessible(page: Page) {
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
 }
@@ -41,6 +42,7 @@ test("flat renamed basename is searchable; missing note requires explicit restor
   await page.getByLabel("Search notes and filenames").fill("renamed-garden");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await row(page).click();
+  await page.getByText("Note details", { exact: true }).click();
   await expect(page.getByText("SYNTHETIC-renamed-garden.md", { exact: true })).toBeVisible();
   await patchMemory(page, { state: "missing", note_path: null, conflict: "SYNTHETIC Markdown note is missing" });
   await row(page).click();
@@ -56,6 +58,7 @@ test("flat renamed basename is searchable; missing note requires explicit restor
   await expect(page.getByText(/restore · human:recall/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Revision 1", exact: true })).toBeVisible();
   await page.reload(); await row(page).click();
+  await page.getByText("Note details", { exact: true }).click();
   await expect(page.getByText(/Revision 2/)).toBeVisible();
   expect((await calls(page, "vault_restore_note")).length).toBe(0); // Reload never retries a restore.
 });
@@ -75,7 +78,7 @@ test("removal requires confirmation; removed history survives reload and stale c
   await expect(page.getByRole("button", { name: "Correct note" })).toBeDisabled();
   await page.getByRole("button", { name: "Back to memories" }).click();
   await expect(row(page)).toHaveCount(0);
-  await page.getByRole("button", { name: "Removed items", exact: true }).click();
+  await memoryTool(page, "Removed items");
   await expect(row(page)).toBeVisible();
   await expect(page.getByText("Saved in vault · Stored on this device", { exact: true })).toHaveCount(0);
   await accessible(page); await screenshot(page, info, "removed");
@@ -90,10 +93,10 @@ test("removal requires confirmation; removed history survives reload and stale c
   await page.reload(); await page.getByRole("button", { name: "Retry pending import", exact: true }).click();
   await expect(page.getByText("This memory is already removed · files retained", { exact: true })).toBeVisible();
   await expect(row(page)).toHaveCount(0);
-  await page.getByRole("button", { name: "Rebuild local search", exact: true }).click();
+  await memoryTool(page, "Rebuild local search");
   await expect(page.getByText("Local keyword search rebuilt from validated vault records.", { exact: true })).toBeVisible();
   await expect(row(page)).toHaveCount(0);
-  await page.getByRole("button", { name: "Removed items", exact: true }).click();
+  await memoryTool(page, "Removed items");
   await expect(row(page)).toHaveCount(1);
   await row(page).click(); await page.getByRole("button", { name: "History", exact: true }).click();
   const captureRevision = page.locator(".local-history li").filter({ has: page.getByRole("heading", { name: "Revision 1", exact: true }) });
@@ -125,9 +128,9 @@ test("failed removal retains exact decision across cancellation and supports exp
 test("failed rebuild preserves query and stale rows; successful rebuild revalidates and keeps removed mode", async ({ page }, info) => {
   await page.getByLabel("Search notes and filenames").fill("garden"); await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Matching memories" })).toBeVisible();
-  await page.getByRole("button", { name: "Rebuild local search", exact: true }).click();
+  await memoryTool(page, "Rebuild local search");
   await expect(page.getByText("Local keyword search rebuilt from validated vault records.", { exact: true })).toBeVisible();
-  await control(page, { failRebuildOnce: true }); await page.getByRole("button", { name: "Rebuild local search", exact: true }).click();
+  await control(page, { failRebuildOnce: true }); await memoryTool(page, "Rebuild local search");
   await expect(page.getByRole("alert")).toContainText("SYNTHETIC rebuild unavailable");
   await expect(row(page)).toBeVisible(); await expect(page.getByLabel("Search notes and filenames")).toHaveValue("garden");
   await expect(page.getByText(/Previously loaded results · not currently verified/)).toBeVisible();
@@ -135,10 +138,10 @@ test("failed rebuild preserves query and stale rows; successful rebuild revalida
   await accessible(page); await screenshot(page, info, "failed-rebuild");
   await row(page).click(); await expect(page.getByText("Previously loaded memory · current state not verified", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to memories" }).click();
-  await page.getByRole("button", { name: "Rebuild local search", exact: true }).click();
+  await memoryTool(page, "Rebuild local search");
   await expect(page.getByText(/Previously loaded results/)).toHaveCount(0);
-  await page.getByRole("button", { name: "Removed items", exact: true }).click();
-  await page.getByRole("button", { name: "Rebuild local search", exact: true }).click();
+  await memoryTool(page, "Removed items");
+  await memoryTool(page, "Rebuild local search");
   await expect(page.getByRole("heading", { name: "Removed items", exact: true })).toBeVisible();
   await expect(page.getByText("No removed items.", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Search notes and filenames")).toBeHidden();

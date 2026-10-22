@@ -1,5 +1,11 @@
 # Synthetic Claude selected-photo evaluation
 
+> Current product direction is in [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), and [roadmap](../../ROADMAP.md); this document preserves only the named historical candidate evidence.
+
+
+> Historical synthetic evaluation evidence. Results apply only to the named evaluation candidate; see canonical PRD and roadmap for current product direction.
+
+
 This harness exercises Recall's selected-reading HTTP service against five fixed,
 full-page synthetic images. The pages are font-rendered pipeline smoke fixtures;
 they do not establish human-handwriting accuracy or V1 acceptance. The cases cover

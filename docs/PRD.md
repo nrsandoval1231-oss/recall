@@ -1,14 +1,14 @@
 # Recall — Product Requirements Document
 
-Version: 0.5 | Date: 2026-10-08 | Product owner: Nick Sandoval
+Version: 0.6 | Date: 2026-10-09 | Product owner: Nick Sandoval
 
-Status: universal product vision approved; bounded local desktop slices are implemented candidates, while full V1 product/platform acceptance remains open.
+Status: universal product vision approved. Photo organization, text capture, grounded current-vault Ask and automatic future text/photo organization have bounded independent local acceptance in their `.agent` completion/review records. Current evidence-backed related-memory links have bounded CONTEXT-01 acceptance; anchored retained historical Ask has bounded HISTORY-01 acceptance. UTF-8 .txt/.md import has bounded TEXT-FILE-01 acceptance. Offline voice feasibility has passed for the tested host; native recording implementation is active and not yet accepted. Vague/event-based retrieval quality, remaining inputs/device work and full product/platform acceptance remain open. The product requirements below are unchanged by these staged results.
 
 ## 1. Product thesis
 
 **Your life remembers itself.**
 
-Recall is a universal external-memory system. It captures information in the forms people already use, organizes it automatically, preserves provenance and uncertainty, connects it across time, and lets people recover what they need using the incomplete, associative way humans actually remember.
+Recall is a universal external-memory system. People drop in notes, photos, voice recordings and files; an LLM understands the source, and Recall automatically organizes useful Obsidian notes, properties and links around it. Recall preserves the original, provenance and uncertainty, connects memory across time, and retrieves it later from the incomplete, associative way people actually remember. The user should not need to learn Markdown, Obsidian properties, folders, tags or a filing format.
 
 The user captures. Recall handles the organizational work.
 
@@ -69,7 +69,7 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 
 ## 6. Memory layers
 
-**Source memory:** what actually entered Recall: original photo/text first; later audio, screenshot, document, link, or authorized connected source.
+**Source memory:** what actually entered Recall: original notes, photos, text, voice, files, links or other authorized sources. Adapters arrive in stages under one source contract.
 
 **Semantic memory:** what it appears to mean: people, organizations, places, things, events, projects, topics, observations, claims, ideas, decisions, commitments, questions, and relationships.
 
@@ -107,12 +107,14 @@ Domain concepts are projections. A generator is a thing; a client is an organiza
 ## 8. Primary experience
 
 ### Capture
-Photograph/import pages or enter text, optionally add a short context hint, and save. No folder, tags, title, project, or identity cleanup is required. The original becomes durable before AI processing.
+Drop in a note, photograph, voice recording or file and optionally add a short context hint. Recall saves the original before processing, then handles titles, properties, links and useful organization. Users do not need to learn Markdown, folders, tags or Obsidian conventions. Text, voice and file adapters are product requirements; they will be delivered through the same source contract in stages. Photo understanding is the first implemented path.
 
-Claude full-page vision is the primary photo-reading path. The bounded local desktop flow reads one selected, already saved photo only after **Read this photo with Claude** and an explicit cloud-processing confirmation. The result is an **Unreviewed machine reading**, shown beside its original with uncertainty and provenance. A separate human reading correction takes precedence over later machine readings; the original and previous proposals remain in vault history. Saved effective readings are locally keyword-searchable. Service connection defaults to disabled; local capture, annotation, evidence and search require no remote account. This does not add OCR or semantic Ask. See [reading evidence and limits](implementation/claude-vault-reading/README.md).
+Claude full-page vision is the primary photo-reading path. The accepted selected-photo flow saves the original, then reads it after explicit cloud-processing confirmation. Its structured Obsidian renderer has bounded local acceptance. ORGANIZE-01 now implements the intended everyday flow: one remembered, revocable opt-in for future text/photo captures, followed by automatic background interpretation without a per-note approval. This source-local flow has bounded independent acceptance; current related-memory context has separate bounded acceptance.
+
+Useful notes include source-linked summaries, mentions, statements, suggested actions, uncertainty and deterministic properties. These remain machine proposals, not verified facts. Originals and provenance stay attached; human corrections suppress stale machine semantics in current organization and retrieval while history retains earlier versions. Neither local acceptance nor synthetic tests prove live handwriting quality or full RCL-005B. See [reading evidence and limits](implementation/claude-vault-reading/README.md).
 
 ### Ask
-Ask naturally: “Who was that transformer guy I met in Houston?”, “What did Professor Miller say about mitochondrial DNA?”, or “What was that restaurant Sarah recommended in Florence?” Recall retrieves authorized evidence, resolves context conservatively, answers with uncertainty intact, and exposes the source.
+Ask naturally: “Who was that transformer guy I met in Houston?”, “What did Professor Miller say about mitochondrial DNA?”, or “What was that restaurant Sarah recommended in Florence?” Recall retrieves authorized evidence, answers with uncertainty intact, and exposes the source. INTELLIGENCE-01 has bounded acceptance for current-vault questions with citations or abstention. Its bounded keyword-based source selection does not establish vague associative recall quality or historical answers; those remain requirements. Local keyword search remains a separate, accurately labeled tool.
 
 ### Correct
 Correct identity, transcription, meaning, date, or relationship. Recall previews scope, versions the correction, invalidates stale derived state, and never lets later model runs silently revert it.
@@ -125,7 +127,7 @@ Desktop adds evidence comparison, review, drag/drop, library exploration, offlin
 V1 proves: **capture something -> retrieve it later correctly with evidence.**
 
 Included:
-- iPhone photo capture/import. Typed text enters V1.5 with the other additional capture adapters.
+- Low-friction capture across photos, typed text, voice and files, delivered incrementally through a shared source contract. Photo is first; text follows, then grounded natural-language Ask, then voice and broader file adapters.
 - Windows desktop with matching product language and richer evidence/review.
 - Durable local draft, retry-safe upload, private originals, hashes, explicit states.
 - Structured interpretation from one evaluated multimodal configuration.
@@ -139,24 +141,16 @@ Included:
 - Workspace isolation even during a single-user pilot.
 
 Deferred:
-- Voice, screenshots/share sheet, broad file/PDF ingestion, email/calendar, browser extension.
+- Screenshots/share sheet, broad document/PDF ingestion beyond the staged file adapter, email/calendar, browser extension.
 - Proactive pattern discovery, scheduled briefs, autonomous reminders/actions.
 - Claude/MCP and other assistant adapters (distinct from the primary Claude photo-reading path).
 - Android/macOS, teams, billing, public launch.
 - Dedicated node-link graph UI, separate graph/vector databases, autonomous agents. Spatial relationship/context rendering on the canonical Memory Surface is part of the approved UX and must not require a graph database.
 - Domain-specific ERP/CMMS/CRM behavior.
 
-## 10. Five primary screens
+## 10. One transforming Memory Surface
 
-**Today:** dominant Ask entry, Capture, recent memory, accepted actions, targeted review.
-
-**Capture:** photo/import/text, page order, retake/remove, optional context, Save, honest state.
-
-**Memory detail / Review:** interpretation plus original evidence; time, claims, relationships, corrections, uncertainty.
-
-**Ask:** grounded answer, evidence cards, source access, ambiguity/conflict handling, limits.
-
-**Library:** search/browse memories and universal entities; domain views are filters/projections, not separate apps.
+Recall has one adaptive Memory Surface, not five separate primary screens. It centers on a simple capture/search/recent-memory surface, then shifts into contextual understanding, relationships, history, correction and original evidence as needed. Mobile presents one primary board at a time; desktop can compare evidence and context. Capture remains easy; maintenance controls live in an accessible settings/disclosure area. Natural-language Ask is a required destination capability, while current keyword search remains a distinct, limited implementation.
 
 ## 11. Trust rules
 
@@ -217,13 +211,13 @@ The new local desktop foundation commits original images, human notes and append
 
 Local-only capture, saved vault reading/correction and local keyword search work without a remote account or network service. Generating a new Claude reading uses a separately consented private service connection, disabled by default pending owner-approved provisioning. Cancellation prevents uncommitted local promotion; it cannot promise to stop a sent request or reverse a charge. Optional cross-device synchronization authenticates authorized devices without an account sign-in flow. Private network APIs remain authenticated and workspace-scoped; neither client receives database-owner or AI-provider secrets. AI remains replaceable derived machinery, and fresh offline generative answers are not promised.
 
-Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish this bounded implementation from the full target; PAIR-01 adds a manual single-device photo-inference connection, while QR pairing remains unanswered and unimplemented. See [foundation acceptance evidence](implementation/local-vault/README.md) and [lifecycle acceptance evidence](implementation/local-vault-lifecycle/README.md).
+Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile and explicit desktop `?mode=legacy-cloud` retain their existing Supabase auth. The [RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) and local plan distinguish the implementation candidate from the full target; PAIR-01 implements a manual single-device photo-inference connection, while QR pairing remains proposed and unimplemented. See [foundation acceptance evidence](implementation/local-vault/README.md) and [lifecycle acceptance evidence](implementation/local-vault-lifecycle/README.md).
 
 ## 15. Product roadmap
 
-**V1 — Trusted Recall:** photo/text -> grounded retrieval.
+**V1 — Trusted Recall:** photo and text capture -> automatic organization -> grounded natural-language retrieval, with originals and corrections retained in the Obsidian memory spine. The staged implementation delivers photo organization first, text capture second and grounded Ask third.
 
-**V1.5 — Natural Capture:** voice, screenshots/share sheet, files, links.
+**V1.5 — Natural Capture:** voice, screenshots/share sheet, broader files and links. These extend the same product source contract; their staged delivery does not make them optional product outcomes.
 
 **V2 — Connected Memory:** stronger identity, relationships, temporal state, correction, cross-source context.
 

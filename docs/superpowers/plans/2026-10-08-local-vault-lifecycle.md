@@ -1,5 +1,8 @@
 # Local vault lifecycle implementation plan
 
+> Historical plan/design record. It preserves its original approved scope and evidence; it is not current dispatch. Current direction is governed by [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), [roadmap](../../ROADMAP.md), and [documentation map](../../DOCUMENTATION-MAP.md).
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development task-by-task, with independent review and a final adversarial whole-branch review.
 
 **Goal:** Keep local memories correct when their Markdown is renamed, missing, explicitly removed, or interrupted during a write.

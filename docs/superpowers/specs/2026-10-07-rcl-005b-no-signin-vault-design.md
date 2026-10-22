@@ -1,5 +1,8 @@
 # RCL-005B — No-sign-in Obsidian memory spine
 
+> Historical plan/design record. It preserves its original approved scope and evidence; it is not current dispatch. Current direction is governed by [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), [roadmap](../../ROADMAP.md), and [documentation map](../../DOCUMENTATION-MAP.md).
+
+
 Date: 2026-10-07. Status reconciled: 2026-10-08. **Bounded local desktop foundation and lifecycle implemented on the review branches; full RCL-005B remains open. Pairing/relay remain proposed.**
 
 Subsequent owner direction: “Ok keep going until the product is finished”. The bounded [local-only implementation plan](../plans/2026-10-07-local-vault-foundation.md) carries this design forward with tests and independent review; routine stage approval is not required for that scope. QR association remains unanswered. No operational permission is implied. The proposal text below retains the full target and excluded future stages.

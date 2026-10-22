@@ -48,6 +48,12 @@ REQUIRED_PUBLIC_TABLES = frozenset(
         "local_reading_receipts",
         "device_pair_invitations",
         "device_pair_grants",
+        "vault_intelligence_pair_invitations",
+        "vault_intelligence_pair_grants",
+        "vault_intelligence_ask_consents",
+        "local_intelligence_receipts",
+        "vault_intelligence_organize_consents",
+        "local_organization_receipts",
     }
 )
 OPTIONAL_PUBLIC_TABLES = frozenset({"search_chunk_embeddings"})

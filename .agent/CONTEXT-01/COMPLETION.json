@@ -1,0 +1,14 @@
+{
+  "candidate_sha256": "4ec20fdb1a4047ff1fbe03b50b0582c3fa3bf355edb4c6a913715de2f4d7a245",
+  "authority": "No live grants, consent activation, spending, migration, push, merge or deployment",
+  "scope": "Current evidence-backed related memories through one organization call and versioned vault projection",
+  "status": "ACCEPTED_BOUNDED_LOCAL",
+  "parent_completion": false,
+  "packet": "CONTEXT-01",
+  "base_sha": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "validation": "Windows229/WSL231 tests and all-target checks/fmt PASS; client298/lint/type/build PASS; local48/web42 PASS; backend Ruff/full strictmypy PASS, pytest387pass3skip + known WSL Compose wrapper FAIL with exact Windows Compose PASS; installer PASS unsigned/uninstalled; 54active doclinks0broken; diff PASS; frozen manifest unchanged.",
+  "baseline_sha256": "c6ba102968d9c4b6513d5a4f8c9a0cbe446293563249ce6ba1078cc24d777b82",
+  "installer_sha256": "ed4347f79493ebda1608fe8ab262ceea6049568b2f3ec3d900d31087874f6bf9",
+  "installer_path": ".agent/CONTEXT-01/Recall-4ec20fdb-x64-setup.exe",
+  "accepted_utc": "2026-10-09T23:54:01Z"
+}

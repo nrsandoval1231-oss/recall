@@ -1,0 +1,50 @@
+{
+  "packet": "TEXT-FILE-01",
+  "status": "ACCEPTED_BOUNDED_LOCAL",
+  "candidate": "2aa36435f5758e7f7f8d85ead56e2b15ccac6a2829adb49a17ea534e19988050",
+  "base_head": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "accepted_baseline": "d506c8de2e6c1ebeffc307874e54459b02eead020360b2d06884fd866d309408",
+  "implementation": [
+    "One native UTF-8 txt/md import, immutable exact original and BOM-aware semantic provenance",
+    "V8 inert source rendering and annotation reconciliation, prior format compatibility",
+    "Durable same-operation import recovery with immutable future-only consent snapshot",
+    "Simple import UI, persistent retry identity, original filename and inert source display"
+  ],
+  "validation": {
+    "windows": "257 tests and all-target check PASS",
+    "wsl": "259 tests,fmt and all-target check PASS",
+    "client": "309 tests,lint,typecheck,build PASS",
+    "backend": "Ruff/format97/strict mypy54 PASS;388passed3skipped,known WSL Compose failure;exact Windows Compose PASS",
+    "browser": "52 local and42 legacy web PASS",
+    "installer": "Unsigned NSIS build PASS;not installed",
+    "docs": "57 changed active Markdown files,zero broken file links;anchors/archive excluded",
+    "diff": "PASS"
+  },
+  "review": "PASS: REVIEW.json",
+  "parent_complete": false,
+  "limits": [
+    "No installed Windows/iPhone proof, live provider or held-out quality acceptance",
+    "No voice, broader file adapters or phone transport acceptance",
+    "No grant/consent activation, private-data migration, deployment, push or merge"
+  ],
+  "repairs": "Native and UI completion artifacts preserve failed attempts and targeted repairs",
+  "timing": "Raw group result files bind UTC/elapsed to candidate; tokens UNKNOWN",
+  "failed_candidate": {
+    "candidate": "41724d85139c64b6b81a28c7c14a04fb15edc31dd148cb033110dee5436ff19a",
+    "evidence": "first-validation",
+    "review": "FIX",
+    "repairs": [
+      "Preserve original consent-bound organization across recovery commit and receipt replay",
+      "Use authoritative imported annotation boundary during first external edit publication",
+      "Restore per-page fixture call logs; persist separate import-only log"
+    ]
+  },
+  "installer": {
+    "path": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall\\.agent\\TEXT-FILE-01\\Recall-2aa36435-x64-setup.exe",
+    "sha256": "c67897b38d8ea07676b9d04aaa6207e7128e6a23ca418291802b4f57dc478e54",
+    "bytes": 5041540,
+    "signed": false,
+    "installed": false
+  },
+  "accepted_at_utc": "2026-10-10T02:58:36.466301+00:00"
+}

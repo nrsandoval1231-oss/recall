@@ -1,0 +1,27 @@
+{
+  "scope": "VOICE-01 native pre-dispatch architecture gate",
+  "role": "independent Sol reviewer",
+  "verdict": "PASS",
+  "reviewed_utc": "2026-10-10T03:28:05Z",
+  "draft": ".agent/VOICE-01/NATIVE-DRAFT.md",
+  "draft_sha256": "3a4cfaa8b8e5e28e9f18248bb36a945e967f2884484e605b8db1982cc8471aae",
+  "accepted_product_baseline": "2aa36435f5758e7f7f8d85ead56e2b15ccac6a2829adb49a17ea534e19988050",
+  "blocking_architecture_findings": [],
+  "decision": "The concrete v9 source-first, machine-transcript, separate-audio-consent and fixed local runtime design is coherent enough for a bounded native packet. This accepts design direction only, not dependency integration, implementation, runtime behavior or product voice completion.",
+  "review_evidence": [
+    "Read final F0 independent review and the frozen native draft; compared architecture boundaries with accepted v8 vault and existing organization receipt/consent schema.",
+    "The native draft keeps full WAV bytes as vault authority and records a separate deterministic 16 kHz derivative, ASR operation, machine evidence and human correction. V9 fences all existing mutation paths and preserves v1-v8 bytes.",
+    "The status/recovery command now requires expectedVaultId and selected-vault/session validation before intent, stage, receipt or ASR disclosure. Text/photo consent cannot authorize audio; v3 audio_transcript binding and separate audio consent table/route keep purpose and epoch distinct while reusing the existing receipt store.",
+    "CPAL 0.18.2 documentation supports advertised input-config enumeration and input callbacks; Rubato 5 documentation describes Fft as the fixed-ratio offline resampler. Exact crate pins and MSRV remain build gates. The 120-second or 24-MiB PCM cap covers the stated supported rate/channel set at 48 kHz stereo with header and queue separately bounded.",
+    "Compared apps, services, packages, infra and tests with the accepted TEXT-FILE manifest: zero product-file changes before dispatch."
+  ],
+  "implementation_conditions": [
+    "Verify exact crate archive hashes, lockfile resolution, compiler compatibility and supported Windows input formats before integrating dependencies; unsupported devices fail clearly.",
+    "Generate golden derivative hashes for each supported rate/channel and chunk boundary; maintain independent full-original SHA-256 and journaled retry identities.",
+    "Add a small checked-in pinned asset manifest and build-time staging script. Keep runtime/model/DLL/license artifacts ignored, verify all hashes before bundling, and do not hardcode the F0 tooling path or download on first run.",
+    "Check the packaged binary's required CPU features before launch, or prove a baseline fallback. Keep the RMS <= 5 gate limited to tested near-zero input and distinguish failed/UNKNOWN audio from eligible unreviewed machine transcription.",
+    "Validate exact v9 source/provenance consistency, authorization before status disclosure, source-first commit, correction precedence, consent fencing, current/history Ask eligibility and v1-v8 byte replay on the implemented candidate. Independent exact-candidate review remains required."
+  ],
+  "authority_boundary": "No private audio, live provider, paid call, activation, deployment, push or merge is authorized by this design gate. Installed Recall Record/Stop, semantic organization, Ask and playback remain open.",
+  "parent_complete": false
+}

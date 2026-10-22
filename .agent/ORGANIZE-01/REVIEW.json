@@ -1,0 +1,31 @@
+{
+  "packet": "ORGANIZE-01",
+  "role": "independent Sol reviewer",
+  "verdict": "PASS",
+  "candidate": "c6ba102968d9c4b6513d5a4f8c9a0cbe446293563249ce6ba1078cc24d777b82",
+  "base_head": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "started_utc": "2026-10-09T21:15:04Z",
+  "finished_utc": "2026-10-09T21:17:54Z",
+  "findings": [],
+  "prior_findings": {
+    "ORG-R0": "Resolved: UI uses the opaque session token for native commands and compares native capability against the distinct stable vault identity.",
+    "ORG-R1": "Resolved: oversize saved_local intents remain outside the dispatch queue; later eligible captures proceed.",
+    "ORG-R2": "Resolved: native background and recovery paths carry a live revocable selection guard; final promotion holds the selected-state lock.",
+    "ORG-R3": "Resolved for this packet: interrupted marker setup has truthful needs_setup/unknown states and explicit future-only reconciliation; ambiguous POST requires the exact next consent epoch and requested decision.",
+    "ORG-R4": "Resolved: focused synthetic text and photo views show one original action, concise proposal status, source evidence and plain uncertainty.",
+    "ORG-R5": "Resolved: confirmed normal opt-in now commits the fresh local marker in the selected-vault closure, so one action enables future captures. Marker-write failure rereads readiness and preserves explicit recovery."
+  },
+  "independent_review": [
+    "Read ONE-DECISION-REPAIR.md, builder handoff, exact three-file delta, the prior FIX, packet, PRD, architecture, roadmap and Finish Contract.",
+    "Inspected production vault_set_organization_consent and commit_confirmed_consent: exact server epoch/decision proof precedes local commit; current protected connection fingerprint is rechecked after the network wait; selected-vault closure serializes marker commit with captures; a failed write cannot create a false ready state because native_capability rereads the marker.",
+    "Checked marker persistence and dispatch paths: prepared intents are bound to the marker local epoch, earlier captures have no intent, stale epochs cannot dispatch, and explicit reconciliation creates a new future-only fence.",
+    "Inspected updated native helper regression, normal one-click and interrupted-marker browser journeys, and UI unit tests. Prior selection, oversize, and focused-memory fixes remain unchanged by the three-file delta.",
+    "node .agent/ORGANIZE-01/freeze.mjs check: exit 0, exact candidate unchanged after final gates."
+  ],
+  "validation": {
+    "exact_candidate": "Windows Rust 217 tests and all-target check PASS; WSL Rust 219 tests, fmt and all-target check PASS; npm check 288 client tests plus lint/typecheck PASS; desktop build PASS; local browser 46 and legacy web browser 42 PASS; unsigned NSIS installer build PASS.",
+    "retained_backend": "Backend source bytes unchanged from b4595729 candidate. Retained backend static checks PASS and pytest 385 pass/3 skip with one WSL Docker Compose wrapper failure; the exact Compose test passed on Windows. This platform-split evidence is bounded and is not represented as a clean WSL backend suite."
+  },
+  "acceptance_boundary": "PASS accepts the bounded ORGANIZE-01 synthetic/local candidate only. The built Windows installer is unsigned and uninstalled. No real grant or consent activation, live provider call, real-vault quality, installed Windows or iPhone run, deployment, migration, or parent Finish Contract completion is established.",
+  "next_direction": "Record bounded acceptance and move to the next READY node under the existing Work Graph. Retain the failed prior candidates and raw review records. Keep all live, hardware, distribution and parent-product gates explicitly open."
+}

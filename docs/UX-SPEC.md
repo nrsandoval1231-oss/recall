@@ -1,10 +1,43 @@
 # Recall — Canonical Experience & Visual System
 
+## Historical Ask — bounded local acceptance
+
+Use the same Ask box for current and historical questions. Resolve clear full dates, today or yesterday in the displayed device timezone; ask a brief inline clarification for an ambiguous date or event reference before sending a request. The follow-up retains the original question. Do not require revision IDs, a date form or a second Ask mode screen.
+
+History sharing has one remembered, revocable disclosure covering retained excerpts under the existing workspace Ask purpose. Each device/vault still requires its owner-approved connection. Results distinguish recorded-then evidence, later corrections and current counterparts. Citation opening shows the exact retained revision with the verified original. Limited evidence, shortened excerpts and stale results stay explicit. Current Ask remains available if only history capability is unavailable. This behavior is under implementation, pending integrated acceptance.
+
+## Related memories — bounded CONTEXT-01 acceptance
+
+Keep capture immediate and add a short **Related memory** section when current, supported suggestions exist. Show the two exact excerpts and a plain **Open related memory** action. Do not expose storage filenames as navigation instructions. Clicking rechecks the source connection, target and original through native authority; changed or unavailable evidence does not open as if it were current. An unresolved Obsidian link repair needs one concise notice, including on conflicted notes, without claiming work is currently running.
+
+The existing organization disclosure now includes up to three short current-vault excerpts and requires one new policy decision. There is no per-note approval. Typed-note headlines use the first nonempty human-note line, bounded for display, with **Text note** as fallback; original filenames stay in details. Current context and coverage are not historical retrieval or full-vault understanding.
+
+## Save and automatic organization — active contract
+
+After one clear opt-in naming automatic cloud organization of future text and photos, saving should be the only ordinary action. Confirm durable local save immediately; interpretation continues while Recall is open. Keep Capture and Write a note prominent. Show short, truthful progress such as saved, organizing or organized; expose detailed recovery information only when useful. Do not require per-note filing, read approval or interpretation approval.
+
+The settings disclosure explains the provider and what leaves the device, enables/revokes this purpose, and makes clear that existing notes are not enrolled. A disconnected or offline device can still save originals. Interrupted or uncertain work recovers the existing request before any resend. Corrections preserve source/history and invalidate stale interpretation. A focused memory keeps its structured note and original accessible; proposal text remains visibly unreviewed. ORGANIZE-01 has bounded local acceptance, not live acceptance.
+
+If permission was saved but local setup was interrupted, explain that setup needs finishing on this device and offer **Finish setup**. Do not show organization as on until the device's future-capture marker is ready. Finishing setup applies only to later captures. Keep **Turn off** available even when processing is temporarily unavailable. Present generated notes in plain language, with one concise AI status, clear question/uncertainty labels and one prominent original action; binding revisions and raw error codes belong in optional details.
+
+## Ask interaction — bounded local acceptance
+
+The everyday surface offers a natural question alongside capture and local keyword search. Answers show their sources; selecting a citation opens its current memory and original. User notes, original text and unreviewed photo readings keep distinct evidence labels. Display current-only, selected-record and shortened-source limitations without implying full-vault or historical coverage.
+
+Keep the question on interruption, unavailable consent/provider, stale evidence and unknown outcomes. Recovery retains the operation identity rather than silently issuing another paid request. Vault changes or uncertain current source eligibility clear the answer. Connection preparation/status/disconnection belong in settings, with a separate Ask permission; photo authorization is not silently widened. Automatic AI text organization is a separately consented, accepted local flow; the Ask panel does not authorize it.
+
+# Current delivery boundary
+
+Recall's target asks the user only to capture; the system handles organization into useful Obsidian memory and later natural-language recall. Photo organization, text capture, grounded current-vault Ask and automatic future text/photo organization have bounded local acceptance. Current related-memory links have bounded acceptance; anchored historical recall has bounded acceptance. UTF-8 .txt/.md import has bounded local acceptance; native voice implementation and broader files follow. Everyday capture, search and recent memories should be prominent; maintenance controls belong in an accessible settings/disclosure area. Do not add a per-memory approval click for ordinary organization. Keep machine proposals visibly distinct from verified facts, preserve source access and uncertainty, and never infer cross-note identity from matching names. Each new integrated change requires exact-candidate checks and independent review.
+
+
 ## First use and device access — bounded desktop subset implemented
 
-The owner requires no account, password, or email-link sign-in anywhere, including first use. Open Recall, create/select an Obsidian vault with the OS folder permission, and capture locally. OS file permission is not a remote account. Do not substitute “sign in once” or remembered sessions. The phone-first target allows local drafts before a desktop vault is associated; the phone vault bridge, association and transport are not implemented in this desktop slice.
+TEXT-01 adds a direct note composer alongside photo import. Type or paste, then **Save note**; no title, folder, tag or photograph is required. Save preserves an immutable text original and an editable current note. Failed or uncertain saves retain the submitted text and retry identity. Opening a text original shows escaped text, never an image or executable markup, and photo-reading controls do not appear for it. Local text is saved and searchable; this packet does not label it AI-organized. Exact checks and review live in `.agent/FINISH-02/TEXT-COMPLETION.json`.
 
-For cross-device private use, one-time QR association remains proposed and unapproved; do not build that interaction. The separately approved PAIR-01 flow is a manual, single-device, photo-inference-only owner invitation. Local-only remains available. Show “Saved on this device,” “Waiting for vault,” “Received by relay; waiting for vault,” “Saved in vault,” and “Conflict needs review” only when supported by acknowledgments. Cloud AI and unseen originals remain unavailable offline. Existing email-auth screens are a current implementation gap, not the desired onboarding. See [RCL-005B](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
+The owner requires no account, password, or email-link sign-in anywhere, including first use. Open Recall, create/select an Obsidian vault with the OS folder permission, and capture locally. OS file permission is not a remote account. Do not substitute “sign in once” or remembered sessions. The phone-first target allows local drafts before a desktop vault is associated. PAIR-01 implements bounded manual owner-approved photo-inference association; it does not bridge a phone to the vault. Phone-to-vault transport remains unimplemented in this desktop slice.
+
+For cross-device private use, one-time QR association remains proposed and unapproved; do not build that interaction. The separately approved PAIR-01 implementation is a manual, single-device, photo-inference-only owner invitation. It does not authorize photo processing by itself. Local-only remains available. Show “Saved on this device,” “Waiting for vault,” “Received by relay; waiting for vault,” “Saved in vault,” and “Conflict needs review” only when supported by acknowledgments. Cloud AI and unseen originals remain unavailable offline. Existing email-auth screens are a current implementation gap, not the desired onboarding. See [RCL-005B](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
 
 ### Selected-photo reading and review — bounded desktop slice
 

@@ -15,7 +15,11 @@ impl Vault {
         let path = self.path("_meta/manifest.json");
         let bytes = read(&path, MAX_JSON)?;
         let manifest: Manifest = serde_json::from_slice(&bytes).map_err(fail)?;
-        if manifest.format == FORMAT_V3 {
+        if [
+            FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+        ]
+        .contains(&manifest.format.as_str())
+        {
             return Ok(());
         }
         let backup = if manifest.format == FORMAT {
@@ -96,6 +100,9 @@ impl Vault {
             return Err("Memory changed; refresh before reading".into());
         }
         let source = self.verify_source(&m)?;
+        if !["image/png", "image/jpeg", "image/webp"].contains(&source.mime_type.as_str()) {
+            return Err("Photo reading supports image sources only".into());
+        }
         let req = ReadingRequest {
             binding: ReadingBinding {
                 schema_version: "1.0".into(),
@@ -388,6 +395,9 @@ impl Vault {
             .as_mut()
             .ok_or("No machine reading to correct")?
             .human_correction = Some(text.into());
+        if let Some(organization) = m.organization.as_mut() {
+            organization.suppressed = true;
+        }
         self.commit_reading(m, operation, "reading_correction")
     }
     fn commit_reading(
@@ -427,6 +437,7 @@ impl Vault {
             previous_markdown: Some(last.markdown),
             markdown: markdown(&m),
             memory: m,
+            context_link_projection: None,
         };
         self.commit(&e)
     }
@@ -653,6 +664,12 @@ impl Vault {
         })
     }
     pub(super) fn reading_event_valid(&self, e: &Event) -> Result<()> {
+        if (e.memory.source_name == "note.txt" || e.memory.imported_text.is_some())
+            && (e.memory.reading.is_some()
+                || ["machine_reading", "reading_correction"].contains(&e.kind.as_str()))
+        {
+            return Err("Text sources do not support photo reading".into());
+        }
         if let Some(r) = &e.memory.reading {
             r.machine.validate()?;
             if let Some(h) = &r.human_correction {
@@ -681,7 +698,21 @@ impl Vault {
         Ok(())
     }
     pub(super) fn reading_transition(&self, prev: &Event, next: &Event) -> Result<()> {
-        if prev.format == FORMAT_V3 && next.format != FORMAT_V3 {
+        if (prev.format == FORMAT_V3
+            && ![
+                FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+            ]
+            .contains(&next.format.as_str()))
+            || (prev.format == FORMAT_V4
+                && ![FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8]
+                    .contains(&next.format.as_str()))
+            || (prev.format == FORMAT_V5
+                && ![FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&next.format.as_str()))
+            || (prev.format == FORMAT_V6
+                && ![FORMAT_V6, FORMAT_V7, FORMAT_V8].contains(&next.format.as_str()))
+            || (prev.format == FORMAT_V7 && ![FORMAT_V7, FORMAT_V8].contains(&next.format.as_str()))
+            || (prev.format == FORMAT_V8 && next.format != FORMAT_V8)
+        {
             return Err("Reading history format downgrade".into());
         }
         let a = &prev.memory.reading;

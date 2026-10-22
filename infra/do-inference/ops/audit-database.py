@@ -9,7 +9,9 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
-MIGRATIONS = Path(os.environ.get("RECALL_MIGRATIONS_DIR", "/app/services/backend/migrations"))
+MIGRATIONS = Path(
+    os.environ.get("RECALL_MIGRATIONS_DIR", "/app/services/backend/migrations")
+)
 REQUIRED = {
     "schema_migrations",
     "workspaces",
@@ -41,6 +43,12 @@ REQUIRED = {
     "local_reading_receipts",
     "device_pair_invitations",
     "device_pair_grants",
+    "vault_intelligence_pair_invitations",
+    "vault_intelligence_pair_grants",
+    "vault_intelligence_ask_consents",
+    "local_intelligence_receipts",
+    "vault_intelligence_organize_consents",
+    "local_organization_receipts",
 }
 OPTIONAL = {"search_chunk_embeddings"}
 FUNCTIONS = {
@@ -52,11 +60,21 @@ FUNCTIONS = {
     "recall_device_pair_revoke",
     "recall_device_pair_owner_revoke",
     "recall_expire_local_readings",
+    "recall_vault_intelligence_auth",
+    "recall_vault_intelligence_invite",
+    "recall_vault_intelligence_claim",
+    "recall_vault_intelligence_revoke",
+    "recall_vault_intelligence_owner_revoke",
+    "recall_is_owner",
+    "recall_expire_local_intelligence",
+    "recall_expire_local_organizations",
 }
 
 
 def api_inherits_app(connection):
-    row = connection.execute("select pg_has_role('recall_api','recall_app','member') as is_app_member").fetchone()
+    row = connection.execute(
+        "select pg_has_role('recall_api','recall_app','member') as is_app_member"
+    ).fetchone()
     return row is not None and bool(row["is_app_member"])
 
 
@@ -74,9 +92,13 @@ def api_memberships(connection):
 
 dsn = os.environ["RECALL_MIGRATION_DATABASE_URL"]
 with psycopg.connect(dsn, row_factory=dict_row) as conn:
-    expected = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(MIGRATIONS.glob("*.sql"))}
+    expected = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(MIGRATIONS.glob("*.sql"))
+    }
     applied = {
-        row["version"]: row["checksum"] for row in conn.execute("select version,checksum from schema_migrations")
+        row["version"]: row["checksum"]
+        for row in conn.execute("select version,checksum from schema_migrations")
     }
     if applied != expected:
         raise SystemExit("migration ledger differs from the checked-in migration set")
@@ -90,7 +112,9 @@ with psycopg.connect(dsn, row_factory=dict_row) as conn:
     ).fetchall()
     actual = {row["relname"] for row in relations}
     if actual - REQUIRED - OPTIONAL or REQUIRED - actual:
-        raise SystemExit("public relation allowlist differs from the supported migration schema")
+        raise SystemExit(
+            "public relation allowlist differs from the supported migration schema"
+        )
     for row in relations:
         name = row["relname"]
         if name == "schema_migrations":
@@ -99,7 +123,11 @@ with psycopg.connect(dsn, row_factory=dict_row) as conn:
             continue
         if row["relkind"] != "r" or row["relispartition"]:
             raise SystemExit("foreign or partitioned public relation is unsupported")
-        if row["owner"] != "recall_migrator" or not row["relrowsecurity"] or not row["relforcerowsecurity"]:
+        if (
+            row["owner"] != "recall_migrator"
+            or not row["relrowsecurity"]
+            or not row["relforcerowsecurity"]
+        ):
             raise SystemExit(f"{name} ownership or forced RLS check failed")
         if row["policies"] < 1:
             raise SystemExit(f"{name} has no row-level security policy")
@@ -137,11 +165,16 @@ with psycopg.connect(dsn, row_factory=dict_row) as conn:
             )
         )
     ):
-        raise SystemExit("API login role is absent or has elevated PostgreSQL privileges")
+        raise SystemExit(
+            "API login role is absent or has elevated PostgreSQL privileges"
+        )
     if (
         worker is None
         or worker["rolcanlogin"]
-        or ("recall_worker_login" in by_name and by_name["recall_worker_login"]["rolcanlogin"])
+        or (
+            "recall_worker_login" in by_name
+            and by_name["recall_worker_login"]["rolcanlogin"]
+        )
     ):
         raise SystemExit("worker role must remain NOLOGIN")
     if (
@@ -164,4 +197,6 @@ with psycopg.connect(dsn, row_factory=dict_row) as conn:
     memberships = api_memberships(conn)
     if memberships != {"recall_app"}:
         raise SystemExit("API role has unexpected role memberships")
-    print("Database schema, migration ledger, roles, object ownership, functions and forced RLS verified.")
+    print(
+        "Database schema, migration ledger, roles, object ownership, functions and forced RLS verified."
+    )

@@ -1,5 +1,24 @@
 # Recall V1 implementation and acceptance
 
+## Current continuation — native voice
+
+REALIGN-01 and TEXT-01 have independent local acceptance in `.agent/REALIGN-01/COMPLETION.json` and `.agent/FINISH-02/TEXT-COMPLETION.json`. INTELLIGENCE-01 has independent bounded acceptance for grounded Ask over current vault evidence in `.agent/INTELLIGENCE-01/COMPLETION.json`. ORGANIZE-01 has bounded independent acceptance at c6ba1029: one remembered purpose-specific opt-in enables future text/photo organization. CONTEXT-01 has bounded independent acceptance for current evidence-backed related-memory links at 4ec20fdb; evidence is in `.agent/CONTEXT-01/COMPLETION.json`. HISTORY-01 has bounded independent acceptance at d506c8de for anchored retained historical Ask. TEXT-FILE-01 has bounded independent acceptance at 2aa36435 for UTF-8 .txt/.md import. VOICE-01 is implementing native recording after independent offline feasibility and design review. Ask uses a separate, default-disabled `vault_intelligence` permission and versioned excerpt-processing consent. Photo permission does not authorize Ask. No live activation or provider processing is implied.
+
+Ask considers up to eight current eligible memories, with bounded excerpts and visible coverage limits. It preserves uncertainty, opens cited memories/originals, and suppresses answers after source or vault changes. Keyword search remains available locally; it is not an offline generated answer. Anchored historical questions and current related links have bounded acceptance. Voice, broader file formats, phone transport and full real-device/live acceptance remain open.
+
+# Scope note (2026-10-09)
+
+This ledger preserves dated evidence for earlier cloud/database-authoritative candidates. It does not establish current no-sign-in product acceptance, complete Obsidian semantic reconstruction, automatic organization, installed-device acceptance, or full V1. The v4 automatic organization renderer and related UI simplification are implementation candidates; exact validation/review is recorded in `.agent/REALIGN-01/COMPLETION.json` when frozen. See [PRD](PRD.md), [ROADMAP](ROADMAP.md), and [DOCUMENTATION-MAP](DOCUMENTATION-MAP.md) for current direction. Do not reinterpret historical PASS rows as acceptance of the current candidate.
+
+## TEXT-01 continuation candidate
+
+The desktop adds typed/pasted text capture, immutable UTF-8 originals, current-note corrections and local keyword retrieval through a v5 vault format. V1-v4 bytes remain protected. Exact validation and independent review are recorded in [TEXT-01 evidence](../.agent/FINISH-02/TEXT-COMPLETION.json). AI text organization, grounded Ask and installed-device acceptance are separate open gates.
+
+## REALIGN-01 native development checkpoint — candidate only
+
+An earlier pre-freeze local development checkpoint recorded **173 native Rust tests passed** for the v4 renderer/lifecycle candidate; retain that count as historical evidence only. The exact-candidate validation and review record is [REALIGN-01 completion evidence](../.agent/REALIGN-01/COMPLETION.json). This status ledger does not establish acceptance, installed Windows behavior, live-provider quality, private-photo processing or full product acceptance. See the current acceptance criteria and [native boundary](../apps/desktop/src-tauri/README.md); preserve the dated ledgers below as evidence for their original commits and scopes.
+
+
 ## Owner-approved device pairing — PAIR-01 implementation candidate, October 8
 
 The owner authorized a manual, single-device, photo-inference-only association; this supersedes the earlier proposed/not-approved status for QR pairing only. The implementation candidate adds an operator-created short-lived invitation, hash-only server grant, native keyring-backed secret, origin-pinned claim/status/revoke, and minimal renderer controls. It does not enable the service, create a real invitation, or change legacy auth. Activation remains default-denied and now requires a new explicit production-owner approval record independent of the USD 5 synthetic-evaluation authorization. QR association remains proposed and unimplemented.

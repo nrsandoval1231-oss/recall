@@ -43,6 +43,12 @@ REQUIRED_TABLES = {
     "local_reading_receipts",
     "device_pair_invitations",
     "device_pair_grants",
+    "vault_intelligence_pair_invitations",
+    "vault_intelligence_pair_grants",
+    "vault_intelligence_ask_consents",
+    "local_intelligence_receipts",
+    "vault_intelligence_organize_consents",
+    "local_organization_receipts",
 }
 OPTIONAL_TABLES = {"search_chunk_embeddings"}
 
@@ -61,7 +67,9 @@ def api_memberships(connection: Any) -> set[str]:
 
 def fail() -> None:
     # Never include setting values, provider identifiers, paths, or database errors.
-    raise SystemExit("Inference preflight failed; verify the private activation, role, and recovery records.")
+    raise SystemExit(
+        "Inference preflight failed; verify the private activation, role, and recovery records."
+    )
 
 
 def read_json(name: str) -> dict[str, Any]:
@@ -136,14 +144,20 @@ if (
     or parsed_origin.fragment
 ):
     fail()
-if activation.get("origin") != origin or os.environ.get("RECALL_SERVICE_PROFILE") != "inference":
+if (
+    activation.get("origin") != origin
+    or os.environ.get("RECALL_SERVICE_PROFILE") != "inference"
+):
     fail()
 if (
     os.environ.get("RECALL_AUTO_PROVISION_WORKSPACES") != "false"
     or os.environ.get("RECALL_DEVICE_PAIRING_ENABLED") != "true"
 ):
     fail()
-if os.environ.get("AI_PROVIDER") != activation["provider"] or os.environ.get("AI_MODEL_ID") != activation["model_id"]:
+if (
+    os.environ.get("AI_PROVIDER") != activation["provider"]
+    or os.environ.get("AI_MODEL_ID") != activation["model_id"]
+):
     fail()
 if not api_key or not dsn:
     fail()
@@ -160,7 +174,9 @@ for env_name, record_name in (
 # SDK's documented custom-header passthrough, require its value to match this record.
 header = os.environ.get("ANTHROPIC_CUSTOM_HEADERS", "")
 if header:
-    match = re.fullmatch(r"\s*anthropic-workspace-id:\s*([^\s,]+)\s*", header, flags=re.IGNORECASE)
+    match = re.fullmatch(
+        r"\s*anthropic-workspace-id:\s*([^\s,]+)\s*", header, flags=re.IGNORECASE
+    )
     if match is None or match.group(1) != activation["provider_account"]:
         fail()
 
@@ -181,7 +197,10 @@ if any(
     )
 ):
     fail()
-if any(name.startswith("AI_") and "EMBEDDING" in name and value for name, value in os.environ.items()):
+if any(
+    name.startswith("AI_") and "EMBEDDING" in name and value
+    for name, value in os.environ.items()
+):
     fail()
 
 recovery_required = {
@@ -236,10 +255,12 @@ try:
             fail()
         migrations_dir = Path("/app/services/backend/migrations")
         expected_ledger = {
-            path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(migrations_dir.glob("*.sql"))
+            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(migrations_dir.glob("*.sql"))
         }
         actual_ledger = {
-            row["version"]: row["checksum"] for row in conn.execute("select version,checksum from schema_migrations")
+            row["version"]: row["checksum"]
+            for row in conn.execute("select version,checksum from schema_migrations")
         }
         if not expected_ledger or actual_ledger != expected_ledger:
             fail()
@@ -254,7 +275,10 @@ try:
             "where n.nspname='public' and c.relkind in ('r','p','f') order by c.relname"
         ).fetchall()
         actual_tables = {row["relname"] for row in relations}
-        if REQUIRED_TABLES - actual_tables or actual_tables - REQUIRED_TABLES - OPTIONAL_TABLES:
+        if (
+            REQUIRED_TABLES - actual_tables
+            or actual_tables - REQUIRED_TABLES - OPTIONAL_TABLES
+        ):
             fail()
         for relation in relations:
             if relation["relname"] == "schema_migrations":
@@ -282,11 +306,21 @@ try:
                 "recall_device_pair_claim",
                 "recall_device_pair_revoke",
                 "recall_expire_local_readings",
+                "recall_vault_intelligence_auth",
+                "recall_vault_intelligence_invite",
+                "recall_vault_intelligence_claim",
+                "recall_vault_intelligence_revoke",
+                "recall_vault_intelligence_owner_revoke",
+                "recall_is_owner",
+                "recall_expire_local_intelligence",
+                "recall_expire_local_organizations",
             }
             <= functions
         ):
             fail()
-        worker = conn.execute("select rolcanlogin from pg_roles where rolname='recall_worker'").fetchone()
+        worker = conn.execute(
+            "select rolcanlogin from pg_roles where rolname='recall_worker'"
+        ).fetchone()
         if worker is None or worker["rolcanlogin"]:
             fail()
 except (psycopg.Error, ValueError):

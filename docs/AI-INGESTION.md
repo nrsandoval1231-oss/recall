@@ -1,5 +1,28 @@
 # AI ingestion and grounded retrieval
 
+## Historical Ask — bounded local acceptance
+
+The historical Ask packet uses the existing single answer call with bounded retained excerpts, recorded times and explicit evidence roles. In as-of mode each answered sentence must cite past evidence; a citation to later-corrected wording must include its current correction. Comparison mode requires past and current citations from the same memory. Software can check these references and role combinations, but cannot prove the semantic truth of arbitrary generated prose. Unverifiable output becomes insufficient evidence.
+
+An explicit history-purpose decision is required before sending retained revisions. Native revalidates the exact events, originals and current correction state before dispatch and display. An ambiguous date does not create a provider request. The [HISTORY-01 contract](../.agent/HISTORY-01.md) has bounded local acceptance. Held-out live historical recall quality remains open.
+
+## Current related context — bounded acceptance
+
+CONTEXT-01 extends the existing organization call with at most three short, current vault excerpts after a newly versioned opt-in. The model may propose a supplied target only with exact quotes from both the submitted source and target excerpt. Reference validation does not prove a real-world relationship; links stay unreviewed and name matches never merge identities. Native selects and freezes context, verifies its currentness before promotion and journals a safe Obsidian projection. Limited record coverage and shortened excerpts are disclosed. Current targets that change are withheld and their links are suppressed through the journal. No second routine inference call or full-vault upload is introduced.
+
+## Automatic text and photo organization — accepted source-local contract
+
+ORGANIZE-01 adds a separate, remembered organization consent under the owner-associated vault intelligence connection. Ask consent and selected-photo consent do not authorize it. New captures after the native consent fence may queue; existing notes are not silently backfilled. A changed policy or decision epoch blocks old queued work and result promotion. The original and initial human note commit before any provider dispatch.
+
+For typed notes, the model receives text and returns only semantic fields. Software attaches the trusted capture envelope and exact original/current human transcription, then validates full extraction, source references and exact evidence quotes. The model does not recreate the input or produce a fake image. Photos use the existing verified image derivative and vision provider. Both outputs remain unreviewed proposals. Native verifies the same source, revision, text and consent decision before journaled publication. Subsequent human edits/corrections suppress stale proposal semantics in current rendering, search and Ask while retaining history.
+
+Source-local ORGANIZE-01 has [bounded independent acceptance](../.agent/ORGANIZE-01/REVIEW.json). The active extension is [CONTEXT-01](../.agent/CONTEXT-01.md), whose integrated validation/review remains pending. Live-provider quality and the full product remain open.
+
+# Product boundary for model-derived organization
+
+Validated extraction is still untrusted interpretation. The native v4 candidate renders source-linked summaries, mentions, statements, action suggestions, uncertainty and safe properties from the existing extraction contract. It does not promote proposals to confirmed facts, resolve identities across notes, or choose paths. A human transcription correction governs current organization/search; prior readings remain in history. Candidate behavior and evidence are tracked in [ARCHITECTURE](ARCHITECTURE.md) and [DOCUMENTATION-MAP](DOCUMENTATION-MAP.md).
+
+
 ## V1 correction and embedding implementation
 
 Canonical user overrides are applied before saving a new machine revision, and canonical claim revisions retain user text/status/validity across reprocessing. Evidence keys carry identity decisions across revisions without accepting same-name candidates automatically. Corrected canonical claims produce explicit claim-linked search chunks; superseded/retracted/out-of-validity claims are excluded from current retrieval while historical revisions remain addressable.

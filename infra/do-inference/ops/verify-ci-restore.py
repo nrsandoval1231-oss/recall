@@ -24,8 +24,12 @@ def roles_by_name(conn):  # type: ignore[no-untyped-def]
 
 
 secrets = Path(__file__).resolve().parents[1] / "secrets"
-connections = json.loads(Path(os.environ["DO_OPS_TEST_CONNECTION_FILE"]).read_text(encoding="utf-8"))
-restored = conninfo_to_dict((secrets / "ci_restore_database_url.local").read_text(encoding="utf-8").strip())
+connections = json.loads(
+    Path(os.environ["DO_OPS_TEST_CONNECTION_FILE"]).read_text(encoding="utf-8")
+)
+restored = conninfo_to_dict(
+    (secrets / "ci_restore_database_url.local").read_text(encoding="utf-8").strip()
+)
 source_operator = conninfo_to_dict(connections["operator"])
 restored_operator = dict(source_operator)
 for key in ("host", "port", "dbname"):
@@ -33,7 +37,9 @@ for key in ("host", "port", "dbname"):
         raise AssertionError(f"restore target omits {key}")
     restored_operator[key] = restored[key]
 with psycopg.connect(**restored_operator) as conn:
-    restored_identity = conn.execute("select inet_server_addr()::text,inet_server_port(),current_database()").fetchone()
+    restored_identity = conn.execute(
+        "select inet_server_addr()::text,inet_server_port(),current_database()"
+    ).fetchone()
     assert restored_identity[2] == "recall_restore"
     roles = roles_by_name(conn)
     assert set(roles) == {
@@ -44,11 +50,21 @@ with psycopg.connect(**restored_operator) as conn:
     }
     assert roles["recall_worker"]["rolcanlogin"] is False
     assert roles["recall_api"]["rolcanlogin"] is True
-    assert not any(roles["recall_api"][key] for key in ("rolsuper", "rolbypassrls", "rolcreatedb", "rolcreaterole"))
-    assert conn.execute("select pg_has_role('recall_api','recall_app','member')").fetchone()[0]
+    assert not any(
+        roles["recall_api"][key]
+        for key in ("rolsuper", "rolbypassrls", "rolcreatedb", "rolcreaterole")
+    )
+    assert conn.execute(
+        "select pg_has_role('recall_api','recall_app','member')"
+    ).fetchone()[0]
 
-with psycopg.connect(connections["operator"]) as source, psycopg.connect(**restored_operator) as restored_conn:
-    source_identity = source.execute("select inet_server_addr()::text,inet_server_port(),current_database()").fetchone()
+with (
+    psycopg.connect(connections["operator"]) as source,
+    psycopg.connect(**restored_operator) as restored_conn,
+):
+    source_identity = source.execute(
+        "select inet_server_addr()::text,inet_server_port(),current_database()"
+    ).fetchone()
     assert source_identity != restored_identity
     relations = restored_conn.execute(
         "select relname,relrowsecurity,relforcerowsecurity from pg_class c "
@@ -62,6 +78,12 @@ with psycopg.connect(connections["operator"]) as source, psycopg.connect(**resto
         "devices",
         "device_pair_invitations",
         "device_pair_grants",
+        "vault_intelligence_pair_invitations",
+        "vault_intelligence_pair_grants",
+        "vault_intelligence_ask_consents",
+        "local_intelligence_receipts",
+        "vault_intelligence_organize_consents",
+        "local_organization_receipts",
         "ai_consents",
         "local_reading_receipts",
         "ai_usage",
@@ -72,5 +94,10 @@ with psycopg.connect(connections["operator"]) as source, psycopg.connect(**resto
             "select coalesce(jsonb_agg(to_jsonb(source_row) "
             "order by to_jsonb(source_row)::text), '[]'::jsonb) from public.{} source_row"
         ).format(sql.Identifier(table))
-        assert source.execute(query).fetchone()[0] == restored_conn.execute(query).fetchone()[0]
-print("Synthetic restored data, forced RLS, least-privilege roles and grant membership verified.")
+        assert (
+            source.execute(query).fetchone()[0]
+            == restored_conn.execute(query).fetchone()[0]
+        )
+print(
+    "Synthetic restored data, forced RLS, least-privilege roles and grant membership verified."
+)

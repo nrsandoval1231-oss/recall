@@ -1,12 +1,22 @@
-# Work graph
+# Recall work graph
 
-- PAIR-01 IMPLEMENTED_UNREVIEWED: owner-approved inference-only backend/client and reviewed activation preflight. Focused tests pass; full candidate gates/review remain authoritative.
-- NATIVE-PAIR-REPAIR IMPLEMENTED_UNREVIEWED: Terra completed native lifecycle serialization and synthetic keyring/transport failure seams after Luna explicitly reported material uncertainty. Formatting passed; Cargo execution requires exact-head CI.
-- EVAL-01 IMPLEMENTED_UNREVIEWED: isolated synthetic evaluation, durable single-batch USD5 reservations, no retries/fallback, real adapter and known ground truth;10 offline tests pass/1 live skip. Live execution needs compatible authorized Anthropic AI_API_KEY; supplied key is OpenAI. Independent of real pairing.
-- DELIVERY-01 WAITING PAIR-01/EVAL-01: independent review, full gates, exact candidate commit, stacked draft PR and exact-head CI, unsigned Windows installer/checksum where build succeeds.
-- REAL-01 NOT AUTHORIZED: real persistent access, enrollment, deployment, private-photo tests and installed-device/cross-device acceptance require owner action-time approval.
+One active packet: [VOICE-01](VOICE-01.md); [TEXT-FILE-01](TEXT-FILE-01.md), [HISTORY-01](HISTORY-01.md), [CONTEXT-01](CONTEXT-01.md), [ORGANIZE-01](ORGANIZE-01.md), [INTELLIGENCE-01](INTELLIGENCE-01.md), [TEXT-01](TEXT-01.md) and [REALIGN-01](REALIGN-01.md) accepted as bounded local slices. Base fa6390b. Direction CONTINUE. Parent finish: [contract](FINISH_CONTRACT.md).
 
-- DIAG-01 READY: safe rejection classifications and synthetic offline replay; original live cause UNKNOWN. No further paid calls.
+| Node | State | Depends on | Outcome |
+| --- | --- | --- | --- |
+| R0 intent/Tribunal | DONE | owner direction | Reuse vault/extraction, version renderer, remove user filing burden |
+| R1 documentation | DONE | R0 | Reconcile active docs and classify historical docs |
+| R2 automatic Obsidian organization | DONE | R0 | Journaled notes, properties/evidence/structure, safe current search |
+| R3 everyday desktop simplification | DONE | R0 (existing DTO) | Capture/search/recent; maintenance disclosed |
+| R4 validation/review | DONE | R1,R2,R3 | Native/client/browser gates, exact independent Sol review |
+| R5 text capture | DONE | R4 | Typed dump through same vault boundary |
+| R6 grounded vault Ask | DONE | R5 | Current eligible citations, natural questions and abstention; bounded independent PASS |
+| R6B automatic text/photo organization | DONE | R6 | Remembered opt-in, source-first queue and useful Obsidian proposals |
+| R6C grounded current context | DONE | R6B | Current context links without identity guesses; independent PASS 4ec20fdb |
+| R6D retained historical Ask | DONE | R6C | Bounded independent PASS d506c8de; exact history and human correction evidence |
+| R7A text-file import | DONE | R6D | One UTF-8 .txt/.md file through the existing source-first organization path |
+| R7B voice and broader files | BUILDING NATIVE | R7A | Audio originals, transcription and remaining input adapters |
+| R7C phone transport | OPEN | explicit transport architecture and association authority | Same private memory on phone and desktop |
+| R8 parent acceptance | OPEN | R7A,R7B,R7C | Finish-contract real-device/live/held-out proof |
 
-- DIAG-02 READY: owner-approved two-case USD1.50 single-use diagnostic run; packet DIAG-02.md, implementation/review before dispatch, no third batch.
-- DIAG-02-R1 READY: demonstrated predicate producer constraint; prompt/tests/docs only, offline replay evidence, no further paid calls.
+Historical PAIR/DIAG/DO work retained in archive and ignored records. It is not the default product frontier. No external actions follow from this graph without their existing authority checks.

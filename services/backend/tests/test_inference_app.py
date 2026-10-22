@@ -109,8 +109,20 @@ def test_inference_profile_routes_and_real_pairing(pg_cluster) -> None:  # type:
             "/v1/device-pairings/{invitation_id}/claim",
             "/v1/device-pairings/status",
             "/v1/device-pairings",
+            "/v1/vault-intelligence/device-pairings/{invitation_id}/claim",
+            "/v1/vault-intelligence/device-pairings/status",
+            "/v1/vault-intelligence/device-pairings",
             "/v1/local-readings",
             "/v1/local-readings/{operation_id}",
+            "/v1/local-intelligence/capability",
+            "/v1/local-intelligence/history-capability",
+            "/v1/local-intelligence/ask/consent",
+            "/v1/local-intelligence/ask",
+            "/v1/local-intelligence/ask/{operation_id}",
+            "/v1/local-intelligence/organization-capability",
+            "/v1/local-intelligence/organization-consent",
+            "/v1/local-intelligence/organizations",
+            "/v1/local-intelligence/organizations/{operation_id}",
         }
         assert client.get("/healthz").json() == {"status": "ok"}
         assert client.get("/openapi.json").status_code == 404

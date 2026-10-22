@@ -1,0 +1,45 @@
+{
+  "elapsed_to_accepted_seconds": 4282.3687296,
+  "build_seconds": "UNKNOWN",
+  "audit_seconds": "UNKNOWN",
+  "packet": "REALIGN-01",
+  "repairs": [
+    "Native compatibility/expectation repair after 167 pass, 4 fail",
+    "Native content projection and v3 retained-byte regression",
+    "Documentation stale component guidance reconciliation",
+    "UI native structured-search parity",
+    "Browser duplicate text selector repair",
+    "Rejected browser viewport inflation; restored configured viewport and scrolled comparison",
+    "Controller evidence script lint globals fixed, no product change",
+    "Review external-event hash concern withdrawn after tracing commit; no net change",
+    "Review unsupported-summary repair: new receipt validation plus legacy projection suppression in native/UI; accepted",
+    "Review documentation checkpoint wording clarified; code bytes unchanged"
+  ],
+  "tokens": "UNKNOWN",
+  "started_at": "2026-10-09T14:00:19Z",
+  "speedup": "NOT_MEASURED",
+  "config_identity": "UNKNOWN",
+  "start_basis": "packet file creation; actual task/planning start UNKNOWN",
+  "finished_at": "2026-10-09T15:11:41.3687296Z",
+  "lane": "bounded native/UI/documentation realignment",
+  "models": {
+    "reviewer": "gpt-6-sol medium",
+    "builders": "gpt-6-luna low",
+    "specialist": "gpt-5.6-terra medium"
+  },
+  "planning_seconds": "UNKNOWN",
+  "recorded_repair_items": 10,
+  "timing_caveat": "Elapsed measured from packet creation to recorded independent acceptance, not total chat/task time. Overlapping phases not separately measured.",
+  "episode": {
+    "state": "Photo extraction existed but organization was absent from current vault and everyday UI exposed maintenance",
+    "decision": "Reuse extraction and journal, add versioned projection, simplify surface, reconcile docs",
+    "action": "Bounded native/UI/docs implementation with independent review",
+    "candidate_lesson": "When promoting previously stored model fields into current organization, validate new intake and historical projection separately",
+    "promotion": "LOCAL_RULE; supported by new receipt and historical projection regressions; no general speedup claim",
+    "outcome": "Local slice accepted; full product open",
+    "deterministic_evaluation": "176 native +268 client +78 browser tests, builds, lint/typecheck, inventory and exact digest",
+    "lesson_metric": "Unsupported summaries surfaced in current v4 projection: must remain zero in native and UI regressions",
+    "reversibility": "Versioned renderer preserves v1-v3 bytes; implementation remains an uncommitted diff against recorded base",
+    "attribution": "Source-evidence review exposed a native receipt/projection gap not covered by initial green tests"
+  }
+}

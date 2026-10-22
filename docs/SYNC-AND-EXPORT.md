@@ -1,5 +1,10 @@
 # Obsidian spine, synchronization and portability
 
+# Current product boundary
+
+Obsidian remains the required user-owned memory spine. Automatic photo organization is a candidate using the existing journaled local vault; it does not establish full semantic projection recovery, phone transport, or migration parity. Text, voice and file capture plus natural-language Ask remain required target capabilities delivered in stages; do not infer their completion from local keyword search or the legacy cloud sync/export evidence. See [PRD](PRD.md), [ROADMAP](ROADMAP.md), and [DOCUMENTATION-MAP](DOCUMENTATION-MAP.md).
+
+
 ## Proposed no-account local-first synchronization
 
 The [RCL-005B design proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md) extends the required spine with private local-only use and optional owner-paired synchronization, without account/password/email-link sign-in even on first use. QR pairing is pending owner decision. Phone drafts remain durable while a desktop is off; relay receipt cannot be labeled vault commitment. Offline devices reconcile expected revisions and tombstones before advancing projections. Existing feed/export behavior below is the current baseline, not proof of the target.

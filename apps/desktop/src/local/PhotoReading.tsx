@@ -7,9 +7,12 @@ const unfinished = (op: ReadingOperation) => !["committed", "cancelled", "failed
 
 export function ReadingText({ reading }: { reading: VaultReading }) {
   const { machine, human_correction: human } = reading;
+  const extraction = machine.result.extraction;
+  const supportedSummaryEvidence = extraction.summary_evidence.filter(e => e.quote.trim().length > 0);
+  const hasSupportedSummary = Boolean(extraction.summary?.trim()) && supportedSummaryEvidence.length > 0;
   return <>
     {human !== null && <section className="local-human-reading"><h2>Your corrected reading</h2><p className="local-reading-text">{human || "Your reading is intentionally empty."}</p><p className="local-muted">Your correction takes precedence over later machine readings. It is not a verified claim.</p></section>}
-    <section className="local-machine-reading"><h2>Unreviewed machine reading</h2><p className="local-reading-text">{machine.result.extraction.pages[0]?.transcription || "No readable text returned."}</p>
+    <section className="local-machine-reading"><h2>Unreviewed machine reading</h2>{human === null && hasSupportedSummary && <section className="local-reading-summary"><h3>Summary · unreviewed</h3><p className="local-reading-text">{extraction.summary}</p><div className="local-summary-evidence"><h4>Source evidence</h4><ul>{supportedSummaryEvidence.map((e, i) => <li key={`${e.page_id}-${i}`}><q>{e.quote}</q> <span className="local-muted">Original photo</span></li>)}</ul></div></section>}<h3>Transcript</h3><p className="local-reading-text">{extraction.pages[0]?.transcription || "No readable text returned."}</p>
       <p className="local-muted">Claude · {machine.result.provider} · {machine.result.model_id}. A machine proposal, not a verified source fact.</p>
       {machine.result.extraction.uncertainties.length > 0 && <><h3>Uncertainty in this reading</h3><ul className="local-uncertainties">{machine.result.extraction.uncertainties.map((u, i) => <li key={i}>{u.description}</li>)}</ul></>}
       <details className="local-provenance"><summary>Reading provenance</summary><p>Source SHA-256: {machine.request.binding.source_sha256}</p><p>Photo captured: {machine.request.binding.captured_at}</p><p>Input SHA-256: {machine.result.input_manifest_sha256}</p><p>Prepared image: {machine.result.derivative.transform_version} · {machine.result.derivative.sha256}</p>{machine.result.validation_notes.map((n, i) => <p key={i}>{n.code}: {n.detail}</p>)}</details>
@@ -17,9 +20,9 @@ export function ReadingText({ reading }: { reading: VaultReading }) {
   </>;
 }
 
-type Props = { vault: LocalVault; session: string; memory: VaultMemory; active: boolean; visible: boolean; generation: number; blocked: boolean; onSaved: (m: VaultMemory) => void };
+type Props = { vault: LocalVault; session: string; memory: VaultMemory; active: boolean; visible: boolean; generation: number; blocked: boolean; organizationBlocked?: boolean; onSaved: (m: VaultMemory) => void };
 type Correction = { operationId: string; revision: number; text: string };
-export function PhotoReading({ vault, session, memory, active, visible, generation, blocked, onSaved }: Props) {
+export function PhotoReading({ vault, session, memory, active, visible, generation, blocked, organizationBlocked = false, onSaved }: Props) {
   const [capability, setCapability] = useState<ReadingCapability | null>(null);
   const [pairing, setPairing] = useState<PairingStatus | null>(null);
   const [invitationId, setInvitationId] = useState("");
@@ -36,6 +39,7 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
   const [needsReview, setNeedsReview] = useState(false);
   const [reviewReady, setReviewReady] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [organizationPending, setOrganizationPending] = useState(Boolean(vault.organizationOperations));
   const [source, setSource] = useState<string | null>(null);
   const [decoded, setDecoded] = useState(false);
   const [sourceError, setSourceError] = useState("");
@@ -206,15 +210,22 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
   }
   const showCorrection = panel === "correct" || (!memory.reading && draftRevision.current !== null);
   const pending = operation && unfinished(operation);
-  const canRead = eligible(memory) && !blocked && capability?.enabled && operationsReady && !working && !cancelling && !pending;
+  useEffect(() => {
+    let alive = true;
+    if (!vault.organizationOperations) { setOrganizationPending(false); return () => { alive = false; }; }
+    void vault.organizationOperations(session, memory.id).then(rows => { if (alive) setOrganizationPending(rows.some(row => ["prepared", "queued", "processing", "unknown"].includes(row.state))); }, () => { if (alive) setOrganizationPending(true); });
+    return () => { alive = false; };
+  }, [vault, session, memory.id, memory.revision]);
+  const suppressManual = organizationBlocked || organizationPending;
+  const canRead = eligible(memory) && !blocked && !suppressManual && capability?.enabled && operationsReady && !working && !cancelling && !pending;
   return <section hidden={!visible || !active} className="local-photo-reading" aria-label="Photo reading">
     {notice && operation?.state !== "committed" && <p role="status">{notice}</p>}{error && <p role="alert" className="local-error">{error}</p>}
     {capability && !capability.enabled && <section className="local-muted" aria-label="Private photo reading connection"><p>Claude reading is not connected on this device. Your photos, notes and local search remain available.</p>
-      {vault.pairingPrepare && <><button disabled={pairingBusy} onClick={() => void preparePairing()}>Prepare this device for owner approval</button>
+      {vault.pairingPrepare && <details className="local-tools local-connection"><summary>Connection settings</summary><button disabled={pairingBusy} onClick={() => void preparePairing()}>Prepare this device for owner approval</button>
         {pairing?.state === "pending_owner_approval" && <><p>Device {pairing.device_id} · vault {pairing.vault_id} · photo inference only</p><p>Device fingerprint: <strong>{pairing.fingerprint}</strong></p><label htmlFor="pairing-invitation">Owner invitation ID</label><input id="pairing-invitation" value={invitationId} onChange={e => setInvitationId(e.target.value)} autoComplete="off" /><button disabled={pairingBusy || !invitationId.trim()} onClick={() => void claimPairing()}>Connect this device</button><button disabled={pairingBusy} onClick={() => void checkPairingStatus()}>Check pairing status</button></>}
         {pairing?.state === "unknown" && <><p role="status">Connection status is unknown. Check status or disconnect this device to recover safely.</p><button disabled={pairingBusy} onClick={() => void checkPairingStatus()}>Check pairing status</button><button disabled={pairingBusy} onClick={() => void disconnectPairing()}>Confirm disconnect or discard pending pairing</button></>}
         {pairing?.state === "pending_owner_approval" && <button disabled={pairingBusy} onClick={() => void disconnectPairing()}>Discard pending pairing</button>}
-      </>}
+      </details>}
       <p>{capability.explanation}</p>
     </section>}
     {capability?.enabled && pairing?.state === "connected" && <p><span>Connected for photo inference on this device.</span> <button disabled={pairingBusy} onClick={() => void disconnectPairing()}>Disconnect device</button></p>}
@@ -222,7 +233,7 @@ export function PhotoReading({ vault, session, memory, active, visible, generati
       {pending && <><p className="local-muted">Retry or recovery may resend this photo if the service has no receipt, using the same operation. In-flight or unknown provider work is not submitted again. A retained complete receipt can be saved locally without another upload.</p><div className="local-actions"><button disabled={working || cancelling || blocked || (operation.state !== "ready" && !capability?.enabled) || !operationsReady} onClick={() => void read(true)}>Retry or recover reading</button><button disabled={cancelling} onClick={() => void cancel()}>{cancelling ? "Cancelling…" : "Cancel reading"}</button></div></>}
     </section>}
     {panel === "consent" ? <section className="local-review" aria-label="Claude reading consent"><h2 ref={heading} tabIndex={-1}>Send this photo for a reading?</h2><p><strong>{memory.source_name}</strong></p><p>Only this selected photo will be sent to your configured private service and Claude for full-page vision reading. Your original stays in the vault. The machine reading may be wrong.</p><p>After sending, cancellation may not stop processing or a charge. Your correction will take precedence over later machine readings.</p><div className="local-actions"><button className="local-primary" disabled={!canRead} onClick={() => void read()}>Send this photo to Claude</button><button onClick={() => { returnConsentFocus.current = true; setPanel("reading"); }}>Keep it local</button></div></section>
-      : <div className="local-actions"><button ref={readingTrigger} disabled={!canRead || panel === "correct"} onClick={() => { setError(""); setNotice(""); setPanel("consent"); }}>Read this photo with Claude</button>{memory.reading && <button disabled={!eligible(memory) || blocked || working || Boolean(pending) || panel === "correct"} onClick={startCorrection}>Correct reading</button>}</div>}
+      : <div className="local-actions">{!suppressManual && <button ref={readingTrigger} disabled={!canRead || panel === "correct"} onClick={() => { setError(""); setNotice(""); setPanel("consent"); }}>Read this photo with Claude</button>}{memory.reading && <button disabled={!eligible(memory) || blocked || working || Boolean(pending) || panel === "correct"} onClick={startCorrection}>Correct reading</button>}</div>}
     {(memory.reading || showCorrection) && <div className="local-reading-comparison"><div className="local-reading-understanding">{memory.reading ? <ReadingText reading={memory.reading} /> : <p className="local-muted">The current reading is unavailable. Your correction draft remains here for review or copying.</p>}
       {showCorrection && <section className="local-review" aria-label="Correct the photo reading"><h2 ref={heading} tabIndex={-1}>Correct the reading</h2><p>Your original, machine proposal and earlier corrections remain in the vault. Your annotation is separate.</p>{needsReview && <><p>Your reading draft is retained. Reload the current reading before resolving this attempt.</p><button disabled={working} onClick={() => void reloadCorrection()}>Reload latest reading</button>{reviewReady && <><p>Current reading · revision {memory.revision}</p><label><input type="checkbox" checked={reviewed} onChange={e => { setReviewed(e.target.checked); if (e.target.checked) setCorrection(null); }} />I reviewed the latest reading</label></>}</>}<label htmlFor="reading-correction">Your reading correction</label><textarea id="reading-correction" value={draft} readOnly={Boolean(correction) || !eligible(memory) || !memory.reading} onChange={e => setDraft(e.target.value)} /><div className="local-actions"><button className="local-primary" disabled={working || blocked || !eligible(memory) || !memory.reading || (needsReview && (!reviewReady || !reviewed))} onClick={() => void saveCorrection()}>Save reading correction</button><button disabled={working} onClick={() => setPanel("reading")}>Back to reading</button></div></section>}
     </div><div className="local-reading-evidence"><h2>Original photo</h2>{sourceError && <p role="alert" className="local-error">{sourceError}</p>}{source && memory.reading && eligible(memory) && <figure className="local-artifact"><img src={source} alt="Original photo for comparison" onLoad={() => setDecoded(true)} onError={() => { releaseSource(); setSourceError("Original unavailable: this image could not be decoded."); onSaved({ ...memory, state: "conflict", conflict: "Original image could not be decoded" }); }} />{decoded && <figcaption>Original bytes unchanged · hash checked by this device. This does not verify the reading’s claims.</figcaption>}</figure>}{!source && !sourceError && eligible(memory) && memory.reading && <p role="status">Loading the original photo…</p>}{(!eligible(memory) || !memory.reading) && <p className="local-muted">Original evidence is unavailable for the current memory state.</p>}</div></div>}

@@ -1,5 +1,8 @@
 # Local vault lifecycle — bounded implementation evidence
 
+> Current product direction is in [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), and [roadmap](../../ROADMAP.md); this document preserves only the named historical candidate evidence.
+
+
 October 8, 2026. Implements the authorized [lifecycle plan](../../superpowers/plans/2026-10-08-local-vault-lifecycle.md) over the accepted local foundation. New local desktop records are vault-authoritative; legacy cloud records remain database-authoritative and unmigrated. This slice does not complete RCL-005B, semantic memory reconstruction or installed-device acceptance.
 
 ## Implemented scope

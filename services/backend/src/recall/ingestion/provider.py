@@ -20,6 +20,7 @@ class InterpretRequest:
     pages: list[PageImage]
     schema: dict[str, Any]
     repair_note: str | None = None  # validation errors from a previous attempt, for one repair call
+    context: list[dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,14 @@ class AnswerRequest:
     question: str
     packet: list[dict[str, Any]]
     schema: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class InterpretTextRequest:
+    text: str
+    envelope: dict[str, Any]
+    schema: dict[str, Any]
+    context: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -55,3 +64,5 @@ class Provider(Protocol):
     def interpret(self, request: InterpretRequest) -> ProviderResult: ...
 
     def answer(self, request: AnswerRequest) -> ProviderResult: ...
+
+    def interpret_text(self, request: InterpretTextRequest) -> ProviderResult: ...

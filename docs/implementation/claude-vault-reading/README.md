@@ -1,5 +1,8 @@
 # Selected-photo Claude reading — bounded implementation evidence
 
+> Current product direction is in [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), and [roadmap](../../ROADMAP.md); this document preserves only the named historical candidate evidence.
+
+
 October 8, 2026. Implements the authorized [design](../../superpowers/specs/2026-10-08-claude-vault-reading-design.md) and [plan](../../superpowers/plans/2026-10-08-claude-vault-reading.md) over preserved local foundation/lifecycle work. New local records remain vault-authoritative; legacy cloud data remains database-authoritative and unmigrated. Claude full-page vision is the primary photo-reading path. This slice does not complete RCL-005B, semantic Ask, phone transport or installed-device acceptance.
 
 ## Implemented behavior

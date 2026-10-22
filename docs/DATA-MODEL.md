@@ -1,10 +1,52 @@
 # Canonical data model
 
+## Imported text — v8
+
+TEXT-FILE-01 adds optional versioned imported-text provenance while preserving exact v1-v7 records and rendering. The immutable original uses `Recall/Sources/<memory-id>.txt` even for an imported `.md`; filename and extension are metadata, never path authority. Initial semantic text omits one leading UTF-8 BOM, with a separate hash and lengths, while the original-byte hash continues to identify the complete file.
+
+A create-only import intent binds the operation, vault, filename and source/semantic hashes before source publication. It enables same-operation recovery without inventing a new memory after an uncertain reply. The journal remains memory authority; the intent is operational state. Imported Markdown is rendered as inert content, and only supported edits to Recall's human annotation region become human revisions. The v8 writer fence must also preserve typed notes, photos, reading corrections and retained history on upgraded vaults. The exact 2aa36435 candidate has bounded independent acceptance. Import intents retain the original organization consent snapshot; recovery prepares it before commit and receipt replay finishes it without enrolling later consent. The Recall-owned annotation boundary also governs first direct-edit publication.
+
+## Retained historical Ask — accepted reader contract
+
+HISTORY-01 reads existing immutable journal events; it introduces no vault format or canonical memory table. A historical evidence item binds memory/revision, immutable source hash, exact event-byte hash, recorded time, exact excerpt and current revision. The as-of selector uses the highest eligible revision recorded before the exclusive cutoff, with revision order resolving equal timestamps. Malformed or decreasing timestamps cause an explicit omission, never an inferred timeline.
+
+Only currently active, source-verified and conflict-free memories qualify. Later human corrections require current counter-evidence alongside older wording. Removed or missing sources do not reappear through historical Ask. Its receipt uses existing operation/digest/consent-version storage, and a changed current revision invalidates display even when historical bytes are unchanged. See [HISTORY-01](../.agent/HISTORY-01.md); bounded local acceptance is recorded in its completion and independent review.
+
+## Related-memory projection v7 — bounded acceptance
+
+V7 preserves the original, human text and source-local organization proposal. Its v2 organization binding additionally contains bounded current context and coverage; its result may contain up to three targets with exact two-sided quotes. An event-only `context_link_projection` snapshots each target ID, native-resolved safe basename and suppression state. It is required for v7 (possibly empty), absent from v1-v6, and part of v7 hashing/rendering. Historical replay uses that snapshot, never today's filesystem layout.
+
+Current `related_context` and optional `context_repair_pending` are derived read projections. They do not grant path authority. A `context_suppress` journal revision removes stale links without replacing human text or rewriting history. Target edits, removal and external rename invalidate links immediately; unsuccessful safe publication leaves an explicit pending-repair state. The [replay contract](../.agent/CONTEXT-01-REPLAY-ADDENDUM.md) and [shared wire fixture](../packages/contracts/fixtures/local-context-synthetic.json) define the accepted bounded contract; v1-v6 byte compatibility remains required.
+
+## Organization proposal v6 — accepted source-local contract
+
+The proposed v6 event carries an optional, source-bound `organization` proposal: input/source hashes, input revision, source kind, operation and consent epoch, normalized extraction and unreviewed provenance. It does not replace the immutable source or human text. New writes require the v6 writer fence; v1–v5 bytes/history remain unchanged on read. Without a proposal, v6 preserves the existing text/photo projection.
+
+Local organization intents and consent markers under `Recall/_meta` are operational state. The local consent fence orders future capture eligibility under the vault lock without comparing server/client clocks. A prepared intent is dispatchable only once source/history commitment is verified. Service consent/receipts remain operational and have no authority to rewrite memory. Human edits and reading corrections suppress the prior proposal in current projections; its historical event remains intact. See [the accepted source-local contract](../.agent/ORGANIZE-01.md) for the exact wire and acceptance invariants.
+
+## Ask operational state — separate from memory
+
+INTELLIGENCE-01 does not introduce a new vault memory version. Native retry intents under `Recall/_meta/ask/<operation-id>.json` bind a validated question/evidence packet to its selected vault and protected connection fingerprint. They contain no secret or provider response and are not history events. Current human text/corrections determine evidence; an intentionally empty correction never revives the immutable source.
+
+Migration `0010_local_intelligence.sql` adds separately scoped invitations/grants, versioned Ask consent and workspace/device/vault/operation-bound receipts. These tables own authorization, recovery and accounting only. Nonempty receipts bind the admitted consent policy and decision version. A changed decision invalidates their private results without resetting accounting or operation identity. Results have a 24-hour expiry; digest/status/budget tombstones prevent replay. The Obsidian vault remains the owner of memory. [The wire fixture](../packages/contracts/fixtures/local-intelligence-synthetic.json) binds Python and Rust canonical JSON/digests, including Unicode.
+
 ## Required vault ownership
+
+The accepted TEXT-01 slice adds the v5 text-source contract: exact submitted UTF-8 bytes are immutable at `Recall/Sources/<id>.txt`; the initial human note contains that text and remains separately editable. The source name is `note.txt`, while its path is derived from the native memory ID. Text is nonblank, contains no NUL, and is bounded to 256 KiB. A deterministic original-text link and trailing editable human body use the existing journal/history and conflict model. V5 photo notes reuse v4 rendering; v1-v4 history is not rewritten. Text has no photo-reading object or fabricated image derivative. Validation and review are recorded in `.agent/FINISH-02/TEXT-COMPLETION.json`; this source contract alone does not supply AI text organization.
 
 The Obsidian vault is the required canonical memory spine. The universal model below must have a durable, versioned vault representation: stable IDs, linked memories/entities, immutable source attachments and hashes, evidence references, uncertainty, temporal revisions, corrections and tombstones. PostgreSQL/search/SQLite semantic projections must be recoverable from this representation; service authorization and secrets are separate protected operational state.
 
-The exact frontmatter/sidecar schema, operation journal and migration contract are not yet implemented or finalized. Do not claim ordinary exported Markdown already preserves every semantic invariant. Direct user edits require validated reconciliation; paths/titles are not identity or authorization.
+The native local vault has a versioned manifest, append-only operation journal/history and transactional publication. The new v4 Markdown renderer is an implementation candidate; exact validation/review is recorded in `.agent/REALIGN-01/COMPLETION.json` when frozen; it supplements the established v1-v3 note formats without rewriting existing notes. This is not a completed legacy-data migration or full semantic-projection rebuild. Direct user edits require validated reconciliation; paths/titles are not identity or authorization.
+
+## Native Markdown renderer v4 — candidate contract
+
+Successful selected-photo readings render deterministically into a readable note containing an original-source link, summary, source transcription, source-local mentions, source-linked statements, action suggestions, uncertainty, provenance and flat YAML properties: `id`, `status: "saved"`, `captured`, `source`, and `review`. `review` is `"not_read"`, `"unreviewed"` or `"corrected"`. The quoted `source` property uses the vault-root Obsidian link `[[Recall/Sources/<uuid>.<ext>]]`; the Markdown body uses a relative link such as `../Sources/<uuid>.<ext>`. Model output cannot select paths, property names, permissions or arbitrary links. Source links resolve deterministically and never infer identity or relationships across notes. Use relative URL-encoded Markdown links or vault-root wikilinks; never use `../` in a vault-root wikilink.
+
+The v4 writer preserves v1-v3 renderer behavior byte-for-byte when reopening or reconciling those historical records. Existing external human edits keep the renderer/version of the record they extend. A qualifying reading/write uses v4 and its writer-version fence refuses older binaries, retaining exact prior manifest bytes; existing vaults are not bulk-converted. In v4, only edits to the trailing human-annotation region reconcile as human revisions when the generated prefix/link is unchanged. Edits to generated properties, reading, statements, provenance or source links conflict and remain on disk. A human transcription correction makes the rendered review state `corrected`, suppresses stale machine semantics from the active note/search projection, and leaves historical readings/source evidence in append-only history.
+
+These rules define the candidate's compatibility and trust contract. They do not establish acceptance until deterministic renderer, fence, restart/recovery, direct-edit/conflict and keyword-projection checks pass on the exact candidate and independent review is recorded.
+
+Obsidian's format constraints follow its official guidance: [Properties](https://obsidian.md/help/properties) and [Internal links](https://obsidian.md/help/links). Flat properties remain standard YAML at the note start; property values that represent links are quoted strings. Recall does not require a community plugin.
 
 ## V1 implemented schema — database-authoritative baseline
 
@@ -19,7 +61,7 @@ Mention identity combines evidence, normalized kind and verbatim mention text, s
 Source bytes and historical user/model revisions are not overwritten by corrections. See [V1-STATUS](V1-STATUS.md) for remaining limits.
 
 
-Version: 0.4 | Logical schema. RCL-001 and RCL-002 tables are implemented in `services/backend/migrations/` (0001, 0002); everything else is still logical
+Version: 0.4 | Legacy relational schema reference. RCL-001/RCL-002 tables and later listed migrations are implemented in `services/backend/migrations/`; this database schema remains a support/pre-migration authority and does not describe the new native vault renderer contract by itself.
 
 ## Design goal
 
@@ -161,3 +203,6 @@ Only `workspaces`, `workspace_members`, `devices`, `captures`, `source_objects`,
 Capture status is now `awaiting_upload → stored → processing → ready | needs_review | failed`, `failed → processing`; a trigger enforces exactly these transitions. A second least-privilege role, `recall_worker`, is scoped by RLS to the workspace of the job it claimed (it is not a member of any workspace), cannot delete anything, and cannot read membership. The API role cannot write memories, revisions, or chunks. Deployment-wide spend is exposed only as two aggregate numbers via `recall_ai_spend()`.
 
 Still logical (not created): entities, aliases, mentions as rows, claims, actions, review items, change events, export jobs, embeddings.
+# Product target and current renderer boundary
+
+The target source contract covers photos, typed text, voice and files; adapters are staged as photo organization, text, grounded Ask, then voice and broader file inputs. The existing extraction model remains universal. Source-local mentions and evidence can be organized in the Obsidian note without merging same-name mentions across memories. The v4 renderer is an implementation candidate; exact validation/review is recorded in `.agent/REALIGN-01/COMPLETION.json` when frozen; its properties and links are deterministic projections, while source evidence and versioned history remain authoritative. See [PRD](PRD.md) and [ARCHITECTURE](ARCHITECTURE.md).

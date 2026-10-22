@@ -1,0 +1,34 @@
+{
+  "node": "VOICE-01/F0",
+  "role": "independent Sol reviewer",
+  "verdict": "PASS",
+  "reviewed_utc": "2026-10-10T03:21:45Z",
+  "accepted_product_baseline": "2aa36435f5758e7f7f8d85ead56e2b15ccac6a2829adb49a17ea534e19988050",
+  "technical_feasibility": "PASS on the tested Windows x64 host for pinned local whisper.cpp inference and actual synthetic Tauri 2 NSIS sidecar/model packaging",
+  "product_acceptance": false,
+  "independent_checks": [
+    "Read F0-COMPLETION, F0-EVIDENCE, the active VOICE-01 packet and NATIVE-DRAFT; inspected raw per-case results, Tauri configuration, installed resource layout and local artifacts.",
+    "Verified clean whisper.cpp checkout at d1be6fde11ac6e0407606b4e42fe72d34add8037. Independently hashed ggml-base.bin at 147951465 bytes, SHA-256 60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe; final CLI SHA-256 329c713c8b36eb8c367137d624b75ec57e17f8b3061fd823c59433abd5f76951.",
+    "Independently verified Tauri fixture NSIS installer at 131752126 bytes, SHA-256 1a2036e34f80edbe8177015f7efe869b69514f6086145a75c59f892c3af6ac99, installed CLI/four DLL hashes and installed model hash. Re-executed installed sidecar against synthetic SAPI WAV: exact gold sentence, exit 0; exact silence emitted 'you', exit 0.",
+    "Compared all product files under apps, services, packages, infra and tests with accepted TEXT-FILE manifest: zero changed. F0 artifacts live under ignored external tooling and repository evidence only."
+  ],
+  "measured_limits": [
+    "True silence hallucinated 'you'; a tone yielded [Music], and 1-10 percent gain speech omitted the time phrase. Nonempty machine output is not evidence of complete or truthful speech recognition.",
+    "RMS <= 5 only separates the tested zero/near-zero fixtures from the tested speech clips. It is no general VAD or quality threshold; microphone conditions, accents, languages, noise and terminology remain untested.",
+    "The 129836578-byte (123.82 MiB) installer delta is between minimal synthetic Tauri fixtures, not a final Recall installer delta. The fixture was installed and executed; Recall, microphone, vault, Obsidian and Ask paths were not exercised.",
+    "The tested host selected AVX2/FMA/F16C/BMI2. Windows x64 distribution compatibility requires a verified baseline/fallback or an exact-feature preflight with an honest unavailable state before launch."
+  ],
+  "native_draft_review": {
+    "architecture_blocker": false,
+    "conditions_before_dispatch": [
+      "Update stale pending F0 measurements/status to the final installed Tauri evidence and bind the final binary/model/config hashes.",
+      "Distinguish failed, silent-gated or ambiguous ASR status (ineligible) from an ordinary eligible but explicitly unreviewed machine transcript; do not imply that all machine uncertainty bars evidence. Keep the caveat concise in transcript details, without a per-note approval step or warning modal.",
+      "Constrain RMS <= 5 to the tested zero/near-zero preflight. Do not infer a general VAD, speech-quality guarantee or missing words from loudness.",
+      "Freeze a truthful effective duration/byte limit for actual-rate PCM16: 48 kHz stereo reaches 8 MiB in about 44 seconds, below the draft's 120-second target. Bound queue, staging and conversion costs accordingly.",
+      "Verify baseline CPU execution/fallback or preflight the required feature set before launching the sidecar; prevent an illegal-instruction crash on unsupported Windows x64 hardware.",
+      "Resolve pinned microphone dependency/input conversion, deterministic resampler, v9 writer/projection coverage and separate audio consent wire in bounded contracts before builder implementation."
+    ]
+  },
+  "next_direction": "Controller may advance from F0 to a frozen, bounded native packet after incorporating these conditions. F0 does not certify product voice behavior, general ASR quality, an installed Recall build, live/private processing, phone support or parent Finish Contract completion.",
+  "parent_complete": false
+}

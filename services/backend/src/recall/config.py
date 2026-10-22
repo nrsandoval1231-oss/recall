@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     ai_monthly_budget_usd: float | None = Field(None, validation_alias="RECALL_AI_MONTHLY_BUDGET_USD")
     ai_image_max_edge: int = Field(2000, validation_alias="AI_IMAGE_MAX_EDGE")
     device_pairing_enabled: bool = Field(False, validation_alias="RECALL_DEVICE_PAIRING_ENABLED")
+    local_intelligence_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_INTELLIGENCE_ENABLED")
+    local_organization_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_ORGANIZATION_ENABLED")
     max_processing_attempts: int = Field(3, validation_alias="RECALL_MAX_PROCESSING_ATTEMPTS")
     worker_database_url: str | None = Field(None, validation_alias="RECALL_WORKER_DATABASE_URL")
     worker_lease_seconds: int = Field(900, validation_alias="RECALL_WORKER_LEASE_SECONDS")
@@ -104,6 +106,10 @@ class Settings(BaseSettings):
             else ""
         )
         return f"{self.ai_provider or 'none'}-v1{semantic}"
+
+    @property
+    def organize_policy_version(self) -> str:
+        return f"organize-v2|{self.ai_policy_version}|{self.ai_model_id or 'unconfigured'}"
 
     @property
     def embedding_configured(self) -> bool:
@@ -158,6 +164,8 @@ class Settings(BaseSettings):
             raise ValueError("supabase storage needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
         if not 1 <= self.max_processing_attempts <= 10:
             raise ValueError("RECALL_MAX_PROCESSING_ATTEMPTS must be 1-10")
+        if len(self.organize_policy_version.encode("utf-8")) > 160:
+            raise ValueError("organization policy version must be at most 160 UTF-8 bytes")
         for name in ("ai_input_usd_per_mtok", "ai_output_usd_per_mtok", "ai_daily_budget_usd", "ai_monthly_budget_usd"):
             value = getattr(self, name)
             if value is not None and value < 0:

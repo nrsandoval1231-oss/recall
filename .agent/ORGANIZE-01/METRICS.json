@@ -1,0 +1,29 @@
+{
+  "packet": "ORGANIZE-01",
+  "lane": "Luna builders, Sol first independent review FIX, Terra native lifecycle repair and Luna UI repair",
+  "base_sha": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "planning_started_utc": "UNKNOWN",
+  "build_started_utc": "UNKNOWN",
+  "backend_finished_utc": "2026-10-09T19:02:15Z",
+  "native_initial_finished_utc": "UNKNOWN; handoff retained without separate timestamp",
+  "validation_duration_seconds": "Measured per command in *-final.result.json; overlapping groups must not be summed as wall time",
+  "audit_duration_seconds": "See REVIEW.json UTC start/finish; prior 1e323bba review 146 seconds, retained separately",
+  "elapsed_to_accepted_seconds": "UNKNOWN; task-entry start not captured",
+  "controller_repairs": [
+    "Scope organize consent by exact workspace/device/vault tuple before activation",
+    "Revalidate source and protected connection after network waits before upload/promotion",
+    "Preserve epistemic status and source wording in v6 projection",
+    "Conservative UTF-8 budget bound and known provider-error settlement",
+    "Named operation recovery and automatic progress through bounded queue batches"
+  ],
+  "repair_count": 5,
+  "models": {
+    "builders": "gpt-6-luna low",
+    "architect": "gpt-6-sol medium",
+    "reviewer": "gpt-6-sol medium; final independent PASS c6ba1029",
+    "repair_specialist": "gpt-5.6-terra medium"
+  },
+  "config_identity": "Named roles per applicable AGENTS.md; runtime configuration load not separately measured",
+  "tokens": "UNKNOWN",
+  "speedup": "UNKNOWN; no matched baseline comparison"
+}

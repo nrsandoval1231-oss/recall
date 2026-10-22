@@ -1,5 +1,8 @@
 # Local vault foundation implementation plan
 
+> Historical plan/design record. It preserves its original approved scope and evidence; it is not current dispatch. Current direction is governed by [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), [roadmap](../../ROADMAP.md), and [documentation map](../../DOCUMENTATION-MAP.md).
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Ship a usable native desktop loop that opens without sign-in, selects an Obsidian vault, imports an original photo, records/corrects a source-linked human note, reconciles direct Markdown edits and retrieves local evidence after restart.

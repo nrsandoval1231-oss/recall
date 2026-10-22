@@ -1,5 +1,8 @@
 # Local desktop vault foundation — historical PR11 evidence
 
+> Current product direction is in [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), and [roadmap](../../ROADMAP.md); this document preserves only the named historical candidate evidence.
+
+
 October 8, 2026. This is a usable local desktop foundation candidate under the authorized [implementation plan](../../superpowers/plans/2026-10-07-local-vault-foundation.md), not completion of RCL-005B or installed-device acceptance. [Run the native application](../../DEVELOPMENT.md#local-only-desktop-foundation) with `npm ci` and `npm run tauri -w @recall/desktop -- dev`; no cloud configuration or sign-in is needed.
 
 PR11 baseline `650e9eae6878b46673d81411789d02e9388077a0` subsequently passed [CI run 37708945255](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255) and produced unsigned [artifact 11521925107](https://github.com/nrsandoval1231-oss/recall/actions/runs/37708945255/artifacts/11521925107). Retained delivered ZIP reference: `file_0000000099f081f599ed9c8fa1be3aa9`. This establishes foundation CI/artifact delivery, not installed-device acceptance. The [lifecycle slice evidence](../local-vault-lifecycle/README.md) records newer rename/restore/logical-removal/rebuild behavior separately. Counts, screenshots and foundation limitations below are preserved historical evidence.

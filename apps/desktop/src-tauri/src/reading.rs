@@ -92,7 +92,9 @@ impl MachineReading {
     }
     pub fn validate(&self) -> Result<()> {
         self.request.validate()?;
-        self.result.validate(&self.request)
+        // Older committed readings may lack evidence for a summary. Keep them
+        // readable; newly received receipts use the stricter receipt validator.
+        self.result.validate(&self.request, false)
     }
 }
 pub fn sha(bytes: &[u8]) -> String {
@@ -152,7 +154,7 @@ impl ReadingReceipt {
                 self.result
                     .as_ref()
                     .ok_or("Missing reading result")?
-                    .validate(request)
+                    .validate(request, true)
             }
             "in_flight" => ensure(self.result.is_none() && self.error_code.is_none()),
             "unknown" => ensure(
@@ -180,7 +182,7 @@ impl ReadingReceipt {
     }
 }
 impl ReadingResult {
-    fn validate(&self, request: &ReadingRequest) -> Result<()> {
+    fn validate(&self, request: &ReadingRequest, require_summary_evidence: bool) -> Result<()> {
         ensure(
             serde_json::to_vec(self)
                 .map_err(|_| "Invalid result")?
@@ -201,7 +203,7 @@ impl ReadingResult {
             text(&n.code, 1, 120)?;
             text(&n.detail, 0, 4000)?;
         }
-        extraction(&self.extraction, request)
+        extraction(&self.extraction, request, require_summary_evidence)
     }
 }
 fn keys(v: &Value, names: &[&str]) -> Result<()> {
@@ -265,7 +267,30 @@ fn proposed_evidence(v: &Value, min: usize, max: usize, source: &str) -> Result<
     Ok(())
 }
 /// Explicit bounded extraction 1.1 shape and references, without a local graph or executable schema engine.
-fn extraction(ex: &Value, req: &ReadingRequest) -> Result<()> {
+fn extraction(ex: &Value, req: &ReadingRequest, require_summary_evidence: bool) -> Result<()> {
+    extraction_inner(
+        ex,
+        &req.binding.memory_id,
+        &req.digest()?,
+        &req.binding.source_id,
+        require_summary_evidence,
+    )
+}
+pub(crate) fn validate_organization_extraction(
+    ex: &Value,
+    memory_id: &str,
+    manifest_sha256: &str,
+    source_id: &str,
+) -> Result<()> {
+    extraction_inner(ex, memory_id, manifest_sha256, source_id, true)
+}
+fn extraction_inner(
+    ex: &Value,
+    memory_id: &str,
+    manifest_sha256: &str,
+    source_id: &str,
+    require_summary_evidence: bool,
+) -> Result<()> {
     keys(
         ex,
         &[
@@ -283,20 +308,26 @@ fn extraction(ex: &Value, req: &ReadingRequest) -> Result<()> {
     )?;
     ensure(
         ex["schema_version"] == "1.1"
-            && ex["capture_id"] == req.binding.memory_id
-            && ex["input_manifest_sha256"] == req.digest()?,
+            && ex["capture_id"] == memory_id
+            && ex["input_manifest_sha256"] == manifest_sha256,
     )?;
     let page = &array(&ex["pages"], 1, 1)?[0];
     keys(page, &["page_id", "ordinal", "transcription", "legibility"])?;
-    ensure(page["page_id"] == req.binding.source_id && page["ordinal"].as_u64() == Some(1))?;
+    ensure(page["page_id"] == source_id && page["ordinal"].as_u64() == Some(1))?;
     choice(&page["legibility"], &["clear", "mixed", "unreadable"])?;
     let transcript = string(&page["transcription"], 0, 30000)?;
     optional(&ex["summary"], 6000)?;
+    let summary_evidence_min = usize::from(
+        require_summary_evidence
+            && ex["summary"]
+                .as_str()
+                .is_some_and(|summary| !normalized(summary).is_empty()),
+    );
     evidence(
         &ex["summary_evidence"],
-        0,
+        summary_evidence_min,
         40,
-        &req.binding.source_id,
+        source_id,
         transcript,
     )?;
     let mut mentions = BTreeSet::new();
@@ -316,7 +347,7 @@ fn extraction(ex: &Value, req: &ReadingRequest) -> Result<()> {
             ],
         )?;
         string(&m["raw_text"], 1, 500)?;
-        evidence(&m["evidence"], 1, 10, &req.binding.source_id, transcript)?;
+        evidence(&m["evidence"], 1, 10, source_id, transcript)?;
     }
     for (kind, prefix, limit) in [("statements", 's', 150), ("action_suggestions", 'a', 50)] {
         let mut ids = BTreeSet::new();
@@ -390,7 +421,7 @@ fn extraction(ex: &Value, req: &ReadingRequest) -> Result<()> {
             }
             ensure(ids.insert(local_id(&s["local_id"], prefix)?))?;
             string(&s["text"], 1, 2000)?;
-            evidence(&s["evidence"], 1, 10, &req.binding.source_id, transcript)?;
+            evidence(&s["evidence"], 1, 10, source_id, transcript)?;
         }
     }
     for u in array(&ex["uncertainties"], 0, 100)? {
@@ -409,7 +440,7 @@ fn extraction(ex: &Value, req: &ReadingRequest) -> Result<()> {
             ],
         )?;
         string(&u["description"], 1, 2000)?;
-        proposed_evidence(&u["evidence"], 1, 10, &req.binding.source_id)?;
+        proposed_evidence(&u["evidence"], 1, 10, source_id)?;
     }
     Ok(())
 }
@@ -483,6 +514,33 @@ mod tests {
             }
             assert!(altered.validate(&request).is_err(), "{changed}");
         }
+    }
+    #[test]
+    fn nonempty_summary_requires_transcript_evidence_in_new_receipts_only() {
+        let f = fixture();
+        let request: ReadingRequest = serde_json::from_value(serde_json::json!({
+            "binding": f["request"]["binding"],
+            "media_type": f["request"]["media_type"]
+        }))
+        .unwrap();
+        let mut receipt: ReadingReceipt = serde_json::from_value(f["response"].clone()).unwrap();
+        receipt.validate(&request).unwrap();
+
+        let result = receipt.result.as_mut().unwrap();
+        result.extraction["summary_evidence"] = serde_json::json!([]);
+        assert!(receipt.validate(&request).is_err());
+
+        let result = receipt.result.take().unwrap();
+        let mut machine = MachineReading { request, result };
+        machine.result.extraction["summary_evidence"] = serde_json::json!([]);
+        machine.validate().unwrap();
+
+        let mut empty_summary: ReadingReceipt =
+            serde_json::from_value(f["response"].clone()).unwrap();
+        let extraction = &mut empty_summary.result.as_mut().unwrap().extraction;
+        extraction["summary"] = "".into();
+        extraction["summary_evidence"] = serde_json::json!([]);
+        empty_summary.validate(&machine.request).unwrap();
     }
     #[test]
     fn reading_receipt_requires_explicit_null_fields() {

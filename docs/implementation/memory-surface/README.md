@@ -1,5 +1,8 @@
 # Canonical Memory Surface — first browser slice
 
+> Current product direction is in [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), and [roadmap](../../ROADMAP.md); this document preserves only the named historical candidate evidence.
+
+
 This implements the approved experience from PR #7 in the active browser product. It does not complete the whole Recall vision. PR #6 remains closed and unmerged. Product authority stays in PRD.md and UX-SPEC.md.
 
 ## Architecture and real boundaries

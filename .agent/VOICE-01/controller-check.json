@@ -1,0 +1,8 @@
+{
+  "checked_at_utc": "2026-10-10T03:22:37.477118+00:00",
+  "command": "installed tauri-installed-fixed/whisper-cli.exe -m bundled resources/models/ggml-base.bin -f fixtures/known-sapi.wav -nt -np",
+  "exit_code": 0,
+  "log": "controller-asr-gold.log",
+  "transcript": "Remember to call the dentist tomorrow at three in the afternoon.",
+  "scope": "Synthetic installed sidecar rerun;not installed Recall/microphone/product proof"
+}

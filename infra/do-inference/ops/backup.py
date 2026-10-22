@@ -46,6 +46,12 @@ TABLES = (
     "local_reading_receipts",
     "device_pair_invitations",
     "device_pair_grants",
+    "vault_intelligence_pair_invitations",
+    "vault_intelligence_pair_grants",
+    "vault_intelligence_ask_consents",
+    "local_intelligence_receipts",
+    "vault_intelligence_organize_consents",
+    "local_organization_receipts",
     "search_chunk_embeddings",
 )
 MAX_BACKUP_BYTES = 10 * 1024**3
@@ -78,18 +84,26 @@ def pg_environment(dsn: str) -> dict[str, str]:
 
 def main() -> int:
     destination = Path(os.environ["RECALL_BACKUP_DESTINATION"])
-    dsn = Path(os.environ["RECALL_BACKUP_DATABASE_URL_FILE"]).read_text(encoding="utf-8").strip()
+    dsn = (
+        Path(os.environ["RECALL_BACKUP_DATABASE_URL_FILE"])
+        .read_text(encoding="utf-8")
+        .strip()
+    )
     recipient = os.environ["RECALL_BACKUP_AGE_RECIPIENT"].strip()
     if destination.exists() or Path(str(destination) + ".sha256").exists():
         raise SystemExit("Backup destination already exists.")
     if not recipient.startswith("age1") or any(ch.isspace() for ch in recipient):
-        raise SystemExit("Supply the owner-provided age recipient in RECALL_BACKUP_AGE_RECIPIENT.")
+        raise SystemExit(
+            "Supply the owner-provided age recipient in RECALL_BACKUP_AGE_RECIPIENT."
+        )
     pg_dump, age = shutil.which("pg_dump"), shutil.which("age")
     if pg_dump is None or age is None:
         raise SystemExit("pg_dump and age are required.")
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="recall-do-inference-backup-") as scratch_name:
+    with tempfile.TemporaryDirectory(
+        prefix="recall-do-inference-backup-"
+    ) as scratch_name:
         scratch = Path(scratch_name)
         os.chmod(scratch, 0o700)
         dump = scratch / "database.dump"
@@ -102,16 +116,26 @@ def main() -> int:
                     snapshot = conn.execute("select pg_export_snapshot()").fetchone()[0]
                     captured = conn.execute("select current_timestamp").fetchone()[0]
                     migrations = [
-                        row[0] for row in conn.execute("select version from schema_migrations order by version")
+                        row[0]
+                        for row in conn.execute(
+                            "select version from schema_migrations order by version"
+                        )
                     ]
                     present = {
-                        row[0] for row in conn.execute("select tablename from pg_tables where schemaname='public'")
+                        row[0]
+                        for row in conn.execute(
+                            "select tablename from pg_tables where schemaname='public'"
+                        )
                     }
                     if present - set(TABLES) or "schema_migrations" not in present:
-                        raise SystemExit("Public table inventory is not supported by this backup tool.")
+                        raise SystemExit(
+                            "Public table inventory is not supported by this backup tool."
+                        )
                     counts = {
                         table: conn.execute(
-                            sql.SQL("select count(*) from public.{}").format(sql.Identifier(table))
+                            sql.SQL("select count(*) from public.{}").format(
+                                sql.Identifier(table)
+                            )
                         ).fetchone()[0]
                         for table in TABLES
                         if table in present
@@ -130,9 +154,13 @@ def main() -> int:
                         check=False,
                     )
                     if result.returncode:
-                        raise SystemExit(f"pg_dump failed (exit {result.returncode}); inspect operator logs.")
+                        raise SystemExit(
+                            f"pg_dump failed (exit {result.returncode}); inspect operator logs."
+                        )
                     if dump.stat().st_size > MAX_BACKUP_BYTES:
-                        raise SystemExit("Database dump exceeds the documented 10 GiB restore bound.")
+                        raise SystemExit(
+                            "Database dump exceeds the documented 10 GiB restore bound."
+                        )
                     manifest = {
                         "format": "recall.do-inference.backup.v1",
                         "captured_at": str(captured),
@@ -141,17 +169,23 @@ def main() -> int:
                         "public_table_rows": counts,
                     }
                     manifest_path = scratch / "manifest.json"
-                    manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+                    manifest_path.write_text(
+                        json.dumps(manifest, sort_keys=True), encoding="utf-8"
+                    )
                     if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
                         raise SystemExit("Backup manifest exceeds its size bound.")
             finally:
                 conn.execute("select pg_advisory_unlock(7402006)")
 
-        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        with zipfile.ZipFile(
+            archive_path, "w", compression=zipfile.ZIP_DEFLATED
+        ) as archive:
             archive.write(dump, "database.dump")
             archive.write(scratch / "manifest.json", "manifest.json")
         if archive_path.stat().st_size > MAX_BACKUP_BYTES:
-            raise SystemExit("Encrypted backup input exceeds the documented 10 GiB bound.")
+            raise SystemExit(
+                "Encrypted backup input exceeds the documented 10 GiB bound."
+            )
         staged = scratch / "encrypted.age"
         encrypted = subprocess.run(  # noqa: S603 -- age binary resolved by shutil and fixed argv
             [
@@ -169,7 +203,9 @@ def main() -> int:
             check=False,
         )
         if encrypted.returncode:
-            raise SystemExit("age encryption failed; inspect the local operator environment.")
+            raise SystemExit(
+                "age encryption failed; inspect the local operator environment."
+            )
         destination.parent.mkdir(parents=True, exist_ok=True)
         # Exclusive creation prevents replacing an earlier recovery point.
         with destination.open("xb") as output, staged.open("rb") as source:
@@ -177,7 +213,9 @@ def main() -> int:
         sidecar = Path(str(destination) + ".sha256")
         with sidecar.open("x", encoding="utf-8") as output:
             output.write(f"{digest(destination)}  {destination.name}\n")
-    print("Encrypted inference database backup created; plaintext temporary files were removed.")
+    print(
+        "Encrypted inference database backup created; plaintext temporary files were removed."
+    )
     return 0
 
 

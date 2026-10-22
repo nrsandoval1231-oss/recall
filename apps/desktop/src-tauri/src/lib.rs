@@ -1,3 +1,6 @@
+mod local_intelligence;
+mod local_intelligence_transport;
+mod local_organization;
 mod local_vault;
 mod managed_export;
 mod pairing;
@@ -205,7 +208,13 @@ fn vault_select(
     else {
         return Ok(None);
     };
-    state.select_path(&root).map(Some)
+    let selected = state.select_path(&root)?;
+    if let Some(vault_id) = selected.vault_id.as_deref() {
+        if let Ok(guard) = state.session(vault_id) {
+            local_organization::schedule_pending(guard);
+        }
+    }
+    Ok(Some(selected))
 }
 #[tauri::command]
 fn vault_capture(
@@ -214,7 +223,7 @@ fn vault_capture(
     operation_id: String,
     note: String,
 ) -> Result<Option<local_vault::VaultMemory>, String> {
-    state.with(&expected_vault_id, |vault| {
+    let result = state.with(&expected_vault_id, |vault| {
         if let Some(saved) = vault.capture_receipt(&operation_id, &note)? {
             return Ok(Some(saved));
         }
@@ -226,7 +235,54 @@ fn vault_capture(
             return Ok(None);
         };
         vault.capture_path(&operation_id, &note, &path).map(Some)
-    })
+    })?;
+    if result.is_some() {
+        if let Ok(guard) = state.session(&expected_vault_id) {
+            local_organization::schedule_pending(guard);
+        }
+    }
+    Ok(result)
+}
+#[tauri::command]
+fn vault_capture_text(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    operation_id: String,
+    text: String,
+) -> Result<local_vault::VaultMemory, String> {
+    let result = state.with(&expected_vault_id, |vault| {
+        vault.capture_text(&operation_id, &text)
+    })?;
+    if let Ok(guard) = state.session(&expected_vault_id) {
+        local_organization::schedule_pending(guard);
+    }
+    Ok(result)
+}
+#[tauri::command]
+fn vault_import_text_file(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    operation_id: String,
+) -> Result<Option<local_vault::VaultMemory>, String> {
+    let guard = state.session(&expected_vault_id)?;
+    let recovered = guard.with(|vault| vault.recover_text_import(&operation_id))?;
+    if let Some(saved) = recovered {
+        local_organization::schedule_pending(guard);
+        return Ok(Some(saved));
+    }
+    guard.active()?;
+    let Some(path) = rfd::FileDialog::new()
+        .set_title("Import one text file")
+        .add_filter("Text files", &["txt", "md"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+    let saved = guard.with(|vault| vault.import_text_path(&operation_id, &path))?;
+    if guard.active().is_ok() {
+        local_organization::schedule_pending(guard);
+    }
+    Ok(Some(saved))
 }
 #[tauri::command]
 fn vault_list(
@@ -301,6 +357,17 @@ fn vault_source(
     state.with(&expected_vault_id, |vault| vault.source(&memory_id))
 }
 #[tauri::command]
+fn vault_related_memory(
+    state: tauri::State<'_, local_vault::LocalVaultState>,
+    expected_vault_id: String,
+    source_memory_id: String,
+    target_memory_id: String,
+) -> Result<local_vault::VaultRelatedMemory, String> {
+    state.with(&expected_vault_id, |vault| {
+        vault.related_memory(&source_memory_id, &target_memory_id)
+    })
+}
+#[tauri::command]
 fn vault_history(
     state: tauri::State<'_, local_vault::LocalVaultState>,
     expected_vault_id: String,
@@ -327,9 +394,34 @@ pub fn run() {
             ));
             app.manage(NativeState(store));
             app.manage(ManagedExportState::default());
+            let vault_state = app.state::<local_vault::LocalVaultState>();
+            if let Ok(status) = vault_state.status() {
+                if let Some(token) = status.vault_id {
+                    if let Ok(guard) = vault_state.session(&token) {
+                        local_organization::schedule_pending(guard);
+                    }
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            pairing::vault_intelligence_pairing_prepare,
+            pairing::vault_intelligence_pairing_claim,
+            pairing::vault_intelligence_pairing_status,
+            pairing::vault_intelligence_pairing_disconnect,
+            local_intelligence::vault_intelligence_capability,
+            local_intelligence::vault_ask,
+            local_intelligence::vault_recover_ask,
+            local_intelligence::vault_set_history_consent,
+            local_intelligence::vault_ask_history,
+            local_intelligence::vault_recover_history_ask,
+            local_intelligence::vault_ask_history_citation,
+            local_organization::vault_organization_capability,
+            local_organization::vault_set_organization_consent,
+            local_organization::vault_reconcile_organization_consent,
+            local_organization::vault_organization_operations,
+            local_organization::vault_recover_organization,
+            local_organization::vault_organization_process_pending,
             pairing::vault_pairing_prepare,
             pairing::vault_pairing_claim,
             pairing::vault_pairing_status,
@@ -343,12 +435,15 @@ pub fn run() {
             vault_status,
             vault_select,
             vault_capture,
+            vault_capture_text,
+            vault_import_text_file,
             vault_list,
             vault_correct,
             vault_restore_note,
             vault_remove,
             vault_rebuild,
             vault_source,
+            vault_related_memory,
             vault_history,
             secrets::secret_get,
             secrets::secret_set,

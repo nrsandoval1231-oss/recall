@@ -1,5 +1,40 @@
 # Recall acceptance and evaluation
 
+## TEXT-FILE-01 — accepted bounded local result
+
+Candidate `2aa36435f5758e7f7f8d85ead56e2b15ccac6a2829adb49a17ea534e19988050` passed independent review after repairing consent recovery, first direct Obsidian edit publication and browser fixture isolation. Windows257/WSL259 native, client309, local52/web42 browser, static/type/build and unsigned installer gates passed. Backend388 passed and3 skipped plus the known WSL Compose failure; the exact Windows Compose test passed. [Completion](../.agent/TEXT-FILE-01/COMPLETION.json) and [review](../.agent/TEXT-FILE-01/REVIEW.json) bind the exact evidence. The installer remains unsigned and uninstalled; live/installed-device/parent acceptance remains open.
+
+## HISTORY-01 — bounded local acceptance
+
+Candidate `d506c8de` has [independent PASS](../.agent/HISTORY-01/REVIEW.json): Windows 249 / WSL 251 native tests, 306 client tests, 50 local-vault / 42 legacy browser tests, static/type/build and installer checks. Backend: 388 passed, 3 skipped plus the known WSL Compose wrapper failure; the exact Windows Compose test passed. The retained unsigned installer was built, not installed. Prior rejected candidates and all three review repairs remain preserved.
+
+Anchored as-of questions use exact retained revisions, current source eligibility, same-operation recovery and appropriate human correction counterparts. Machine reprocessing stays unreviewed and never becomes a human correction through an unrelated annotation. Blank or missing counterparts omit the pair; coverage stays accurate. Historical dates describe recorded vault state, not objective truth. Vague/event-based recall, held-out live quality and real-device acceptance remain open.
+
+## CONTEXT-01 — bounded local acceptance
+
+Candidate `4ec20fdb` has [independent PASS](../.agent/CONTEXT-01/REVIEW.json). Current links come from the same organization call with exact supporting excerpts and freshly disclosed purpose consent. Tests cover v1-v6 compatibility, v7 replay, source corrections/removal/restore, reading corrections, repeated capture, target rename/correction/removal suppression, interrupted repair, preserved conflicting edits and atomic source opening. Windows229/WSL231 native, 298 client, 48 local/42 legacy browser tests and static/build gates passed. Backend: 387 passed, three explicit skips and one WSL Docker wrapper failure covered by the exact Windows Compose pass. The unsigned installer was built, not installed. Live provider/proxy, real-vault quality and parent completion remain open.
+
+## ORGANIZE-01 — bounded local acceptance
+
+The required user journey is one remembered organization opt-in, followed by immediate durable text/photo capture and automatic structured Obsidian publication. No per-note processing approval or manual filing is required. Validate the [packet's acceptance matrix](../.agent/ORGANIZE-01.md#ui-and-deterministic-acceptance), including source-first durability, future-capture fencing, consent epoch changes, exact text provenance, photo derivatives, unknown-operation recovery, budget accounting and correction precedence across rendered notes, search and Ask.
+
+Candidate `c6ba1029` has [independent PASS](../.agent/ORGANIZE-01/REVIEW.json): Windows217/WSL219 native tests, 288 client tests, 46 local/42 legacy browser tests, builds and the retained backend platform-split evidence. Its unsigned installer was built, not installed. This proves bounded local/synthetic behavior only. Voice/files, phone transport, contextual connections, historical retrieval, live provider quality and installed-device proof remain open parent requirements.
+
+## INTELLIGENCE-01 acceptance boundary
+
+Grounded local-vault Ask has bounded independent acceptance in [its review](../.agent/INTELLIGENCE-01/REVIEW.json) and [completion evidence](../.agent/INTELLIGENCE-01/COMPLETION.json). That candidate passed shared wire/digest, real PostgreSQL authorization/consent/budget/receipt, native source revalidation/recovery, client and synthetic browser gates. Development checks on later changes do not extend that acceptance automatically.
+
+Test cross-scope denial, revocation, same-operation recovery, no second dispatch after unknown effects, expiry tombstones, empty human corrections, tampered originals, changed revisions, vault switches, vague queries and explicit truncated/limited coverage. Windows compilation/tests do not establish installed app use. Real provider entailment/relevance, held-out handwritten data, installed Windows/iPhone, historical retrieval and the parent finish contract remain separate open gates.
+
+# Current candidate acceptance status
+
+TEXT-01 additionally requires exact text-source bytes, retry-safe capture across restart, correction/direct-edit history, conflict and tombstone handling, v1-v4 byte compatibility and the v5 writer fence. The UI must expose an inert immutable text original and prevent photo inference for text. [TEXT-01 evidence](../.agent/FINISH-02/TEXT-COMPLETION.json) records the final candidate; local text capture is not AI text organization or Ask.
+
+The versioned v4 native Obsidian organization renderer and streamlined local surface have bounded local acceptance recorded in REALIGN-01. That acceptance covers legacy v1-v3 byte compatibility, source links/properties and hostile-string escaping, correction precedence, no invented identity/confirmation, retries/recovery, direct-edit conflicts and structured keyword projection. None of this closes natural-language Ask, text/voice/file adapters, phone transport, live handwriting quality, real-device installation, or full RCL-005B. Historical acceptance below remains evidence for its named candidate and scope only.
+
+Historical pre-freeze checkpoint only: an earlier local run recorded 173 native Rust tests passed. Final exact-candidate validation and review evidence belongs in [REALIGN-01 completion evidence](../.agent/REALIGN-01/COMPLETION.json); this checkpoint does not establish acceptance or close installed Windows, live-provider or full-product gates.
+
+
 ## Historical PR11 local foundation evidence — platform acceptance OPEN
 
 The authorized implementation supplies a no-sign-in desktop vault loop for new local captures. [Local verification evidence](implementation/local-vault/README.md) separates 76 aggregate native Rust tests (including real-disk checks) from rendered synthetic Tauri-boundary journeys and installed-device gates. Neither mock commands nor an unsigned Windows CI artifact prove installed native acceptance. Full RCL-005B, migration, phone association/transport and live AI remain open.
@@ -157,7 +192,7 @@ Candidate: branch `rcl-001-trusted-capture` (exact SHA in the PR description). E
 | A04 | Corrupt/oversized/unsupported | PASS | `test_capture.py`, `test_failures.py`; nothing is stored for rejected bytes |
 | A05 | Offline / permission denied | PARTIAL | Offline and signed-out upload behaviour PASS (`syncer.test.ts`). Camera/photo permission-denied UI is implemented but **not exercised** (needs device) |
 | A12 | Cross-workspace access incl. source bytes | PASS | `test_isolation.py` (two workspaces; list, fetch, source, finalize, authorizations, upload tokens, ID inference, header/body workspace injection, raw SQL as the API role) |
-| A06–A11, A13–A24 | Interpretation, AI, sync feed, export, delete, restore… | Not in scope | RCL-002+; not implemented, not claimed |
+| A06–A11, A13–A24 | Historical cloud-pilot interpretation, AI, sync feed, export, delete and restore | PASS/PARTIAL as recorded in the RCL-002+ ledger below | This table is the earlier RCL-001 acceptance snapshot, not the current local-vault product gate. See the dated implementation evidence and current open gates below. |
 
 ### Remaining live gates (OPEN, not simulated)
 

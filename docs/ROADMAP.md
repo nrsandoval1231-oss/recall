@@ -1,12 +1,32 @@
 # Recall build roadmap
 
-Version: 0.5 | Dependency-ordered, not delivery-date promises
+## Active continuation — VOICE-01 native implementation
 
-The existing pilot uses the Cloudflare browser adapter for iPhone photo capture and Windows retrieval; native clients remain preserved. [V1-STATUS](V1-STATUS.md) records deployment of the older email-authenticated pilot. Deployment of the newer canonical Memory Surface is not established by its [local/fixture evidence](implementation/memory-surface/README.md), and real signed-in cross-device acceptance remains open. The authorized local-only RCL-005B foundation is implemented for desktop; platform acceptance and the remaining full-spine work are open. QR pairing remains unanswered.
+Ask and automatic future text/photo organization have bounded independent acceptance. Current evidence-backed links within the vault also have bounded acceptance. Anchored retained historical Ask also has bounded independent acceptance. UTF-8 .txt/.md import has bounded independent acceptance at 2aa36435. The active frontier is native Record/Stop implementation after pinned offline speech and packaging feasibility passed on the tested host. [CONTEXT-01](../.agent/CONTEXT-01.md) adds bounded excerpts, a fresh purpose-policy opt-in and a v7 journaled link projection. It preserves source-first capture and requires no per-note approval. The accepted [HISTORY-01 packet](../.agent/HISTORY-01.md) handles anchored historical questions and correction counterpoints. [TEXT-FILE-01](../.agent/TEXT-FILE-01.md) is accepted; proceed with [VOICE-01](../.agent/VOICE-01.md), then remaining input/device work. Live provider, installed-device and held-out quality gates remain separate.
+
+## Accepted bounded Ask — INTELLIGENCE-01
+
+Local photo organization and typed/pasted text capture have bounded independent acceptance. Grounded vault Ask has bounded independent acceptance: native current evidence -> separately authorized inference -> cited answer -> original. See `.agent/INTELLIGENCE-01/COMPLETION.json` for the exact acceptance state. Automatic text/photo organization with remembered purpose consent is also accepted; grounded context links are accepted, with anchored historical retrieval accepted before remaining input/device adapters. A successful Ask packet does not finish the product.
+
+Version: 0.6 | Updated 2026-10-09 | Dependency-ordered, not delivery-date promises
+
+## Product delivery sequence
+
+The product target accepts unstructured notes, photos, voice and files without requiring user filing or taxonomy knowledge, organizes them into useful Obsidian memory, and supports natural-language source-backed recall. Delivery order is photo organization first, text capture next, grounded natural-language Ask next, then voice and broader file adapters. This sequence is not a deferral of text/voice/files from the product; it stages shared-source-contract implementation. Screenshots/share sheet, email/calendar, proactive actions and assistant connectors remain later scope. The renderer has bounded local acceptance recorded in `.agent/REALIGN-01/COMPLETION.json`; see [DOCUMENTATION-MAP](DOCUMENTATION-MAP.md) for current/historical document boundaries.
+
+The existing pilot uses the Cloudflare browser adapter for iPhone photo capture and Windows retrieval; native clients remain preserved. [V1-STATUS](V1-STATUS.md) records deployment of the older email-authenticated pilot. Deployment of the newer canonical Memory Surface is not established by its [local/fixture evidence](implementation/memory-surface/README.md), and real signed-in cross-device acceptance remains open. The authorized local-only RCL-005B foundation/lifecycle and selected-photo reading have bounded implementation evidence; v4 automatic photo organization and simplified UI have bounded local acceptance. Full product/platform acceptance remains open. QR pairing remains proposed and unimplemented.
+
+## Accepted local text checkpoint — TEXT-01
+
+Typed/pasted text capture is an independently accepted local v5 implementation using the existing vault journal and immutable UTF-8 original. It requires no photo or remote account. Exact evidence is in `.agent/FINISH-02/TEXT-COMPLETION.json`. Grounded vault Ask and automatic future text/photo organization also have bounded acceptance; current context also has bounded acceptance; anchored historical retrieval has bounded acceptance, while broader/vague recall quality and remaining input adapters retain separate acceptance requirements.
 
 ## Required architecture decision
 
 Obsidian is the required memory spine. Legacy cloud database-authoritative capture/retrieval and one-way Markdown export are the pre-migration baseline; new local desktop records are vault-authoritative. RCL-005B below is a mandatory dependency for claiming the architecture fulfills this vision; completed earlier packets do not prove vault integration.
+
+## Historical rollout reference — earlier stages
+
+RCL-001 through RCL-005A record earlier cloud, desktop, ownership and Memory Surface candidates. Their dated evidence and limits remain useful, but this history is not the active product frontier or proof of current full-spine acceptance.
 
 ## Foundation
 
@@ -44,7 +64,7 @@ Exit includes same-name ambiguity, historical-vs-latest queries, correction repr
 
 ## RCL-004 — Resilient desktop
 
-Status: native persistence/sync/offline implemented; CI verified, installed Windows acceptance OPEN.
+Historical cloud-pilot status: native persistence/sync/offline implemented; CI verified, installed Windows acceptance OPEN. This is not the current local-vault acceptance state.
 
 Objective: normal desktop work remains useful through connectivity loss and reconnection.
 
@@ -82,7 +102,7 @@ Build the smallest real round trip: capture -> preserved vault original and memo
 
 Exit: crash-safe/idempotent vault writes, direct-edit conflicts, concurrent devices, immutable sources/hash checks, temporal/correction/tombstone preservation, revoked access and cross-workspace isolation, and reconstruction of memory/search projections from vault data. Existing users' memory must migrate with verified parity and a safe rollback; legacy Markdown export alone does not pass.
 
-The separately authorized [selected-photo Claude reading plan](superpowers/plans/2026-10-08-claude-vault-reading.md) adds full-page vision as the primary photo-reading path, explicit one-photo cloud consent, unreviewed original comparison, separate human transcription corrections, effective reading keyword search and retained provenance/history. New reads default to disconnected pending independently approved device/service provisioning. This is a bounded semantic-history extension, not completion of grounded Ask, full semantic reconstruction, phone synchronization or RCL-005B. See [reading evidence and remaining gates](implementation/claude-vault-reading/README.md); historical email-auth deployment and PR11/PR12 evidence stay preserved.
+The selected-photo Claude path adds full-page vision, explicit one-photo cloud consent, unreviewed original comparison, separate human transcription corrections, effective reading keyword search and retained provenance/history. PAIR-01 provides owner-approved, inference-only device association; it does not authorize a photo request by itself. The v4 renderer, current-vault Ask and remembered future text/photo organization now have separate bounded acceptance records. Current-context links have bounded acceptance; full semantic reconstruction, phone synchronization and RCL-005B remain open. See [reading evidence and remaining gates](implementation/claude-vault-reading/README.md); legacy email-auth deployment and PR11/PR12 evidence remain historical.
 
 ## RCL-006 — Private multi-domain pilot
 

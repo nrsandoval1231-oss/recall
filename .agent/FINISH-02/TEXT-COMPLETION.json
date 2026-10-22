@@ -1,0 +1,73 @@
+{
+  "product_complete": false,
+  "candidate": "e75ee1a6c526bb0f912dcab64f807eab539ff22218d28e8fe85ba10e55c1dfee",
+  "authority": "Local implementation only; no live grants/provider calls/merge/deploy/migration",
+  "accepted_at": "2026-10-09T16:28:59.6563310Z",
+  "tokens": "UNKNOWN",
+  "status": "PASS_BOUNDED",
+  "repair_count": 1,
+  "phase_durations": "UNKNOWN except recorded command timings",
+  "base_sha": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "packet": "TEXT-01",
+  "validation": [
+    {
+      "commands": [
+        "npm run check",
+        "desktop build",
+        "local-vault browser",
+        "git diff --check",
+        "candidate check"
+      ],
+      "started": "2026-10-09T16:19:54.2964485Z",
+      "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "finished": "2026-10-09T16:21:59.4548886Z"
+    },
+    {
+      "finished": "2026-10-09T16:27:41.7036071Z",
+      "commands": [
+        "native fmt/test/check",
+        "diff check",
+        "candidate unchanged"
+      ],
+      "started": "2026-10-09T16:27:22.2452152Z",
+      "exit_codes": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "current": "e75ee1a6c526bb0f912dcab64f807eab539ff22218d28e8fe85ba10e55c1dfee",
+      "changed": [
+        "apps/desktop/src-tauri/src/local_vault.rs",
+        "apps/desktop/src-tauri/src/local_vault_tests.rs"
+      ],
+      "reuse": "Client/browser/build/docs inputs unchanged; native gates rerun",
+      "prior": "166e5929b4ba5e04edbde0caccaba90f108d634846bfebb3384ad6c757792db1"
+    },
+    {
+      "broken_links": [],
+      "at": "2026-10-09T16:22:12.4569868Z",
+      "files_checked": 11
+    }
+  ],
+  "next": "INTELLIGENCE-01",
+  "repair": "Restored v4 unsupported-summary search guard for v5 upgrade; regression red/green",
+  "client_tests": 269,
+  "review": "Independent Sol text_review PASS",
+  "local_browser_tests": 38,
+  "remaining": [
+    "AI text organization",
+    "Grounded Ask",
+    "Voice/files",
+    "Phone transport",
+    "Installed-device/live/held-out acceptance"
+  ],
+  "native_tests": 182
+}

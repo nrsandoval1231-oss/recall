@@ -19,6 +19,16 @@
     "active": true,
     "targets": ["nsis"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "externalBin": ["binaries/whisper-cli"],
+    "resources": {
+      "voice-assets/ggml-base.bin": "voice/ggml-base.bin",
+      "voice-assets/whisper.dll": "voice/whisper.dll",
+      "voice-assets/ggml.dll": "voice/ggml.dll",
+      "voice-assets/ggml-cpu.dll": "voice/ggml-cpu.dll",
+      "voice-assets/ggml-base.dll": "voice/ggml-base.dll",
+      "voice-assets/WHISPER-LICENSE.txt": "voice/WHISPER-LICENSE.txt",
+      "voice-assets/MODEL-CARD.txt": "voice/MODEL-CARD.txt"
+    },
     "windows": { "nsis": { "installMode": "currentUser" } }
   }
 }

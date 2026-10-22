@@ -1,6 +1,6 @@
 # Primary technical references
 
-Checked 2026-10-06. These support technology capabilities and cautions, not a claim that Recall is implemented. Recheck version-specific behavior before installing dependencies or provisioning a service.
+Checked 2026-10-09. These support technology capabilities and cautions, not a claim that Recall is implemented. Recheck version-specific behavior before installing dependencies or provisioning a service.
 
 - [Expo Camera](https://docs.expo.dev/versions/latest/sdk/camera/) — native camera access and temporary image URIs; copy captures to durable app storage before acknowledging local Save.
 - [Expo permissions](https://docs.expo.dev/guides/permissions/) — native build-time configuration and runtime permission handling.
@@ -17,3 +17,5 @@ Checked 2026-10-06. These support technology capabilities and cautions, not a cl
 - [Obsidian file storage](https://help.obsidian.md/Files+and+folders/How+Obsidian+stores+data) — Markdown-based local storage supporting a portable archive.
 
 Provider/model privacy terms, actual pricing, signing/distribution choices, and supported versions are deployment gates. They are deliberately not invented in this foundation.
+- [Obsidian properties](https://obsidian.md/help/properties) — flat YAML properties at the beginning of a note; use quoted strings for values such as links.
+- [Obsidian internal links](https://obsidian.md/help/links) — Markdown relative links and vault-root wikilinks; keep path conventions distinct.

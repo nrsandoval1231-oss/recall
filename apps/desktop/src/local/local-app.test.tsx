@@ -3,22 +3,508 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { DesktopEntry } from "../entry";
-import type { LocalVault, VaultMemory, VaultStatus } from "../platform/local-vault";
+import { operationLabel } from "./Organization";
+import type { AskOutcome, LocalVault, OrganizationCapability, OrganizationOperation, OrganizationProposal, VaultMemory, VaultStatus } from "../platform/local-vault";
 
 const selected: VaultStatus = { root: "/synthetic/vault", vault_id: "session-a", vault_identity: "manifest-a" };
 const memory: VaultMemory = { id: "m1", revision: 1, note: "Synthetic garden note", source_name: "synthetic.png", source_sha256: "hash", captured_at: "2026-10-08T12:00:00Z", updated_at: "2026-10-08T12:00:00Z", conflict: null, state: "active", note_path: "renamed-garden.md" };
 function vault(over: Partial<LocalVault> = {}): LocalVault {
-  return { readingCapability: vi.fn(async () => ({ enabled: false, explanation: "Not connected" })), readingOperations: vi.fn(async () => []), readPhoto: vi.fn(async () => { throw new Error("Not connected"); }), recoverReading: vi.fn(async () => { throw new Error("Not connected"); }), cancelReading: vi.fn(async () => { throw new Error("No operation"); }), correctReading: vi.fn(async () => memory), available: true, status: vi.fn(async () => selected), select: vi.fn(async () => selected), capture: vi.fn(async () => memory), list: vi.fn(async () => [memory]), correct: vi.fn(async (_s, _id, _r, _op, note) => ({ ...memory, note, revision: 2 })), source: vi.fn(async () => ({ bytes: [137,80,78,71], mime_type: "image/png", sha256: "hash" })), history: vi.fn(async () => [{ revision: 1, note: memory.note, recorded_at: memory.captured_at, origin: "human:recall" as const, kind: "capture" as const }]), rebuild: vi.fn(async () => [memory]), restoreNote: vi.fn(async () => ({ ...memory, revision: 2 })), remove: vi.fn(async () => ({ ...memory, state: "deleted" as const, revision: 2 })), ...over };
+  const capability = (enabled = false): OrganizationCapability => ({ schema_version: "1.0", scope: "vault_intelligence", purpose: "organize", vault_id: "manifest-a", policy_version: "organize-v1|synthetic", provider: "anthropic", consent: enabled ? "active" : "missing", enabled, consent_epoch: enabled ? 1 : 0, decided_at: enabled ? "2026-10-09T12:00:00Z" : null, local_readiness: enabled ? "ready" : "off", automatic_enabled: enabled });
+  return { organizationCapability: vi.fn(async () => capability()), setOrganizationConsent: vi.fn(async (_v, enabled) => capability(enabled)), reconcileOrganizationConsent: vi.fn(async () => capability(true)), organizationOperations: vi.fn(async () => [] as OrganizationOperation[]), recoverOrganization: vi.fn(async (_v, operationId) => ({ operation_id: operationId, memory_id: memory.id, state: "unknown" as const, error_code: null })), processPendingOrganization: vi.fn(async () => {}), relatedMemory: vi.fn(async () => { throw new Error("Related memory verification is unavailable"); }), readingCapability: vi.fn(async () => ({ enabled: false, explanation: "Not connected" })), readingOperations: vi.fn(async () => []), readPhoto: vi.fn(async () => { throw new Error("Not connected"); }), recoverReading: vi.fn(async () => { throw new Error("Not connected"); }), cancelReading: vi.fn(async () => { throw new Error("No operation"); }), correctReading: vi.fn(async () => memory), askCapability: vi.fn(async () => ({ enabled: false, scope: "vault_intelligence" as const, consent: "missing" as const, explanation: "Ask consent is missing; local keyword search remains available." })), ask: vi.fn(async (_vault, operationId) => ({ operation: { operation_id: operationId, state: "failed" as const, error_code: "ASK_UNAVAILABLE" }, answer: null })), recoverAsk: vi.fn(async (_vault, operationId) => ({ operation: { operation_id: operationId, state: "failed" as const, error_code: "ASK_OPERATION_NOT_FOUND" }, answer: null })), intelligencePairingPrepare: vi.fn(async () => ({ state: "pending_owner_approval" as const, device_id: "synthetic-device", vault_id: "session-a", fingerprint: null, scope: "vault_intelligence" as const })), intelligencePairingClaim: vi.fn(async () => ({ state: "connected" as const, device_id: "synthetic-device", vault_id: "session-a", fingerprint: "synthetic", scope: "vault_intelligence" as const })), intelligencePairingStatus: vi.fn(async () => ({ state: "disconnected" as const, device_id: null, vault_id: "session-a", fingerprint: null, scope: "vault_intelligence" as const })), intelligencePairingDisconnect: vi.fn(async () => ({ state: "disconnected" as const, device_id: null, vault_id: "session-a", fingerprint: null, scope: "vault_intelligence" as const })), available: true, status: vi.fn(async () => selected), select: vi.fn(async () => selected), capture: vi.fn(async () => memory), list: vi.fn(async () => [memory]), correct: vi.fn(async (_s, _id, _r, _op, note) => ({ ...memory, note, revision: 2 })), source: vi.fn(async () => ({ bytes: [137,80,78,71], mime_type: "image/png", sha256: "hash" })), history: vi.fn(async () => [{ revision: 1, note: memory.note, recorded_at: memory.captured_at, origin: "human:recall" as const, kind: "capture" as const }]), rebuild: vi.fn(async () => [memory]), restoreNote: vi.fn(async () => ({ ...memory, revision: 2 })), remove: vi.fn(async () => ({ ...memory, state: "deleted" as const, revision: 2 })), ...over };
 }
 const mount = (v: LocalVault) => render(<DesktopEntry vault={v} search="" />);
+async function clickTool(name: "Removed items" | "Rebuild local search") { const details = Array.from(document.querySelectorAll("details.local-tools")).find(el => el.querySelector("summary")?.textContent === "Memory tools") as HTMLDetailsElement; if (!details.open) await userEvent.click(screen.getByText("Memory tools", { exact: true })); await userEvent.click(screen.getByRole("button", { name })); }
+
+it.each([null, "Obsidian note changed outside Recall"]) ("shows unresolved related-link repair status independently of note conflict (%s)", async conflict => {
+  const repairPending: VaultMemory = { ...memory, context_repair_pending: true, ...(conflict ? { state: "conflict" as const, conflict } : {}) };
+  mount(vault({ list: vi.fn(async () => [repairPending]) }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  expect((await screen.findByRole("status")).textContent).toContain("A related link changed. Recall could not update the Obsidian note.");
+  if (conflict) expect(screen.getByRole("alert").textContent).toContain(conflict);
+});
+
+it("saves exact text with a durable retry identity and shows its immutable original as inert text", async () => {
+  const textMemory: VaultMemory = { ...memory, id: "text-memory", note: "  A thought\nwith a second line.  ", source_name: "note.txt" };
+  const captureText = vi.fn().mockRejectedValueOnce(new Error("Temporary vault interruption")).mockResolvedValue(textMemory);
+  const v = vault({ captureText, list: vi.fn(async () => [textMemory]), source: vi.fn(async () => ({ bytes: Array.from(new TextEncoder().encode(textMemory.note)), mime_type: "text/plain", sha256: textMemory.source_sha256 })) });
+  const first = mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: "Write a note" }));
+  await userEvent.type(screen.getByLabelText("Your note"), textMemory.note);
+  await userEvent.click(screen.getByRole("button", { name: "Save note" }));
+  await screen.findByText("Temporary vault interruption");
+  first.unmount();
+  mount(v);
+  expect(await screen.findByRole("button", { name: "Retry pending capture" })).toBeTruthy();
+  expect((screen.getByLabelText("Your note") as HTMLTextAreaElement).value).toBe(textMemory.note);
+  await userEvent.click(screen.getByRole("button", { name: "Retry pending capture" }));
+  await screen.findByRole("button", { name: /A thought/ });
+  expect(captureText).toHaveBeenCalledTimes(2);
+  expect(captureText.mock.calls[0]).toEqual(captureText.mock.calls[1]);
+  expect(captureText.mock.calls[0]?.[0]).toBe("session-a");
+  expect(captureText.mock.calls[0]?.[2]).toBe(textMemory.note);
+  expect(screen.queryByText(/Photo processed with Claude/)).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: /A thought/ }));
+  expect(screen.queryByRole("button", { name: "Read this photo with Claude" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "View original" }));
+  expect(await screen.findByLabelText("Original text")).toBeTruthy();
+  expect(screen.getByLabelText("Original text").textContent).toBe(textMemory.note);
+  expect(screen.queryByRole("img", { name: "Original photo" })).toBeNull();
+});
+
+it("titles text memories from a bounded first nonempty human line and retains the original filename", async () => {
+  const longTitle = "A very long human-written heading that should be bounded without changing the stored note. ".repeat(2);
+  const textMemory: VaultMemory = { ...memory, id: "heading-text", note: `\n   ${longTitle}\nA second line`, source_name: "original-note.txt" };
+  mount(vault({ list: vi.fn(async () => [textMemory]) }));
+  await userEvent.click(await screen.findByRole("button", { name: /A very long human-written heading/ }));
+  const heading = screen.getByRole("heading", { level: 1 }).textContent ?? "";
+  expect(heading.startsWith("A very long human-written heading")).toBe(true);
+  expect(Array.from(heading)).toHaveLength(100);
+  expect(heading.endsWith("…")).toBe(true);
+  await userEvent.click(screen.getByText("Note details", { exact: true }));
+  expect(screen.getByText("Original file · original-note.txt")).toBeTruthy();
+  expect(textMemory.note).toContain("A second line");
+});
+
+it("uses a plain fallback heading when a text note has no nonempty line", async () => {
+  const textMemory: VaultMemory = { ...memory, id: "blank-heading-text", note: " \n\t\n", source_name: "blank.txt" };
+  mount(vault({ list: vi.fn(async () => [textMemory]) }));
+  await userEvent.click(await screen.findByRole("button", { name: /Saved in vault/ }));
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Text note");
+});
+
+it("imports one native-picked Markdown file with a stable retry ID and renders its original inertly", async () => {
+  const original = "---\npermissions: all\n<script>window.bad = true</script>\n# Synthetic source\n";
+  const imported: VaultMemory = { ...memory, id: "imported-markdown", note: original, source_name: "notes.md", imported_text: { original_name: "notes.md", original_extension: "md", source_media_type: "text/plain; charset=utf-8", semantic_sha256: "semantic-hash", semantic_bytes: new TextEncoder().encode(original).length, semantic_characters: original.length } };
+  const importTextFile = vi.fn().mockResolvedValueOnce(null).mockRejectedValueOnce(new Error("Temporary vault interruption")).mockResolvedValue(imported);
+  const source = vi.fn(async () => ({ bytes: Array.from(new TextEncoder().encode(original)), mime_type: "text/plain; charset=utf-8", sha256: memory.source_sha256 }));
+  const v = vault({ importTextFile, source, list: vi.fn(async () => [imported]) });
+  const first = mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: "Import text file" }));
+  expect(importTextFile).toHaveBeenCalledWith("session-a", expect.any(String));
+  const operationId = importTextFile.mock.calls[0]?.[1];
+  expect((await screen.findByRole("status")).textContent).toContain("File selection cancelled");
+  expect(localStorage.getItem(`recall.local.capture:${JSON.stringify([selected.root, selected.vault_identity])}`)).toContain(operationId);
+  first.unmount(); mount(v);
+  expect(await screen.findByRole("button", { name: "Retry text file import" })).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: "Retry text file import" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("Temporary vault interruption");
+  expect(importTextFile.mock.calls[1]).toEqual(importTextFile.mock.calls[0]);
+  await userEvent.click(screen.getByRole("button", { name: "Retry text file import" }));
+  await screen.findByRole("button", { name: /Synthetic source/ });
+  expect(importTextFile.mock.calls[2]).toEqual(importTextFile.mock.calls[0]);
+  await userEvent.click(screen.getByRole("button", { name: /Synthetic source/ }));
+  expect(screen.getByText(/shown as inert plain text/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Read this photo with Claude" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "View original" }));
+  expect((await screen.findByLabelText("Original text")).textContent).toBe(original);
+  expect(document.querySelector("script")).toBeNull();
+  const download = screen.getByRole("link", { name: "Download original · notes.md" }) as HTMLAnchorElement;
+  expect(download.download).toBe("notes.md");
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("notes.md");
+});
+
+it("reports an imported file over the organizer threshold as saved locally with processing skipped", async () => {
+  const imported: VaultMemory = { ...memory, id: "oversize-text", source_name: "large.txt", note: "Large synthetic source", imported_text: { original_name: "large.txt", original_extension: "txt", source_media_type: "text/plain; charset=utf-8", semantic_sha256: "semantic-hash", semantic_bytes: 120001, semantic_characters: 30001 } };
+  const organizationOperations = vi.fn(async () => [{ operation_id: "org-large", memory_id: imported.id, state: "failed" as const, error_code: "INPUT_LIMIT_EXCEEDED" }]);
+  mount(vault({ importTextFile: vi.fn(async () => imported), organizationOperations }));
+  await userEvent.click(await screen.findByRole("button", { name: "Import text file" }));
+  expect((await screen.findByRole("status")).textContent).toMatch(/Saved large\.txt.*skipped because the file exceeds the 30,000-character or 120,000-byte limit/);
+  expect((await screen.findByRole("status")).textContent).not.toContain("Automatic organization failed");
+});
+
+it("does not publish a late imported-file result after switching vaults", async () => {
+  let finish!: (result: VaultMemory | null) => void;
+  const next: VaultStatus = { root: "/synthetic/vault-b", vault_id: "session-b", vault_identity: "manifest-b" };
+  const importTextFile = vi.fn(() => new Promise<VaultMemory | null>(resolve => { finish = resolve; }));
+  const v = vault({ importTextFile, select: vi.fn(async () => next) }); mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: "Import text file" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
+  await screen.findByText("/synthetic/vault-b");
+  await act(async () => finish({ ...memory, id: "late-import", source_name: "late.md", imported_text: { original_name: "late.md", original_extension: "md", source_media_type: "text/plain; charset=utf-8", semantic_sha256: "x", semantic_bytes: 1, semantic_characters: 1 } }));
+  expect(screen.queryByText(/late\.md/)).toBeNull();
+  expect(screen.getByText("/synthetic/vault-b")).toBeTruthy();
+});
+
 beforeEach(() => { localStorage.clear(); URL.createObjectURL = vi.fn(() => "blob:synthetic"); URL.revokeObjectURL = vi.fn(); });
 afterEach(cleanup);
+
+it("remembers separate organization consent with a provider disclosure and explicit revoke", async () => {
+  const v = vault(); mount(v);
+  await userEvent.click(await screen.findByText("Automatically organize new notes and photos", { exact: true }));
+  await waitFor(() => expect(document.querySelector("details.local-organization-settings p")?.textContent).toMatch(/notes and photos you save from then on, plus up to three short excerpts.*sent to Anthropic Claude/i));
+  expect(screen.getByText(/Older captures are not processed/i)).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: "Turn on" }));
+  expect(await screen.findByText(/Automatic organization is on/)).toBeTruthy();
+  expect(v.setOrganizationConsent).toHaveBeenCalledWith("session-a", true, 0);
+  await userEvent.click(screen.getByRole("button", { name: "Turn off" }));
+  expect(v.setOrganizationConsent).toHaveBeenLastCalledWith("session-a", false, 1);
+});
+
+it("keeps an active organization permission revocable when its provider is temporarily unavailable", async () => {
+  const active: OrganizationCapability = { schema_version: "1.0", scope: "vault_intelligence", purpose: "organize", vault_id: "manifest-a", policy_version: "organize-v1|synthetic", provider: null, consent: "active", enabled: false, consent_epoch: 3, decided_at: "2026-10-09T12:00:00Z", local_readiness: "ready", automatic_enabled: false };
+  const revoked: OrganizationCapability = { ...active, consent: "missing", consent_epoch: 4, decided_at: null, local_readiness: "off", automatic_enabled: false };
+  const v = vault({ organizationCapability: vi.fn(async () => active), setOrganizationConsent: vi.fn(async () => revoked) }); mount(v);
+  await userEvent.click(await screen.findByText("Automatically organize new notes and photos", { exact: true }));
+  expect(await screen.findByText(/permission is saved, but organization is unavailable right now/i)).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Turn off" }) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByRole("button", { name: "Turn on" }) as HTMLButtonElement).disabled).toBe(true);
+  await userEvent.click(screen.getByRole("button", { name: "Turn off" }));
+  expect(v.setOrganizationConsent).toHaveBeenCalledWith("session-a", false, 3);
+});
+
+it("does not let a late organization setting response cross a vault switch", async () => {
+  let resolveFirst!: (value: OrganizationCapability) => void;
+  const next: VaultStatus = { root: "/synthetic/vault-b", vault_id: "session-b", vault_identity: "manifest-b" };
+  const capability = (vaultId: string, provider: OrganizationCapability["provider"]): OrganizationCapability => ({ schema_version: "1.0", scope: "vault_intelligence", purpose: "organize", vault_id: vaultId, policy_version: "organize-v1|synthetic", provider, consent: "missing", enabled: false, consent_epoch: 0, decided_at: null, local_readiness: "off", automatic_enabled: false });
+  const organizationCapability = vi.fn().mockImplementationOnce(() => new Promise<OrganizationCapability>(resolve => { resolveFirst = resolve; })).mockResolvedValueOnce(capability("manifest-b", null));
+  const v = vault({ organizationCapability, select: vi.fn(async () => next) }); mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: "Switch vault" }));
+  await screen.findByText("/synthetic/vault-b");
+  await userEvent.click(await screen.findByText("Automatically organize new notes and photos", { exact: true }));
+  expect(await screen.findByText("No organization provider is configured. New captures stay local.")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Turn on" }) as HTMLButtonElement).disabled).toBe(true);
+  resolveFirst(capability("manifest-a", "anthropic"));
+  await waitFor(() => expect((screen.getByRole("button", { name: "Turn on" }) as HTMLButtonElement).disabled).toBe(true));
+  expect(screen.getByText("No organization provider is configured. New captures stay local.")).toBeTruthy();
+});
+
+it("enables future organization in the same consent decision", async () => {
+  const ready: OrganizationCapability = { schema_version: "1.0", scope: "vault_intelligence", purpose: "organize", vault_id: "manifest-a", policy_version: "organize-v1|synthetic", provider: "anthropic", consent: "active", enabled: true, consent_epoch: 5, decided_at: "2026-10-09T12:00:00Z", local_readiness: "ready", automatic_enabled: true };
+  let current: OrganizationCapability = { ...ready, consent: "missing", enabled: false, consent_epoch: 4, decided_at: null, local_readiness: "off", automatic_enabled: false };
+  const v = vault({ organizationCapability: vi.fn(async () => current), setOrganizationConsent: vi.fn(async () => { current = ready; return current; }) }); mount(v);
+  await userEvent.click(await screen.findByText("Automatically organize new notes and photos", { exact: true }));
+  await userEvent.click(screen.getByRole("button", { name: "Turn on" }));
+  expect(await screen.findByText(/Automatic organization is on/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
+  expect(v.reconcileOrganizationConsent).not.toHaveBeenCalled();
+  expect(v.setOrganizationConsent).toHaveBeenCalledWith("session-a", true, 4);
+});
+
+it("keeps unresolved local setup honest, offers reconciliation and still allows revocation", async () => {
+  const unknown: OrganizationCapability = { schema_version: "1.0", scope: "vault_intelligence", purpose: "organize", vault_id: "manifest-a", policy_version: "organize-v1|synthetic", provider: "anthropic", consent: "active", enabled: true, consent_epoch: 6, decided_at: "2026-10-09T12:00:00Z", local_readiness: "unknown", automatic_enabled: false };
+  const ready = { ...unknown, local_readiness: "ready" as const, automatic_enabled: true };
+  let current: OrganizationCapability = unknown;
+  const v = vault({ organizationCapability: vi.fn(async () => current), reconcileOrganizationConsent: vi.fn(async () => { current = ready; return current; }) }); mount(v);
+  await userEvent.click(await screen.findByText("Automatically organize new notes and photos", { exact: true }));
+  expect(await screen.findByText(/device’s setup status is unknown/i)).toBeTruthy();
+  expect(screen.queryByText(/Automatic organization is on/)).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Check again" }));
+  expect(await screen.findByText(/Automatic organization is on/)).toBeTruthy();
+  expect(v.reconcileOrganizationConsent).toHaveBeenCalledWith("session-a");
+  expect((screen.getByRole("button", { name: "Turn off" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("rejects a server capability or consent response carrying the invocation token instead of stable vault identity", async () => {
+  const wrong: OrganizationCapability = { schema_version: "1.0", scope: "vault_intelligence", purpose: "organize", vault_id: "session-a", policy_version: "organize-v1|synthetic", provider: "anthropic", consent: "missing", enabled: false, consent_epoch: 0, decided_at: null, local_readiness: "off", automatic_enabled: false };
+  const wrongResponse: OrganizationCapability = { ...wrong, consent: "active", enabled: true, local_readiness: "ready", automatic_enabled: true };
+  const v = vault({ organizationCapability: vi.fn(async () => wrong), setOrganizationConsent: vi.fn(async () => wrongResponse) }); mount(v);
+  await userEvent.click(await screen.findByText("Automatically organize new notes and photos", { exact: true }));
+  expect((await screen.findByRole("alert")).textContent).toContain("does not match this vault");
+  expect((screen.getByRole("button", { name: "Turn on" }) as HTMLButtonElement).disabled).toBe(true);
+  cleanup();
+  const correct = { ...wrong, vault_id: "manifest-a" };
+  const wrongSet: OrganizationCapability = { ...correct, vault_id: "session-a", consent: "active", enabled: true, local_readiness: "ready", automatic_enabled: true };
+  const second = vault({ organizationCapability: vi.fn(async () => correct), setOrganizationConsent: vi.fn(async () => wrongSet) }); mount(second);
+  await userEvent.click(await screen.findByText("Automatically organize new notes and photos", { exact: true }));
+  await userEvent.click(screen.getByRole("button", { name: "Turn on" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("does not match this vault");
+  expect(screen.queryByText(/Automatic organization is on/)).toBeNull();
+  expect(second.setOrganizationConsent).toHaveBeenCalledWith("session-a", true, 0);
+});
+
+it("confirms a capture before organization finishes and keeps another capture available", async () => {
+  const textMemory: VaultMemory = { ...memory, id: "future-text", source_name: "note.txt", note: "A thought" };
+  const operations = vi.fn(async () => [{ operation_id: "org-op", memory_id: textMemory.id, state: "queued" as const, error_code: null }]);
+  const v = vault({ captureText: vi.fn(async () => textMemory), list: vi.fn(async () => [textMemory]), organizationOperations: operations });
+  mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: "Write a note" }));
+  await userEvent.type(screen.getByLabelText("Your note"), textMemory.note);
+  await userEvent.click(screen.getByRole("button", { name: "Save note" }));
+  expect(await screen.findByText(/waiting for organization/i)).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Capture" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(v.processPendingOrganization).toHaveBeenCalled();
+  expect(v.captureText).toHaveBeenCalledWith("session-a", expect.any(String), textMemory.note);
+});
+
+it("shows effective organization with uncertainty, attribution, time and source quotes, while honoring suppression", async () => {
+  const proposal: OrganizationProposal = { binding: { schema_version: "2.0", operation_id: "org-1", vault_id: "manifest-a", memory_id: memory.id, source_kind: "photo", source_sha256: memory.source_sha256, expected_revision: 1, input_sha256: memory.source_sha256, consent_epoch: 1, captured_at: memory.captured_at, context_coverage: { eligible_count: 2, selected_count: 1, limited: true, truncated_count: 1 } }, media_type: "image/png", payload_sha256: "synthetic", result: { provider: "anthropic", model_id: "synthetic-model", input_manifest_sha256: "synthetic", extraction: { summary: "Synthetic summary", summary_evidence: [{ page_id: memory.id, quote: "garden note?" }], statements: [{ epistemic_state: "question", text: "Was the shed built in 2021?", attribution_text: "Nick wondered", temporal_text: "last spring", evidence: [{ page_id: memory.id, quote: "shed maybe 2021?" }] }], uncertainties: [{ kind: "unknown", description: "The year is uncertain", evidence: [{ page_id: memory.id, quote: "2021?" }] }] }, validation_notes: [], review_state: "unreviewed" }, review_state: "unreviewed", suppressed: false };
+  const v = vault({ list: vi.fn(async () => [{ ...memory, organization: proposal }]) }); mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  expect(await screen.findByRole("heading", { name: "AI suggestion · not confirmed" })).toBeTruthy();
+  expect(screen.getByText(/Question · Was the shed built in 2021\?/)).toBeTruthy();
+  expect(screen.getByText(/Nick wondered/)).toBeTruthy();
+  expect(screen.getByText(/last spring/)).toBeTruthy();
+  expect(screen.getByText(/Source: shed maybe 2021\?/)).toBeTruthy();
+  expect(screen.getByText(/The year is uncertain/)).toBeTruthy();
+  expect(screen.getByText(/Unclear · The year is uncertain/)).toBeTruthy();
+  expect(screen.getByLabelText("Related memory coverage").textContent).toMatch(/considered 1 of 2 current memories/);
+  expect(screen.getByLabelText("Related memory coverage").textContent).toMatch(/more memories were available/i);
+  expect(screen.getByLabelText("Related memory coverage").textContent).toMatch(/1 excerpt was shortened/i);
+  expect(screen.queryByText(/Kind: unknown/)).toBeNull();
+  expect(screen.getAllByRole("button", { name: "View original" })).toHaveLength(1);
+  expect(document.querySelector("script")).toBeNull();
+  cleanup();
+  mount(vault({ list: vi.fn(async () => [{ ...memory, organization: { ...proposal, suppressed: true } }]) }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  expect(await screen.findByRole("heading", { name: "synthetic.png" })).toBeTruthy();
+  expect(screen.queryByText("Synthetic summary")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Back to memories" }));
+  await userEvent.type(screen.getByLabelText("Search notes and filenames"), "Synthetic summary");
+  await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  expect(await screen.findByText(/No matching notes or filenames/)).toBeTruthy();
+});
+
+it("opens a related memory only after rechecking the selected session, link and original", async () => {
+  const target: VaultMemory = { ...memory, id: "target-2", note: "Synthetic backup power note", source_name: "backup.txt", source_sha256: "target-hash" };
+  const link = { target_memory_id: target.id, label: "Possibly related (unreviewed)" as const, source_quote: "backup power", target_quote: "backup power", note_basename: "Backup power.md" };
+  const proposal: OrganizationProposal = { binding: { schema_version: "2.0", operation_id: "org-2", vault_id: "manifest-a", memory_id: memory.id, source_kind: "photo", source_sha256: memory.source_sha256, expected_revision: 1, input_sha256: memory.source_sha256, consent_epoch: 2, captured_at: memory.captured_at, context_coverage: { eligible_count: 1, selected_count: 1, limited: false, truncated_count: 0 } }, media_type: "image/png", payload_sha256: "synthetic", result: { provider: "anthropic", model_id: "synthetic-model", input_manifest_sha256: "synthetic", related_context: [{ target_memory_id: target.id, source_quote: link.source_quote, target_quote: link.target_quote }], extraction: {}, validation_notes: [], review_state: "unreviewed" }, review_state: "unreviewed", suppressed: false };
+  const sourceMemory = { ...memory, organization: proposal, related_context: [link] };
+  const list = vi.fn(async (_session: string, _query: string, _includeDeleted?: boolean) => [sourceMemory, target]);
+  const relatedMemory = vi.fn(async () => ({ memory_id: target.id, revision: target.revision, source_sha256: target.source_sha256, source_name: target.source_name, note_basename: link.note_basename, original: { bytes: Array.from(new TextEncoder().encode("SYNTHETIC related original")), mime_type: "text/plain", sha256: target.source_sha256 } }));
+  const source = vi.fn();
+  const v = vault({ list, source, relatedMemory }); mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  expect(screen.getByText("Possibly related (unreviewed)")).toBeTruthy();
+  expect(screen.getAllByText("backup power", { selector: "blockquote" })).toHaveLength(2);
+  await userEvent.click(screen.getByRole("button", { name: /Open related memory/ }));
+  expect(await screen.findByRole("heading", { name: "backup.txt" })).toBeTruthy();
+  expect(list).toHaveBeenCalledWith("session-a", "", true);
+  expect(relatedMemory).toHaveBeenCalledWith("session-a", memory.id, target.id);
+  expect(source).not.toHaveBeenCalled();
+  expect(await screen.findByLabelText("Original text")).toBeTruthy();
+});
+
+it("keeps the source open when a related target changes during the click-time check", async () => {
+  const target: VaultMemory = { ...memory, id: "target-stale", note: "Old target note", source_name: "old-target.txt", source_sha256: "target-hash" };
+  const changed = { ...target, revision: 2, source_sha256: "changed-hash" };
+  const link = { target_memory_id: target.id, label: "Possibly related (unreviewed)" as const, source_quote: "garden", target_quote: "garden", note_basename: "Garden.md" };
+  const proposal: OrganizationProposal = { binding: { schema_version: "2.0", operation_id: "org-stale", vault_id: "manifest-a", memory_id: memory.id, source_kind: "photo", source_sha256: memory.source_sha256, expected_revision: 1, input_sha256: memory.source_sha256, consent_epoch: 2, captured_at: memory.captured_at }, media_type: "image/png", payload_sha256: "synthetic", result: { provider: "anthropic", model_id: "synthetic-model", input_manifest_sha256: "synthetic", extraction: {}, validation_notes: [], review_state: "unreviewed" }, review_state: "unreviewed", suppressed: false };
+  const sourceMemory = { ...memory, organization: proposal, related_context: [link] };
+  let relatedListCall = 0;
+  const list = vi.fn(async (_session: string, _query: string, includeDeleted?: boolean) => {
+    if (!includeDeleted) return [sourceMemory, target];
+    relatedListCall++;
+    return relatedListCall <= 1 ? [sourceMemory, target] : [sourceMemory, changed];
+  });
+  const relatedMemory = vi.fn(async () => ({ memory_id: target.id, revision: target.revision, source_sha256: target.source_sha256, source_name: target.source_name, note_basename: link.note_basename, original: { bytes: [1], mime_type: "text/plain", sha256: target.source_sha256 } }));
+  const source = vi.fn();
+  mount(vault({ list, source, relatedMemory }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  await userEvent.click(screen.getByRole("button", { name: /Open related memory/ }));
+  expect((await screen.findByRole("alert")).textContent).toMatch(/changed while it was opening/i);
+  expect(screen.getByRole("heading", { name: "AI suggestion · not confirmed" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "old-target.txt" })).toBeNull();
+  expect(relatedMemory).toHaveBeenCalledWith("session-a", memory.id, target.id);
+  expect(source).not.toHaveBeenCalled();
+});
+
+it("does not open a related link when the target is missing from the current vault", async () => {
+  const link = { target_memory_id: "missing-target", label: "Possibly related (unreviewed)" as const, source_quote: "garden", target_quote: "garden", note_basename: "Garden.md" };
+  const proposal: OrganizationProposal = { binding: { schema_version: "2.0", operation_id: "org-missing", vault_id: "manifest-a", memory_id: memory.id, source_kind: "photo", source_sha256: memory.source_sha256, expected_revision: 1, input_sha256: memory.source_sha256, consent_epoch: 2, captured_at: memory.captured_at }, media_type: "image/png", payload_sha256: "synthetic", result: { provider: "anthropic", model_id: "synthetic-model", input_manifest_sha256: "synthetic", extraction: {}, validation_notes: [], review_state: "unreviewed" }, review_state: "unreviewed", suppressed: false };
+  const sourceMemory = { ...memory, organization: proposal, related_context: [link] };
+  const source = vi.fn(); const relatedMemory = vi.fn(async () => { throw new Error("This related memory has changed or is no longer available."); }); const v = vault({ list: vi.fn(async () => [sourceMemory]), source, relatedMemory }); mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  await userEvent.click(screen.getByRole("button", { name: /Open related memory/ }));
+  expect((await screen.findByRole("alert")).textContent).toMatch(/changed or is no longer available/i);
+  expect(source).not.toHaveBeenCalled();
+  expect(relatedMemory).toHaveBeenCalledWith("session-a", memory.id, link.target_memory_id);
+  expect(screen.getByRole("heading", { name: "AI suggestion · not confirmed" })).toBeTruthy();
+});
+
+it("discards a related target response after the selected vault session changes", async () => {
+  const target: VaultMemory = { ...memory, id: "target-switch", note: "Synthetic private target", source_name: "target.txt", source_sha256: "target-hash" };
+  const link = { target_memory_id: target.id, label: "Possibly related (unreviewed)" as const, source_quote: "garden", target_quote: "target", note_basename: "Target.md" };
+  const proposal: OrganizationProposal = { binding: { schema_version: "2.0", operation_id: "org-switch", vault_id: "manifest-a", memory_id: memory.id, source_kind: "photo", source_sha256: memory.source_sha256, expected_revision: 1, input_sha256: memory.source_sha256, consent_epoch: 2, captured_at: memory.captured_at }, media_type: "image/png", payload_sha256: "synthetic", result: { provider: "anthropic", model_id: "synthetic-model", input_manifest_sha256: "synthetic", extraction: {}, validation_notes: [], review_state: "unreviewed" }, review_state: "unreviewed", suppressed: false };
+  const sourceMemory = { ...memory, organization: proposal, related_context: [link] };
+  type Verification = { memory_id: string; revision: number; source_sha256: string; source_name: string; note_basename: string; original: { bytes: number[]; mime_type: string; sha256: string } };
+  let release!: (value: Verification) => void;
+  const relatedMemory = vi.fn(() => new Promise<Verification>(resolve => { release = () => resolve({ memory_id: target.id, revision: target.revision, source_sha256: target.source_sha256, source_name: target.source_name, note_basename: link.note_basename, original: { bytes: [1], mime_type: "text/plain", sha256: target.source_sha256 } }); }));
+  const list = vi.fn(async (session: string) => session === "session-a" ? [sourceMemory, target] : []);
+  const next: VaultStatus = { root: "/synthetic/other", vault_id: "session-other", vault_identity: "manifest-other" };
+  mount(vault({ list, relatedMemory, select: vi.fn(async () => next), status: vi.fn(async () => selected) }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  await userEvent.click(screen.getByRole("button", { name: /Open related memory/ }));
+  await waitFor(() => expect(relatedMemory).toHaveBeenCalledWith("session-a", memory.id, target.id));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
+  await screen.findByText("/synthetic/other");
+  await act(async () => release({ memory_id: target.id, revision: target.revision, source_sha256: target.source_sha256, source_name: target.source_name, note_basename: link.note_basename, original: { bytes: [1], mime_type: "text/plain", sha256: target.source_sha256 } }));
+  expect(screen.queryByText("Synthetic private target")).toBeNull();
+  expect(screen.queryByRole("heading", { name: "target.txt" })).toBeNull();
+});
+
+it("recovers the same unknown organization operation and hides duplicate manual photo processing", async () => {
+  const operation: OrganizationOperation = { operation_id: "same-org-op", memory_id: memory.id, state: "unknown", error_code: "OUTCOME_UNKNOWN" };
+  const recoverOrganization = vi.fn(async () => ({ ...operation, state: "organized" as const }));
+  const v = vault({ organizationOperations: vi.fn(async () => [operation]), recoverOrganization }); mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  expect(await screen.findByText(/Processing status uncertain/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Read this photo with Claude" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Check processing status" }));
+  expect(recoverOrganization).toHaveBeenCalledWith("session-a", "same-org-op");
+});
+it("maps organization failures to plain guidance without exposing operation codes", () => {
+  const failed = (error_code: string) => operationLabel({ operation_id: "operation", memory_id: memory.id, state: "failed", error_code }, memory);
+  expect(failed("INPUT_LIMIT_EXCEEDED")).toBe("Saved locally · this note is too long to organize");
+  expect(failed("CONNECTION_CHANGED")).toBe("Saved locally · the connection is unavailable; review its status");
+  expect(failed("PROVIDER_FAILED")).toBe("Saved locally · processing could not finish");
+  expect(failed("NEW_UNKNOWN_CODE")).not.toContain("NEW_UNKNOWN_CODE");
+});
+it("asks from the selected vault and opens a freshly verified citation at its original", async () => {
+  const completed = (operationId: string): AskOutcome => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, answer: { status: "answered", sentences: [{ text: "The saved note mentions a garden workshop.", citation_ids: ["c1"] }], citations: [{ citation_id: "c1", memory_id: memory.id, memory_revision: memory.revision, source_sha256: memory.source_sha256, evidence_kind: "human_note", quote: "Synthetic garden workshop note" }], limitations: ["Current eligible records only."], coverage: { eligible_count: 1, selected_count: 1, limited: false, truncated_count: 0 } } });
+  const ask = vi.fn(async (_vault: string, operationId: string, _question: string) => completed(operationId));
+  const v = vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ask is ready for this vault." })), ask });
+  mount(v); await userEvent.type(await screen.findByLabelText("Your question"), "What was the garden note?"); await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(await screen.findByText("The saved note mentions a garden workshop.")).toBeTruthy();
+  expect(screen.getByText("Current eligible records only.")).toBeTruthy();
+  await userEvent.click(screen.getByRole("button", { name: /Source 1 · your note/i }));
+  expect(await screen.findByRole("heading", { name: "synthetic.png" })).toBeTruthy();
+  expect(await screen.findByLabelText("Cited source")).toBeTruthy();
+  expect(await screen.findByRole("img", { name: "Original photo" })).toBeTruthy();
+  expect(v.list).toHaveBeenCalledWith("session-a", "", false);
+  expect(v.source).toHaveBeenCalledWith("session-a", memory.id);
+});
+
+it("explains stale evidence from a failed operation, keeps the question, and offers an explicit fresh Ask", async () => {
+  const ask = vi.fn(async (_vault: string, operationId: string): Promise<AskOutcome> => ({ operation: { operation_id: operationId, state: "failed", error_code: "STALE_EVIDENCE" }, answer: null }));
+  mount(vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ask ready." })), ask }));
+  const question = "What changed in the garden note?";
+  const input = await screen.findByLabelText("Your question") as HTMLTextAreaElement;
+  await userEvent.type(input, question);
+  await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect((await screen.findByRole("status")).textContent).toContain("A source changed while Recall was answering.");
+  expect(screen.queryByRole("region", { name: "Ask answer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Source/ })).toBeNull();
+  expect(input.value).toBe(question);
+  expect(input.readOnly).toBe(true);
+  await userEvent.click(screen.getByRole("button", { name: "Ask a new question" }));
+  expect(input.value).toBe(question);
+  expect(input.readOnly).toBe(false);
+  expect(screen.queryByText("STALE_EVIDENCE")).toBeNull();
+});
+
+it("uses bounded abstention wording for insufficient-evidence outcomes", async () => {
+  const ask = vi.fn(async (_vault: string, operationId: string): Promise<AskOutcome> => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, answer: { status: "insufficient_evidence", sentences: [], citations: [], limitations: [], coverage: { eligible_count: 1, selected_count: 1, limited: false, truncated_count: 0 } } }));
+  mount(vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ask ready." })), ask }));
+  await userEvent.type(await screen.findByLabelText("Your question"), "What happened next?");
+  await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(await screen.findByText("Recall could not answer confidently from the sources considered.")).toBeTruthy();
+});
+
+it("retains the question and exact operation identity while recovering an unknown Ask after restart", async () => {
+  const completed = (operationId: string): AskOutcome => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, answer: { status: "answered", sentences: [{ text: "Recovered synthetic answer.", citation_ids: ["c1"] }], citations: [{ citation_id: "c1", memory_id: memory.id, memory_revision: memory.revision, source_sha256: memory.source_sha256, evidence_kind: "human_note", quote: memory.note }], limitations: [], coverage: { eligible_count: 1, selected_count: 1, limited: false, truncated_count: 0 } } });
+  const ask = vi.fn(async (_vault: string, operationId: string, _question: string): Promise<AskOutcome> => ({ operation: { operation_id: operationId, state: "unknown", error_code: "PROVIDER_OUTCOME_UNKNOWN" }, answer: null }));
+  const recoverAsk = vi.fn(async (_vault: string, operationId: string) => completed(operationId));
+  const v = vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ask ready." })), ask, recoverAsk });
+  const first = mount(v); await userEvent.type(await screen.findByLabelText("Your question"), "Who did I meet?"); await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  await screen.findByText(/has not confirmed whether this request finished/i); expect((screen.getByLabelText("Your question") as HTMLTextAreaElement).readOnly).toBe(true); const operationId = ask.mock.calls[0]![1]; first.unmount();
+  mount(v); await waitFor(() => expect((screen.getByLabelText("Your question") as HTMLTextAreaElement).value).toBe("Who did I meet?"));
+  await userEvent.click(screen.getByRole("button", { name: "Check Ask status" }));
+  expect(await screen.findByText("Recovered synthetic answer.")).toBeTruthy();
+  expect(recoverAsk).toHaveBeenCalledWith("session-a", operationId);
+});
+
+it("clears an answer when its citation no longer matches the current memory", async () => {
+  const ask = vi.fn(async (_vault: string, operationId: string): Promise<AskOutcome> => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, answer: { status: "answered", sentences: [{ text: "This answer must be cleared when its source changes.", citation_ids: ["c1"] }], citations: [{ citation_id: "c1", memory_id: memory.id, memory_revision: memory.revision, source_sha256: memory.source_sha256, evidence_kind: "human_note", quote: memory.note }], limitations: [], coverage: { eligible_count: 1, selected_count: 1, limited: false, truncated_count: 0 } } }));
+  const v = vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ask ready." })), ask, list: vi.fn(async () => [{ ...memory, revision: memory.revision + 1 }]) });
+  mount(v); await userEvent.type(await screen.findByLabelText("Your question"), "What is in this note?"); await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  await screen.findByText("This answer must be cleared when its source changes.");
+  await userEvent.click(screen.getByRole("button", { name: /Source 1 · your note/i }));
+  expect((await screen.findByRole("alert")).textContent).toContain("could not be verified");
+  expect(screen.queryByText("This answer must be cleared when its source changes.")).toBeNull();
+  expect(v.source).not.toHaveBeenCalled();
+});
+
+it("clears a displayed answer before checking Ask availability again", async () => {
+  const ask = vi.fn(async (_vault: string, operationId: string): Promise<AskOutcome> => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, answer: { status: "answered", sentences: [{ text: "Clear this answer when authorization is rechecked.", citation_ids: ["c1"] }], citations: [{ citation_id: "c1", memory_id: memory.id, memory_revision: memory.revision, source_sha256: memory.source_sha256, evidence_kind: "human_note", quote: memory.note }], limitations: [], coverage: { eligible_count: 1, selected_count: 1, limited: false, truncated_count: 0 } } }));
+  const askCapability = vi.fn().mockResolvedValueOnce({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ask ready." }).mockResolvedValueOnce({ enabled: false, scope: "vault_intelligence" as const, consent: "unknown" as const, explanation: "Status unknown." });
+  mount(vault({ askCapability, ask })); await userEvent.type(await screen.findByLabelText("Your question"), "What did I write?"); await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  await screen.findByText("Clear this answer when authorization is rechecked.");
+  await userEvent.click(screen.getByText("Ask connection settings", { exact: true }));
+  await userEvent.click(screen.getByRole("button", { name: "Refresh Ask availability" }));
+  await waitFor(() => expect(screen.queryByText("Clear this answer when authorization is rechecked.")).toBeNull());
+  expect((screen.getByRole("button", { name: "Ask" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("does not show a late Ask result after switching the selected vault", async () => {
+  let finish!: (outcome: AskOutcome) => void;
+  const ask = vi.fn((_vault: string, _operationId: string) => new Promise<AskOutcome>(resolve => { finish = resolve; }));
+  const next: VaultStatus = { root: "/synthetic/vault-b", vault_id: "session-b", vault_identity: "manifest-b" };
+  const v = vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ask ready." })), ask, select: vi.fn(async () => next), status: vi.fn(async () => selected), list: vi.fn(async () => []) });
+  mount(v); await userEvent.type(await screen.findByLabelText("Your question"), "Keep this question"); await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  await userEvent.click(screen.getByRole("button", { name: "Switch vault" })); await screen.findByText("/synthetic/vault-b");
+  finish({ operation: { operation_id: ask.mock.calls[0]![1], state: "complete", error_code: null }, answer: { status: "answered", sentences: [{ text: "Late answer must not appear.", citation_ids: [] }], citations: [], limitations: [], coverage: { eligible_count: 0, selected_count: 0, limited: false, truncated_count: 0 } } });
+  await waitFor(() => expect(screen.queryByText("Late answer must not appear.")).toBeNull());
+});
+
+it("clarifies historical dates before creating an operation and keeps the original question for the follow-up", async () => {
+  const ask = vi.fn();
+  const askHistory = vi.fn(async (_vault: string, operationId: string, _question: string, temporal: import("../platform/local-vault").AskTemporal): Promise<import("../platform/local-vault").HistoryAskOutcome> => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, temporal, answer: null, history_evidence: [] }));
+  const v = vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ready", history_consent: "active" as const, history_enabled: true, consent_version: 4, history_policy_version: "ask-history-v1" })), ask, askHistory });
+  mount(v);
+  const input = await screen.findByLabelText("Your question");
+  await userEvent.type(input, "What did I know on 10/01?");
+  await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(await screen.findByText(/Please give one valid full date/)).toBeTruthy();
+  expect(ask).not.toHaveBeenCalled(); expect(askHistory).not.toHaveBeenCalled();
+  await userEvent.type(input, "October 1, 2026");
+  await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+  await waitFor(() => expect(askHistory).toHaveBeenCalledTimes(1));
+  expect(askHistory.mock.calls[0]?.[2]).toBe("What did I know on 10/01?");
+  expect(askHistory.mock.calls[0]?.[3]).toMatchObject({ display_date: "2026-10-01", mode: "as_of" });
+  expect(ask).not.toHaveBeenCalled();
+});
+
+it("keeps current Ask available when only the history capability is unknown", async () => {
+  const ask = vi.fn(async (_vault: string, operationId: string): Promise<AskOutcome> => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, answer: null }));
+  const v = vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ready", history_consent: "unknown" as const, history_enabled: false, consent_version: 0, history_policy_version: null })), ask });
+  mount(v); await userEvent.type(await screen.findByLabelText("Your question"), "What is the latest note?");
+  await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+  expect((screen.getByRole("button", { name: "Ask" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("requires explicit workspace history opt-in before historical dispatch and opens the exact retained revision", async () => {
+  const temporal = { mode: "as_of" as const, start_utc: "2026-10-01T05:00:00Z", end_exclusive_utc: "2026-10-02T05:00:00Z", display_date: "2026-10-01", display_timezone: "America/Chicago" };
+  const askHistory = vi.fn(async (_vault: string, operationId: string): Promise<import("../platform/local-vault").HistoryAskOutcome> => ({ operation: { operation_id: operationId, state: "complete", error_code: null }, temporal, answer: { status: "answered", sentences: [{ text: "The earlier note says garden shade.", citation_ids: ["c1"] }], citations: [{ citation_id: "c1", memory_id: memory.id, memory_revision: 1, source_sha256: memory.source_sha256, evidence_kind: "human_note", quote: "garden shade" }], limitations: [], coverage: { eligible_count: 1, selected_count: 1, limited: false, truncated_count: 0 } }, history_evidence: [{ citation_id: "c1", memory_id: memory.id, memory_revision: 1, event_sha256: "e".repeat(64), source_sha256: memory.source_sha256, captured_at: memory.captured_at, recorded_at: "2026-10-01T12:00:00Z", current_revision: 2, history_status: "as_of_later_corrected", evidence_kind: "human_note", epistemic_state: "reported", excerpt: "garden shade" }] }));
+  const setHistoryConsent = vi.fn(async () => ({ scope: "vault_intelligence" as const, history_consent: "active" as const, history_enabled: true, consent_version: 2, history_policy_version: "ask-history-v1" }));
+  const historicalProposal: OrganizationProposal = { binding: { schema_version: "1.0", operation_id: "synthetic-history", vault_id: "manifest-a", memory_id: memory.id, source_kind: "photo", source_sha256: memory.source_sha256, expected_revision: 1, input_sha256: memory.source_sha256, consent_epoch: 1, captured_at: memory.captured_at }, media_type: "image/png", payload_sha256: "synthetic", result: { provider: "anthropic", model_id: "synthetic", input_manifest_sha256: "synthetic", extraction: { summary: "Earlier machine reading", pages: [{ page_id: memory.id, ordinal: 1, transcription: "Full historical transcription beyond the quoted excerpt.", legibility: "mixed" }] }, validation_notes: [], review_state: "unreviewed" }, review_state: "unreviewed", suppressed: true };
+  const askHistoryCitation = vi.fn(async () => ({ memory_id: memory.id, revision: 1, event_sha256: "e".repeat(64), source_sha256: memory.source_sha256, current_revision: 2, current: false, quote: "garden shade", retained_revision: { revision: 1, recorded_at: "2026-10-01T12:00:00Z", kind: "capture", origin: "human:recall", note: "Original retained garden note.", organization: historicalProposal }, original: { bytes: Array.from(new TextEncoder().encode("synthetic original")), mime_type: "text/plain; charset=utf-8", sha256: memory.source_sha256 } }));
+  const v = vault({ askCapability: vi.fn(async () => ({ enabled: true, scope: "vault_intelligence" as const, consent: "active" as const, explanation: "Ready", history_consent: "missing" as const, history_enabled: true, consent_version: 1, history_policy_version: "ask-history-v1" })), setHistoryConsent, askHistory, askHistoryCitation });
+  mount(v); const input = await screen.findByLabelText("Your question"); await userEvent.type(input, "What did I know on October 1, 2026?");
+  await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(askHistory).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByText("How Ask works and sends data"));
+  await userEvent.click(screen.getByRole("button", { name: "Allow questions about the past" }));
+  await waitFor(() => expect(setHistoryConsent).toHaveBeenCalledWith("session-a", true, 1));
+  await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(await screen.findByText("The earlier note says garden shade.")).toBeTruthy();
+  expect((await screen.findAllByText(/Later corrected/)).length).toBeGreaterThan(0);
+  await userEvent.click(screen.getByRole("button", { name: "Open saved note and original" }));
+  expect(await screen.findByText("Original retained garden note.")).toBeTruthy();
+  expect(await screen.findByText("Retained photo proposal · superseded")).toBeTruthy();
+  expect(screen.getByText("Full historical transcription beyond the quoted excerpt.")).toBeTruthy();
+  expect(screen.getByText("synthetic original")).toBeTruthy();
+  expect(askHistoryCitation).toHaveBeenCalledWith("session-a", expect.any(String), "c1");
+});
 it("enters real first-use local setup without cloud configuration or auth", async () => {
   const v = vault({ status: vi.fn(async () => ({ root: null, vault_id: null, vault_identity: null })), list: vi.fn(async () => []) });
   mount(v);
   await userEvent.click(await screen.findByRole("button", { name: "Choose vault" }));
   expect(await screen.findByText("Nothing captured yet")).toBeTruthy();
   expect(screen.queryByText(/sign in|isn't configured/i)).toBeNull();
+});
+it("keeps the home focused and exposes maintenance through a native disclosure", async () => {
+  const v = vault({ list: vi.fn(async () => []) }); mount(v);
+  await userEvent.click(await screen.findByRole("button", { name: "Choose vault" }));
+  await screen.findByText("Nothing captured yet");
+  expect(screen.getByRole("button", { name: "Capture" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Refresh memories" })).toBeTruthy();
+  const summary = screen.getByText("Memory tools");
+  expect((summary.closest("details") as HTMLDetailsElement).open).toBe(false);
+  await userEvent.click(summary);
+  expect((summary.closest("details") as HTMLDetailsElement).open).toBe(true);
+  expect(screen.getByRole("button", { name: "Removed items" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Rebuild local search" })).toBeTruthy();
 });
 it("honestly explains browser limits without loading saved intent", async () => {
   const v = vault({ available: false }); mount(v);
@@ -285,10 +771,10 @@ it.each([{ ...memory, state: "conflict" as const, conflict: "Duplicate ID" }, { 
 it("failed rebuild keeps previous rows visibly stale then successful rebuild replaces them", async () => {
   const rebuild = vi.fn().mockRejectedValueOnce(new Error("Malformed journal")).mockResolvedValue([{ ...memory, note: "Rebuilt note" }]);
   mount(vault({ rebuild })); await screen.findByRole("button", { name: /Synthetic garden note/ });
-  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" }));
+  await clickTool("Rebuild local search");
   expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Malformed journal");
   expect(screen.getByRole("button", { name: /Synthetic garden note/ })).toBeTruthy(); expect(screen.getByText(/Previously loaded results · not currently verified/)).toBeTruthy();
-  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" }));
+  await clickTool("Rebuild local search");
   expect(await screen.findByRole("button", { name: /Rebuilt note/ })).toBeTruthy(); expect(screen.queryByText(/Previously loaded results/)).toBeNull();
   expect(rebuild).toHaveBeenCalledWith("session-a", true);
 });
@@ -296,7 +782,7 @@ it("back preserves keyword query and rebuild uses canonical results without rein
   const v = vault({ rebuild: async () => [memory, deleted, { ...memory, id: "other", note: "Other", note_path: "other.md", source_name: "other.png" }] });
   mount(v); await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "garden"); await userEvent.click(screen.getByRole("button", { name: "Search" })); await openMemory();
   await userEvent.click(screen.getByRole("button", { name: "Back to memories" })); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden");
-  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByRole("button", { name: /Synthetic garden note/ }); expect(screen.queryByRole("button", { name: /^Other/ })).toBeNull();
+  await clickTool("Rebuild local search"); await screen.findByRole("button", { name: /Synthetic garden note/ }); expect(screen.queryByRole("button", { name: /^Other/ })).toBeNull();
 });
 it("failed removal retries frozen decision; fresh review creates a new revision/state intent", async () => {
   const remove = vi.fn().mockRejectedValueOnce(new Error("Lost receipt")).mockRejectedValueOnce(new Error("Still unavailable")).mockResolvedValue(deleted);
@@ -327,9 +813,9 @@ it.each(["remove", "restore", "rebuild"])("ignores late %s response after vault 
 it("failed switch to removed preserves active query and rows; failed return preserves removed mode", async () => {
   const list = vi.fn().mockResolvedValueOnce([memory]).mockResolvedValueOnce([memory]).mockRejectedValueOnce(new Error("Removed list unavailable")).mockResolvedValueOnce([deleted]).mockRejectedValueOnce(new Error("Active list unavailable"));
   mount(vault({ list })); await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "garden"); await userEvent.click(screen.getByRole("button", { name: "Search" }));
-  await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await screen.findByText("Removed list unavailable"); expect(screen.getByRole("heading", { name: "Matching memories" })).toBeTruthy(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden"); expect(screen.getByRole("button", { name: /Synthetic garden note/ })).toBeTruthy();
-  await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await screen.findByRole("heading", { name: "Removed items" });
-  await userEvent.click(screen.getByRole("button", { name: "All memories / refresh" })); await screen.findByText("Active list unavailable"); expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden");
+  await clickTool("Removed items"); await screen.findByText("Removed list unavailable"); expect(screen.getByRole("heading", { name: "Matching memories" })).toBeTruthy(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden"); expect(screen.getByRole("button", { name: /Synthetic garden note/ })).toBeTruthy();
+  await clickTool("Removed items"); await screen.findByRole("heading", { name: "Removed items" });
+  await userEvent.click(screen.getByRole("button", { name: "Refresh memories" })); await screen.findByText("Active list unavailable"); expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); expect((screen.getByLabelText("Search notes and filenames") as HTMLInputElement).value).toBe("garden");
 });
 it("pending removal survives back to memories and retains operation identity", async () => {
   const remove = vi.fn().mockRejectedValueOnce(new Error("Lost acknowledgment")).mockResolvedValue(deleted); mount(vault({ remove })); await openMemory();
@@ -353,7 +839,7 @@ it.each(["capture", "correct", "restore"])("%s receipts with current missing/con
   await screen.findByText(/Current memory (has a missing Markdown note|needs attention)/); expect(screen.queryByText(/Correction saved|Note restored/)).toBeNull();
 });
 it("opening stale rows keeps their unverified state visible until a validated mutation", async () => {
-  mount(vault({ rebuild: async () => { throw new Error("Rebuild failed"); } })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByText("Rebuild failed"); await openMemory();
+  mount(vault({ rebuild: async () => { throw new Error("Rebuild failed"); } })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await clickTool("Rebuild local search"); await screen.findByText("Rebuild failed"); await openMemory();
   expect(screen.getByText("Previously loaded memory · current state not verified")).toBeTruthy();
 });
 it("a failed decision can retain current terminal state after reload and inspect its history", async () => {
@@ -366,14 +852,14 @@ it("a failed decision can retain current terminal state after reload and inspect
 it("out-of-order list responses cannot replace the latest chosen mode", async () => {
   let finish!: (rows: VaultMemory[]) => void;
   const list = vi.fn().mockResolvedValueOnce([memory]).mockImplementationOnce(() => new Promise<VaultMemory[]>(resolve => { finish = resolve; })).mockResolvedValueOnce([memory]);
-  mount(vault({ list })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await userEvent.click(screen.getByRole("button", { name: "All memories / refresh" })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await act(async () => finish([deleted])); expect(screen.getByRole("heading", { name: "Recent memory" })).toBeTruthy(); expect(screen.queryByRole("heading", { name: "Removed items" })).toBeNull();
+  mount(vault({ list })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await clickTool("Removed items"); await userEvent.click(screen.getByRole("button", { name: "Refresh memories" })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await act(async () => finish([deleted])); expect(screen.getByRole("heading", { name: "Recent memory" })).toBeTruthy(); expect(screen.queryByRole("heading", { name: "Removed items" })).toBeNull();
 });
 it("initial read failure does not claim previously loaded results or an empty vault", async () => {
   mount(vault({ list: async () => { throw new Error("Vault unreadable"); } })); await screen.findByText("Vault unreadable"); expect(screen.queryByText(/Previously loaded results/)).toBeNull(); expect(screen.queryByText("Nothing captured yet")).toBeNull();
 });
 it("a failed later rebuild clears the earlier rebuild success receipt", async () => {
-  const rebuild = vi.fn().mockResolvedValueOnce([memory]).mockRejectedValueOnce(new Error("New rebuild failed")); mount(vault({ rebuild })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByText("Local keyword search rebuilt from validated vault records.");
-  await userEvent.click(screen.getByRole("button", { name: "Rebuild local search" })); await screen.findByText("New rebuild failed"); expect(screen.queryByText("Local keyword search rebuilt from validated vault records.")).toBeNull();
+  const rebuild = vi.fn().mockResolvedValueOnce([memory]).mockRejectedValueOnce(new Error("New rebuild failed")); mount(vault({ rebuild })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await clickTool("Rebuild local search"); await screen.findByText("Local keyword search rebuilt from validated vault records.");
+  await clickTool("Rebuild local search"); await screen.findByText("New rebuild failed"); expect(screen.queryByText("Local keyword search rebuilt from validated vault records.")).toBeNull();
 });
 it("list predating successful removal cannot reintroduce its tombstone", async () => {
   let finishList!: (rows: VaultMemory[]) => void;
@@ -401,7 +887,7 @@ it.each([false, true])("delayed capture preserves the latest removed view (reque
   const list = vi.fn().mockResolvedValueOnce([memory]);
   if (pendingView) list.mockImplementationOnce(() => new Promise<VaultMemory[]>(resolve => { finishView = resolve; })); else list.mockResolvedValueOnce([deleted]);
   list.mockImplementation(async (_session, _query, includeDeleted) => includeDeleted ? [deleted] : [memory]);
-  mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await userEvent.click(screen.getByRole("button", { name: "Removed items" }));
+  mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await clickTool("Removed items");
   if (!pendingView) await screen.findByRole("heading", { name: "Removed items" }); await act(async () => finishCapture({ ...memory, id: "new-capture" })); await waitFor(() => expect(screen.queryByText("Reading your vault…")).toBeNull());
   expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); expect(list.mock.calls.at(-1)).toEqual(["session-a", "", true]); expect(screen.getByText("Saved in vault · Stored on this device")).toBeTruthy();
   if (pendingView) { await act(async () => finishView([deleted])); expect(screen.getByRole("heading", { name: "Removed items" })).toBeTruthy(); }
@@ -418,13 +904,13 @@ it.each([false, true])("delayed capture preserves the latest submitted keyword q
 });
 it("delayed capture preserves a newer return from removed items to active memories", async () => {
   let finishCapture!: (m: VaultMemory) => void; const list = vi.fn(async (_session: string, _query: string, includeDeleted?: boolean) => includeDeleted ? [deleted] : [memory]);
-  mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await screen.findByRole("heading", { name: "Removed items" });
-  await userEvent.click(screen.getByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await userEvent.click(screen.getByRole("button", { name: "All memories / refresh" })); await screen.findByRole("heading", { name: "Recent memory" }); await act(async () => finishCapture({ ...memory, id: "new-capture" }));
+  mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await screen.findByRole("button", { name: /Synthetic garden note/ }); await clickTool("Removed items"); await screen.findByRole("heading", { name: "Removed items" });
+  await userEvent.click(screen.getByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await userEvent.click(screen.getByRole("button", { name: "Refresh memories" })); await screen.findByRole("heading", { name: "Recent memory" }); await act(async () => finishCapture({ ...memory, id: "new-capture" }));
   await waitFor(() => expect(screen.queryByText("Reading your vault…")).toBeNull()); expect(screen.getByRole("heading", { name: "Recent memory" })).toBeTruthy(); expect(screen.queryByRole("heading", { name: "Removed items" })).toBeNull(); expect(list.mock.calls.at(-1)).toEqual(["session-a", "", false]);
 });
 it("capture follow-up failure retains the prior view after a newer requested view failed", async () => {
   let finishCapture!: (m: VaultMemory) => void; const list = vi.fn(async (_session: string, _query: string, includeDeleted?: boolean) => { if (includeDeleted) throw new Error("Removed view unavailable"); return [memory]; });
-  mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await userEvent.click(screen.getByRole("button", { name: "Removed items" })); await screen.findByText("Removed view unavailable");
+  mount(vault({ list, capture: () => new Promise(resolve => { finishCapture = resolve; }) })); await userEvent.click(await screen.findByRole("button", { name: "Capture" })); await userEvent.click(screen.getByRole("button", { name: "Choose photo & save" })); await clickTool("Removed items"); await screen.findByText("Removed view unavailable");
   await act(async () => finishCapture({ ...memory, id: "new-capture" })); await waitFor(() => expect(screen.queryByText("Reading your vault…")).toBeNull()); expect(screen.getByText("Removed view unavailable")).toBeTruthy(); expect(screen.getByRole("heading", { name: "Recent memory" })).toBeTruthy(); expect(screen.getByRole("button", { name: /Synthetic garden note/ })).toBeTruthy(); expect(screen.getByText(/Previously loaded results · not currently verified/)).toBeTruthy(); expect(list.mock.calls.at(-1)).toEqual(["session-a", "", true]);
 });
 
@@ -440,7 +926,7 @@ it("authoritative removal clears the earlier capture success notice from home", 
   await screen.findByText("Removed from Recall · files retained");
   await userEvent.click(screen.getByRole("button", { name: "Back to memories" }));
   expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull();
-  await userEvent.click(screen.getByRole("button", { name: "Removed items" }));
+  await clickTool("Removed items");
   await screen.findByRole("button", { name: /Synthetic garden note/ });
   expect(screen.queryByText("Saved in vault · Stored on this device")).toBeNull();
 });

@@ -1,6 +1,6 @@
 # Repository tree and ownership
 
-This was the starter layout. RCL-001 added runnable packages in `apps/mobile`, `apps/desktop`, `services/backend`, `packages/{api-client,design-tokens,sync}`, `tests/e2e`, `scripts/dev-db.sh`, `.github/workflows/ci.yml`, a root npm workspace, and `docs/DEVELOPMENT.md`. The backend also has a `storage/` adapter package (object-store port, local and Supabase adapters) beside the documented modules; `ingestion`, `retrieval`, `sync`, and `exports` remain reserved.
+This is an illustrative top-level map, not an exhaustive file tree. The repository now has runnable mobile, desktop, web, backend, shared-contract/sync and infrastructure surfaces. The backend's `ingestion` and `retrieval` modules implement the preserved cloud processing and Ask paths; `sync` implements the authenticated change feed; export commands live in `domain/export.py` and `api/export.py`. There is no separate `recall.exports` package. The native local-vault and selected-photo reading implementation lives in `apps/desktop/src-tauri`; current product truth and implementation limits are in [PRD](PRD.md), [architecture](ARCHITECTURE.md), [roadmap](ROADMAP.md) and [status](V1-STATUS.md).
 
 ```text
 recall/
@@ -93,12 +93,12 @@ recall/
 
 `packages/sync` owns reusable client protocol/state logic, not a second server implementation or a universal filesystem layer. Platform persistence adapters stay in each app.
 
-`services/backend` is one Python package with API and worker entrypoints once implemented. Its migrations own the application database schema. `infra/supabase` documents platform/auth/storage setup; it must not create a competing application migration history.
+`services/backend` is one Python package with separate API and worker entrypoints. Its migrations own the application database schema. `infra/supabase` documents the preserved cloud pilot's platform/auth/storage setup; it must not create a competing application migration history. The local desktop vault is not a backend service.
 
-`tests/fixtures/synthetic` is safe public contract data. The real pilot corpus lives in approved private storage outside this tree. `tests/evaluation` will hold harness logic and redacted manifest formats, never private scans or labels.
+`tests/fixtures/synthetic` is safe public contract data. Real pilot material remains private and outside this tree. `tests/evaluation` contains harness logic and redacted/synthetic evaluation fixtures, never private scans or labels.
 
 `docs/PRD.md` owns product scope. Architecture/data/API/sync documents own their named contracts. ROADMAP owns packet ordering. ACCEPTANCE owns release evidence expectations. Update these in place rather than spawning alternate PRDs.
 
 ## Intentionally absent
 
-No marketing website, independent web product, separate bridge service, graph database, vector-service folder, agent framework, model router, billing service, or implemented Claude connector. Add those only after a concrete approved need.
+No separate bridge service, graph database, vector-service folder, agent framework or model router. The repository does contain the bounded Claude photo-reading adapter and legacy cloud provider/retrieval modules; these do not constitute a general assistant connector or full-memory LLM organization service. Add new services only after a concrete approved need.

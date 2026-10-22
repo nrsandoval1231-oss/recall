@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "runtime": {
+    "repository": "https://github.com/ggml-org/whisper.cpp",
+    "version": "v1.9.5",
+    "source_commit": "d1be6fde11ac6e0407606b4e42fe72d34add8037",
+    "binary": { "name": "whisper-cli.exe", "bytes": 778752, "sha256": "329c713c8b36eb8c367137d624b75ec57e17f8b3061fd823c59433abd5f76951" },
+    "dlls": [
+      { "name": "whisper.dll", "bytes": 966144, "sha256": "ab158cdb751614a99c2261abd7b63ddbae2e490ade8c42a42217788bf1e98ad9" },
+      { "name": "ggml.dll", "bytes": 175104, "sha256": "4b468b90912196e46c4e44fa08f55073ab60e71bdb6aced8ab0c722441f45e9b" },
+      { "name": "ggml-cpu.dll", "bytes": 1172480, "sha256": "74fbea95303e0c182ea4dd7713cecd374b431796229e63256702600e9efb78ea" },
+      { "name": "ggml-base.dll", "bytes": 873984, "sha256": "15ddec9434d314c375068f823e8ff9f947054199e7a0f043619c6f59c97a365c" }
+    ]
+  },
+  "model": {
+    "repository": "https://huggingface.co/ggerganov/whisper.cpp",
+    "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+    "name": "ggml-base.bin",
+    "bytes": 147951465,
+    "sha256": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
+  },
+  "notices": [
+    { "name": "WHISPER-LICENSE.txt", "sha256": "bcd8ec749126d45cb06737d0690295d73df4b6e7e194205bcf91190368f27285" },
+    { "name": "MODEL-CARD.txt", "sha256": "21fd967098804f33fc84e803fb0e5ab7666d71801f4027cf28a65e7af09c1758" }
+  ],
+  "runtime_cpu_features": ["avx2", "fma", "f16c", "bmi2"],
+  "runtime_source": "Pinned offline tooling output; no runtime download"
+}

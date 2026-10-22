@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "node": "F0",
+  "builder_status": "PASS_WITH_LIMITATIONS",
+  "independent_review": "PASS: F0-REVIEW.json",
+  "product_acceptance": "NOT_CLAIMED",
+  "repository": {
+    "path": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall",
+    "branch": "implement/owner-device-pairing",
+    "head": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+    "product_files_changed": false,
+    "only_new_repository_evidence": [
+      ".agent/VOICE-01/F0-COMPLETION.json",
+      ".agent/VOICE-01/F0-EVIDENCE.md"
+    ]
+  },
+  "timing": {
+    "first_recorded_utc": "2026-10-10T02:59:47.0170711Z",
+    "first_recorded_utc_note": "This is the earliest exact timestamp captured during this task; initial reading and inspection began shortly earlier.",
+    "completion_utc": "2026-10-10T03:20:13.1107667Z"
+  },
+  "tooling_root": "C:\\Users\\nrsan\\AppData\\Local\\RecallBuildTools\\voice-feasibility",
+  "pinned_inputs": {
+    "runtime": {
+      "repository": "https://github.com/ggml-org/whisper.cpp",
+      "version": "v1.9.5",
+      "commit": "d1be6fde11ac6e0407606b4e42fe72d34add8037",
+      "source_checkout_clean": true
+    },
+    "model": {
+      "repository": "https://huggingface.co/ggerganov/whisper.cpp",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "file": "ggml-base.bin",
+      "bytes": 147951465,
+      "sha256": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+      "verified_before_execution": true
+    },
+    "synthetic_known_speech": {
+      "generator": "Windows SAPI System.Speech, Microsoft Zira Desktop, en-US",
+      "utterance": "Remember to call the dentist tomorrow at three in the afternoon.",
+      "file": "fixtures/known-sapi.wav",
+      "bytes": 127726,
+      "sha256": "47a345a10dafe4db7eda065344b8ac250f88e4451e2597111b5dc00ce2031672"
+    }
+  },
+  "toolchain_and_hardware": {
+    "os": "Windows 11 Home 10.0.26200 x64",
+    "cpu": "Intel Core Ultra 5 225F",
+    "logical_processors": 10,
+    "physical_memory_kib": 33054736,
+    "visual_studio": "2022 Build Tools 17.14.41",
+    "msvc": "19.44.35229",
+    "windows_sdk": "10.0.26100.0",
+    "cmake": "3.31.6-msvc6",
+    "tauri_cli": "2.12.1",
+    "tauri_crate": "2.12.2",
+    "nsis": "3.11"
+  },
+  "build": {
+    "configure_command": "cmake -S <tooling_root>/whisper.cpp -B <tooling_root>/build-static -G \"Visual Studio 17 2022\" -A x64 -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON -DWHISPER_BUILD_SERVER=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
+    "configure_exit_code": 0,
+    "build_command": "cmake --build <tooling_root>/build-static --config Release --target whisper-cli --parallel 4",
+    "build_exit_code": 0,
+    "cpu_variant": "AVX2, FMA, F16C and BMI2 selected by ggml CPU backend on this x64 host",
+    "warnings": [
+      "MSVC C4068 unknown GCC pragmas in upstream ggml tiled-kernel.cpp; build completed successfully"
+    ],
+    "artifacts": [
+      {
+        "path": "build-static/bin/Release/whisper-cli.exe",
+        "bytes": 778752,
+        "sha256": "329c713c8b36eb8c367137d624b75ec57e17f8b3061fd823c59433abd5f76951"
+      },
+      {
+        "path": "build-static/bin/Release/whisper.dll",
+        "bytes": 966144,
+        "sha256": "ab158cdb751614a99c2261abd7b63ddbae2e490ade8c42a42217788bf1e98ad9"
+      },
+      {
+        "path": "build-static/bin/Release/ggml.dll",
+        "bytes": 175104,
+        "sha256": "4b468b90912196e46c4e44fa08f55073ab60e71bdb6aced8ab0c722441f45e9b"
+      },
+      {
+        "path": "build-static/bin/Release/ggml-cpu.dll",
+        "bytes": 1172480,
+        "sha256": "74fbea95303e0c182ea4dd7713cecd374b431796229e63256702600e9efb78ea"
+      },
+      {
+        "path": "build-static/bin/Release/ggml-base.dll",
+        "bytes": 873984,
+        "sha256": "15ddec9434d314c375068f823e8ff9f947054199e7a0f043619c6f59c97a365c"
+      }
+    ]
+  },
+  "runtime_runs": [
+    {
+      "case": "known-sapi",
+      "exit_code": 0,
+      "elapsed_ms": 1265,
+      "sampled_peak_working_set_bytes": 317554688,
+      "transcript": "Remember to call the dentist tomorrow at three in the afternoon.",
+      "result": "exact synthetic gold phrase"
+    },
+    {
+      "case": "silence",
+      "fixture_rms": 0,
+      "exit_code": 0,
+      "elapsed_ms": 1123,
+      "sampled_peak_working_set_bytes": 316305408,
+      "transcript": "you",
+      "result": "FALSE POSITIVE"
+    },
+    {
+      "case": "near-silence",
+      "fixture_rms": 4.9,
+      "exit_code": 0,
+      "elapsed_ms": 1063,
+      "sampled_peak_working_set_bytes": 316334080,
+      "transcript": "[BLANK_AUDIO]",
+      "result": "non-speech marker"
+    },
+    {
+      "case": "tone-440hz",
+      "fixture_rms": 22.66,
+      "exit_code": 0,
+      "elapsed_ms": 1105,
+      "sampled_peak_working_set_bytes": 316628992,
+      "transcript": "[Music]",
+      "result": "non-speech label, not factual text"
+    },
+    {
+      "case": "low-noise",
+      "fixture_rms": 148.16,
+      "exit_code": 0,
+      "elapsed_ms": 1082,
+      "sampled_peak_working_set_bytes": 316911616,
+      "transcript": "[BLANK_AUDIO]",
+      "result": "non-speech marker"
+    },
+    {
+      "case": "speech-gain-1-percent",
+      "fixture_rms": 34.35,
+      "exit_code": 0,
+      "elapsed_ms": 1120,
+      "sampled_peak_working_set_bytes": 316506112,
+      "transcript": "Remember to call the dentist tomorrow.",
+      "result": "partial transcript; omitted time phrase"
+    },
+    {
+      "case": "speech-gain-2-percent",
+      "fixture_rms": 68.71,
+      "exit_code": 0,
+      "elapsed_ms": 1117,
+      "sampled_peak_working_set_bytes": 317034496,
+      "transcript": "Remember to call the dentist tomorrow.",
+      "result": "partial transcript; omitted time phrase"
+    },
+    {
+      "case": "speech-gain-5-percent",
+      "fixture_rms": 171.77,
+      "exit_code": 0,
+      "elapsed_ms": 1108,
+      "sampled_peak_working_set_bytes": 317333504,
+      "transcript": "Remember to call the dentist tomorrow.",
+      "result": "partial transcript; omitted time phrase"
+    },
+    {
+      "case": "speech-gain-10-percent",
+      "fixture_rms": 343.55,
+      "exit_code": 0,
+      "elapsed_ms": 1145,
+      "sampled_peak_working_set_bytes": 316911616,
+      "transcript": "Remember to call the dentist tomorrow.",
+      "result": "partial transcript; omitted time phrase"
+    },
+    {
+      "case": "corrupt",
+      "exit_code": 11,
+      "elapsed_ms": 542,
+      "sampled_peak_working_set_bytes": 215683072,
+      "transcript": "",
+      "stderr": "failed to read audio data; failed to read audio file; 1 input file failed"
+    }
+  ],
+  "energy_gate_probe": {
+    "absolute_silence_rms": 0,
+    "near_silence_rms": 4.9,
+    "lowest_tested_speech_rms": 34.35,
+    "candidate_threshold_rms_lte": 5,
+    "candidate_behavior": "would reject the two tested zero/near-zero fixtures and preserve these tested speech fixtures",
+    "limitation": "synthetic SAPI gains and generated noise do not establish a production microphone VAD threshold; tones still produce non-speech text, and ordinary background noise can exceed the threshold"
+  },
+  "dll_closure": {
+    "dumpbin_exit_code": 0,
+    "local_dependencies": [
+      "whisper-cli.exe -> whisper.dll, ggml.dll",
+      "whisper.dll -> ggml.dll, ggml-base.dll",
+      "ggml.dll -> ggml-cpu.dll, ggml-base.dll",
+      "ggml-cpu.dll -> ggml-base.dll, ADVAPI32.dll",
+      "ggml-base.dll -> KERNEL32.dll"
+    ],
+    "packaged_local_dlls": [
+      "whisper.dll",
+      "ggml.dll",
+      "ggml-cpu.dll",
+      "ggml-base.dll"
+    ],
+    "platform_dlls": [
+      "KERNEL32.dll",
+      "ADVAPI32.dll"
+    ],
+    "msvc_runtime_dlls": [],
+    "openmp_runtime_dlls": []
+  },
+  "license_material": [
+    {
+      "path": "package/resources/licenses/whisper.cpp-LICENSE.txt",
+      "bytes": 1099,
+      "sha256": "bcd8ec749126d45cb06737d0690295d73df4b6e7e194205bcf91190368f27285"
+    },
+    {
+      "path": "package/resources/licenses/openai-whisper-LICENSE.txt",
+      "bytes": 1063,
+      "sha256": "b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d"
+    },
+    {
+      "path": "package/resources/licenses/ggml-base-model-card.md",
+      "bytes": 3196,
+      "sha256": "21fd967098804f33fc84e803fb0e5ab7666d71801f4027cf28a65e7af09c1758"
+    }
+  ],
+  "tauri_nsis_packaging": {
+    "fixture_isolated_outside_repository": true,
+    "fixture_app_is_synthetic": true,
+    "tauri_cli_command": "tauri build --bundles nsis",
+    "tauri_cli_exit_code": 0,
+    "target_triple": "x86_64-pc-windows-msvc",
+    "sidecar_config": "bundle.externalBin=[binaries/whisper-cli]",
+    "sidecar_install_path": "<install-root>/whisper-cli.exe",
+    "dll_resource_mapping": "four binaries/*.dll resources mapped to empty destination so NSIS installs them beside the sidecar",
+    "model_install_path": "<install-root>/resources/models/ggml-base.bin",
+    "license_install_path": "<install-root>/resources/licenses/",
+    "voice_setup_bytes": 131752126,
+    "voice_setup_sha256": "1a2036e34f80edbe8177015f7efe869b69514f6086145a75c59f892c3af6ac99",
+    "baseline_setup_bytes": 1915548,
+    "baseline_setup_sha256": "d2d00e65137c50bccb28e0a6683017e9ebc34c7bb586500c5170a401151d6751",
+    "installer_size_delta_bytes": 129836578,
+    "installer_size_delta_mib": 123.82,
+    "nsis_install_exit_code": 0,
+    "installed_model_bytes": 147951465,
+    "installed_model_sha256": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+    "installed_sidecar_exit_code": 0,
+    "installed_sidecar_elapsed_ms": 1254,
+    "installed_sidecar_sampled_peak_working_set_bytes": 317116416,
+    "installed_sidecar_transcript": "Remember to call the dentist tomorrow at three in the afternoon.",
+    "first_run_model_download": "none; bundled file was hash-verified and passed directly to installed CLI; no cloud call or downloader was invoked",
+    "voice_config_sha256": "7cfbb8e1ee618eeb77b94b6d20b9d45b7687f09242fc84e743609e43577ac88b"
+  },
+  "repair_history": [
+    {
+      "attempt": 1,
+      "finding": "Minimal Tauri fixture failed before build because default Windows resource generation required src-tauri/icons/icon.ico.",
+      "repair": "Copied the existing icon into the isolated fixture only; no repository app file changed."
+    },
+    {
+      "attempt": 2,
+      "finding": "First actual bundle preserved DLL resource paths under <install-root>/binaries while externalBin sidecar landed at <install-root>/whisper-cli.exe.",
+      "repair": "Changed fixture resource-map destinations for four DLLs to the installer root, beside sidecar. Rebuilt, installed, hash-verified and executed successfully."
+    }
+  ],
+  "limits": [
+    "Speech fixtures are synthetic Windows SAPI, not microphone or retained-user recordings.",
+    "ASR quality evidence is a few short en-US clips and does not establish broad language, accent, noise, terminology, correction, or factual-accuracy performance.",
+    "True silence hallucinated a word; non-speech tone produced a label. A later product packet needs deterministic silence/VAD handling and must retain transcript as unreviewed machine output.",
+    "The installer size delta is from a minimal synthetic Tauri app built with the current Tauri CLI/NSIS and does not equal the eventual Recall installer delta.",
+    "No installed Recall application, microphone, vault, Obsidian write, or Ask path was exercised."
+  ],
+  "handoff_recommendation": "Controller review required. Offline pinned runtime and actual Tauri NSIS resource/sidecar packaging are technically feasible on this host. Keep broad voice implementation waiting until the controller decides whether the approximately 123.82 MiB synthetic installer delta and documented silence/quality limitations are acceptable and freezes a bounded follow-on packet.",
+  "controller_status": "ACCEPTED_TECHNICAL_FEASIBILITY_HOST_ONLY",
+  "controller_rerun": "controller-check.json"
+}

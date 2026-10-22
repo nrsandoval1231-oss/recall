@@ -55,7 +55,15 @@ def build_packet(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for i, hit in enumerate(hits[:PACKET_SIZE], start=1):
         history_fields: dict[str, Any] = {
             key: hit[key]
-            for key in ("recorded_at", "valid_from", "valid_to", "supersedes_claim_id", "history_status")
+            for key in (
+                "recorded_at",
+                "valid_from",
+                "valid_to",
+                "supersedes_claim_id",
+                "history_status",
+                "history_mode",
+                "current_revision",
+            )
             if key in hit
         }
         packet.append(

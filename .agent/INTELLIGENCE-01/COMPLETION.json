@@ -1,0 +1,62 @@
+{
+  "packet": "INTELLIGENCE-01",
+  "status": "PASS_BOUNDED_ASK",
+  "parent_complete": false,
+  "base": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "candidate_sha256": "4376965f5ff264fa023e02b9b9f941f4b20bdae51054b7fbded19f9394330dbe",
+  "scope": "All tracked and nonignored untracked repository files except .agent execution artifacts",
+  "validation": {
+    "native_windows": "199 passed; locked all-target cargo check passed",
+    "native_wsl": "201 passed; fmt and all-target cargo check passed",
+    "client": "npm run check passed: lint/typecheck/277 tests; desktop production build and rebuilt NSIS installer passed",
+    "browser": "42 local-vault plus42 legacy web checks passed",
+    "backend": "Ruff check/format94files, mypy52files; realPG WSL pytest376passed,3skipped,1 WSL DockerDesktop wrapperfailure; same Compose test freshly passed on Windows",
+    "backend_skips": [
+      "Original live Claude batch requires opt-in",
+      "DIAG-02 live batch requires opt-in",
+      "Isolated DO-OPS Docker database unavailable"
+    ],
+    "links": "46 active/new Markdown docs checked, zero broken relative links;3byte-preserved historical archives excluded",
+    "diff": "git diff --check passed"
+  },
+  "validation_binding": {
+    "final_delta": "final-delta.json",
+    "native_inputs": "Native sources unchanged since windows/wsl-repair-final gates",
+    "client_inputs": "Client sources unchanged since client-repair-final gates",
+    "backend_inputs": "backend-consent-final gates executed on final candidate",
+    "browser_inputs": "local browser rerun on final; legacy web inputs unchanged",
+    "review_repair_delta": "review-repair-delta.json; only listed backend/UI/docs changes; native and legacy-browser inputs unchanged"
+  },
+  "installer": {
+    "sha256": "db8255cec17ea1e08d8933cd06eb15909f994740bf9ce78c933c4d9f43cd78d4",
+    "bytes": 4702491,
+    "recorded_at": "2026-10-09T18:16:40.1015063Z",
+    "signed": false,
+    "path": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall\\.agent\\INTELLIGENCE-01\\Recall_0.1.0_x64-setup.exe",
+    "installed": false
+  },
+  "remaining": [
+    "Live provider and held-out entailment/relevance",
+    "Installed Windows and iPhone",
+    "Automatic text/photo organization",
+    "Historical retrieval, cross-memory context, voice/files/phone",
+    "Parent finish contract"
+  ],
+  "repairs": [
+    "UI recovery/freshness and capture-first layout",
+    "Photo annotation/effective-reading query selection and stale machine ranking suppression",
+    "Two UI lint violations",
+    "Consent/grant race before provider result promotion; measured accounting retained",
+    "ASK-R1 persisted consent policy/decision binding for recovery and POST replay",
+    "ASK-R2 explicit stale-source failed DTO message and bounded abstention copy"
+  ],
+  "external_actions": {
+    "live_provider": false,
+    "new_grant": false,
+    "deployment": false,
+    "merge": false,
+    "push": false,
+    "real_data_migration": false
+  },
+  "independent_review": "REVIEW.json"
+}

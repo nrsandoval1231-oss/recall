@@ -7,7 +7,7 @@ import type { LocalVault, ReadingOperation, VaultMemory, VaultReading } from "..
 
 const session = { root: "/synthetic/vault", vault_id: "session-a", vault_identity: "manifest-a" };
 const memory: VaultMemory = { id: "m1", revision: 1, note: "Synthetic annotation", source_name: "synthetic.png", source_sha256: "a".repeat(64), captured_at: "2026-10-08T12:00:00Z", updated_at: "2026-10-08T12:00:00Z", state: "active", conflict: null, note_path: "synthetic.md" };
-const reading: VaultReading = { machine: { request: { binding: { schema_version: "1.0", operation_id: "synthetic-op", vault_id: "manifest-a", memory_id: "m1", source_id: "m1", source_sha256: memory.source_sha256, expected_revision: 1, captured_at: memory.captured_at }, media_type: "image/png" }, result: { provider: "anthropic", model_id: "synthetic-claude", review_state: "unreviewed", input_manifest_sha256: "b".repeat(64), derivative: { sha256: "c".repeat(64), transform_version: "jpeg-rgb-exif-orient-v1", media_type: "image/jpeg" }, extraction: { schema_version: "1.1", capture_id: "synthetic-op", input_manifest_sha256: "b".repeat(64), summary: null, summary_evidence: [], pages: [{ page_id: "m1", ordinal: 1, transcription: "SYNTHETIC seedlings 12?", legibility: "mixed" }], mentions: [], statements: [], action_suggestions: [], uncertainties: [{ kind: "illegible", description: "The number may be 12; the question mark is unresolved.", evidence: [] }] }, validation_notes: [] } }, human_correction: null };
+const reading: VaultReading = { machine: { request: { binding: { schema_version: "1.0", operation_id: "synthetic-op", vault_id: "manifest-a", memory_id: "m1", source_id: "m1", source_sha256: memory.source_sha256, expected_revision: 1, captured_at: memory.captured_at }, media_type: "image/png" }, result: { provider: "anthropic", model_id: "synthetic-claude", review_state: "unreviewed", input_manifest_sha256: "b".repeat(64), derivative: { sha256: "c".repeat(64), transform_version: "jpeg-rgb-exif-orient-v1", media_type: "image/jpeg" }, extraction: { schema_version: "1.1", capture_id: "synthetic-op", input_manifest_sha256: "b".repeat(64), summary: "The source mentions seedlings; the count is unclear.", summary_evidence: [{ page_id: "m1", quote: "SYNTHETIC seedlings 12?" }], pages: [{ page_id: "m1", ordinal: 1, transcription: "SYNTHETIC seedlings 12?", legibility: "mixed" }], mentions: [], statements: [], action_suggestions: [], uncertainties: [{ kind: "illegible", description: "The number may be 12; the question mark is unresolved.", evidence: [] }] }, validation_notes: [] } }, human_correction: null };
 const readMemory = { ...memory, revision: 2, reading };
 const operation = (patch: Partial<ReadingOperation> = {}): ReadingOperation => ({ operation_id: "synthetic-op", memory_id: memory.id, expected_revision: 1, state: "unknown", may_have_been_sent: true, error_code: null, ...patch });
 function vault(over: Partial<LocalVault> = {}): LocalVault {
@@ -15,6 +15,7 @@ function vault(over: Partial<LocalVault> = {}): LocalVault {
 }
 const mount = (v: LocalVault) => render(<DesktopEntry vault={v} search="" />);
 async function open() { await userEvent.click(await screen.findByRole("button", { name: /Synthetic annotation/ })); }
+async function openConnectionSettings() { await userEvent.click(await screen.findByText("Connection settings")); }
 async function consent() { await userEvent.click(await screen.findByRole("button", { name: "Read this photo with Claude" })); }
 async function send() { await consent(); await userEvent.click(screen.getByRole("button", { name: "Send this photo to Claude" })); }
 beforeEach(() => { localStorage.clear(); URL.createObjectURL = vi.fn(() => "blob:synthetic"); URL.revokeObjectURL = vi.fn(); });
@@ -34,7 +35,7 @@ it("recovers a lost claim acknowledgement through authenticated status", async (
     pairingPrepare: async () => pending,
     pairingClaim: async () => { throw new Error("connection reset"); },
   });
-  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  mount(v); await open(); await openConnectionSettings(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
   await userEvent.type(screen.getByLabelText("Owner invitation ID"), "00000000-0000-4000-8000-000000000099");
   await userEvent.click(screen.getByRole("button", { name: "Connect this device" }));
   expect(await screen.findByText("Connected for photo inference on this device.")).toBeTruthy();
@@ -52,7 +53,7 @@ it("does not apply a delayed pairing status after switching vaults", async () =>
     select: async () => ({ root: "/synthetic/b", vault_id: "session-b", vault_identity: "manifest-b" }),
     list: async s => s === "session-a" ? [memory] : [],
   });
-  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  mount(v); await open(); await openConnectionSettings(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
   await userEvent.click(screen.getByRole("button", { name: "Check pairing status" }));
   await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
   await act(async () => finish({ ...pending, state: "connected" }));
@@ -65,7 +66,7 @@ it("reports a failed pairing status check as unknown", async () => {
     pairingStatus: vi.fn().mockResolvedValueOnce({ ...pending, state: "disconnected" as const }).mockRejectedValueOnce(new Error("connection reset")),
     pairingPrepare: async () => pending,
   });
-  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  mount(v); await open(); await openConnectionSettings(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
   await userEvent.click(screen.getByRole("button", { name: "Check pairing status" }));
   expect(await screen.findByText("Pairing status is unknown: connection reset")).toBeTruthy();
   expect(screen.getByText(/Connection status is unknown/)).toBeTruthy();
@@ -81,7 +82,7 @@ it("ignores a delayed pairing reply after switching vaults", async () => {
     select: async () => ({ root: "/synthetic/b", vault_id: "session-b", vault_identity: "manifest-b" }),
     list: async s => s === "session-a" ? [memory] : [],
   });
-  mount(v); await open(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
+  mount(v); await open(); await openConnectionSettings(); await userEvent.click(await screen.findByRole("button", { name: "Prepare this device for owner approval" }));
   await userEvent.type(screen.getByLabelText("Owner invitation ID"), "00000000-0000-4000-8000-000000000099");
   await userEvent.click(screen.getByRole("button", { name: "Connect this device" }));
   await userEvent.click(screen.getByRole("button", { name: "Switch vault" }));
@@ -90,7 +91,7 @@ it("ignores a delayed pairing reply after switching vaults", async () => {
 });
 it("never uploads on focus or consent cancellation and shows an attributed uncertain reading beside original", async () => {
   const v = vault(); mount(v); await open(); await consent(); expect(v.readPhoto).not.toHaveBeenCalled(); await userEvent.click(screen.getByRole("button", { name: "Keep it local" })); expect(v.readPhoto).not.toHaveBeenCalled();
-  await send(); expect(await screen.findByRole("heading", { name: "Unreviewed machine reading" })).toBeTruthy(); expect(screen.getByText("SYNTHETIC seedlings 12?")).toBeTruthy(); expect(screen.getByText(/question mark is unresolved/)).toBeTruthy(); expect(screen.getByText(/synthetic-claude/)).toBeTruthy();
+  await send(); expect(await screen.findByRole("heading", { name: "Unreviewed machine reading" })).toBeTruthy(); expect(screen.getByText("The source mentions seedlings; the count is unclear.")).toBeTruthy(); expect(screen.getAllByText("SYNTHETIC seedlings 12?")).toHaveLength(2); expect(screen.getByText(/Source evidence/)).toBeTruthy(); expect(screen.getByText(/question mark is unresolved/)).toBeTruthy(); expect(screen.getByText(/synthetic-claude/)).toBeTruthy();
   fireEvent.load(await screen.findByRole("img", { name: "Original photo for comparison" })); expect(screen.getByText(/Original bytes unchanged/)).toBeTruthy(); expect(v.readPhoto).toHaveBeenCalledWith("session-a", "m1", 1, expect.any(String)); expect(screen.getByText("Synthetic annotation")).toBeTruthy();
 });
 it("searches effective human reading instead of the superseded machine proposal", async () => {
@@ -98,9 +99,47 @@ it("searches effective human reading instead of the superseded machine proposal"
   await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "marigolds"); await userEvent.click(screen.getByRole("button", { name: "Search" })); expect(await screen.findByRole("button", { name: /Synthetic annotation/ })).toBeTruthy();
   await open(); expect(await screen.findByRole("heading", { name: "Your corrected reading" })).toBeTruthy(); expect(screen.getByText("SYNTHETIC marigolds")).toBeTruthy();
 });
+it("searches an unreviewed summary but suppresses it after even an empty human correction", async () => {
+  const corrected = { ...readMemory, revision: 3, reading: { ...reading, human_correction: "" } };
+  mount(vault({ list: async () => [readMemory] }));
+  await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "unclear"); await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  expect(await screen.findByRole("button", { name: /Synthetic annotation/ })).toBeTruthy();
+  cleanup();
+  const correctedList = vi.fn(async () => [corrected]);
+  mount(vault({ list: correctedList }));
+  await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "unclear"); await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  await screen.findByText(/No matching notes or filenames/);
+});
+it("hides and excludes a legacy summary without evidence while keeping its transcript", async () => {
+  const legacyReading: VaultReading = { ...reading, machine: { ...reading.machine, result: { ...reading.machine.result, extraction: { ...reading.machine.result.extraction, summary: "SYNTHETIC unsupported historical summary", summary_evidence: [] } } } };
+  const legacyMemory = { ...readMemory, reading: legacyReading };
+  mount(vault({ list: async () => [legacyMemory] }));
+  await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "unsupported historical"); await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  await screen.findByText(/No matching notes or filenames/);
+  const input = screen.getByLabelText("Search notes and filenames");
+  await userEvent.clear(input); await userEvent.type(input, "seedlings"); await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic annotation/ }));
+  expect(screen.queryByText("SYNTHETIC unsupported historical summary")).toBeNull();
+  expect(screen.getByText("SYNTHETIC seedlings 12?")).toBeTruthy();
+});
+it("retains native structured qualifier and nested evidence search matches, then suppresses them after correction", async () => {
+  const extraction = { ...reading.machine.result.extraction, statements: [{ attribution_text: "according to Lee", temporal_text: "just after sunset", value_text: "fourteen kilowatts", due_text: "before next harvest", evidence: [{ page_id: "m1", quote: "etched cedar" }] }] };
+  const structured: VaultMemory = { ...readMemory, reading: { ...reading, machine: { ...reading.machine, result: { ...reading.machine.result, extraction } } } };
+  mount(vault({ list: async () => [structured] }));
+  for (const term of ["Lee", "sunset", "kilowatts", "harvest", "etched"]) {
+    const input = await screen.findByLabelText("Search notes and filenames");
+    await userEvent.clear(input); await userEvent.type(input, term); await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(await screen.findByRole("button", { name: /Synthetic annotation/ })).toBeTruthy();
+  }
+  cleanup();
+  const corrected: VaultMemory = { ...structured, revision: 3, reading: { ...structured.reading!, human_correction: "" } };
+  mount(vault({ list: async () => [corrected] }));
+  await userEvent.type(await screen.findByLabelText("Search notes and filenames"), "sunset"); await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  await screen.findByText(/No matching notes or filenames/);
+});
 it("keeps a human reading correction separate and later reprocessing does not overwrite it", async () => {
   let current = readMemory; const v = vault({ list: async () => [current], correctReading: vi.fn(async (_s, _id, _r, _op, text) => current = { ...current, revision: 3, reading: { ...reading, human_correction: text } }), readPhoto: vi.fn(async (_s, _id, _r, op) => ({ operation: operation({ operation_id: op, state: "committed" }), memory: { ...current, revision: 4 } })) }); mount(v); await open();
-  await userEvent.click(await screen.findByRole("button", { name: "Correct reading" })); await userEvent.clear(screen.getByLabelText("Your reading correction")); await userEvent.type(screen.getByLabelText("Your reading correction"), "SYNTHETIC marigolds"); await userEvent.click(screen.getByRole("button", { name: "Save reading correction" }));
+  expect(screen.getByText("The source mentions seedlings; the count is unclear.")).toBeTruthy(); await userEvent.click(await screen.findByRole("button", { name: "Correct reading" })); await userEvent.clear(screen.getByLabelText("Your reading correction")); await userEvent.type(screen.getByLabelText("Your reading correction"), "SYNTHETIC marigolds"); await userEvent.click(screen.getByRole("button", { name: "Save reading correction" })); expect(screen.queryByText("The source mentions seedlings; the count is unclear.")).toBeNull();
   expect(await screen.findByRole("heading", { name: "Your corrected reading" })).toBeTruthy(); expect(screen.getByText("Synthetic annotation")).toBeTruthy(); expect(v.correctReading).toHaveBeenCalledWith("session-a", "m1", 2, expect.any(String), "SYNTHETIC marigolds");
   await send(); expect(await screen.findByText("Reading saved in your vault." )).toBeTruthy(); expect(screen.getByText("SYNTHETIC marigolds")).toBeTruthy(); expect(screen.getByText("SYNTHETIC seedlings 12?")).toBeTruthy();
 });

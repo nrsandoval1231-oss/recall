@@ -1,0 +1,114 @@
+{
+  "packet": "REALIGN-01",
+  "base_sha": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "status": "PASS_BOUNDED_REALIGNMENT",
+  "product_complete": false,
+  "final_candidate": "e68575350c82bb0803921f316eda3b2724e945377f985d9d9a33de5c1967b540",
+  "final_validation": [
+    {
+      "command": "cargo fmt --check; cargo test --lib; cargo check",
+      "record": {
+        "exit_code": 0,
+        "started": "2026-10-09T15:04:49.9244382Z",
+        "command": "cargo fmt check, test --lib, check (WSL)",
+        "finished": "2026-10-09T15:05:09.3335138Z"
+      },
+      "environment": "WSL Ubuntu Rust1.99; synthetic real-filesystem tests",
+      "exit_code": 0,
+      "tests": 176
+    },
+    {
+      "command": "npm run check",
+      "exit_code": 0,
+      "includes": "repository lint, typecheck, workspace tests",
+      "tests": 268
+    },
+    {
+      "command": "npm run test:local-vault",
+      "environment": "Chromium synthetic Tauri boundary, desktop/reduced-motion/narrow comparison",
+      "exit_code": 0,
+      "tests": 36
+    },
+    {
+      "command": "npm run build -w @recall/desktop",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run build -w @recall/web",
+      "exit_code": 0,
+      "basis": "web inputs unchanged after first freeze"
+    },
+    {
+      "command": "npm run test:ui",
+      "basis": "web inputs unchanged after first freeze",
+      "exit_code": 0,
+      "tests": 42
+    },
+    {
+      "command": "documentation inventory, relative links, archived handoff bytes",
+      "exit_code": 0,
+      "record": {
+        "started_at": "2026-10-09T14:43:46.926Z",
+        "finished_at": "2026-10-09T14:43:47.14Z",
+        "tracked_markdown": 66,
+        "missing_inventory": [],
+        "broken_links": [],
+        "archived_handoff_exact_bytes": true,
+        "archive_sha256": "2960e7457a6a1b84466d5f41ab3ba5480311f14ecd73f1e669a77ef1d5f238ed",
+        "exclusions": "Historical archive retains original relative-link context; .agent execution links are not included in this pass"
+      }
+    },
+    {
+      "command": "git diff --check; final candidate comparison",
+      "exit_code": 0,
+      "record": {
+        "at": "2026-10-09T15:09:30.3760211Z",
+        "validation_reuse": "All executable code, build configuration, browser tests and fixtures byte-identical; only two checkpoint descriptions changed",
+        "prior_candidate": "fe8ab63716248dc84ecf37de975c76335d9bc74d2f5532b1a5245ecb88c32d1c",
+        "exit_code": 0,
+        "command": "git diff --check",
+        "changed_since_code_validation": [
+          "docs/ACCEPTANCE.md",
+          "docs/V1-STATUS.md"
+        ],
+        "final_candidate": "e68575350c82bb0803921f316eda3b2724e945377f985d9d9a33de5c1967b540"
+      }
+    }
+  ],
+  "independent_review": "PASS: independent Sol final_review; see REVIEW.json",
+  "remaining": [
+    "Grounded local natural-language Ask",
+    "Text/voice/file adapters",
+    "Context-aware cross-memory organization",
+    "Phone transport",
+    "Installed-device and live-quality acceptance"
+  ],
+  "authority": "Local implementation and documentation only; no new provider spending, deployment, merge or real-data migration",
+  "validation_timing": {
+    "started": "2026-10-09T15:04:40.5426591Z",
+    "commands": [
+      "npm run check",
+      "npm run build -w @recall/desktop",
+      "npm run test:local-vault",
+      "git diff --check",
+      "candidate unchanged"
+    ],
+    "exit_codes": [
+      0,
+      0,
+      0,
+      2,
+      0
+    ],
+    "finished": "2026-10-09T15:06:39.8297044Z"
+  },
+  "validation_notes": [
+    "Final npm/build/browser commands exit0; initial final diff2 was controller blank EOF then corrected and independently rerun exit0",
+    "Two historical-checkpoint doc descriptions changed after code validation; exact file hash comparison proves all code/config/tests unchanged",
+    "Backend implementation unchanged; Python backend tests not run",
+    "No installed Windows/iPhone, live provider, new CI, deployment, migration or end-to-end real-data acceptance claimed",
+    "Existing NativeStore::memory dead_code warning remains"
+  ],
+  "completed_at": "2026-10-09T15:11:41.3687296Z",
+  "next_direction": "CONTINUE: text capture through existing source-first vault; grounded Ask follows. Full product incomplete."
+}

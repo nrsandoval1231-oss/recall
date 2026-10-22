@@ -1,5 +1,31 @@
 # Developer setup and real-device acceptance (RCL-001)
 
+## Voice development — native implementation
+
+Follow [VOICE-01](../.agent/VOICE-01.md) over accepted TEXT-FILE-01. F0 and the native architecture gate passed. Follow the native contract for exact dependency/asset pins, supported CPU/input formats, durable recording and transcript provenance; backend/UI remain dependent on the frozen native DTO. Preserve v1-v8 compatibility and exact originals in later product work; machine speech transcription must not be treated as human typed text. Invoke validation wrappers with `pwsh`; run backend mypy from `services/backend` when checking shared contracts.
+
+## Current context development — accepted baseline
+
+Follow [CONTEXT-01](../.agent/CONTEXT-01.md) and its replay addendum. Use synthetic sources and fake provider output only. Verify the shared Unicode request/digest, strict bounded v2 context, new purpose-policy decision, source-first capture, current target checks, v7 historical replay and v1-v6 compatibility. Reconcile real temporary-file external renames; inject interruption during durable link suppression, preserve conflicting editor bytes, and expose pending repair. The atomic related-memory command must verify the source connection, target and original together. UI checks cover stale/missing targets and vault changes during opening. The external HTTPS proxy's total-header compatibility is a deployment gate, not proven by in-process route tests.
+
+## Automatic organization development — accepted baseline
+
+Preserve the accepted [ORGANIZE-01](../.agent/ORGANIZE-01.md) behavior. Use a disposable synthetic vault and fake provider for development. Verify that pre-opt-in captures stay local, future text/photo captures save immediately and queue automatically, and offline processing preserves saved sources. Exercise restart recovery, revocation followed by renewed consent, changed source/revision, and corrections both during and after processing. None may duplicate an unknown paid operation or revive stale semantics.
+
+The separate `RECALL_LOCAL_ORGANIZATION_ENABLED` flag defaults to false. Migration 0011 supplies organization receipts and consent keyed by workspace/device/vault. The service additionally requires the exact protected grant, configured provider/budget and current purpose consent. Enabling the flag alone does not opt in a vault. The desktop settings decision establishes the local future-capture marker only after the scoped service decision succeeds.
+
+Run migration and real PostgreSQL authorization/receipt tests, native journal/compatibility tests, client checks and the local browser journey before freezing the integrated candidate. The v6 writer must preserve v1–v5 history and rendering compatibility. Record independent review against that exact source/docs digest. A synthetic consent flow does not authorize a real grant, provider call or deployment; actual activation and installed-device acceptance remain separately evidenced.
+
+## Local Ask development and activation boundary
+
+The inference app registers `/v1/local-intelligence/ask`, receipt recovery and capability routes. `RECALL_LOCAL_INTELLIGENCE_ENABLED` defaults to false. Migration 0010, a separately scoped owner/device/vault grant, current versioned Ask consent, configured provider and budget policy are required. Local capture and keyword search do not depend on these services.
+
+On an explicitly authorized secured operator host, `python -m recall.pairing_cli --scope vault_intelligence` supplies the separate invitation/revocation path. Invitation creation also requires owner/workspace/device/vault IDs, the fingerprint prepared by the native settings flow and `--approve`. Separate consent uses `--scope vault_intelligence --ask-consent enable` (or `revoke`) with owner/workspace IDs, exact configured `--policy-version` and `--approve`. The CLI requires the owner-role `RECALL_MIGRATION_DATABASE_URL`; never put that credential in the renderer or vault. These are operator instructions, not authorization to activate or spend. Existing photo-only setup remains unchanged.
+
+Windows native checks use the MSVC Rust toolchain. WSL backend tests use real temporary PostgreSQL/pgvector; cross-platform Node tests require an esbuild executable matching the host OS and repository version. Do not replace existing Windows `node_modules` with Linux dependencies. An isolated Linux binary can be selected with `ESBUILD_BINARY_PATH`. Docker Compose configuration validation is offline and can run on Windows when the WSL Docker Desktop wrapper is unavailable. Record split-platform results and actual skips explicitly.
+
+TEXT-01 local check: choose a disposable synthetic vault, write or paste a note, save, reload, search, edit the current note, and open its original. The `.txt` original must retain the exact submitted bytes after correction; photo reading must be unavailable for that source. Exercise failed-save retry with the same operation and text. V5 writes require the current native binary; existing v1-v4 notes/history remain byte-compatible. This is local text capture, not AI text interpretation or natural-language Ask. Exact candidate results are in `.agent/FINISH-02/TEXT-COMPLETION.json`.
+
 ## Local-only desktop foundation
 
 Requires Node 22+, npm, Rust 1.89+ and Tauri platform prerequisites. Windows needs MSVC/Windows SDK and WebView2; Linux needs GTK/WebKit development libraries listed below. From the repository root:
@@ -9,7 +35,7 @@ npm ci
 npm run tauri -w @recall/desktop -- dev
 ```
 
-No API, Supabase, AI key, account, `.env`, or cloud configuration is needed. Choose/create a disposable vault folder through the native picker, Capture one synthetic PNG/JPEG/WebP with an optional human note, then search words from that note/filename. View original, correct the note, review History, close/restart and reopen. To exercise a direct Obsidian edit, change only the Markdown body (preserve header and source link), refresh, and review the new human revision. Cancelled folder/photo pickers preserve drafts. A correction racing a direct edit requires Reload latest note and explicit review before saving again.
+No API, Supabase, AI key, account, `.env`, or cloud configuration is needed for local capture, annotation, evidence and keyword search. Choose a disposable vault folder through the native picker, import a clearly synthetic PNG/JPEG/WebP and optionally add a human note; then search words from the note or filename, view the original, correct the note and inspect History. Optional selected-photo reading requires an owner-associated inference connection, choosing **Read this photo with Claude**, and confirming cloud processing for that photo. A completed proposal appears as an automatically organized Obsidian note candidate; no reading is dispatched merely by opening, searching or importing. For direct Obsidian edits, change only the trailing **Human annotation** region and preserve generated properties, reading sections and the source link. Changes to generated content conflict instead of being overwritten; use **Correct reading** for transcription. Cancelled folder/photo pickers preserve drafts. A correction racing an external annotation edit requires reload and explicit review before saving again.
 
 `npm run dev -w @recall/desktop` runs only the browser preview: it cannot persist a native vault. `npm run build -w @recall/desktop` builds renderer assets; `npm run tauri -w @recall/desktop -- build` builds the native bundle. PR11 CI successfully emitted unsigned artifact `11521925107` in run `37708945255` without cloud variables, with seven-day retention. The lifecycle slice retains this configuration, but needs its own exact-head CI/artifact verification. Neither artifact is a signed release or proof of installation acceptance.
 
@@ -23,7 +49,9 @@ npm run test:local-vault
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 ```
 
-Set `RECALL_CHROMIUM=/path/to/chromium` to use a system browser. The separate local suite starts a fresh Vite server on `127.0.0.1:1422` with the three desktop `VITE_*` cloud settings explicitly empty, and injects a synthetic Tauri boundary only in tests. It never reuses the regular port-1420 dev server. Rust tests separately exercise filesystem behavior. See [evidence and limits](implementation/local-vault/README.md). Human-note/filename search is not OCR, handwriting interpretation or AI. Logical removal/tombstones and explicit missing-note restore are included in the lifecycle slice; they retain files/history and provide no secure purge or undelete. No phone sync, QR, real-data migration or full semantic rebuild is included. Failed correction drafts survive the current focus session and cancelled vault selection, but not application restart or deliberate memory/vault exit. Pending import intents persist for explicit retry. Corrupt intent/metadata and publication conflicts can require owner-managed recovery; never delete recovery files to conceal an error.
+On Windows, WSL2 is an optional way to run the native Rust unit suite when the Windows Rust toolchain is unavailable. From the repository root, run `wsl.exe -- bash -c 'cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml'` with Cargo installed in that WSL distribution. The tests use synthetic fixtures and temporary directories; they do not need a vault path, API key or other user secret. This Linux check does not build or verify the Windows/Tauri application.
+
+Set `RECALL_CHROMIUM=/path/to/chromium` to use a system browser. The separate local suite starts a fresh Vite server on `127.0.0.1:1422` with desktop `VITE_*` cloud settings explicitly empty and injects synthetic Tauri command responses only in tests. It never reuses the regular port-1420 dev server. Rust tests separately exercise native filesystem behavior. Local keyword search over human annotation/filename is not natural-language Ask; selected-photo Claude reading is a separate explicit, connected path and is not OCR or offline generation. See [evidence and limits](implementation/local-vault/README.md). Lifecycle removal/tombstones and explicit missing-note restore retain files/history and provide no secure purge or undelete. Phone-to-vault synchronization, QR pairing, real-data migration and full semantic reconstruction remain open. Failed correction drafts survive the current focus session and cancelled vault selection, but not application restart or deliberate memory/vault exit. Pending import intents persist for explicit retry. Corrupt intent/metadata and publication conflicts can require owner-managed recovery; never delete recovery files to conceal an error.
 
 ## Local lifecycle checks and compatibility
 
@@ -37,7 +65,7 @@ Unchanged v1 vaults remain readable byte-for-byte. The first v2 mutation retains
 
 ## Legacy cloud procedures, not local onboarding
 
-Sign-in and provider setup below verify the existing implementation only. The target requires no account/password/email-link sign-in, including first use; local-only use needs no remote account. See the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md), whose local-only subset is authorized and implemented; device pairing remains unresolved. Do not bypass existing private API authentication or change deployed configuration to simulate this target.
+Sign-in and provider setup below verify the preserved legacy cloud implementation only. The target requires no account/password/email-link sign-in, including first use; local-only use needs no remote account. PAIR-01 authorizes one manually owner-associated photo-inference device; QR and general synchronization remain out of scope. See the [RCL-005B proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Do not bypass existing private API authentication or change deployed configuration to simulate this target.
 
 ## V1 deployment, recovery and acceptance
 
@@ -45,7 +73,7 @@ Apply all checksummed migrations with the owner connection; enable pgvector as a
 
 For offline acceptance: installed Windows sign-in → sync → open/hash-check original → correct → disconnect → restart → local search/original → supported correction → reconnect → confirm outbox acknowledgment or visible version conflict. Delete on another client and resync; controlled originals must disappear. Export to a disposable selected root, edit a generated Markdown file, re-export and confirm conflict preservation. Run the backup/restore tests and perform a trusted operator restore into fresh staging before using recovery in production.
 
-Linux and Windows CI run native Rust tests; local Windows builds require MSVC/SDK and WebView2. Tests create real isolated PostgreSQL clusters; Windows requires PostgreSQL binaries on PATH. pgvector-specific tests skip honestly where unavailable and must pass in Linux CI. See [V1-STATUS](V1-STATUS.md) for current recorded evidence.
+Linux and Windows CI run native Rust tests; local Windows builds require MSVC/SDK and WebView2. Tests create real isolated PostgreSQL clusters; Windows requires PostgreSQL binaries on PATH. pgvector-specific tests skip honestly where unavailable and must pass in Linux CI. See [V1-STATUS](V1-STATUS.md) for current recorded evidence and explicit platform/live limits.
 
 
 Instructions only. Product scope lives in [PRD](PRD.md); evidence lives in [ACCEPTANCE](ACCEPTANCE.md) ("RCL-001 evidence").

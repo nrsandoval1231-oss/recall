@@ -48,6 +48,8 @@ infra/do-inference/recovery/
 # Tauri generated schemas/build output
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/Cargo.lock.bak
+apps/desktop/src-tauri/voice-assets/
+apps/desktop/src-tauri/binaries/whisper-cli-*.exe
 
 # Local dev storage/state
 .recall-storage/

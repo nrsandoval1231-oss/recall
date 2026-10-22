@@ -39,6 +39,12 @@ TABLES = [
     "local_reading_receipts",
     "device_pair_invitations",
     "device_pair_grants",
+    "vault_intelligence_pair_invitations",
+    "vault_intelligence_pair_grants",
+    "vault_intelligence_ask_consents",
+    "local_intelligence_receipts",
+    "vault_intelligence_organize_consents",
+    "local_organization_receipts",
 ]
 
 MIGRATIONS = [
@@ -51,6 +57,8 @@ MIGRATIONS = [
     "0007_provider_budget_reservations.sql",
     "0008_local_readings.sql",
     "0009_device_pairing.sql",
+    "0010_local_intelligence.sql",
+    "0011_local_organization.sql",
 ]
 
 
@@ -133,7 +141,12 @@ def test_every_table_has_forced_rls_and_the_app_role_cannot_delete(fresh: tuple[
                 assert not conn.execute(
                     "select has_table_privilege('recall_app', %s, %s)", (table, privilege)
                 ).fetchone()[0], (table, privilege)  # type: ignore[index]
-        for table in ("device_pair_invitations", "device_pair_grants"):
+        for table in (
+            "device_pair_invitations",
+            "device_pair_grants",
+            "vault_intelligence_pair_invitations",
+            "vault_intelligence_pair_grants",
+        ):
             assert not conn.execute("select has_table_privilege('recall_app', %s, 'INSERT')", (table,)).fetchone()[0], (
                 table
             )

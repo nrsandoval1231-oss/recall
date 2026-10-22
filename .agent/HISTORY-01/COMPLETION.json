@@ -1,0 +1,49 @@
+{
+  "packet": "HISTORY-01",
+  "status": "ACCEPTED_BOUNDED_LOCAL",
+  "candidate": "d506c8de2e6c1ebeffc307874e54459b02eead020360b2d06884fd866d309408",
+  "base_head": "fa6390be3e9539b68040379e7e81a3a7bc90491d",
+  "accepted_baseline": "4ec20fdb1a4047ff1fbe03b50b0582c3fa3bf355edb4c6a913715de2f4d7a245",
+  "implementation": [
+    "Same-box anchored historical Ask with clarification before intent/network",
+    "Strict v2 bounded evidence on existing Ask service and original-operation receipt recovery",
+    "Retained exact journal/source citations, automatic photo transcriptions, current human correction counterpart or omission",
+    "Explicit history consent under existing workspace purpose with separate exact device/vault grant",
+    "Independent stale-result rejection and strict receipt validation"
+  ],
+  "validation": {
+    "windows": "249 tests and all-target check PASS",
+    "wsl": "251 tests, fmt and all-target check PASS",
+    "client": "306 tests, lint, typecheck and build PASS",
+    "backend": "Ruff/format/strict mypy (54 sources) PASS; pytest: 388 passed, 3 skipped, known WSL Compose wrapper failure; exact Windows Compose PASS",
+    "browser": "50 local-vault and 42 legacy web browser tests PASS",
+    "installer": "Unsigned NSIS build PASS; retained artifact, not installed",
+    "docs": "56 changed active Markdown files checked, zero broken file links; anchors/historical archives excluded",
+    "diff": "PASS"
+  },
+  "failed_attempt": {
+    "candidate": "e0932e1b708693b65edf35f53c52bd8f3800b1173ec0b438d36475938aab2114",
+    "evidence": "first-validation",
+    "failures": [
+      "Windows fake accepted socket inherited nonblocking mode; helper now normalizes accepted stream to blocking with timeouts/shutdown/join",
+      "Backend exact route allowlist lacked two intended historical endpoints; updated exact set without weakening auth"
+    ]
+  },
+  "review": "PASS: REVIEW.json",
+  "parent_complete": false,
+  "limits": [
+    "Synthetic/local acceptance only; no live provider quality or live consent/grant activation",
+    "No installed Windows/iPhone/phone transport, voice/broader files, real-data migration, deployment, push or merge",
+    "Historical natural-language routing is anchored date grammar; vague/event-based recall quality remains open",
+    "Unsigned installer build is not installed-device proof"
+  ],
+  "timing": "Raw gate UTC and elapsed values are in *-final.result.json; build start/tokens UNKNOWN",
+  "installer": {
+    "sha256": "7a0a580d1c0daab16c936ee8a28c5885a266e5af19d8000661d4f125a2d75ae0",
+    "installed": false,
+    "path": "C:\\Users\\nrsan\\Nucleus\\02_Projects\\Recall\\.agent\\HISTORY-01\\Recall-d506c8de-x64-setup.exe",
+    "bytes": 5007585,
+    "signed": false
+  },
+  "accepted_at_utc": "2026-10-10T02:03:10Z"
+}

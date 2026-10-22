@@ -9,6 +9,9 @@ use tauri::State;
 use uuid::Uuid;
 
 const SERVICE: &str = "app.recall.desktop.selected-photo-reading";
+// Ask credentials are deliberately isolated from photo_inference and from the
+// renderer-accessible legacy session secret service.
+const INTELLIGENCE_SERVICE: &str = "app.recall.desktop.vault-intelligence";
 type Result<T> = std::result::Result<T, String>;
 // This lock covers only pairing/keyring lifecycle, never a vault authority lock.
 static PAIRING_LIFECYCLE: Mutex<()> = Mutex::new(());
@@ -491,6 +494,463 @@ pub fn confirmed_active(vault: &str) -> bool {
     production(|core| Ok(core.confirmed_active(vault))).unwrap_or(false)
 }
 
+struct IntelligenceKeyringStore;
+impl IntelligenceKeyringStore {
+    fn entry(key: &str) -> Result<Entry> {
+        Entry::new(INTELLIGENCE_SERVICE, key)
+            .map_err(|_| "The protected Ask connection is unavailable".into())
+    }
+}
+impl PairingStore for IntelligenceKeyringStore {
+    fn load(&self, key: &str) -> Result<Option<String>> {
+        match Self::entry(key)?.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err("The protected Ask connection is unavailable".into()),
+        }
+    }
+    fn save(&self, key: &str, value: &str) -> Result<()> {
+        Self::entry(key)?
+            .set_password(value)
+            .map_err(|_| "The protected Ask connection is unavailable".into())
+    }
+    fn remove(&self, key: &str) -> Result<()> {
+        match Self::entry(key)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => Err("The protected Ask connection is unavailable".into()),
+        }
+    }
+}
+
+struct IntelligenceHttpsTransport;
+impl PairingTransport for IntelligenceHttpsTransport {
+    fn claim(&self, pending: &Pending, invitation: &Uuid) -> Result<()> {
+        let url = pinned_origin(&pending.origin)?
+            .join(&format!(
+                "v1/vault-intelligence/device-pairings/{invitation}/claim"
+            ))
+            .map_err(|_| "Pairing service is unavailable")?;
+        let body = serde_json::to_string(&serde_json::json!({"secret": &pending.secret}))
+            .map_err(|_| "Pairing service is unavailable")?;
+        let response = client()?
+            .post(url)
+            .header("Content-Type", "application/json")
+            .body(body)
+            .send()
+            .map_err(|_| "Pairing outcome is unknown; recover Ask connection status")?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err("Ask invitation was not accepted; connection remains pending".into())
+        }
+    }
+    fn status(&self, pending: &Pending) -> Result<Bound> {
+        let url = pinned_origin(&pending.origin)?
+            .join("v1/vault-intelligence/device-pairings/status")
+            .map_err(|_| "Pairing service is unavailable")?;
+        let response = client()?
+            .get(url)
+            .bearer_auth(&pending.secret)
+            .send()
+            .map_err(|_| "Ask connection outcome is unknown; recover status")?;
+        if !response.status().is_success() {
+            return Err("Ask connection is not confirmed".into());
+        }
+        bounded_json(response, "Ask connection status is unavailable")
+    }
+    fn revoke(&self, pending: &Pending) -> Result<bool> {
+        let url = pinned_origin(&pending.origin)?
+            .join("v1/vault-intelligence/device-pairings")
+            .map_err(|_| "Pairing service is unavailable")?;
+        let response = client()?
+            .delete(url)
+            .bearer_auth(&pending.secret)
+            .send()
+            .map_err(|_| "Ask revocation outcome is unknown; credentials were retained")?;
+        if !response.status().is_success() {
+            return Err("Ask revocation was not confirmed; credentials were retained".into());
+        }
+        Ok(bounded_json::<Revocation>(
+            response,
+            "Ask revocation outcome is unknown; credentials were retained",
+        )?
+        .confirmed)
+    }
+}
+
+fn intelligence_pending_key(vault: &str) -> String {
+    format!("pending.{vault}")
+}
+fn inspect_intelligence_pending(store: &impl PairingStore, vault: &str) -> Result<PendingMaterial> {
+    let Some(raw) = store.load(&intelligence_pending_key(vault))? else {
+        return Ok(PendingMaterial::Absent);
+    };
+    let Ok(pending) = serde_json::from_str::<Pending>(&raw) else {
+        return Ok(PendingMaterial::Corrupt);
+    };
+    if pending.vault_id != vault
+        || Uuid::parse_str(&pending.device_id).is_err()
+        || hex::decode(&pending.secret).map_or(true, |bytes| bytes.len() != 32)
+        || pinned_origin(&pending.origin).is_err()
+    {
+        return Ok(PendingMaterial::Corrupt);
+    }
+    Ok(PendingMaterial::Valid(pending))
+}
+fn load_intelligence_active(
+    store: &impl PairingStore,
+    vault: &str,
+) -> Result<Option<ActiveConnection>> {
+    let Some(raw) = store.load(vault)? else {
+        return Ok(None);
+    };
+    let active: ActiveConnection =
+        serde_json::from_str(&raw).map_err(|_| "The protected Ask connection is unavailable")?;
+    if active.schema_version != "1.0"
+        || active.vault_id != vault
+        || Uuid::parse_str(vault).is_err()
+        || pinned_origin(&active.origin).is_err()
+        || hex::decode(&active.credential).map_or(true, |bytes| bytes.len() != 32)
+    {
+        return Err("The protected Ask connection is unavailable".into());
+    }
+    Ok(Some(active))
+}
+fn validate_intelligence_bound(vault: &str, pending: &Pending, bound: &Bound) -> Result<()> {
+    if bound.vault_id != vault
+        || bound.device_id != pending.device_id
+        || bound.scope != "vault_intelligence"
+    {
+        return Err("Ask pairing response scope does not match this vault".into());
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+pub(crate) struct IntelligenceConnection {
+    pub(crate) vault_id: String,
+    pub(crate) origin: String,
+    pub(crate) secret: String,
+    pub(crate) fingerprint: String,
+}
+impl IntelligenceConnection {
+    pub(crate) fn from_parts(vault_id: String, origin: String, secret: String) -> Self {
+        let normalized_origin = origin.trim_end_matches('/');
+        let fingerprint = hex::encode(Sha256::digest(
+            serde_json::to_vec(&(
+                "recall-vault-intelligence-connection-v1",
+                &vault_id,
+                normalized_origin,
+                &secret,
+            ))
+            .expect("connection fingerprint fields serialize"),
+        ));
+        Self {
+            vault_id,
+            origin,
+            secret,
+            fingerprint,
+        }
+    }
+}
+
+struct IntelligenceCore<'a, S: PairingStore, T: PairingTransport> {
+    store: &'a S,
+    transport: &'a T,
+    gate: &'a Mutex<()>,
+}
+impl<S: PairingStore, T: PairingTransport> IntelligenceCore<'_, S, T> {
+    fn prepare(&self, vault: &str) -> Result<PairingStatus> {
+        let _guard = self
+            .gate
+            .lock()
+            .map_err(|_| "Ask pairing lifecycle unavailable")?;
+        if Uuid::parse_str(vault).is_err() {
+            return Err("Select a valid vault first".into());
+        }
+        if load_intelligence_active(self.store, vault)?.is_some() {
+            return Err("An Ask connection exists; recover status or disconnect first".into());
+        }
+        let pending = match inspect_intelligence_pending(self.store, vault)? {
+            PendingMaterial::Valid(pending) => pending,
+            PendingMaterial::Corrupt => return Err("Pending Ask connection is unavailable".into()),
+            PendingMaterial::Absent => {
+                let mut bytes = [0_u8; 32];
+                getrandom::fill(&mut bytes).map_err(|_| {
+                    "The operating system could not generate Ask connection material"
+                })?;
+                let pending = Pending {
+                    device_id: Uuid::new_v4().to_string(),
+                    vault_id: vault.into(),
+                    secret: hex::encode(bytes),
+                    origin: configured_origin()?.to_string(),
+                };
+                self.store
+                    .save(
+                        &intelligence_pending_key(vault),
+                        &serde_json::to_string(&pending)
+                            .map_err(|_| "Cannot save Ask connection material")?,
+                    )
+                    .map_err(|_| {
+                        "The protected Ask keyring is unavailable; no invitation was claimed"
+                    })?;
+                pending
+            }
+        };
+        Ok(pairing_status(
+            "pending_owner_approval",
+            vault,
+            Some(&pending),
+            Some("vault_intelligence".into()),
+        ))
+    }
+    fn claim(&self, vault: &str, invitation: &str) -> Result<PairingStatus> {
+        let _guard = self
+            .gate
+            .lock()
+            .map_err(|_| "Ask pairing lifecycle unavailable")?;
+        if load_intelligence_active(self.store, vault)?.is_some() {
+            return Err("An Ask connection exists; recover status or disconnect first".into());
+        }
+        let invitation =
+            Uuid::parse_str(invitation).map_err(|_| "Enter a valid owner invitation ID")?;
+        let pending = match inspect_intelligence_pending(self.store, vault)? {
+            PendingMaterial::Valid(pending) => pending,
+            PendingMaterial::Absent => {
+                return Err("Prepare this device before entering an Ask invitation".into())
+            }
+            PendingMaterial::Corrupt => return Err("Pending Ask connection is unavailable".into()),
+        };
+        self.transport.claim(&pending, &invitation)?;
+        let bound = self.transport.status(&pending)?;
+        validate_intelligence_bound(vault, &pending, &bound)?;
+        save_connection(self.store, vault, &pending)?;
+        Ok(pairing_status(
+            "connected",
+            vault,
+            Some(&pending),
+            Some("vault_intelligence".into()),
+        ))
+    }
+    fn status(&self, vault: &str) -> Result<PairingStatus> {
+        let _guard = self
+            .gate
+            .lock()
+            .map_err(|_| "Ask pairing lifecycle unavailable")?;
+        let pending = inspect_intelligence_pending(self.store, vault);
+        let active = load_intelligence_active(self.store, vault);
+        let (pending, active) = match (pending, active) {
+            (Ok(p), Ok(a)) => (p, a),
+            _ => return Ok(pairing_status("unknown", vault, None, None)),
+        };
+        match (pending, active) {
+            (PendingMaterial::Absent, None) => {
+                Ok(pairing_status("disconnected", vault, None, None))
+            }
+            (PendingMaterial::Corrupt, None) => Ok(pairing_status("unknown", vault, None, None)),
+            (PendingMaterial::Valid(pending), None) => Ok(pairing_status(
+                "pending_owner_approval",
+                vault,
+                Some(&pending),
+                Some("vault_intelligence".into()),
+            )),
+            (PendingMaterial::Valid(pending), Some(active))
+                if matching_active(&pending, &active) =>
+            {
+                match self.transport.status(&pending).and_then(|bound| {
+                    validate_intelligence_bound(vault, &pending, &bound)?;
+                    save_connection(self.store, vault, &pending)?;
+                    Ok(())
+                }) {
+                    Ok(()) => Ok(pairing_status(
+                        "connected",
+                        vault,
+                        Some(&pending),
+                        Some("vault_intelligence".into()),
+                    )),
+                    Err(_) => Ok(pairing_status("unknown", vault, Some(&pending), None)),
+                }
+            }
+            (PendingMaterial::Valid(_), Some(_)) => {
+                Ok(pairing_status("unknown", vault, None, None))
+            }
+            (PendingMaterial::Absent | PendingMaterial::Corrupt, Some(active)) => {
+                let pending = Pending {
+                    device_id: String::new(),
+                    vault_id: vault.into(),
+                    secret: active.credential.clone(),
+                    origin: active.origin.clone(),
+                };
+                match self.transport.status(&pending) {
+                    Ok(bound) if bound.vault_id == vault && bound.scope == "vault_intelligence" => {
+                        let recovered = active_pending(&active, &bound);
+                        Ok(pairing_status(
+                            "connected",
+                            vault,
+                            Some(&recovered),
+                            Some("vault_intelligence".into()),
+                        ))
+                    }
+                    _ => Ok(pairing_status("unknown", vault, None, None)),
+                }
+            }
+        }
+    }
+    fn connection(&self, vault: &str) -> Result<IntelligenceConnection> {
+        let status = self.status(vault)?;
+        if status.state != "connected" {
+            return Err("Ask connection is not confirmed".into());
+        }
+        let active =
+            load_intelligence_active(self.store, vault)?.ok_or("Ask connection is unavailable")?;
+        Ok(IntelligenceConnection::from_parts(
+            active.vault_id,
+            active.origin,
+            active.credential,
+        ))
+    }
+    fn disconnect(&self, vault: &str) -> Result<PairingStatus> {
+        let _guard = self
+            .gate
+            .lock()
+            .map_err(|_| "Ask pairing lifecycle unavailable")?;
+        let pending_material = inspect_intelligence_pending(self.store, vault)?;
+        let active = load_intelligence_active(self.store, vault)?;
+        let pending = match (pending_material, active) {
+            (PendingMaterial::Absent, None) => {
+                return Ok(pairing_status("disconnected", vault, None, None))
+            }
+            (PendingMaterial::Valid(p), None) => p,
+            (PendingMaterial::Valid(p), Some(a)) if matching_active(&p, &a) => p,
+            (PendingMaterial::Absent | PendingMaterial::Corrupt, Some(a)) => {
+                let candidate = Pending {
+                    device_id: String::new(),
+                    vault_id: vault.into(),
+                    secret: a.credential.clone(),
+                    origin: a.origin.clone(),
+                };
+                let bound = self
+                    .transport
+                    .status(&candidate)
+                    .map_err(|_| "Ask state is unknown; retain protected credentials")?;
+                if bound.vault_id != vault || bound.scope != "vault_intelligence" {
+                    return Err("Ask state is inconsistent; retain protected credentials".into());
+                }
+                active_pending(&a, &bound)
+            }
+            _ => return Err("Ask state is unknown; retain protected credentials".into()),
+        };
+        if !self.transport.revoke(&pending)? {
+            return Err("Ask revocation is unknown; protected credentials were retained".into());
+        }
+        self.store
+            .remove(vault)
+            .map_err(|_| "Server revoked Ask access, but local credential removal is unknown")?;
+        self.store
+            .remove(&intelligence_pending_key(vault))
+            .map_err(|_| "Server revoked Ask access; pending credential cleanup is unknown")?;
+        Ok(pairing_status("disconnected", vault, None, None))
+    }
+}
+fn intelligence_production<T>(
+    action: impl FnOnce(
+        IntelligenceCore<'_, IntelligenceKeyringStore, IntelligenceHttpsTransport>,
+    ) -> Result<T>,
+) -> Result<T> {
+    let store = IntelligenceKeyringStore;
+    let transport = IntelligenceHttpsTransport;
+    action(IntelligenceCore {
+        store: &store,
+        transport: &transport,
+        gate: &PAIRING_LIFECYCLE,
+    })
+}
+pub(crate) fn confirmed_intelligence(vault: &str) -> Result<IntelligenceConnection> {
+    intelligence_production(|core| core.connection(vault))
+}
+
+#[tauri::command]
+pub async fn vault_intelligence_pairing_prepare(
+    state: State<'_, LocalVaultState>,
+    expected_vault_id: String,
+) -> Result<PairingStatus> {
+    let vault = state.with(&expected_vault_id, |v| Ok(v.id.clone()))?;
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        intelligence_production(|core| core.prepare(&vault))
+    })
+    .await
+    .map_err(|_| "Ask pairing task failed")??;
+    state.with(&expected_vault_id, |v| {
+        if v.id == status.vault_id {
+            Ok(())
+        } else {
+            Err("Vault selection changed".into())
+        }
+    })?;
+    Ok(status)
+}
+#[tauri::command]
+pub async fn vault_intelligence_pairing_claim(
+    state: State<'_, LocalVaultState>,
+    expected_vault_id: String,
+    invitation_id: String,
+) -> Result<PairingStatus> {
+    let vault = state.with(&expected_vault_id, |v| Ok(v.id.clone()))?;
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        intelligence_production(|core| core.claim(&vault, &invitation_id))
+    })
+    .await
+    .map_err(|_| "Ask pairing task failed")??;
+    state.with(&expected_vault_id, |v| {
+        if v.id == status.vault_id {
+            Ok(())
+        } else {
+            Err("Vault selection changed".into())
+        }
+    })?;
+    Ok(status)
+}
+#[tauri::command]
+pub async fn vault_intelligence_pairing_status(
+    state: State<'_, LocalVaultState>,
+    expected_vault_id: String,
+) -> Result<PairingStatus> {
+    let vault = state.with(&expected_vault_id, |v| Ok(v.id.clone()))?;
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        intelligence_production(|core| core.status(&vault))
+    })
+    .await
+    .map_err(|_| "Ask pairing task failed")??;
+    state.with(&expected_vault_id, |v| {
+        if v.id == status.vault_id {
+            Ok(())
+        } else {
+            Err("Vault selection changed".into())
+        }
+    })?;
+    Ok(status)
+}
+#[tauri::command]
+pub async fn vault_intelligence_pairing_disconnect(
+    state: State<'_, LocalVaultState>,
+    expected_vault_id: String,
+) -> Result<PairingStatus> {
+    let vault = state.with(&expected_vault_id, |v| Ok(v.id.clone()))?;
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        intelligence_production(|core| core.disconnect(&vault))
+    })
+    .await
+    .map_err(|_| "Ask pairing task failed")??;
+    state.with(&expected_vault_id, |v| {
+        if v.id == status.vault_id {
+            Ok(())
+        } else {
+            Err("Vault selection changed".into())
+        }
+    })?;
+    Ok(status)
+}
+
 #[tauri::command]
 pub async fn vault_pairing_prepare(
     state: State<'_, LocalVaultState>,
@@ -637,6 +1097,19 @@ mod tests {
             entered: None,
             release: None,
         }
+    }
+    fn intelligence_transport(vault: &str) -> SyntheticTransport {
+        let mut transport = transport(vault);
+        transport.bound.scope = "vault_intelligence".into();
+        transport
+    }
+    fn seed_intelligence(store: &impl PairingStore, vault: &str) {
+        store
+            .save(
+                &intelligence_pending_key(vault),
+                &serde_json::to_string(&pending(vault)).unwrap(),
+            )
+            .unwrap();
     }
     fn seed(store: &impl PairingStore, vault: &str) {
         store
@@ -886,6 +1359,69 @@ mod tests {
             "unknown"
         );
         assert!(store.load(&pending_key(&vault)).unwrap().is_some());
+    }
+    #[test]
+    fn intelligence_pairing_is_scope_specific_and_keeps_photo_state_separate() {
+        assert_ne!(SERVICE, INTELLIGENCE_SERVICE);
+        let vault = vault();
+        let store = MemoryStore::default();
+        seed_intelligence(&store, &vault);
+        let gate = Mutex::new(());
+        let net = intelligence_transport(&vault);
+        let status = IntelligenceCore {
+            store: &store,
+            transport: &net,
+            gate: &gate,
+        }
+        .claim(&vault, &Uuid::new_v4().to_string())
+        .unwrap();
+        assert_eq!(status.state, "connected");
+        assert_eq!(status.scope.as_deref(), Some("vault_intelligence"));
+        assert!(store.load(&vault).unwrap().is_some());
+        assert!(store.load(&pending_key(&vault)).unwrap().is_none());
+        assert!(store
+            .load(&intelligence_pending_key(&vault))
+            .unwrap()
+            .is_some());
+    }
+    #[test]
+    fn intelligence_pairing_rejects_photo_scope_without_promoting_credential() {
+        let vault = vault();
+        let store = MemoryStore::default();
+        seed_intelligence(&store, &vault);
+        let pending_before = store.load(&intelligence_pending_key(&vault)).unwrap();
+        let gate = Mutex::new(());
+        let photo_scope = transport(&vault);
+        let core = IntelligenceCore {
+            store: &store,
+            transport: &photo_scope,
+            gate: &gate,
+        };
+        assert!(core.claim(&vault, &Uuid::new_v4().to_string()).is_err());
+        assert_eq!(core.status(&vault).unwrap().state, "pending_owner_approval");
+        assert_eq!(
+            store.load(&intelligence_pending_key(&vault)).unwrap(),
+            pending_before
+        );
+        assert!(store.load(&vault).unwrap().is_none());
+    }
+    #[test]
+    fn intelligence_connection_fingerprint_binds_vault_origin_and_secret_rotation() {
+        let vault = "00000000-0000-4000-8000-000000000002".to_owned();
+        let first = IntelligenceConnection::from_parts(
+            vault.clone(),
+            "https://one.test/".into(),
+            "00".repeat(32),
+        );
+        let rotated = IntelligenceConnection::from_parts(
+            vault.clone(),
+            "https://one.test/".into(),
+            "11".repeat(32),
+        );
+        let moved =
+            IntelligenceConnection::from_parts(vault, "https://two.test/".into(), "00".repeat(32));
+        assert_ne!(first.fingerprint, rotated.fingerprint);
+        assert_ne!(first.fingerprint, moved.fingerprint);
     }
     #[test]
     fn offline_disconnect_retains_both_credentials_and_repeated_confirmation_is_safe() {

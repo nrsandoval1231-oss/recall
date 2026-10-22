@@ -1,5 +1,8 @@
 # Claude vault reading implementation plan
 
+> Historical plan/design record. It preserves its original approved scope and evidence; it is not current dispatch. Current direction is governed by [PRD](../../PRD.md), [architecture](../../ARCHITECTURE.md), [roadmap](../../ROADMAP.md), and [documentation map](../../DOCUMENTATION-MAP.md).
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Execute each task with tests and an independent spec/quality review.
 
 **Goal:** Deliver selected full-page Claude readings as unreviewed, correctable, searchable local vault memory.
