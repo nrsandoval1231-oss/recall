@@ -60,6 +60,61 @@ it("retains a conflicting local edit and protects it from incoming cloud refresh
   expect(vault.syncMessage).toContain("conflict");
 });
 
+async function conflicted(note = "SYNTHETIC local change") {
+  const api = server(); const store = new BrowserCloudStore(); const vault = new CloudVault(store, api.request);
+  await vault.status(); const id = crypto.randomUUID();
+  await vault.captureNote(api.scope,id,"SYNTHETIC base"); await vault.synchronize();
+  api.setOnline(false);
+  await vault.correct(api.scope,id,1,crypto.randomUUID(),note); await vault.synchronize();
+  api.rows.set(id, {...api.rows.get(id)!, revision:2, note:"SYNTHETIC remote change"});
+  api.setOnline(true); await vault.synchronize();
+  return {api, store, vault, id};
+}
+
+it("lists a conflict with both versions and keeps my edit as a new revision on top of the cloud revision", async () => {
+  const {api, store, vault, id} = await conflicted();
+  const review = (await vault.conflictReviews())[0]!;
+  expect(review.local.note).toBe("SYNTHETIC local change");
+  expect(review.remote?.note).toBe("SYNTHETIC remote change");
+  await vault.resolveConflict(id, {kind: "mine"}); await vault.synchronize();
+  expect(await vault.conflicts()).toHaveLength(0);
+  expect(api.rows.get(id)).toMatchObject({revision: 3, note: "SYNTHETIC local change"});
+  expect(await store.pending(api.scope)).toHaveLength(0);
+  expect(vault.syncMessage).not.toContain("conflict");
+});
+
+it("adopts the cloud version only on explicit choice and then accepts later cloud refreshes", async () => {
+  const {api, store, vault, id} = await conflicted();
+  await vault.resolveConflict(id, {kind: "cloud"}); await vault.synchronize();
+  expect(await store.pending(api.scope)).toHaveLength(0);
+  expect((await store.list(api.scope))[0]).toMatchObject({revision: 2, note: "SYNTHETIC remote change"});
+  api.rows.set(id, {...api.rows.get(id)!, revision: 3, note: "SYNTHETIC later cloud"});
+  await vault.synchronize();
+  expect((await store.list(api.scope))[0]?.note).toBe("SYNTHETIC later cloud");
+});
+
+it("saves edited combined text as the next revision, and restores before editing a memory deleted in the cloud", async () => {
+  const {api, vault, id} = await conflicted();
+  await vault.resolveConflict(id, {kind: "merged", note: "SYNTHETIC combined"}); await vault.synchronize();
+  expect(api.rows.get(id)).toMatchObject({revision: 3, note: "SYNTHETIC combined"});
+  const second = await conflicted();
+  second.api.rows.set(second.id, {...second.api.rows.get(second.id)!, revision: 3, state: "deleted"});
+  const seen: string[] = [];
+  const inner = second.api.request;
+  const vault2 = new CloudVault(second.store, (async (path: string, init?: RequestInit) => { if (init?.body) seen.push(JSON.parse(init.body as string).action); return inner(path, init); }) as typeof cloudRequest);
+  await vault2.status();
+  await vault2.resolveConflict(second.id, {kind: "mine"}); await vault2.synchronize();
+  expect(seen).toEqual(["restore", "correct"]);
+  expect(second.api.rows.get(second.id)).toMatchObject({revision: 5, note: "SYNTHETIC local change"});
+});
+
+it("refuses to resolve a memory that has no conflict", async () => {
+  const api = server(); const vault = new CloudVault(new BrowserCloudStore(), api.request);
+  await vault.status(); const id = crypto.randomUUID();
+  await vault.captureNote(api.scope,id,"SYNTHETIC base"); await vault.synchronize();
+  await expect(vault.resolveConflict(id, {kind: "cloud"})).rejects.toThrow("no conflict");
+});
+
 it("atomically rejects stale-window writes and does not create orphaned outbox items", async () => {
   const store = new BrowserCloudStore(); const scope=crypto.randomUUID(); const id=crypto.randomUUID();
   const record={id,revision:1,note:"first",state:"active",source_name:"note.txt",source_sha256:"",captured_at:"",updated_at:"",note_path:`${id}.md`,conflict:null} as VaultMemory;
