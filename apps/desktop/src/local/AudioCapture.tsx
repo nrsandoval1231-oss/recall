@@ -30,7 +30,10 @@ function AudioCaptureInner({ vault, selected, active, onChanged, onOpen }: { vau
   const [paused, setPaused] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   // Only a stored recording needs a status check before new actions are offered.
-  const [ready, setReady] = useState(() => loadIntent(selected)?.kind !== "record");
+  // The intent present when the panel mounted is the only one to restore; one written later by a user action is never mistaken for it.
+  const [mountIntent] = useState(() => loadIntent(selected));
+  const firstRun = useRef(true);
+  const [ready, setReady] = useState(mountIntent?.kind !== "record");
   const [now, setNow] = useState(() => Date.now());
   const epoch = useRef(0);
   const alive = useRef(true);
@@ -62,7 +65,9 @@ function AudioCaptureInner({ vault, selected, active, onChanged, onOpen }: { vau
   }
   useEffect(() => {
     if (!active) return;
-    const restored = loadIntent(selected);
+    const first = firstRun.current; firstRun.current = false;
+    const restored = first ? mountIntent : loadIntent(selected);
+    if (first && !restored) { setReady(true); return; }
     intentRef.current = restored; setIntent(restored); setBusy(null);
     if (!restored || restored.kind === "import") { setReady(true); return () => { epoch.current++; }; }
     // A recording or recovery decision can outlive this view; status is read-only and resumes it.

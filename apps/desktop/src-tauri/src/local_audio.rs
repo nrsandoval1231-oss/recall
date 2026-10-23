@@ -826,7 +826,10 @@ struct Core {
     backend: Arc<dyn InputBackend>,
     engine: Arc<dyn AsrEngine>,
     inner: Mutex<Inner>,
+    /// Called after a transcript or correction commits, so audio organization can queue.
+    transcript_hook: Mutex<Option<TranscriptHook>>,
 }
+pub type TranscriptHook = Arc<dyn Fn(SelectionGuard) + Send + Sync>;
 #[derive(Clone)]
 pub struct AudioState(Arc<Core>);
 
@@ -853,7 +856,23 @@ impl AudioState {
             backend,
             engine,
             inner: Mutex::new(Inner::default()),
+            transcript_hook: Mutex::new(None),
         }))
+    }
+    pub fn set_transcript_hook(&self, hook: TranscriptHook) {
+        if let Ok(mut slot) = self.0.transcript_hook.lock() {
+            *slot = Some(hook);
+        }
+    }
+    fn notify_transcript(core: &Core, guard: &SelectionGuard) {
+        let hook = core
+            .transcript_hook
+            .lock()
+            .ok()
+            .and_then(|slot| slot.clone());
+        if let Some(hook) = hook {
+            hook(guard.clone());
+        }
     }
     /// True while a clip is being recorded or committed. Vault selection is
     /// refused meanwhile so a recording can never be redirected to another vault.
@@ -1394,7 +1413,10 @@ impl AudioState {
         operation_id: &str,
         text: &str,
     ) -> Result<VaultMemory> {
-        guard.with(|v| v.audio_correct(memory_id, expected_revision, operation_id, text))
+        let saved =
+            guard.with(|v| v.audio_correct(memory_id, expected_revision, operation_id, text))?;
+        Self::notify_transcript(&self.0, guard);
+        Ok(saved)
     }
 
     /// Optional WAV import through the same commit path as a recording.
@@ -1452,6 +1474,9 @@ impl AudioState {
                     &core.stage_root.join("asr"),
                     &memory_id,
                 );
+                if matches!(end, Ok(AttemptEnd::Finished)) {
+                    AudioState::notify_transcript(&core, &guard);
+                }
                 let unavailable = match end {
                     Ok(AttemptEnd::Unavailable(code)) => Some(code),
                     Ok(AttemptEnd::Finished) => None,

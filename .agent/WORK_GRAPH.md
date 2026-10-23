@@ -15,7 +15,7 @@ One active packet: [VOICE-01](VOICE-01.md); [TEXT-FILE-01](TEXT-FILE-01.md), [HI
 | R6C grounded current context | DONE | R6B | Current context links without identity guesses; independent PASS 4ec20fdb |
 | R6D retained historical Ask | DONE | R6C | Bounded independent PASS d506c8de; exact history and human correction evidence |
 | R7A text-file import | DONE | R6D | One UTF-8 .txt/.md file through the existing source-first organization path |
-| R7B voice and broader files | CANDIDATE BUILT, NOT ACCEPTED | R7A | Native v9 + UI + Ask wire built and twice-reviewed (2026-10-22); open: audio organization/consent, installer + microphone proof, independent Sol review, broader files |
+| R7B voice and broader files | CANDIDATE BUILT, NOT ACCEPTED | R7A | Native v9 + UI + Ask wire built and twice-reviewed (2026-10-22); AUDIO-ORG-01 candidate (separate audio consent + Binding 3.0 + native dispatch + UI) built and reviewed 2026-10-22; open: installer re-build/install + microphone proof, live service/provider proof, independent Sol review, broader files |
 | R7C phone transport | OPEN | explicit transport architecture and association authority | Same private memory on phone and desktop |
 | R8 parent acceptance | OPEN | R7A,R7B,R7C | Finish-contract real-device/live/held-out proof |
 

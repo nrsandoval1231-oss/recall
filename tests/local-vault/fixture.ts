@@ -8,17 +8,17 @@ export async function installVaultFixture(page: Page) {
     const key = "synthetic.test.native";
     type Receipt = { command: string; payload: string; memoryId: string };
     type Temporal = { mode: "as_of" | "compare_to_current"; start_utc: string; end_exclusive_utc: string; display_date: string; display_timezone: string };
-    type State = { status: VaultStatus; memories: VaultMemory[]; history: Record<string, VaultRevision[]>; receipts: Record<string, Receipt>; readings: Record<string, ReadingOperation>; organizations: Record<string, OrganizationOperation>; organizationEnabled: boolean; organizationReady: boolean; organizationEpoch: number; asks: Record<string, { question: string; outcome: AskOutcome }>; historyEnabled: boolean; historyVersion: number; historyAsks: Record<string, { question: string; temporal: Temporal; outcome: HistoryAskOutcome }>; sources: Record<string, { bytes: number[]; mime_type: string; sha256: string }>; audio: Record<string, { phase: "recording" | "saved"; memoryId: string | null }> };
-    const empty: State = { status: { root: null, vault_id: null, vault_identity: null }, memories: [], history: {}, receipts: {}, readings: {}, organizations: {}, organizationEnabled: false, organizationReady: false, organizationEpoch: 0, asks: {}, historyEnabled: false, historyVersion: 0, historyAsks: {}, sources: {}, audio: {} };
+    type State = { status: VaultStatus; memories: VaultMemory[]; history: Record<string, VaultRevision[]>; receipts: Record<string, Receipt>; readings: Record<string, ReadingOperation>; organizations: Record<string, OrganizationOperation>; organizationEnabled: boolean; organizationReady: boolean; organizationEpoch: number; asks: Record<string, { question: string; outcome: AskOutcome }>; historyEnabled: boolean; historyVersion: number; historyAsks: Record<string, { question: string; temporal: Temporal; outcome: HistoryAskOutcome }>; sources: Record<string, { bytes: number[]; mime_type: string; sha256: string }>; audio: Record<string, { phase: "recording" | "saved"; memoryId: string | null }>; audioOrgEnabled: boolean; audioOrgEpoch: number; audioOrgOps: Record<string, OrganizationOperation> };
+    const empty: State = { status: { root: null, vault_id: null, vault_identity: null }, memories: [], history: {}, receipts: {}, readings: {}, organizations: {}, organizationEnabled: false, organizationReady: false, organizationEpoch: 0, asks: {}, historyEnabled: false, historyVersion: 0, historyAsks: {}, sources: {}, audio: {}, audioOrgEnabled: false, audioOrgEpoch: 0, audioOrgOps: {} };
     const state: State = JSON.parse(localStorage.getItem(key) || JSON.stringify(empty));
     state.receipts ??= {};
     state.readings ??= {};
     state.asks ??= {};
     state.historyEnabled ??= false; state.historyVersion ??= 0; state.historyAsks ??= {};
     state.sources ??= {};
-    state.audio ??= {};
+    state.audio ??= {}; state.audioOrgEnabled ??= false; state.audioOrgEpoch ??= 0; state.audioOrgOps ??= {};
     state.organizations ??= {}; state.organizationEnabled ??= false; state.organizationReady ??= false; state.organizationEpoch ??= 0;
-    const control = { diagnosticReading: false, readingEnabled: false, askEnabled: false, unknownAsk: false, unknownHistoryAsk: false, delayAsk: false, askPending: false, releaseAsk: () => {}, askPairingState: "disconnected", audioDenied: false, audioTranscribe: false, delayReading: false, readingPending: false, releaseReading: () => {}, unknownReading: false, failRemovalOnce: false, failRebuildOnce: false, delayRemoval: false, removalPending: false, releaseRemoval: () => {}, cancelCapture: false, cancelFileImport: false, failFileImportAfterCommit: false, cancelSelect: false, conflict: false, switchVault: false, delaySource: false, sourcePending: false, releaseSource: () => {}, organizationNeedsSetup: false, organizationUnknown: false, relatedTargetId: null as string | null, finishOrganization: (_memoryId: string) => {}, calls: [] as { command: string; args: Record<string, unknown> }[], importCalls: JSON.parse(localStorage.getItem("synthetic.test.importCalls") || "[]") as { command: string; args: Record<string, unknown> }[] };
+    const control = { diagnosticReading: false, readingEnabled: false, askEnabled: false, unknownAsk: false, unknownHistoryAsk: false, delayAsk: false, askPending: false, releaseAsk: () => {}, askPairingState: "disconnected", audioDenied: false, audioTranscribe: false, delayReading: false, readingPending: false, releaseReading: () => {}, unknownReading: false, failRemovalOnce: false, failRebuildOnce: false, delayRemoval: false, removalPending: false, releaseRemoval: () => {}, cancelCapture: false, cancelFileImport: false, failFileImportAfterCommit: false, cancelSelect: false, conflict: false, switchVault: false, delaySource: false, sourcePending: false, releaseSource: () => {}, organizationNeedsSetup: false, organizationUnknown: false, relatedTargetId: null as string | null, finishOrganization: (_memoryId: string) => {}, finishAudioOrganization: (_memoryId: string, _suppressed?: boolean) => {}, calls: [] as { command: string; args: Record<string, unknown> }[], importCalls: JSON.parse(localStorage.getItem("synthetic.test.importCalls") || "[]") as { command: string; args: Record<string, unknown> }[] };
     Object.assign(window, { syntheticVault: control });
     const save = () => localStorage.setItem(key, JSON.stringify(state));
     const now = "2026-10-08T12:00:00Z";
@@ -28,6 +28,14 @@ export async function installVaultFixture(page: Page) {
       state.organizations[operationId] = { operation_id: operationId, memory_id: memory.id, state: "queued", error_code: null };
       save();
     }
+    control.finishAudioOrganization = (memoryId: string, suppressed = false) => {
+      const org = Object.values(state.audioOrgOps).find(op => op.memory_id === memoryId); const m = state.memories.find(item => item.id === memoryId);
+      if (!org || !m?.audio_transcript) throw new Error("SYNTHETIC voice organization operation missing");
+      const evidence = [{ page_id: m.id, quote: m.audio_transcript.machine.text.slice(0, 20) }];
+      m.audio_organization = { binding: { schema_version: "3.0", operation_id: org.operation_id, vault_id: state.status.vault_identity!, memory_id: m.id, source_kind: "audio_transcript", source_sha256: m.source_sha256, expected_revision: m.revision, input_sha256: "a".repeat(64), derivative_sha256: "b".repeat(64), transcript_revision: m.revision, transcript_evidence_kind: "machine_unreviewed", consent_epoch: state.audioOrgEpoch, captured_at: m.captured_at }, media_type: "text/plain; charset=utf-8", payload_sha256: "c".repeat(64), result: { provider: "anthropic", model_id: "synthetic-model", input_manifest_sha256: "d".repeat(64), extraction: { summary: "SYNTHETIC voice summary: water the seedlings", summary_evidence: evidence, pages: [{ page_id: m.id, ordinal: 1, transcription: m.audio_transcript.machine.text, legibility: "mixed" }], mentions: [], statements: [], action_suggestions: [{ kind: "reminder", text: "SYNTHETIC water the seedlings", evidence }], uncertainties: [] }, validation_notes: [], review_state: "unreviewed" }, review_state: "unreviewed", suppressed };
+      m.revision++; state.history[m.id]!.push({ revision: m.revision, note: "", recorded_at: now, origin: "machine:anthropic", kind: "audio_organization", audio_organization: structuredClone(m.audio_organization) });
+      org.state = "organized"; save();
+    };
     control.finishOrganization = (memoryId: string) => {
       const operation = Object.values(state.organizations).find(op => op.memory_id === memoryId);
       const memory = state.memories.find(item => item.id === memoryId);
@@ -86,7 +94,7 @@ export async function installVaultFixture(page: Page) {
         const id = control.switchVault ? "b" : "a";
         state.status = { root: `/synthetic/vault-${id}`, vault_id: crypto.randomUUID(), vault_identity: `synthetic-${id}` };
         for (const op of Object.values(state.readings)) if (!["committed", "cancelled", "failed", "expired"].includes(op.state)) op.state = "cancelled";
-        if (control.switchVault) { state.memories = []; state.history = {}; state.receipts = {}; state.readings = {}; state.organizations = {}; state.organizationEnabled = false; state.organizationReady = false; state.organizationEpoch = 0; state.asks = {}; state.historyEnabled = false; state.historyVersion = 0; state.historyAsks = {}; state.sources = {}; state.audio = {}; }
+        if (control.switchVault) { state.memories = []; state.history = {}; state.receipts = {}; state.readings = {}; state.organizations = {}; state.organizationEnabled = false; state.organizationReady = false; state.organizationEpoch = 0; state.asks = {}; state.historyEnabled = false; state.historyVersion = 0; state.historyAsks = {}; state.sources = {}; state.audio = {}; state.audioOrgEnabled = false; state.audioOrgEpoch = 0; state.audioOrgOps = {}; }
         save(); return state.status;
       }
       if (args.expectedVaultId !== state.status.vault_id) throw new Error("Stale vault session");
@@ -214,6 +222,16 @@ export async function installVaultFixture(page: Page) {
       function audioStatus(op: string, over: Partial<AudioOperationStatus> = {}): AudioOperationStatus {
         return { schema_version: "1.0", operation_id: op, vault_id: state.status.vault_identity!, state: "recording", memory: null, error_code: null, limit_reason: null, source_sample_rate_hz: 16000, source_channels: 1, ...over };
       }
+      const audioCapability = () => ({ schema_version: "1.0", scope: "vault_intelligence", purpose: "organize_audio", vault_id: state.status.vault_identity!, policy_version: "organize-audio-v1|synthetic", provider: "anthropic", consent: state.audioOrgEnabled ? "active" : "missing", enabled: state.audioOrgEnabled, consent_epoch: state.audioOrgEpoch, decided_at: state.audioOrgEnabled ? now : null, local_readiness: state.audioOrgEnabled ? "ready" : "off", automatic_enabled: state.audioOrgEnabled });
+      if (command === "vault_audio_organization_capability" || command === "vault_reconcile_audio_organization_consent") return audioCapability();
+      if (command === "vault_set_audio_organization_consent") {
+        if (args.expectedConsentEpoch !== state.audioOrgEpoch) throw new Error("Voice organization consent changed; refresh the setting");
+        state.audioOrgEnabled = args.enabled === true; state.audioOrgEpoch++;
+        if (!state.audioOrgEnabled) for (const op of Object.values(state.audioOrgOps)) if (["awaiting_transcript", "queued"].includes(op.state)) { op.state = "stale"; op.error_code = "CONSENT_REVOKED"; }
+        save(); return audioCapability();
+      }
+      if (command === "vault_audio_organization_operations") return Object.values(state.audioOrgOps).filter(op => op.memory_id === args.memoryId);
+      if (command === "vault_recover_audio_organization") return state.audioOrgOps[String(args.operationId)] ?? { operation_id: String(args.operationId), memory_id: "", state: "unknown", error_code: "RECEIPT_UNAVAILABLE" };
       if (command === "vault_audio_start") {
         const op = String(args.operationId); const prior = state.audio[op];
         if (prior) return audioStatus(op, { state: prior.phase === "recording" ? "recording" : "saved_local", memory: state.memories.find(m => m.id === prior.memoryId) ?? null });
@@ -231,14 +249,18 @@ export async function installVaultFixture(page: Page) {
           const bytes = Array.from(wav); const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", wav)), b => b.toString(16).padStart(2, "0")).join("");
           const m: VaultMemory = { id: op, revision: 1, note: "", source_name: "SYNTHETIC-recording.wav", source_sha256: sha, captured_at: now, updated_at: now, conflict: null, state: "active", note_path: "synthetic-recording.md", audio_source: { capture_origin: "recorded", original_name: null, media_type: "audio/wav", source_sha256: sha, source_bytes: bytes.length, sample_rate_hz: 16000, channels: 1, pcm_bits: 16, duration_ms: 100 }, audio_transcript: null };
           state.memories.push(m); state.sources[op] = { bytes, mime_type: "audio/wav", sha256: sha }; state.history[op] = [{ revision: 1, note: "", recorded_at: now, origin: "human:recall", kind: "capture" }];
-          entry.phase = "saved"; entry.memoryId = op; save();
+          entry.phase = "saved"; entry.memoryId = op;
+          if (state.audioOrgEnabled) { const orgId = crypto.randomUUID(); state.audioOrgOps[orgId] = { operation_id: orgId, memory_id: op, state: "awaiting_transcript", error_code: null }; }
+          save();
           return audioStatus(op, { state: "saved_local", memory: structuredClone(m) });
         }
         const m = state.memories.find(item => item.id === entry.memoryId)!;
         if (!m.audio_transcript && control.audioTranscribe) {
           const hash = "e".repeat(64);
           m.audio_transcript = { machine: { operation_id: crypto.randomUUID(), source_sha256: m.source_sha256, source_revision: 1, runtime_source_commit: "d".repeat(40), runtime_binary_sha256: hash, model_sha256: hash, derivative_sha256: hash, transform_version: "pcm16-mono-16khz-rubato-fft-v1", output_sha256: hash, text: "SYNTHETIC remember to water the seedlings.", segments: null, input_rms_pcm16: 1200, quality_flags: [], eligibility: "eligible", quality_state: "machine_unreviewed" }, human_correction: null };
-          m.revision++; state.history[m.id]!.push({ revision: m.revision, note: "", recorded_at: now, origin: "machine:local", kind: "machine_audio_transcript" }); save();
+          m.revision++; state.history[m.id]!.push({ revision: m.revision, note: "", recorded_at: now, origin: "machine:local", kind: "machine_audio_transcript" });
+          for (const org of Object.values(state.audioOrgOps)) if (org.memory_id === m.id && org.state === "awaiting_transcript") org.state = "queued";
+          save();
         }
         return audioStatus(op, { state: m.audio_transcript ? "transcribed" : command === "vault_audio_stop" ? "saved_local" : "transcription_processing", memory: structuredClone(m) });
       }
@@ -350,6 +372,9 @@ export async function control(page: Page, values: Record<string, boolean>) {
 }
 export async function finishOrganization(page: Page, memoryId: string) {
   await page.evaluate(memoryId => (window as unknown as { syntheticVault: { finishOrganization: (id: string) => void } }).syntheticVault.finishOrganization(memoryId), memoryId);
+}
+export async function finishAudioOrganization(page: Page, memoryId: string) {
+  await page.evaluate(memoryId => (window as unknown as { syntheticVault: { finishAudioOrganization: (id: string) => void } }).syntheticVault.finishAudioOrganization(memoryId), memoryId);
 }
 export async function relateToMemory(page: Page, memoryId: string) {
   await page.evaluate(memoryId => { (window as unknown as { syntheticVault: { relatedTargetId: string | null } }).syntheticVault.relatedTargetId = memoryId; }, memoryId);

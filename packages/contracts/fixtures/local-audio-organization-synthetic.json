@@ -1,0 +1,404 @@
+{
+  "fixture": "SYNTHETIC ONLY — no user capture data, no audio",
+  "schema_version": "3.0",
+  "description": "Version 3.0 audio-transcript organization binding (header v3.<base64url-no-pad canonical JSON>). Key order in canonical_binding_utf8 is the frozen order; the header is the UTF-8 bytes of that exact string. The request body is the exact UTF-8 transcript (text/plain; charset=utf-8) whose SHA-256 is input_sha256. canonical_payload_json is the sorted-key canonical payload whose SHA-256 is the receipt digest.",
+  "variants": [
+    {
+      "name": "machine-unreviewed",
+      "body_text": "Synthetic voice memo: the pump reads maybe forty two psi, the name sounds like Dana.",
+      "binding": {
+        "schema_version": "3.0",
+        "operation_id": "00000000-0000-4000-8000-000000000031",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "memory_id": "00000000-0000-4000-8000-000000000003",
+        "source_kind": "audio_transcript",
+        "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+        "expected_revision": 2,
+        "input_sha256": "3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6",
+        "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+        "transcript_revision": 1,
+        "transcript_evidence_kind": "machine_unreviewed",
+        "consent_epoch": 1,
+        "captured_at": "2026-10-09T12:00:00Z"
+      },
+      "canonical_binding_utf8": "{\"schema_version\":\"3.0\",\"operation_id\":\"00000000-0000-4000-8000-000000000031\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"source_kind\":\"audio_transcript\",\"source_sha256\":\"2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0\",\"expected_revision\":2,\"input_sha256\":\"3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6\",\"derivative_sha256\":\"bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519\",\"transcript_revision\":1,\"transcript_evidence_kind\":\"machine_unreviewed\",\"consent_epoch\":1,\"captured_at\":\"2026-10-09T12:00:00Z\"}",
+      "organization_header": "v3.eyJzY2hlbWFfdmVyc2lvbiI6IjMuMCIsIm9wZXJhdGlvbl9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAzMSIsInZhdWx0X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwibWVtb3J5X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwic291cmNlX2tpbmQiOiJhdWRpb190cmFuc2NyaXB0Iiwic291cmNlX3NoYTI1NiI6IjJkNDdkMWNmOTdmMzFiZWNlYjViMGU4ODIwMzA5NDhiMWE5ZmM2OTIyMzczN2E1NmRkMjIyMTgwOGI0NjJlYjAiLCJleHBlY3RlZF9yZXZpc2lvbiI6MiwiaW5wdXRfc2hhMjU2IjoiMzA4M2VkYjA2MmEzOGYzNzRjYzM2NjI4YTRjNDQxNGFiZjM4NGJmMTEwNmM0ZGNmYjdmNzc3OWFmOTgyYzliNiIsImRlcml2YXRpdmVfc2hhMjU2IjoiYmMxZmMyOGUwMWFlY2JjZmI1NGJmNzc1NDQyMzhlNGQ3MGM1NDAzNzUwNGU4OTczYTdjZmJiMWMwMmMyNDUxOSIsInRyYW5zY3JpcHRfcmV2aXNpb24iOjEsInRyYW5zY3JpcHRfZXZpZGVuY2Vfa2luZCI6Im1hY2hpbmVfdW5yZXZpZXdlZCIsImNvbnNlbnRfZXBvY2giOjEsImNhcHR1cmVkX2F0IjoiMjAyNi0xMC0wOVQxMjowMDowMFoifQ",
+      "header_ascii_length": 821,
+      "media_type": "text/plain; charset=utf-8",
+      "canonical_payload_json": "{\"binding\":{\"captured_at\":\"2026-10-09T12:00:00Z\",\"consent_epoch\":1,\"derivative_sha256\":\"bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519\",\"expected_revision\":2,\"input_sha256\":\"3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"operation_id\":\"00000000-0000-4000-8000-000000000031\",\"schema_version\":\"3.0\",\"source_kind\":\"audio_transcript\",\"source_sha256\":\"2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0\",\"transcript_evidence_kind\":\"machine_unreviewed\",\"transcript_revision\":1,\"vault_id\":\"00000000-0000-4000-8000-000000000002\"},\"input_sha256\":\"3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6\",\"media_type\":\"text/plain; charset=utf-8\"}",
+      "payload_sha256": "2d389b82d5653f2ee70e98e927aa06260e10ed2c89c7fbf25ac13dc4fb75d127",
+      "expected_wrapper_legibility": "mixed",
+      "receipt_example": {
+        "http_status": 200,
+        "receipt": {
+          "schema_version": "1.0",
+          "binding": {
+            "vault_id": "00000000-0000-4000-8000-000000000002",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "captured_at": "2026-10-09T12:00:00Z",
+            "source_kind": "audio_transcript",
+            "input_sha256": "3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6",
+            "operation_id": "00000000-0000-4000-8000-000000000031",
+            "consent_epoch": 1,
+            "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+            "schema_version": "3.0",
+            "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+            "expected_revision": 2,
+            "transcript_revision": 1,
+            "transcript_evidence_kind": "machine_unreviewed"
+          },
+          "payload_sha256": "2d389b82d5653f2ee70e98e927aa06260e10ed2c89c7fbf25ac13dc4fb75d127",
+          "state": "complete",
+          "result": {
+            "model_id": "fake-model",
+            "provider": "anthropic",
+            "extraction": {
+              "pages": [
+                {
+                  "ordinal": 1,
+                  "page_id": "00000000-0000-4000-8000-000000000003",
+                  "legibility": "mixed",
+                  "transcription": "Synthetic voice memo: the pump reads maybe forty two psi, the name sounds like Dana."
+                }
+              ],
+              "summary": "Voice memo about a pump pressure reading and a contact whose name sounds like Dana.",
+              "mentions": [
+                {
+                  "kind": "person",
+                  "evidence": [
+                    {
+                      "quote": "the name sounds like Dana",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "local_id": "m1",
+                  "raw_text": "Dana"
+                }
+              ],
+              "capture_id": "00000000-0000-4000-8000-000000000003",
+              "statements": [
+                {
+                  "kind": "observation",
+                  "text": "the pump reads maybe forty two psi",
+                  "evidence": [
+                    {
+                      "quote": "the pump reads maybe forty two psi",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "local_id": "s1",
+                  "predicate": "pump_reading",
+                  "value_text": "forty two psi",
+                  "temporal_text": null,
+                  "epistemic_state": "uncertain",
+                  "attribution_text": null,
+                  "object_mention_id": null,
+                  "subject_mention_id": null
+                }
+              ],
+              "uncertainties": [
+                {
+                  "kind": "number",
+                  "evidence": [
+                    {
+                      "quote": "maybe forty two psi",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "description": "The pressure value may be misheard; the transcript says maybe forty two."
+                },
+                {
+                  "kind": "identity",
+                  "evidence": [
+                    {
+                      "quote": "the name sounds like Dana",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "description": "The contact's name is only what it sounds like in the transcript."
+                }
+              ],
+              "schema_version": "1.1",
+              "summary_evidence": [
+                {
+                  "quote": "the pump reads maybe forty two psi",
+                  "page_id": "00000000-0000-4000-8000-000000000003"
+                }
+              ],
+              "action_suggestions": [
+                {
+                  "kind": "action",
+                  "text": "confirm the pump pressure reading",
+                  "due_text": null,
+                  "evidence": [
+                    {
+                      "quote": "the pump reads maybe forty two psi",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "local_id": "a1",
+                  "assignee_mention_id": null
+                }
+              ],
+              "input_manifest_sha256": "2d389b82d5653f2ee70e98e927aa06260e10ed2c89c7fbf25ac13dc4fb75d127"
+            },
+            "review_state": "unreviewed",
+            "validation_notes": [
+              {
+                "code": "QUESTION_MARK_KEPT",
+                "detail": "statement s1: source line is uncertain; kept uncertain"
+              }
+            ],
+            "input_manifest_sha256": "2d389b82d5653f2ee70e98e927aa06260e10ed2c89c7fbf25ac13dc4fb75d127"
+          },
+          "error_code": null
+        }
+      }
+    },
+    {
+      "name": "human-corrected",
+      "body_text": "Synthetic voice memo: the pump reads 42 psi; the contact is Dana (surname unknown).",
+      "binding": {
+        "schema_version": "3.0",
+        "operation_id": "00000000-0000-4000-8000-000000000032",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "memory_id": "00000000-0000-4000-8000-000000000003",
+        "source_kind": "audio_transcript",
+        "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+        "expected_revision": 2,
+        "input_sha256": "f4243840d1724545068d5b7ec1236e102254f8caebacc6b50e9097e2fe296d84",
+        "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+        "transcript_revision": 2,
+        "transcript_evidence_kind": "human_corrected",
+        "consent_epoch": 1,
+        "captured_at": "2026-10-09T12:00:00Z"
+      },
+      "canonical_binding_utf8": "{\"schema_version\":\"3.0\",\"operation_id\":\"00000000-0000-4000-8000-000000000032\",\"vault_id\":\"00000000-0000-4000-8000-000000000002\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"source_kind\":\"audio_transcript\",\"source_sha256\":\"2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0\",\"expected_revision\":2,\"input_sha256\":\"f4243840d1724545068d5b7ec1236e102254f8caebacc6b50e9097e2fe296d84\",\"derivative_sha256\":\"bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519\",\"transcript_revision\":2,\"transcript_evidence_kind\":\"human_corrected\",\"consent_epoch\":1,\"captured_at\":\"2026-10-09T12:00:00Z\"}",
+      "organization_header": "v3.eyJzY2hlbWFfdmVyc2lvbiI6IjMuMCIsIm9wZXJhdGlvbl9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAzMiIsInZhdWx0X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwibWVtb3J5X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwic291cmNlX2tpbmQiOiJhdWRpb190cmFuc2NyaXB0Iiwic291cmNlX3NoYTI1NiI6IjJkNDdkMWNmOTdmMzFiZWNlYjViMGU4ODIwMzA5NDhiMWE5ZmM2OTIyMzczN2E1NmRkMjIyMTgwOGI0NjJlYjAiLCJleHBlY3RlZF9yZXZpc2lvbiI6MiwiaW5wdXRfc2hhMjU2IjoiZjQyNDM4NDBkMTcyNDU0NTA2OGQ1YjdlYzEyMzZlMTAyMjU0ZjhjYWViYWNjNmI1MGU5MDk3ZTJmZTI5NmQ4NCIsImRlcml2YXRpdmVfc2hhMjU2IjoiYmMxZmMyOGUwMWFlY2JjZmI1NGJmNzc1NDQyMzhlNGQ3MGM1NDAzNzUwNGU4OTczYTdjZmJiMWMwMmMyNDUxOSIsInRyYW5zY3JpcHRfcmV2aXNpb24iOjIsInRyYW5zY3JpcHRfZXZpZGVuY2Vfa2luZCI6Imh1bWFuX2NvcnJlY3RlZCIsImNvbnNlbnRfZXBvY2giOjEsImNhcHR1cmVkX2F0IjoiMjAyNi0xMC0wOVQxMjowMDowMFoifQ",
+      "header_ascii_length": 817,
+      "media_type": "text/plain; charset=utf-8",
+      "canonical_payload_json": "{\"binding\":{\"captured_at\":\"2026-10-09T12:00:00Z\",\"consent_epoch\":1,\"derivative_sha256\":\"bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519\",\"expected_revision\":2,\"input_sha256\":\"f4243840d1724545068d5b7ec1236e102254f8caebacc6b50e9097e2fe296d84\",\"memory_id\":\"00000000-0000-4000-8000-000000000003\",\"operation_id\":\"00000000-0000-4000-8000-000000000032\",\"schema_version\":\"3.0\",\"source_kind\":\"audio_transcript\",\"source_sha256\":\"2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0\",\"transcript_evidence_kind\":\"human_corrected\",\"transcript_revision\":2,\"vault_id\":\"00000000-0000-4000-8000-000000000002\"},\"input_sha256\":\"f4243840d1724545068d5b7ec1236e102254f8caebacc6b50e9097e2fe296d84\",\"media_type\":\"text/plain; charset=utf-8\"}",
+      "payload_sha256": "fedc8e1d696d9ffcee60ab7dbe534587bdd36483e3212c2e20c20ef7a270cd9b",
+      "expected_wrapper_legibility": "clear",
+      "receipt_example": {
+        "http_status": 200,
+        "receipt": {
+          "schema_version": "1.0",
+          "binding": {
+            "vault_id": "00000000-0000-4000-8000-000000000002",
+            "memory_id": "00000000-0000-4000-8000-000000000003",
+            "captured_at": "2026-10-09T12:00:00Z",
+            "source_kind": "audio_transcript",
+            "input_sha256": "f4243840d1724545068d5b7ec1236e102254f8caebacc6b50e9097e2fe296d84",
+            "operation_id": "00000000-0000-4000-8000-000000000032",
+            "consent_epoch": 1,
+            "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+            "schema_version": "3.0",
+            "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+            "expected_revision": 2,
+            "transcript_revision": 2,
+            "transcript_evidence_kind": "human_corrected"
+          },
+          "payload_sha256": "fedc8e1d696d9ffcee60ab7dbe534587bdd36483e3212c2e20c20ef7a270cd9b",
+          "state": "complete",
+          "result": {
+            "model_id": "fake-model",
+            "provider": "anthropic",
+            "extraction": {
+              "pages": [
+                {
+                  "ordinal": 1,
+                  "page_id": "00000000-0000-4000-8000-000000000003",
+                  "legibility": "clear",
+                  "transcription": "Synthetic voice memo: the pump reads 42 psi; the contact is Dana (surname unknown)."
+                }
+              ],
+              "summary": "Voice memo giving a pump pressure reading and a contact named Dana with an unknown surname.",
+              "mentions": [
+                {
+                  "kind": "person",
+                  "evidence": [
+                    {
+                      "quote": "the contact is Dana (surname unknown)",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "local_id": "m1",
+                  "raw_text": "Dana"
+                }
+              ],
+              "capture_id": "00000000-0000-4000-8000-000000000003",
+              "statements": [
+                {
+                  "kind": "observation",
+                  "text": "the pump reads 42 psi",
+                  "evidence": [
+                    {
+                      "quote": "the pump reads 42 psi",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "local_id": "s1",
+                  "predicate": "pump_reading",
+                  "value_text": "42 psi",
+                  "temporal_text": null,
+                  "epistemic_state": "reported",
+                  "attribution_text": null,
+                  "object_mention_id": null,
+                  "subject_mention_id": null
+                }
+              ],
+              "uncertainties": [
+                {
+                  "kind": "identity",
+                  "evidence": [
+                    {
+                      "quote": "(surname unknown)",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "description": "The surname is stated as unknown."
+                }
+              ],
+              "schema_version": "1.1",
+              "summary_evidence": [
+                {
+                  "quote": "the pump reads 42 psi",
+                  "page_id": "00000000-0000-4000-8000-000000000003"
+                }
+              ],
+              "action_suggestions": [
+                {
+                  "kind": "action",
+                  "text": "find out the contact's surname",
+                  "due_text": null,
+                  "evidence": [
+                    {
+                      "quote": "the contact is Dana (surname unknown)",
+                      "page_id": "00000000-0000-4000-8000-000000000003"
+                    }
+                  ],
+                  "local_id": "a1",
+                  "assignee_mention_id": null
+                }
+              ],
+              "input_manifest_sha256": "fedc8e1d696d9ffcee60ab7dbe534587bdd36483e3212c2e20c20ef7a270cd9b"
+            },
+            "review_state": "unreviewed",
+            "validation_notes": [],
+            "input_manifest_sha256": "fedc8e1d696d9ffcee60ab7dbe534587bdd36483e3212c2e20c20ef7a270cd9b"
+          },
+          "error_code": null
+        }
+      }
+    }
+  ],
+  "capability_example": {
+    "schema_version": "1.0",
+    "scope": "vault_intelligence",
+    "purpose": "organize_audio",
+    "vault_id": "00000000-0000-4000-8000-000000000002",
+    "policy_version": "organize-audio-v1|anthropic-v1|fake-model",
+    "provider": "anthropic",
+    "consent": "active",
+    "enabled": true,
+    "consent_epoch": 1,
+    "decided_at": "2026-10-09T12:00:00Z"
+  },
+  "consent_request_example": {
+    "schema_version": "1.0",
+    "policy_version": "organize-audio-v1|anthropic-v1|fake-model",
+    "enabled": true,
+    "expected_consent_epoch": 0
+  },
+  "non_complete_receipt_examples": [
+    {
+      "name": "failed-invalid-extraction",
+      "binding": {
+        "schema_version": "3.0",
+        "operation_id": "00000000-0000-4000-8000-000000000033",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "memory_id": "00000000-0000-4000-8000-000000000003",
+        "source_kind": "audio_transcript",
+        "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+        "expected_revision": 2,
+        "input_sha256": "3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6",
+        "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+        "transcript_revision": 1,
+        "transcript_evidence_kind": "machine_unreviewed",
+        "consent_epoch": 1,
+        "captured_at": "2026-10-09T12:00:00Z"
+      },
+      "organization_header": "v3.eyJzY2hlbWFfdmVyc2lvbiI6IjMuMCIsIm9wZXJhdGlvbl9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAzMyIsInZhdWx0X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwibWVtb3J5X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwic291cmNlX2tpbmQiOiJhdWRpb190cmFuc2NyaXB0Iiwic291cmNlX3NoYTI1NiI6IjJkNDdkMWNmOTdmMzFiZWNlYjViMGU4ODIwMzA5NDhiMWE5ZmM2OTIyMzczN2E1NmRkMjIyMTgwOGI0NjJlYjAiLCJleHBlY3RlZF9yZXZpc2lvbiI6MiwiaW5wdXRfc2hhMjU2IjoiMzA4M2VkYjA2MmEzOGYzNzRjYzM2NjI4YTRjNDQxNGFiZjM4NGJmMTEwNmM0ZGNmYjdmNzc3OWFmOTgyYzliNiIsImRlcml2YXRpdmVfc2hhMjU2IjoiYmMxZmMyOGUwMWFlY2JjZmI1NGJmNzc1NDQyMzhlNGQ3MGM1NDAzNzUwNGU4OTczYTdjZmJiMWMwMmMyNDUxOSIsInRyYW5zY3JpcHRfcmV2aXNpb24iOjEsInRyYW5zY3JpcHRfZXZpZGVuY2Vfa2luZCI6Im1hY2hpbmVfdW5yZXZpZXdlZCIsImNvbnNlbnRfZXBvY2giOjEsImNhcHR1cmVkX2F0IjoiMjAyNi0xMC0wOVQxMjowMDowMFoifQ",
+      "body_text": "Synthetic voice memo: the pump reads maybe forty two psi, the name sounds like Dana.",
+      "media_type": "text/plain; charset=utf-8",
+      "http_status": 200,
+      "receipt": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "00000000-0000-4000-8000-000000000002",
+          "memory_id": "00000000-0000-4000-8000-000000000003",
+          "captured_at": "2026-10-09T12:00:00Z",
+          "source_kind": "audio_transcript",
+          "input_sha256": "3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6",
+          "operation_id": "00000000-0000-4000-8000-000000000033",
+          "consent_epoch": 1,
+          "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+          "schema_version": "3.0",
+          "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+          "expected_revision": 2,
+          "transcript_revision": 1,
+          "transcript_evidence_kind": "machine_unreviewed"
+        },
+        "payload_sha256": "c428d0a942042b74ca76a63206a04a3b9dab03ac1a797c164c673abaf87e42b4",
+        "state": "failed",
+        "result": null,
+        "error_code": "INVALID_EXTRACTION"
+      }
+    },
+    {
+      "name": "unknown-provider-outcome",
+      "binding": {
+        "schema_version": "3.0",
+        "operation_id": "00000000-0000-4000-8000-000000000034",
+        "vault_id": "00000000-0000-4000-8000-000000000002",
+        "memory_id": "00000000-0000-4000-8000-000000000003",
+        "source_kind": "audio_transcript",
+        "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+        "expected_revision": 2,
+        "input_sha256": "3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6",
+        "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+        "transcript_revision": 1,
+        "transcript_evidence_kind": "machine_unreviewed",
+        "consent_epoch": 1,
+        "captured_at": "2026-10-09T12:00:00Z"
+      },
+      "organization_header": "v3.eyJzY2hlbWFfdmVyc2lvbiI6IjMuMCIsIm9wZXJhdGlvbl9pZCI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAzNCIsInZhdWx0X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwibWVtb3J5X2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwic291cmNlX2tpbmQiOiJhdWRpb190cmFuc2NyaXB0Iiwic291cmNlX3NoYTI1NiI6IjJkNDdkMWNmOTdmMzFiZWNlYjViMGU4ODIwMzA5NDhiMWE5ZmM2OTIyMzczN2E1NmRkMjIyMTgwOGI0NjJlYjAiLCJleHBlY3RlZF9yZXZpc2lvbiI6MiwiaW5wdXRfc2hhMjU2IjoiMzA4M2VkYjA2MmEzOGYzNzRjYzM2NjI4YTRjNDQxNGFiZjM4NGJmMTEwNmM0ZGNmYjdmNzc3OWFmOTgyYzliNiIsImRlcml2YXRpdmVfc2hhMjU2IjoiYmMxZmMyOGUwMWFlY2JjZmI1NGJmNzc1NDQyMzhlNGQ3MGM1NDAzNzUwNGU4OTczYTdjZmJiMWMwMmMyNDUxOSIsInRyYW5zY3JpcHRfcmV2aXNpb24iOjEsInRyYW5zY3JpcHRfZXZpZGVuY2Vfa2luZCI6Im1hY2hpbmVfdW5yZXZpZXdlZCIsImNvbnNlbnRfZXBvY2giOjEsImNhcHR1cmVkX2F0IjoiMjAyNi0xMC0wOVQxMjowMDowMFoifQ",
+      "body_text": "Synthetic voice memo: the pump reads maybe forty two psi, the name sounds like Dana.",
+      "media_type": "text/plain; charset=utf-8",
+      "http_status": 202,
+      "receipt": {
+        "schema_version": "1.0",
+        "binding": {
+          "vault_id": "00000000-0000-4000-8000-000000000002",
+          "memory_id": "00000000-0000-4000-8000-000000000003",
+          "captured_at": "2026-10-09T12:00:00Z",
+          "source_kind": "audio_transcript",
+          "input_sha256": "3083edb062a38f374cc36628a4c4414abf384bf1106c4dcfb7f7779af982c9b6",
+          "operation_id": "00000000-0000-4000-8000-000000000034",
+          "consent_epoch": 1,
+          "source_sha256": "2d47d1cf97f31beceb5b0e882030948b1a9fc69223737a56dd2221808b462eb0",
+          "schema_version": "3.0",
+          "derivative_sha256": "bc1fc28e01aecbcfb54bf77544238e4d70c54037504e8973a7cfbb1c02c24519",
+          "expected_revision": 2,
+          "transcript_revision": 1,
+          "transcript_evidence_kind": "machine_unreviewed"
+        },
+        "payload_sha256": "4ee3f7efcbe9325f0ef998b3d3caa738ac8367d9e1d9d63028be2cc69f6090c5",
+        "state": "unknown",
+        "result": null,
+        "error_code": "PROVIDER_OUTCOME_UNKNOWN"
+      }
+    }
+  ]
+}

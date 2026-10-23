@@ -221,6 +221,105 @@ fn quoted(text: &str) -> String {
         format!("> {}\n", markdown_text(text))
     }
 }
+/// Inert rendering of validated machine proposals. Every string is escaped as
+/// quoted text, so nothing here can forge a Recall marker, heading or link.
+fn proposals_markdown(p: &OrganizationProposal) -> String {
+    let basis = match p.binding.transcript_evidence_kind.as_deref() {
+        Some("human_corrected") => "a human-corrected transcript",
+        _ => "an unreviewed machine transcript",
+    };
+    if p.suppressed {
+        return format!(
+            "## Machine proposals (suppressed)\n\nProposals derived from {basis} were retired after the transcript changed. They stay in history and are not used for search or answers.\n\n"
+        );
+    }
+    let ex = &p.result.extraction;
+    let mut out = format!(
+        "## Machine proposals (unreviewed)\n\nUnreviewed machine proposals derived from {basis}. They are not verified facts and may reflect misheard words.\n\n"
+    );
+    if let Some(summary) = ex["summary"].as_str().filter(|s| !s.trim().is_empty()) {
+        out.push_str(&format!(
+            "Summary (proposal): {}\n\n",
+            markdown_text(summary)
+        ));
+    }
+    let names: BTreeMap<&str, &str> = ex["mentions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|m| Some((m["local_id"].as_str()?, m["raw_text"].as_str()?)))
+        .collect();
+    let quotes = |item: &serde_json::Value| -> String {
+        item["evidence"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e["quote"].as_str())
+            .map(|q| format!("  - Transcript excerpt: “{}”\n", markdown_text(q)))
+            .collect()
+    };
+    if let Some(items) = ex["mentions"].as_array().filter(|a| !a.is_empty()) {
+        out.push_str("Mentions (proposals):\n\n");
+        for item in items {
+            if let Some(raw) = item["raw_text"].as_str() {
+                out.push_str(&format!(
+                    "- {} ({})\n{}",
+                    markdown_text(raw),
+                    markdown_text(item["kind"].as_str().unwrap_or("topic")),
+                    quotes(item)
+                ));
+            }
+        }
+        out.push('\n');
+    }
+    if let Some(items) = ex["statements"].as_array().filter(|a| !a.is_empty()) {
+        out.push_str("Statements (proposals):\n\n");
+        for item in items {
+            if let Some(text) = item["text"].as_str() {
+                out.push_str(&format!(
+                    "- {} — {}\n",
+                    markdown_text(text),
+                    markdown_text(item["epistemic_state"].as_str().unwrap_or("uncertain"))
+                ));
+                for field in ["subject_mention_id", "object_mention_id"] {
+                    if let Some(name) = names.get(item[field].as_str().unwrap_or("")) {
+                        out.push_str(&format!("  - Mentioned: {}\n", markdown_text(name)));
+                    }
+                }
+                out.push_str(&quotes(item));
+            }
+        }
+        out.push('\n');
+    }
+    if let Some(items) = ex["action_suggestions"]
+        .as_array()
+        .filter(|a| !a.is_empty())
+    {
+        out.push_str("Suggested actions (proposals):\n\n");
+        for item in items {
+            if let Some(text) = item["text"].as_str() {
+                out.push_str(&format!("- {}\n", markdown_text(text)));
+                if let Some(due) = item["due_text"].as_str().filter(|d| !d.is_empty()) {
+                    out.push_str(&format!("  - Due (as said): {}\n", markdown_text(due)));
+                }
+                out.push_str(&quotes(item));
+            }
+        }
+        out.push('\n');
+    }
+    if let Some(items) = ex["uncertainties"].as_array().filter(|a| !a.is_empty()) {
+        out.push_str("Uncertainties:\n\n");
+        for item in items {
+            if let Some(text) = item["description"].as_str() {
+                out.push_str(&format!("- {}\n", markdown_text(text)));
+                out.push_str(&quotes(item));
+            }
+        }
+        out.push('\n');
+    }
+    out
+}
+
 /// Inert generated Markdown. Transcript wording is escaped quoted text, so it
 /// cannot introduce a Recall marker, heading or link. Only the region after the
 /// final "Human annotation" heading participates in direct-edit reconciliation;
@@ -276,6 +375,9 @@ pub(super) fn audio_markdown(m: &VaultMemory) -> String {
                 ));
             }
         }
+    }
+    if let Some(proposal) = m.audio_organization.as_ref() {
+        out.push_str(&proposals_markdown(proposal));
     }
     out.push_str(&format!(
         "<!-- Recall memory {} | human annotation -->\n[Original recording]({source})\n\n## Human annotation\n\n{}",
@@ -403,10 +505,14 @@ impl Vault {
 
     pub(super) fn audio_event_valid(&self, e: &Event) -> Result<()> {
         let m = &e.memory;
-        let audio_kind =
-            ["audio_transcription", "audio_transcript_correction"].contains(&e.kind.as_str());
+        let audio_kind = [
+            "audio_transcription",
+            "audio_transcript_correction",
+            "audio_organization",
+        ]
+        .contains(&e.kind.as_str());
         let Some(source) = m.audio_source.as_ref() else {
-            if m.audio_transcript.is_some() || audio_kind {
+            if m.audio_transcript.is_some() || m.audio_organization.is_some() || audio_kind {
                 return Err("Audio provenance requires an audio source".into());
             }
             return Ok(());
@@ -483,6 +589,41 @@ impl Vault {
                 }
             }
         }
+        if let Some(proposal) = &m.audio_organization {
+            proposal.validate_audio(&self.id, &m.id, &m.source_sha256, &m.captured_at)?;
+            // A retired (suppressed) proposal is history: its derivative may predate a re-run.
+            if proposal.binding.expected_revision >= m.revision
+                || (!proposal.suppressed
+                    && proposal.binding.derivative_sha256.as_deref()
+                        != m.audio_transcript
+                            .as_ref()
+                            .map(|t| t.machine.derivative_sha256.as_str()))
+            {
+                return malformed();
+            }
+        }
+        if e.kind == "audio_organization" {
+            let proposal = m
+                .audio_organization
+                .as_ref()
+                .ok_or("Organization event must carry its proposal")?;
+            let transcript = m.audio_transcript.as_ref().ok_or("Missing transcript")?;
+            let (current, evidence) = match &transcript.human_correction {
+                Some(human) => (human.text.as_str(), "human_corrected"),
+                None if transcript.machine.eligibility == "eligible" => {
+                    (transcript.machine.text.as_str(), "machine_unreviewed")
+                }
+                None => return Err("An ineligible transcript cannot be organized".into()),
+            };
+            if proposal.suppressed
+                || proposal.binding.operation_id != e.operation_id
+                || proposal.binding.expected_revision != e.expected_revision
+                || proposal.binding.input_sha256 != hash(current.as_bytes())
+                || proposal.binding.transcript_evidence_kind.as_deref() != Some(evidence)
+            {
+                return Err("Audio organization revision binding mismatch".into());
+            }
+        }
         match e.kind.as_str() {
             "audio_transcription" => {
                 if m.audio_transcript
@@ -513,6 +654,7 @@ impl Vault {
         if next.memory.audio_source.is_none() {
             return Ok(());
         }
+        self.audio_org_transition(prev, next)?;
         let a = prev.memory.audio_transcript.as_ref();
         let b = next.memory.audio_transcript.as_ref();
         match next.kind.as_str() {
@@ -545,6 +687,41 @@ impl Vault {
         Ok(())
     }
 
+    fn audio_org_transition(&self, prev: &Event, next: &Event) -> Result<()> {
+        let before = prev.memory.audio_organization.as_ref();
+        let after = next.memory.audio_organization.as_ref();
+        match next.kind.as_str() {
+            "audio_organization" => {
+                if prev.memory.audio_transcript != next.memory.audio_transcript
+                    || prev.memory.note != next.memory.note
+                    || before.is_some_and(|p| !p.suppressed)
+                    || after.is_none_or(|p| p.suppressed)
+                {
+                    return Err("Stale audio organization cannot be promoted".into());
+                }
+            }
+            "audio_transcript_correction" | "audio_transcription" | "remove" | "restore" => {
+                match (before, after) {
+                    (None, None) => {}
+                    (Some(a), Some(b))
+                        if a.binding == b.binding
+                            && a.payload_sha256 == b.payload_sha256
+                            && a.result == b.result
+                            && b.suppressed => {}
+                    _ => {
+                        return Err("Transcript change did not retire the audio organization".into())
+                    }
+                }
+            }
+            _ => {
+                if before != after {
+                    return Err("Unrelated event changed the audio organization".into());
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn v9_digest(&self, e: &Event) -> Result<String> {
         let base = payload(
             &e.kind,
@@ -556,13 +733,17 @@ impl Vault {
         )?;
         let with_reading = hash(&json(&(base, &e.memory.reading))?);
         let with_org = hash(&json(&(with_reading, &e.memory.organization))?);
-        Ok(hash(&json(&(
+        let digest = hash(&json(&(
             with_org,
             &e.context_link_projection,
             &e.memory.imported_text,
             &e.memory.audio_source,
             &e.memory.audio_transcript,
-        ))?))
+        ))?);
+        if e.memory.audio_organization.is_some() {
+            return Ok(hash(&json(&(digest, &e.memory.audio_organization))?));
+        }
+        Ok(digest)
     }
 
     /// Publish a validated WAV create-only, then commit its v9 `capture` event.
@@ -634,6 +815,7 @@ impl Vault {
                 duration_ms: info.duration_ms,
             }),
             audio_transcript: None,
+            audio_organization: None,
         };
         let mut e = Event {
             format: FORMAT_V9.into(),
@@ -655,8 +837,11 @@ impl Vault {
         e.payload_sha256 = self.v9_digest(&e)?;
         // Capacity is reserved before the immutable original is published.
         self.preflight_capacity(&e)?;
+        let org_marker = self.audio_org_current_marker();
         immutable(&self.path(&format!("Sources/{operation_id}.wav")), bytes)?;
-        self.commit(&e)
+        let saved = self.commit(&e)?;
+        let _ = self.prepare_audio_org_intent(&saved, org_marker.as_ref());
+        Ok(saved)
     }
 
     /// The committed capture memory for an operation, if any.
@@ -868,7 +1053,11 @@ impl Vault {
         immutable(
             &self.asr_file(&request.memory_id, "asr-result.json")?,
             &json(result)?,
-        )
+        )?;
+        if result.state == "failed" {
+            self.audio_org_mark_awaiting_failed(&request.memory_id);
+        }
+        Ok(())
     }
     /// Promote a retained `completed` result to the journal after revalidating
     /// vault, source hash and request binding under the writer lock.
@@ -980,7 +1169,9 @@ impl Vault {
             memory: m,
             context_link_projection: None,
         };
-        self.commit(&e)
+        let saved = self.commit(&e)?;
+        let _ = self.audio_org_queue_locked(&saved);
+        Ok(saved)
     }
     /// Memories with a saved recording whose recognizer never launched: safe to
     /// resume after a restart, as is a retained completed result that was never
@@ -1096,7 +1287,9 @@ impl Vault {
             memory: m,
             context_link_projection: None,
         };
-        self.commit(&e)
+        let saved = self.commit(&e)?;
+        let _ = self.audio_org_queue_locked(&saved);
+        Ok(saved)
     }
 }
 

@@ -14,6 +14,10 @@ Preserve the accepted [ORGANIZE-01](../.agent/ORGANIZE-01.md) behavior. Use a di
 
 The separate `RECALL_LOCAL_ORGANIZATION_ENABLED` flag defaults to false. Migration 0011 supplies organization receipts and consent keyed by workspace/device/vault. The service additionally requires the exact protected grant, configured provider/budget and current purpose consent. Enabling the flag alone does not opt in a vault. The desktop settings decision establishes the local future-capture marker only after the scoped service decision succeeds.
 
+Voice-transcript organization (AUDIO-ORG-01, local candidate, not activated) is gated by its own `RECALL_LOCAL_AUDIO_ORGANIZATION_ENABLED` flag (default false). Migration 0012 adds `vault_intelligence_audio_organize_consents` with the same key, owner-only row-level security and epoch semantics as the text/photo table, and purge revokes it. Text/photo consent never authorizes audio and audio consent never authorizes text/photo. Routes: `GET /v1/local-intelligence/audio-organization-capability` and `POST /v1/local-intelligence/audio-organization-consent`; the shared organizations routes accept the `v3.` Binding 3.0 header for transcripts only. See `.agent/AUDIO-ORG-01.md`.
+
+To run the database-backed backend tests on this Windows host, use WSL: `PATH=/usr/lib/postgresql/18/bin:/home/nrsan/.local/recall-backend/bin:$PATH PYTHONPATH=$PWD/src ESBUILD_BINARY_PATH=/home/nrsan/.local/recall-node-tools/node_modules/@esbuild/linux-x64/bin/esbuild python -m pytest -q -p no:cacheprovider` from `services/backend`. Without `initdb` on `PATH` those tests skip silently.
+
 Run migration and real PostgreSQL authorization/receipt tests, native journal/compatibility tests, client checks and the local browser journey before freezing the integrated candidate. The v6 writer must preserve v1–v5 history and rendering compatibility. Record independent review against that exact source/docs digest. A synthetic consent flow does not authorize a real grant, provider call or deployment; actual activation and installed-device acceptance remain separately evidenced.
 
 ## Local Ask development and activation boundary

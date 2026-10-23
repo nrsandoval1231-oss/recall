@@ -53,6 +53,7 @@ def test_closed_inference_operator_inventory_covers_intelligence_receipts_and_gr
         "vault_intelligence_ask_consents",
         "local_intelligence_receipts",
         "vault_intelligence_organize_consents",
+        "vault_intelligence_audio_organize_consents",
         "local_organization_receipts",
     }
     expected_functions = {

@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     device_pairing_enabled: bool = Field(False, validation_alias="RECALL_DEVICE_PAIRING_ENABLED")
     local_intelligence_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_INTELLIGENCE_ENABLED")
     local_organization_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_ORGANIZATION_ENABLED")
+    local_audio_organization_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_AUDIO_ORGANIZATION_ENABLED")
     max_processing_attempts: int = Field(3, validation_alias="RECALL_MAX_PROCESSING_ATTEMPTS")
     worker_database_url: str | None = Field(None, validation_alias="RECALL_WORKER_DATABASE_URL")
     worker_lease_seconds: int = Field(900, validation_alias="RECALL_WORKER_LEASE_SECONDS")
@@ -110,6 +111,10 @@ class Settings(BaseSettings):
     @property
     def organize_policy_version(self) -> str:
         return f"organize-v2|{self.ai_policy_version}|{self.ai_model_id or 'unconfigured'}"
+
+    @property
+    def audio_organize_policy_version(self) -> str:
+        return f"organize-audio-v1|{self.ai_policy_version}|{self.ai_model_id or 'unconfigured'}"
 
     @property
     def embedding_configured(self) -> bool:
@@ -166,6 +171,8 @@ class Settings(BaseSettings):
             raise ValueError("RECALL_MAX_PROCESSING_ATTEMPTS must be 1-10")
         if len(self.organize_policy_version.encode("utf-8")) > 160:
             raise ValueError("organization policy version must be at most 160 UTF-8 bytes")
+        if len(self.audio_organize_policy_version.encode("utf-8")) > 160:
+            raise ValueError("audio organization policy version must be at most 160 UTF-8 bytes")
         for name in ("ai_input_usd_per_mtok", "ai_output_usd_per_mtok", "ai_daily_budget_usd", "ai_monthly_budget_usd"):
             value = getattr(self, name)
             if value is not None and value < 0:

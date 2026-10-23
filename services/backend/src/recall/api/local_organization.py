@@ -1,6 +1,8 @@
-"""Protected v1 local-vault text and photo organization routes."""
+"""Protected v1 local-vault text, photo and audio-transcript organization routes."""
 
 from __future__ import annotations
+
+from functools import partial
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -14,16 +16,14 @@ MAX_TEXT_BYTES = 120_000
 
 
 def register_routes(app: FastAPI, service: LocalOrganizationService) -> None:
-    @app.get("/v1/local-intelligence/organization-capability")
-    async def capability(request: Request) -> JSONResponse:
+    async def read_capability(request: Request, *, audio: bool) -> JSONResponse:
         authorization = request.headers.get("authorization")
         grant = await run_in_threadpool(service.authorize, authorization)
-        result = await run_in_threadpool(service.capability, grant)
+        result = await run_in_threadpool(partial(service.capability, grant, audio=audio))
         await run_in_threadpool(service.authorize, authorization, grant)
         return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
-    @app.post("/v1/local-intelligence/organization-consent")
-    async def set_consent(request: Request) -> JSONResponse:
+    async def write_consent(request: Request, *, audio: bool) -> JSONResponse:
         authorization = request.headers.get("authorization")
         grant = await run_in_threadpool(service.authorize, authorization)
         if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
@@ -37,9 +37,25 @@ def register_routes(app: FastAPI, service: LocalOrganizationService) -> None:
                 raise payload_too_large("Organization consent request is too large.")
             raw.extend(chunk)
         body = service.parse_consent(bytes(raw))
-        result = await run_in_threadpool(service.set_consent, authorization, grant, body)
+        result = await run_in_threadpool(partial(service.set_consent, authorization, grant, body, audio=audio))
         await run_in_threadpool(service.authorize, authorization, grant)
         return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+    @app.get("/v1/local-intelligence/organization-capability")
+    async def capability(request: Request) -> JSONResponse:
+        return await read_capability(request, audio=False)
+
+    @app.post("/v1/local-intelligence/organization-consent")
+    async def set_consent(request: Request) -> JSONResponse:
+        return await write_consent(request, audio=False)
+
+    @app.get("/v1/local-intelligence/audio-organization-capability")
+    async def audio_capability(request: Request) -> JSONResponse:
+        return await read_capability(request, audio=True)
+
+    @app.post("/v1/local-intelligence/audio-organization-consent")
+    async def set_audio_consent(request: Request) -> JSONResponse:
+        return await write_consent(request, audio=True)
 
     @app.post("/v1/local-intelligence/organizations")
     async def organize(request: Request) -> JSONResponse:
@@ -47,7 +63,9 @@ def register_routes(app: FastAPI, service: LocalOrganizationService) -> None:
         grant = await run_in_threadpool(service.authorize, authorization)
         binding_text = request.headers.get("x-recall-organization", "")
         binding = parse_binding(binding_text)
-        await run_in_threadpool(service.require_consent, grant, binding["consent_epoch"])
+        await run_in_threadpool(
+            partial(service.require_consent, grant, binding["consent_epoch"], audio=binding["schema_version"] == "3.0")
+        )
         media_type = request.headers.get("content-type", "").strip().lower()
         limit = MAX_TEXT_BYTES if media_type == "text/plain; charset=utf-8" else MAX_PHOTO_BYTES
         declared = request.headers.get("content-length")

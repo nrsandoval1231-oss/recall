@@ -578,3 +578,57 @@ def test_synthetic_inference_receipt_survives_restart_and_revoke() -> None:
         assert revoked.status_code == 200 and revoked.json()["revoked"] is True
         assert client.get(f"/v1/local-readings/{binding['operation_id']}", headers=headers).status_code == 403
     restarted_db.close()
+
+
+def _ops_inventory(filename: str, variable: str) -> set[str]:
+    path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / filename
+    for node in ast.parse(path.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == variable for t in node.targets):
+            value = node.value.args[0] if isinstance(node.value, ast.Call) else node.value
+            return set(ast.literal_eval(value))
+    raise AssertionError(f"{filename} has no {variable}")
+
+
+def _migration_tables() -> set[str]:
+    import re
+
+    migrations = Path(__file__).resolve().parents[1] / "migrations"
+    tables: set[str] = set()
+    for migration in sorted(migrations.glob("*.sql")):
+        text = migration.read_text(encoding="utf-8")
+        tables |= set(re.findall(r"create table (?:if not exists )?(?:public\.)?(\w+)", text, re.I))
+    return tables
+
+
+def test_ops_table_inventories_exactly_cover_every_migration_created_table() -> None:
+    """Omitting any migration-created table (for example a new consent table) from an ops inventory fails here."""
+    created = _migration_tables()
+    assert "vault_intelligence_audio_organize_consents" in created
+    optional = {"search_chunk_embeddings"}
+    preflight = _ops_inventory("preflight.py", "REQUIRED_TABLES")
+    audit = _ops_inventory("audit-database.py", "REQUIRED")
+    backup = _ops_inventory("backup.py", "TABLES")
+    for name, inventory in (("preflight", preflight), ("audit-database", audit)):
+        assert inventory - {"schema_migrations"} == created - optional, name
+    assert backup - {"schema_migrations"} == created
+    assert _ops_inventory("preflight.py", "OPTIONAL_TABLES") == optional
+    assert _ops_inventory("audit-database.py", "OPTIONAL") == optional
+
+
+def test_restore_verifier_compares_every_local_intelligence_consent_and_receipt_table() -> None:
+    path = Path(__file__).resolve().parents[3] / "infra" / "do-inference" / "ops" / "verify-ci-restore.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    evidence = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "evidence_tables" for t in node.targets)
+    )
+    compared = set(ast.literal_eval(evidence.value))
+    local_intelligence = {
+        table
+        for table in _migration_tables()
+        if table.startswith(("vault_intelligence_", "local_")) and table.endswith(("_consents", "_receipts"))
+    }
+    assert "vault_intelligence_audio_organize_consents" in local_intelligence
+    assert local_intelligence <= compared

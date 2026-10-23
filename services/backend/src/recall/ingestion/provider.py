@@ -36,6 +36,10 @@ class InterpretTextRequest:
     envelope: dict[str, Any]
     schema: dict[str, Any]
     context: list[dict[str, Any]] | None = None
+    # Explicit selector: "text" (typed note, the default) keeps the original prompt byte-for-byte;
+    # "audio_transcript" selects the voice-transcript prompt. Audio never carries related-memory context.
+    source_kind: str = "text"
+    transcript_evidence_kind: str | None = None
 
 
 @dataclass

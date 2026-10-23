@@ -1,4 +1,4 @@
-import type { AudioOperationStatus, AudioState } from "../platform/local-vault";
+import type { AudioOperationStatus, AudioState, OrganizationOperation } from "../platform/local-vault";
 
 export const TRANSCRIPT_CAVEAT = "Machine transcript may omit or mishear words; check the recording.";
 // States that can still change on their own. Everything else is final for this operation.
@@ -62,5 +62,55 @@ export function audioHeadline(s: AudioOperationStatus): string {
     case "recovery_required": return "A recording needs your decision";
     case "failed": return "Recording failed";
     case "discarded": return "Recording discarded";
+  }
+}
+
+// ---- Voice-note organization (read-only status of the single automatic operation) ----
+export const ORG_LIVE: readonly OrganizationOperation["state"][] = ["awaiting_transcript", "queued", "processing"];
+const STALE: Record<string, string> = {
+  CONSENT_REVOKED: "you turned voice-note organization off",
+  CONSENT_EPOCH_CHANGED: "your voice-note organization choice changed",
+  CONSENT_CHANGED: "your voice-note organization permission changed",
+  CONNECTION_CHANGED: "the private service connection changed",
+  SOURCE_OR_CONNECTION_CHANGED: "the recording or the private service connection changed",
+  SOURCE_OR_REVISION_CHANGED: "the recording changed",
+  TRANSCRIPT_CHANGED: "the transcript changed",
+  HUMAN_CORRECTION: "you corrected the transcript",
+  INPUT_CHANGED: "the text to organize changed",
+  REQUEST_CHANGED: "the prepared request no longer matched the recording",
+  NOT_QUEUED: "it was never queued to be sent",
+  STATE_CHANGED: "something changed while it was being prepared, so Recall retired it",
+};
+const LOCAL: Record<string, string> = {
+  TRANSCRIPT_INELIGIBLE: "Recall found no clear speech to organize, so nothing was sent",
+  TRANSCRIPTION_FAILED: "transcription did not complete, so there was nothing to organize",
+  INPUT_LIMIT_EXCEEDED: "the transcript is too long to organize (over 30,000 characters or 120,000 bytes)",
+  EMPTY_CORRECTION: "your correction is empty, so there is nothing to organize",
+  REQUEST_INVALID: "the transcript could not be prepared for organization",
+};
+const UNKNOWN: Record<string, string> = {
+  NOT_DISPATCHED: "Recall could not confirm whether the transcript text was sent",
+  RECEIPT_UNAVAILABLE: "the private service has no receipt for it yet",
+  PROVIDER_OUTCOME_UNKNOWN: "the service did not confirm the outcome",
+  RECEIPT_INVALID: "the service’s answer could not be trusted, so nothing was added to the note",
+  PROMOTION_FAILED: "the result could not be saved to the note",
+};
+const FAILED: Record<string, string> = {
+  INVALID_EXTRACTION: "the service could not produce a valid result", INVALID_JSON: "the service could not produce a valid result", SCHEMA_INVALID: "the service could not produce a valid result",
+  PROVIDER_FAILED: "the AI service could not finish", RECEIPT_EXPIRED: "the service result expired before it could be saved",
+};
+const reason = (table: Record<string, string>, code: string | null) => code ? table[code] ?? `(${code})` : "";
+// Plain wording for each state; the recording and transcript are always described as safe, and nothing is called verified.
+export function audioOrganizationText(op: OrganizationOperation): { headline: string; detail: string } {
+  const why = (table: Record<string, string>) => { const r = reason(table, op.error_code); return r ? ` — ${r}` : ""; };
+  switch (op.state) {
+    case "awaiting_transcript": return { headline: "Waiting for a usable transcript", detail: "Once there is one, its text is sent to Claude automatically. The recording is never sent." };
+    case "queued": case "prepared": return { headline: "Queued for organization", detail: "The transcript text will be sent to Claude automatically. The recording is never sent." };
+    case "processing": return { headline: "Organizing the transcript…", detail: "Only the transcript text is sent to Claude; the recording never is." };
+    case "unknown": return { headline: `Organization result uncertain${why(UNKNOWN)}`, detail: "Your recording and transcript are safe. Check the result to look up the same request; Recall will not send it again blindly." };
+    case "organized": return { headline: "Organized", detail: "The proposals below are unreviewed machine suggestions, not facts." };
+    case "failed": return { headline: `Not organized — the service reported a problem${why(FAILED)}`, detail: "Your recording and transcript are unchanged." };
+    case "stale": return { headline: `Not organized — retired without being sent${why(STALE)}`, detail: "Nothing from this request was applied. Your recording and transcript are unchanged." };
+    case "saved_local": return { headline: `Saved locally, not organized${why(LOCAL)}`, detail: "Your recording and transcript are kept." };
   }
 }

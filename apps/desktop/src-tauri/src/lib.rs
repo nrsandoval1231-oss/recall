@@ -1,6 +1,7 @@
 mod audio_asr;
 mod audio_wav;
 mod local_audio;
+mod local_audio_organization;
 mod local_intelligence;
 mod local_intelligence_transport;
 mod local_organization;
@@ -219,6 +220,7 @@ fn vault_select(
     if let Some(vault_id) = selected.vault_id.as_deref() {
         if let Ok(guard) = state.session(vault_id) {
             audio.resume_pending(&guard);
+            local_audio_organization::schedule_pending(guard.clone());
             local_organization::schedule_pending(guard);
         }
     }
@@ -406,14 +408,18 @@ pub fn run() {
                 .ok()
                 .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
                 .unwrap_or_default();
-            app.manage(local_audio::AudioState::new(
+            let audio_state = local_audio::AudioState::new(
                 data_dir.join("audio-stage"),
                 std::sync::Arc::new(local_audio::CpalBackend),
                 std::sync::Arc::new(audio_asr::SidecarEngine::production(
                     exe_dir,
                     app.path().resource_dir().ok(),
                 )),
+            );
+            audio_state.set_transcript_hook(std::sync::Arc::new(
+                local_audio_organization::schedule_pending,
             ));
+            app.manage(audio_state);
             app.manage(ManagedExportState::default());
             let vault_state = app.state::<local_vault::LocalVaultState>();
             if let Ok(status) = vault_state.status() {
@@ -421,6 +427,7 @@ pub fn run() {
                     if let Ok(guard) = vault_state.session(&token) {
                         app.state::<local_audio::AudioState>()
                             .resume_pending(&guard);
+                        local_audio_organization::schedule_pending(guard.clone());
                         local_organization::schedule_pending(guard);
                     }
                 }
@@ -472,6 +479,11 @@ pub fn run() {
             local_audio::vault_audio_recover,
             local_audio::vault_audio_correct,
             local_audio::vault_import_wav,
+            local_audio_organization::vault_audio_organization_capability,
+            local_audio_organization::vault_set_audio_organization_consent,
+            local_audio_organization::vault_reconcile_audio_organization_consent,
+            local_audio_organization::vault_audio_organization_operations,
+            local_audio_organization::vault_recover_audio_organization,
             vault_related_memory,
             vault_history,
             secrets::secret_get,

@@ -9,7 +9,14 @@ from typing import Any
 
 import anthropic
 
-from .prompts import ANSWER_SYSTEM, INTERPRET_CONTEXT_SYSTEM, INTERPRET_SYSTEM, INTERPRET_TEXT_SYSTEM
+from .prompts import (
+    ANSWER_SYSTEM,
+    INTERPRET_AUDIO_HUMAN_SYSTEM,
+    INTERPRET_AUDIO_MACHINE_SYSTEM,
+    INTERPRET_CONTEXT_SYSTEM,
+    INTERPRET_SYSTEM,
+    INTERPRET_TEXT_SYSTEM,
+)
 from .provider import AnswerRequest, InterpretRequest, InterpretTextRequest, ProviderError, ProviderResult
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
@@ -166,6 +173,23 @@ class AnthropicProvider:
 
     def interpret_text(self, request: InterpretTextRequest) -> ProviderResult:
         envelope = json.dumps(request.envelope, ensure_ascii=False, sort_keys=True)
+        if request.source_kind == "audio_transcript":
+            if request.context is not None or request.transcript_evidence_kind not in {
+                "machine_unreviewed",
+                "human_corrected",
+            }:
+                raise ValueError("audio transcript requests carry no context and a known evidence kind")
+            audio_system = (
+                INTERPRET_AUDIO_MACHINE_SYSTEM
+                if request.transcript_evidence_kind == "machine_unreviewed"
+                else INTERPRET_AUDIO_HUMAN_SYSTEM
+            )
+            audio_content = [
+                {"type": "text", "text": f"Envelope (data):\n{envelope}\n\nTranscript (data):\n{request.text}"}
+            ]
+            return self._call(system=audio_system, content=audio_content, schema=request.schema, max_tokens=64000)
+        if request.source_kind != "text":
+            raise ValueError("unknown text source kind")
         content = [{"type": "text", "text": f"Envelope (data):\n{envelope}\n\nNote (data):\n{request.text}"}]
         if request.context is not None:
             content.append(

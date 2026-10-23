@@ -52,6 +52,7 @@ TABLES = (
     "local_intelligence_receipts",
     "vault_intelligence_organize_consents",
     "local_organization_receipts",
+    "vault_intelligence_audio_organize_consents",
     "search_chunk_embeddings",
 )
 MAX_BACKUP_BYTES = 10 * 1024**3

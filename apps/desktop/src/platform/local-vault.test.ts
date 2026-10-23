@@ -144,6 +144,20 @@ it("audio commands carry only the selected session, UUIDs, action and text, and 
   ]);
 });
 
+it("voice-note organization uses its own commands with camelCase arguments and no text/photo command", async () => {
+  Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+  const vault = new NativeLocalVault();
+  await vault.audioOrganizationCapability("session"); await vault.setAudioOrganizationConsent("session", true, 4); await vault.reconcileAudioOrganizationConsent("session");
+  await vault.audioOrganizationOperations("session", "memory"); await vault.recoverAudioOrganization("session", "operation");
+  expect(vi.mocked(invoke).mock.calls).toEqual([
+    ["vault_audio_organization_capability", { expectedVaultId: "session" }],
+    ["vault_set_audio_organization_consent", { expectedVaultId: "session", enabled: true, expectedConsentEpoch: 4 }],
+    ["vault_reconcile_audio_organization_consent", { expectedVaultId: "session" }],
+    ["vault_audio_organization_operations", { expectedVaultId: "session", memoryId: "memory" }],
+    ["vault_recover_audio_organization", { expectedVaultId: "session", operationId: "operation" }],
+  ]);
+});
+
 it("an empty human reading correction takes precedence over machine text", async () => {
   const { effectiveReading } = await import("./local-vault");
   const reading = { human_correction: "", machine: { result: { extraction: { pages: [{ transcription: "machine" }] } } } };

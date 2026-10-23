@@ -2160,6 +2160,7 @@ mod tests {
                 imported_text: None,
                 audio_source: None,
                 audio_transcript: None,
+                audio_organization: None,
             },
             text: text.into(),
             evidence_kind: "text_source".into(),

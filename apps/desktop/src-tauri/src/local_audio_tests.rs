@@ -1498,3 +1498,28 @@ fn start_creates_its_session_under_the_selection_mutex() {
         "selection never moved"
     );
 }
+
+#[test]
+fn the_transcript_hook_runs_after_a_transcript_and_after_a_correction() {
+    let env = Env::new();
+    let (audio, _engine) = env.idle_audio(Mode::Text("hook words".into()));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    audio.set_transcript_hook(Arc::new(move |_guard| {
+        counter.fetch_add(1, Ordering::SeqCst);
+    }));
+    let guard = env.guard();
+    let id_ = import(&env, &audio, &guard, &synthetic_wav(16_000, 1, 16_000));
+    let done = wait_for(&audio, &guard, &id_, |s| s.state == "transcribed");
+    let started = Instant::now();
+    while calls.load(Ordering::SeqCst) == 0 {
+        assert!(started.elapsed() < Duration::from_secs(10));
+        thread::sleep(Duration::from_millis(5));
+    }
+    let before = calls.load(Ordering::SeqCst);
+    let revision = done.memory.unwrap().revision;
+    audio
+        .correct(&guard, &id_, revision, &op(), "corrected")
+        .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+}

@@ -72,6 +72,11 @@ pub struct VaultMemory {
     pub audio_source: Option<AudioSource>,
     #[serde(default)]
     pub audio_transcript: Option<AudioTranscript>,
+    /// Validated, unreviewed machine proposals derived from an unreviewed machine
+    /// transcript (or a human-corrected one). Null in the command DTO; omitted from
+    /// every event that never carried one so earlier bytes are unchanged.
+    #[serde(default)]
+    pub audio_organization: Option<OrganizationProposal>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -135,6 +140,7 @@ pub struct VaultRevision {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organization: Option<OrganizationProposal>,
     pub audio_transcript: Option<AudioTranscript>,
+    pub audio_organization: Option<OrganizationProposal>,
     pub recorded_at: String,
     pub origin: String,
     pub kind: String,
@@ -184,6 +190,7 @@ pub struct RetainedRevision {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organization: Option<OrganizationProposal>,
     pub audio_transcript: Option<AudioTranscript>,
+    pub audio_organization: Option<OrganizationProposal>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -284,6 +291,8 @@ mod event_memory {
         audio_source: Option<AudioSource>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         audio_transcript: Option<AudioTranscript>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        audio_organization: Option<OrganizationProposal>,
     }
     fn present_reading<'de, D: serde::Deserializer<'de>>(
         d: D,
@@ -308,6 +317,7 @@ mod event_memory {
             imported_text: m.imported_text.clone(),
             audio_source: m.audio_source.clone(),
             audio_transcript: m.audio_transcript.clone(),
+            audio_organization: m.audio_organization.clone(),
         }
         .serialize(serializer)
     }
@@ -329,6 +339,7 @@ mod event_memory {
             imported_text: m.imported_text,
             audio_source: m.audio_source,
             audio_transcript: m.audio_transcript,
+            audio_organization: m.audio_organization,
             state: "active".into(),
             note_path: None,
             related_context: Vec::new(),
@@ -2482,6 +2493,9 @@ impl Vault {
             source_sha256: source_sha.into(),
             expected_revision: 1,
             input_sha256: input_sha.into(),
+            derivative_sha256: None,
+            transcript_revision: None,
+            transcript_evidence_kind: None,
             consent_epoch: marker.consent_epoch,
             captured_at: captured_at.into(),
             context_coverage: None,
@@ -2881,10 +2895,13 @@ impl Vault {
                 "context_suppress",
                 "audio_transcription",
                 "audio_transcript_correction",
+                "audio_organization",
             ]
             .contains(&e.kind.as_str())
             || e.origin
-                != if ["machine_reading", "organization"].contains(&e.kind.as_str()) {
+                != if ["machine_reading", "organization", "audio_organization"]
+                    .contains(&e.kind.as_str())
+                {
                     "machine:anthropic"
                 } else if e.kind == "audio_transcription" {
                     "machine:whisper-local"
@@ -2970,6 +2987,7 @@ impl Vault {
                 "context_suppress",
                 "audio_transcription",
                 "audio_transcript_correction",
+                "audio_organization",
             ]
             .contains(&e.kind.as_str())
                 && e.previous_markdown.is_none())
@@ -3020,6 +3038,10 @@ impl Vault {
                 &e.memory.audio_source,
                 &e.memory.audio_transcript,
             ))?);
+        }
+        // Chained only when present, so every existing v9 digest stays byte-identical.
+        if e.format == FORMAT_V9 && e.memory.audio_organization.is_some() {
+            expected = hash(&json(&(expected, &e.memory.audio_organization))?);
         }
         self.context_projection_valid(e)?;
         self.reading_event_valid(e)?;
@@ -3835,6 +3857,20 @@ impl Vault {
                         .for_each(|entry| entry.suppressed = true);
                 }
             }
+            // A corrected transcript, removal or restore retires the machine proposals that
+            // were derived from the earlier wording; history keeps them.
+            if [
+                "audio_transcript_correction",
+                "audio_transcription",
+                "remove",
+                "restore",
+            ]
+            .contains(&normalized.kind.as_str())
+            {
+                if let Some(proposal) = normalized.memory.audio_organization.as_mut() {
+                    proposal.suppressed = true;
+                }
+            }
             normalized.markdown = markdown_for_event(&normalized)?;
         } else if e.format == FORMAT_V7 || manifest.format == FORMAT_V7 {
             normalized.format = FORMAT_V7.into();
@@ -3926,6 +3962,12 @@ impl Vault {
                     &normalized.memory.imported_text,
                     &normalized.memory.audio_source,
                     &normalized.memory.audio_transcript,
+                ))?);
+            }
+            if normalized.format == FORMAT_V9 && normalized.memory.audio_organization.is_some() {
+                normalized.payload_sha256 = hash(&json(&(
+                    normalized.payload_sha256,
+                    &normalized.memory.audio_organization,
                 ))?);
             }
         }
@@ -4140,6 +4182,7 @@ impl Vault {
             imported_text: Some(meta),
             audio_source: None,
             audio_transcript: None,
+            audio_organization: None,
         };
         let base = payload(
             "capture",
@@ -4218,6 +4261,7 @@ impl Vault {
             imported_text: Some(imported_text),
             audio_source: None,
             audio_transcript: None,
+            audio_organization: None,
         };
         // A source already published after interruption is completed with the same ID and no dispatch.
         let base = payload(
@@ -4402,6 +4446,7 @@ impl Vault {
             imported_text: None,
             audio_source: None,
             audio_transcript: None,
+            audio_organization: None,
         };
         let e = Event {
             format: FORMAT_V2.into(),
@@ -4477,6 +4522,7 @@ impl Vault {
             imported_text: None,
             audio_source: None,
             audio_transcript: None,
+            audio_organization: None,
         };
         let e = Event {
             format: FORMAT_V5.into(),
@@ -4710,6 +4756,7 @@ impl Vault {
                     imported_text: None,
                     audio_source: None,
                     audio_transcript: None,
+                    audio_organization: None,
                 },
             };
             if m.state == "deleted" && !include_deleted {
@@ -4733,12 +4780,24 @@ impl Vault {
             } else {
                 String::new()
             };
-            let spoken = m
-                .audio_transcript
-                .as_ref()
-                .and_then(|_| audio_current_text(&m))
-                .map(|(text, _, _)| text.to_lowercase())
-                .unwrap_or_default();
+            let spoken = {
+                let mut text = m
+                    .audio_transcript
+                    .as_ref()
+                    .and_then(|_| audio_current_text(&m))
+                    .map(|(text, _, _)| text.to_lowercase())
+                    .unwrap_or_default();
+                // Current (unsuppressed) machine proposals are searchable like text organization.
+                if let Some(proposal) = m.audio_organization.as_ref().filter(|p| !p.suppressed) {
+                    text.push(' ');
+                    text.push_str(
+                        &serde_json::to_string(&proposal.result.extraction)
+                            .unwrap_or_default()
+                            .to_lowercase(),
+                    );
+                }
+                text
+            };
             let organized = m
                 .organization
                 .as_ref()
@@ -4785,6 +4844,7 @@ impl Vault {
                     imported_text: None,
                     audio_source: None,
                     audio_transcript: None,
+                    audio_organization: None,
                 });
             }
         }
@@ -5283,6 +5343,7 @@ impl Vault {
                 reading: event.memory.reading.clone(),
                 organization: event.memory.organization.clone(),
                 audio_transcript: event.memory.audio_transcript.clone(),
+                audio_organization: event.memory.audio_organization.clone(),
             },
             original,
         })
@@ -5802,6 +5863,7 @@ impl Vault {
                 reading: e.memory.reading,
                 organization: e.memory.organization,
                 audio_transcript: e.memory.audio_transcript,
+                audio_organization: e.memory.audio_organization,
                 recorded_at: e.memory.updated_at,
                 origin: e.origin,
                 kind: e.kind,
@@ -5914,6 +5976,7 @@ impl LocalVaultState {
             token: current.token.clone(),
         })
     }
+    #[cfg(test)]
     pub fn select_path(&self, root: &Path) -> Result<VaultStatus> {
         self.select_path_if(root, || Ok(()))
     }
@@ -5994,8 +6057,11 @@ impl LocalVaultState {
 #[path = "reading_storage.rs"]
 mod reading_storage;
 pub use reading_storage::ReadingOperation;
+#[path = "local_vault_audio_org.rs"]
+mod audio_org_storage;
 #[path = "local_vault_audio.rs"]
 mod audio_storage;
+pub use audio_org_storage::AudioOrganizationIntent;
 use audio_storage::{audio_current_text, audio_markdown};
 #[cfg(test)]
 pub use audio_storage::{classify_machine_output, AudioMachineTranscript};

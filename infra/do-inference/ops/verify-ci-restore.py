@@ -84,6 +84,7 @@ with (
         "local_intelligence_receipts",
         "vault_intelligence_organize_consents",
         "local_organization_receipts",
+        "vault_intelligence_audio_organize_consents",
         "ai_consents",
         "local_reading_receipts",
         "ai_usage",

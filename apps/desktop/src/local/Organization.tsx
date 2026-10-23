@@ -1,36 +1,45 @@
 import { useEffect, useRef, useState } from "react";
-import type { LocalVault, OrganizationCapability, OrganizationOperation, OrganizationProposal } from "../platform/local-vault";
+import type { AudioOrganizationCapability, LocalVault, OrganizationCapability, OrganizationOperation, OrganizationProposal } from "../platform/local-vault";
 
-export function OrganizationSettings({ vault, sessionId, vaultIdentity, onChanged }: { vault: LocalVault; sessionId: string; vaultIdentity: string; onChanged: () => void }) {
-  const [capability, setCapability] = useState<OrganizationCapability | null>(null);
+type ConsentProps = { vault: LocalVault; sessionId: string; vaultIdentity: string; onChanged: () => void };
+export function OrganizationSettings(props: ConsentProps) { return <ConsentControl kind="text" {...props} />; }
+// Voice notes have their own server consent, epoch and local marker; this control shares no state with the text/photo one.
+export function AudioOrganizationSettings(props: ConsentProps) { return props.vault.audioOrganizationCapability ? <ConsentControl kind="audio" {...props} /> : null; }
+
+function ConsentControl({ kind, vault, sessionId, vaultIdentity, onChanged }: ConsentProps & { kind: "text" | "audio" }) {
+  const audio = kind === "audio";
+  const [capability, setCapability] = useState<OrganizationCapability | AudioOrganizationCapability | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const alive = useRef(true);
   const request = useRef(0);
   useEffect(() => { alive.current = true; return () => { alive.current = false; request.current++; }; }, []);
-  function validate(result: OrganizationCapability) {
-    if (result.vault_id !== vaultIdentity || result.scope !== "vault_intelligence" || result.purpose !== "organize") throw new Error("Organization status does not match this vault. Check again before changing its setting.");
+  function validate<T extends OrganizationCapability | AudioOrganizationCapability>(result: T): T {
+    if (result.vault_id !== vaultIdentity || result.scope !== "vault_intelligence" || result.purpose !== (audio ? "organize_audio" : "organize")) throw new Error(`${audio ? "Voice organization" : "Organization"} status does not match this vault. Check again before changing its setting.`);
     return result;
   }
   async function refresh() {
     const id = ++request.current;
     setLoading(true); setError(""); setCapability(null);
     try {
-      if (!vault.organizationCapability) throw new Error("Automatic organization is unavailable in this vault adapter.");
-      const result = await vault.organizationCapability(sessionId);
+      if (!(audio ? vault.audioOrganizationCapability : vault.organizationCapability)) throw new Error(`${audio ? "Voice-note organization" : "Automatic organization"} is unavailable in this vault adapter.`);
+      const result = await (audio ? vault.audioOrganizationCapability!(sessionId) : vault.organizationCapability!(sessionId));
       if (!alive.current || id !== request.current) return;
       setCapability(validate(result));
     } catch (e) { if (alive.current && id === request.current) setError(e instanceof Error ? e.message : String(e)); }
     finally { if (alive.current && id === request.current) setLoading(false); }
   }
   useEffect(() => { void refresh(); }, [vault, sessionId, vaultIdentity]);
+  const canWrite = audio ? Boolean(vault.setAudioOrganizationConsent) : Boolean(vault.setOrganizationConsent);
+  const canReconcile = audio ? Boolean(vault.reconcileAudioOrganizationConsent) : Boolean(vault.reconcileOrganizationConsent);
+  // Consent writes are never retried automatically: an ambiguous outcome clears the shown state and asks for a fresh read.
   async function decide(enabled: boolean) {
-    if (!capability || saving || !vault.setOrganizationConsent) return;
+    if (!capability || saving || !canWrite) return;
     const id = ++request.current;
     setSaving(true); setError("");
     try {
-      const result = await vault.setOrganizationConsent(sessionId, enabled, capability.consent_epoch);
+      const result = await (audio ? vault.setAudioOrganizationConsent!(sessionId, enabled, capability.consent_epoch) : vault.setOrganizationConsent!(sessionId, enabled, capability.consent_epoch));
       if (!alive.current || id !== request.current) return;
       setCapability(validate(result)); onChanged();
     } catch (e) {
@@ -38,11 +47,11 @@ export function OrganizationSettings({ vault, sessionId, vaultIdentity, onChange
     } finally { if (alive.current && id === request.current) setSaving(false); }
   }
   async function reconcile() {
-    if (!capability || saving || !vault.reconcileOrganizationConsent) return;
+    if (!capability || saving || !canReconcile) return;
     const id = ++request.current;
     setSaving(true); setError("");
     try {
-      const result = await vault.reconcileOrganizationConsent(sessionId);
+      const result = await (audio ? vault.reconcileAudioOrganizationConsent!(sessionId) : vault.reconcileOrganizationConsent!(sessionId));
       if (!alive.current || id !== request.current) return;
       setCapability(validate(result)); onChanged();
     } catch (e) {
@@ -50,9 +59,23 @@ export function OrganizationSettings({ vault, sessionId, vaultIdentity, onChange
     } finally { if (alive.current && id === request.current) setSaving(false); }
   }
   const activePermission = capability?.consent === "active";
-  const canTurnOn = Boolean(capability && !loading && !saving && capability.provider && !activePermission && vault.setOrganizationConsent);
-  const canTurnOff = Boolean(capability && !loading && !saving && activePermission && vault.setOrganizationConsent);
-  const status = !capability ? null : capability.automatic_enabled
+  const canTurnOn = Boolean(capability && !loading && !saving && capability.provider && !activePermission && canWrite);
+  const canTurnOff = Boolean(capability && !loading && !saving && activePermission && canWrite);
+  const status = !capability ? null : audio ? audioConsentStatus(capability) : textConsentStatus(capability);
+  return <details className={`local-tools local-organization-settings${audio ? " local-audio-organization-settings" : ""}`}>
+    <summary>{audio ? "Organize voice notes automatically" : "Automatically organize new notes and photos"}</summary>
+    {audio
+      ? <p>When turned on, the transcript text of voice notes you record or import from then on is sent, via your private Recall service, to {capability?.provider === "anthropic" ? "Anthropic Claude" : "the configured cloud provider"} to suggest a summary and other proposals. The recording or audio file itself is never sent. Recordings and imported audio you already have are not affected. The results are unreviewed machine proposals, not facts. Your choice is remembered until you turn it off, and it needs the private service connection.</p>
+      : <p>When turned on, notes and photos you save from then on, plus up to three short excerpts from current memories in this vault, are sent to {capability?.provider === "anthropic" ? "Anthropic Claude" : "the configured cloud provider"} through your private Recall service. The excerpts help suggest possibly related memories. Originals stay in your Obsidian vault. Older captures are not processed.</p>}
+    {loading && <p>{audio ? "Checking this vault’s voice-organization setting…" : "Checking this vault’s organization setting…"}</p>}
+    {status && <p>{status}</p>}
+    {error && <p role="alert" className="local-error">{error}</p>}
+    <div className="local-actions"><button disabled={!canTurnOn} onClick={() => void decide(true)}>{saving ? "Saving…" : audio ? "Turn on voice organization" : "Turn on"}</button><button disabled={!canTurnOff} onClick={() => void decide(false)}>{audio ? "Turn off voice organization" : "Turn off"}</button>{capability?.consent === "active" && capability.local_readiness === "needs_setup" && <button disabled={saving || !canReconcile} onClick={() => void reconcile()}>{saving ? "Finishing setup…" : audio ? "Finish voice setup" : "Finish setup"}</button>}{capability?.local_readiness === "unknown" && <button disabled={saving || !canReconcile} onClick={() => void reconcile()}>{saving ? "Checking…" : audio ? "Check voice setup again" : "Check again"}</button>}<button disabled={loading || saving} onClick={() => void refresh()}>{audio ? "Refresh voice setting" : "Refresh setting"}</button></div>
+  </details>;
+}
+
+function textConsentStatus(capability: OrganizationCapability | AudioOrganizationCapability): string {
+  return capability.automatic_enabled
     ? `Automatic organization is on${capability.provider === "anthropic" ? " with Anthropic Claude" : ""}.`
     : capability.local_readiness === "unknown"
       ? capability.consent === "active"
@@ -67,14 +90,23 @@ export function OrganizationSettings({ vault, sessionId, vaultIdentity, onChange
             : capability.provider
               ? "Automatic organization is off. New captures stay local."
               : "No organization provider is configured. New captures stay local.";
-  return <details className="local-tools local-organization-settings">
-    <summary>Automatically organize new notes and photos</summary>
-    <p>When turned on, notes and photos you save from then on, plus up to three short excerpts from current memories in this vault, are sent to {capability?.provider === "anthropic" ? "Anthropic Claude" : "the configured cloud provider"} through your private Recall service. The excerpts help suggest possibly related memories. Originals stay in your Obsidian vault. Older captures are not processed.</p>
-    {loading && <p>Checking this vault’s organization setting…</p>}
-    {status && <p>{status}</p>}
-    {error && <p role="alert" className="local-error">{error}</p>}
-    <div className="local-actions"><button disabled={!canTurnOn} onClick={() => void decide(true)}>{saving ? "Saving…" : "Turn on"}</button><button disabled={!canTurnOff} onClick={() => void decide(false)}>Turn off</button>{capability?.consent === "active" && capability.local_readiness === "needs_setup" && <button disabled={saving || !vault.reconcileOrganizationConsent} onClick={() => void reconcile()}>{saving ? "Finishing setup…" : "Finish setup"}</button>}{capability?.local_readiness === "unknown" && <button disabled={saving || !vault.reconcileOrganizationConsent} onClick={() => void reconcile()}>{saving ? "Checking…" : "Check again"}</button>}<button disabled={loading || saving} onClick={() => void refresh()}>Refresh setting</button></div>
-  </details>;
+}
+function audioConsentStatus(capability: OrganizationCapability | AudioOrganizationCapability): string {
+  return capability.automatic_enabled
+    ? `Voice-note organization is on${capability.provider === "anthropic" ? " with Anthropic Claude" : ""}. Only the transcript text of voice notes you record or import from now on is sent.`
+    : capability.local_readiness === "unknown"
+      ? capability.consent === "active"
+        ? "Your permission is saved, but this device’s setup status is unknown. New voice notes stay local until you check again."
+        : "Voice-note organization is off, but this device’s previous setup could not be cleared. Check again to confirm its status."
+      : capability.consent === "active" && capability.local_readiness === "needs_setup"
+        ? "Your permission is saved. Finish setup on this device before new voice notes can be organized. New voice notes stay local."
+        : capability.consent === "active"
+          ? "Your permission is saved, but voice organization is unavailable right now, for example because the private service connection is missing. New voice notes stay local for now. You can still turn it off."
+          : capability.consent === "outdated"
+            ? "The previous permission no longer applies. Review the disclosure above and turn it on again if you want to continue."
+            : capability.provider
+              ? "Voice-note organization is off. New voice notes stay local."
+              : "No organization provider is configured, so voice notes stay local.";
 }
 
 export function organizationEffective(proposal: OrganizationProposal | null | undefined): boolean {
@@ -107,17 +139,25 @@ function List({ title, items }: { title: string; items: unknown }) {
   return rows.length ? <section><h3>{title}</h3><ul>{rows.map((row, i) => <li key={`${title}-${i}`}>{row}</li>)}</ul></section> : null;
 }
 
-export function OrganizationContent({ proposal, historical = false }: { proposal: OrganizationProposal; historical?: boolean }) {
+// Proposals derived from a voice transcript: always unreviewed, never approvable, and retired (not shown as current) once suppressed.
+export function AudioProposals({ proposal, retained = false }: { proposal: OrganizationProposal; retained?: boolean }) {
+  if (proposal.suppressed && !retained) return <section className="local-organization" aria-label="Machine proposals (suppressed)"><h2>Machine proposals · suppressed</h2><p>Suppressed after your correction; kept in history.</p></section>;
+  if (proposal.suppressed) return <OrganizationContent proposal={proposal} historical audio heading="Retained machine proposals · suppressed after your correction" />;
+  const human = proposal.binding.transcript_evidence_kind === "human_corrected";
+  return <OrganizationContent proposal={proposal} historical={retained} audio heading={`Unreviewed machine proposals derived from ${human ? "a human-corrected transcript" : "an unreviewed machine transcript"}`} />;
+}
+
+export function OrganizationContent({ proposal, historical = false, heading, audio = false }: { proposal: OrganizationProposal; historical?: boolean; heading?: string; audio?: boolean }) {
   const extraction = proposal.result.extraction;
   const coverage = proposal.binding.context_coverage;
-  return <section className="local-organization" aria-label="Automatic organization">
-    <h2>{historical || proposal.suppressed ? "Earlier AI suggestion" : "AI suggestion · not confirmed"}</h2>{(historical || proposal.suppressed) && <p className="local-muted">Historical only · a human correction or edit takes precedence.</p>}
+  return <section className="local-organization" aria-label={audio ? "Machine proposals from the transcript" : "Automatic organization"}>
+    <h2>{heading ?? (historical || proposal.suppressed ? "Earlier AI suggestion" : "AI suggestion · not confirmed")}</h2>{(historical || proposal.suppressed) && <p className="local-muted">Historical only · a human correction or edit takes precedence.</p>}
     {extraction.summary && <><h3>Summary</h3><p>{extraction.summary}</p></>}
     {(extraction.summary_evidence ?? []).map((e, i) => <blockquote key={`summary-evidence-${i}`}>{e.quote}</blockquote>)}
-    <List title="Mentions" items={extraction.mentions} /><List title="What the source says" items={extraction.statements} /><List title="Possible next steps" items={extraction.action_suggestions} /><List title="Uncertainty" items={extraction.uncertainties} />
+    <List title="Mentions" items={extraction.mentions} /><List title={audio ? "What the transcript may say" : "What the source says"} items={extraction.statements} /><List title="Possible next steps" items={extraction.action_suggestions} /><List title="Uncertainty" items={extraction.uncertainties} />
     {proposal.binding.source_kind === "photo" && extraction.pages?.map((page, i) => <section key={`${page.page_id}-${i}`}><h3>Text seen in photo</h3><p>{page.transcription}</p></section>)}
     {coverage && <p className="local-muted" aria-label="Related memory coverage">{coverage.eligible_count === 0 ? "No current memories were available to compare." : `For related suggestions, Recall considered ${coverage.selected_count} of ${coverage.eligible_count} current memories.`}{coverage.limited ? " More memories were available than could be considered." : ""}{coverage.truncated_count > 0 ? ` ${coverage.truncated_count} excerpt${coverage.truncated_count === 1 ? " was" : "s were"} shortened to fit.` : ""}</p>}
-    <details className="local-tools local-organization-provenance"><summary>About this suggestion</summary><p>{proposal.result.provider === "anthropic" ? "Anthropic Claude" : "Configured provider"} · revision {proposal.binding.expected_revision} · source checked by Recall</p></details>
+    <details className="local-tools local-organization-provenance"><summary>About this suggestion</summary>{audio ? <p>Anthropic Claude read only the transcript text, never the recording · transcript revision {proposal.binding.transcript_revision ?? proposal.binding.expected_revision} · {proposal.binding.transcript_evidence_kind === "human_corrected" ? "your corrected wording" : "an unreviewed machine transcript"}. These are proposals, not verified facts.</p> : <p>{proposal.result.provider === "anthropic" ? "Anthropic Claude" : "Configured provider"} · revision {proposal.binding.expected_revision} · source checked by Recall</p>}</details>
   </section>;
 }
 

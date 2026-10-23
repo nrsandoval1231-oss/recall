@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { effectiveTranscript, type AudioOperationStatus, type LocalVault, type VaultMemory } from "../platform/local-vault";
-import { AUDIO_LIVE, AUDIO_OBSERVE_MS, TRANSCRIPT_CAVEAT, audioPollDelay, clock, transcriptProblem } from "./audio";
+import { effectiveTranscript, type AudioOperationStatus, type LocalVault, type OrganizationOperation, type VaultMemory } from "../platform/local-vault";
+import { AUDIO_LIVE, AUDIO_OBSERVE_MS, ORG_LIVE, TRANSCRIPT_CAVEAT, audioOrganizationText, audioPollDelay, clock, transcriptProblem } from "./audio";
+import { AudioProposals, organizationPollDelay } from "./Organization";
 
 const message = (e: unknown) => e instanceof Error ? e.message : String(e);
 function readable(iso: string) { const d = new Date(iso); return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" }); }
@@ -39,6 +40,14 @@ export function AudioMemory({ vault, session, memory, active, generation, blocke
   const [needsReview, setNeedsReview] = useState(false);
   const [reviewReady, setReviewReady] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [op, setOp] = useState<OrganizationOperation | null>(null);
+  const [opError, setOpError] = useState("");
+  const [opPaused, setOpPaused] = useState(false);
+  const [opTick, setOpTick] = useState(0);
+  const [recovering, setRecovering] = useState(false);
+  const orgRequest = useRef(0);
+  const orgPolls = useRef(0);
+  const orgSince = useRef(Date.now());
   const alive = useRef(true);
   const epoch = useRef(0);
   const sourceRequest = useRef(0);
@@ -90,6 +99,44 @@ export function AudioMemory({ vault, session, memory, active, generation, blocke
     return () => { window.clearTimeout(timer); statusRequest.current++; };
   }, [awaiting, waitPaused, wait, session, memory.id]);
   useLayoutEffect(() => { if (active && panel === "correct") heading.current?.focus(); }, [panel, active]);
+  // Organization is automatic. This only reads the one operation's status (never sends or retries) and refreshes the memory once it is organized.
+  async function refreshMemory(id: number) {
+    const rows = await vault.list(session, "", true);
+    const latest = rows.find(m => m.id === memory.id);
+    if (alive.current && id === orgRequest.current && latest) onMemoryRef.current(latest);
+  }
+  async function loadOperation() {
+    const id = ++orgRequest.current;
+    try {
+      const rows = await vault.audioOrganizationOperations!(session, memory.id);
+      if (!alive.current || id !== orgRequest.current) return;
+      const current = rows.at(-1) ?? null; setOp(current); setOpError("");
+      if (current?.state === "organized" && !memory.audio_organization) await refreshMemory(id);
+    } catch (e) { if (alive.current && id === orgRequest.current) { setOpError(`Voice organization status could not be read: ${message(e)}`); setOpPaused(true); } }
+  }
+  useEffect(() => {
+    if (!active || !vault.audioOrganizationOperations) return;
+    orgPolls.current = 0; orgSince.current = Date.now(); setOpPaused(false); void loadOperation();
+    return () => { orgRequest.current++; };
+  }, [active, session, memory.id, memory.revision]);
+  const orgLive = Boolean(op && ORG_LIVE.includes(op.state));
+  useEffect(() => {
+    if (!active || !orgLive || opPaused) return;
+    if (Date.now() - orgSince.current >= 600_000) { setOpPaused(true); return; }
+    const timer = window.setTimeout(() => { orgPolls.current++; void loadOperation().finally(() => setOpTick(t => t + 1)); }, organizationPollDelay(orgPolls.current));
+    return () => window.clearTimeout(timer);
+  }, [active, orgLive, op?.state, opTick, opPaused]);
+  async function recoverOperation() {
+    if (!op || !vault.recoverAudioOrganization || recovering) return;
+    const id = ++orgRequest.current; setRecovering(true); setOpError("");
+    try {
+      const result = await vault.recoverAudioOrganization(session, op.operation_id);
+      if (!alive.current || id !== orgRequest.current) return;
+      setOp(result); orgPolls.current = 0; orgSince.current = Date.now(); setOpPaused(false);
+      if (result.state === "organized") await refreshMemory(id);
+    } catch (e) { if (alive.current && id === orgRequest.current) setOpError(`The result could not be checked yet: ${message(e)}`); }
+    finally { if (alive.current) setRecovering(false); }
+  }
   const t = memory.audio_transcript;
   function startCorrection() { setDraft(effectiveTranscript(memory) ?? ""); setCorrection(null); setNeedsReview(false); setReviewReady(false); setReviewed(false); setError(""); setNotice(""); setPanel("correct"); }
   async function saveCorrection() {
@@ -138,5 +185,13 @@ export function AudioMemory({ vault, session, memory, active, generation, blocke
         <label htmlFor="transcript-correction">Your transcript correction</label><textarea id="transcript-correction" value={draft} readOnly={Boolean(correction)} onChange={e => setDraft(e.target.value)} />
         <div className="local-actions"><button className="local-primary" disabled={working || blocked || !playable || (needsReview && (!reviewReady || !reviewed))} onClick={() => void saveCorrection()}>{working ? "Saving…" : "Save correction"}</button><button disabled={working} onClick={() => setPanel("view")}>Back to transcript</button></div></section>}
     </div>
+    {(op || opError || memory.audio_organization) && <div className="local-audio-organization" aria-label="Voice organization">
+      {op && <section className="local-organization-operation" aria-label="Voice organization status" aria-live="polite">{(() => { const text = audioOrganizationText(op); const suppressed = op.state === "organized" && memory.audio_organization?.suppressed; return <><p><strong>{text.headline}</strong></p><p className="local-muted">{suppressed ? "The earlier proposals were suppressed after your correction and are kept in history." : text.detail}</p></>; })()}
+        {op.error_code && <details className="local-tools"><summary>Technical details</summary><code>{op.state} · {op.error_code}</code></details>}
+        {op.state === "unknown" && <button disabled={recovering || !active || !vault.recoverAudioOrganization} onClick={() => void recoverOperation()}>{recovering ? "Checking…" : "Check result"}</button>}
+        {opPaused && orgLive && <><p className="local-muted">Automatic status checks are paused.</p><button disabled={!active} onClick={() => { orgPolls.current = 0; orgSince.current = Date.now(); setOpPaused(false); void loadOperation(); }}>Check status again</button></>}</section>}
+      {opError && <p role="alert" className="local-error">{opError}</p>}
+      {memory.audio_organization && <AudioProposals proposal={memory.audio_organization} />}
+    </div>}
   </section>;
 }

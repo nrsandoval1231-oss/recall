@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AskAnswer, AskCapability, AskCitation, AskOutcome, HistoryAskOutcome, HistoryCapability, HistoryCitation, HistoryEvidence, AskTemporal, IntelligencePairingStatus, LocalVault, VaultStatus } from "../platform/local-vault";
 import { resolveHistoryQuestion } from "./history-question";
 import { TRANSCRIPT_CAVEAT } from "./audio";
+import { AudioProposals } from "./Organization";
 
 type Selected = VaultStatus & { root: string; vault_id: string; vault_identity: string };
 type Intent = { operationId: string; question: string; kind?: "current" | "history"; temporal?: AskTemporal };
@@ -72,7 +73,7 @@ export function HistoricalSourceView({ source, onClose }: { source: HistoryCitat
   const mime = source.original.mime_type || "application/octet-stream";
   const bytes = new Uint8Array(source.original.bytes);
   const text = mime.startsWith("text/") ? new TextDecoder().decode(bytes) : null;
-  const retained = source.retained_revision; const transcript = retained.audio_transcript ?? null; const audio = mime.startsWith("audio/") || Boolean(transcript);
+  const retained = source.retained_revision; const transcript = retained.audio_transcript ?? null; const audio = mime.startsWith("audio/") || Boolean(transcript) || Boolean(retained.audio_organization);
   useEffect(() => {
     const next = URL.createObjectURL(new Blob([bytes], { type: mime })); setUrl(next);
     return () => { URL.revokeObjectURL(next); };
@@ -83,6 +84,7 @@ export function HistoricalSourceView({ source, onClose }: { source: HistoryCitat
     <p className="local-muted">{audio ? "This is the recording and transcript saved then. The quoted excerpt below is only the passage used for the answer." : "This is the saved note or photo reading from then. The quoted excerpt below is only the passage used for the answer."}</p>
     {source.retained_revision.note && <><h4>{audio ? "Saved annotation" : "Saved human note"}</h4><pre>{source.retained_revision.note}</pre></>}
     {audio && (transcript ? transcript.human_correction ? <><h4>Your transcript correction · reported</h4><pre>{transcript.human_correction.text || "(The human correction is intentionally blank.)"}</pre><p className="local-muted">Typed by you after listening; not a verified fact.</p></> : transcript.machine.eligibility === "eligible" && transcript.machine.text.trim() ? <><h4>Machine transcript · unreviewed</h4><pre>{transcript.machine.text}</pre><p className="local-muted">{TRANSCRIPT_CAVEAT}</p></> : <p className="local-muted">No usable transcript had been saved at that point.</p> : <p className="local-muted">No transcript had been saved at that point.</p>)}
+    {audio && retained.audio_organization && <AudioProposals proposal={retained.audio_organization} retained />}
     {source.retained_revision.reading && <><h4>Saved photo reading</h4>{source.retained_revision.reading.human_correction !== null ? <><p><strong>Human reading correction</strong></p><pre>{source.retained_revision.reading.human_correction || "(The human correction is intentionally blank.)"}</pre></> : <><p><strong>Unreviewed machine transcription</strong></p>{source.retained_revision.reading.machine.result.extraction.pages.map(page => <div key={`${page.ordinal}:${page.page_id}`}><p><strong>Page {page.ordinal} · {page.legibility}</strong></p><pre>{page.transcription || "No readable transcription was retained."}</pre></div>)}</>}</>}
     {source.retained_revision.organization && <><h4>{source.retained_revision.organization.suppressed ? "Retained photo proposal · superseded" : "Retained photo interpretation · unreviewed"}</h4>{source.retained_revision.organization.suppressed && <p className="local-muted">This earlier machine proposal was later suppressed and is shown for history, not as current guidance.</p>}{source.retained_revision.organization.result.extraction.summary && <><p><strong>Summary · unreviewed</strong></p><p>{source.retained_revision.organization.result.extraction.summary}</p></>}{(source.retained_revision.organization.result.extraction.pages ?? []).map(page => <div key={`${page.ordinal}:${page.page_id}`}><p><strong>Full transcription · {page.legibility}</strong></p><pre>{page.transcription}</pre></div>)}</>}
     <h4>Quoted excerpt</h4><blockquote>{source.quote}</blockquote>

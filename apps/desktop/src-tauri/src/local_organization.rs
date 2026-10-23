@@ -41,6 +41,13 @@ pub struct OrganizationBinding {
     pub source_sha256: String,
     pub expected_revision: u64,
     pub input_sha256: String,
+    // Binding 3.0 (audio transcript) only; absent from 1.0/2.0 so their bytes are unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derivative_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcript_revision: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcript_evidence_kind: Option<String>,
     pub consent_epoch: u64,
     pub captured_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -179,7 +186,7 @@ fn native_capability(
     }
 }
 
-fn requested_decision_proven(
+pub(crate) fn requested_decision_proven(
     before: &OrganizationCapability,
     after: &OrganizationCapability,
     requested_enabled: bool,
@@ -231,7 +238,10 @@ fn commit_confirmed_consent(
     Ok(native_capability(vault, expected_connection, server))
 }
 
-fn post_if_selected<T>(guard: &SelectionGuard, post: impl FnOnce() -> Result<T>) -> Result<T> {
+pub(crate) fn post_if_selected<T>(
+    guard: &SelectionGuard,
+    post: impl FnOnce() -> Result<T>,
+) -> Result<T> {
     guard.active()?;
     post()
 }
@@ -282,6 +292,61 @@ pub struct OrganizationOperation {
 }
 
 impl OrganizationProposal {
+    /// Validate a proposal projected onto a voice recording. Internal consistency only:
+    /// the transcript it was derived from may since have been corrected, so the
+    /// extraction's own transcription is the bound input.
+    pub fn validate_audio(
+        &self,
+        vault_id: &str,
+        memory_id: &str,
+        source_sha256: &str,
+        captured_at: &str,
+    ) -> Result<()> {
+        let b = &self.binding;
+        if self.review_state != "unreviewed"
+            || b.schema_version != "3.0"
+            || b.source_kind != "audio_transcript"
+            || b.vault_id != vault_id
+            || b.memory_id != memory_id
+            || b.source_sha256 != source_sha256
+            || b.captured_at != captured_at
+            || b.expected_revision == 0
+            || self.media_type != "text/plain; charset=utf-8"
+        {
+            return Err("Invalid audio organization proposal binding".into());
+        }
+        let request = OrganizationRequest {
+            binding: b.clone(),
+            media_type: self.media_type.clone(),
+        };
+        request.validate_binding()?;
+        if request.payload_sha256()? != self.payload_sha256
+            || self.result.input_manifest_sha256 != self.payload_sha256
+            || self.result.provider != "anthropic"
+            || self.result.review_state != "unreviewed"
+            || self.result.derivative.is_some()
+            || self.result.related_context.is_some()
+        {
+            return Err("Invalid audio organization proposal digest".into());
+        }
+        crate::reading::validate_organization_extraction(
+            &self.result.extraction,
+            memory_id,
+            &self.payload_sha256,
+            memory_id,
+        )?;
+        let transcript = self.result.extraction["pages"][0]["transcription"]
+            .as_str()
+            .ok_or("Missing bound transcript")?;
+        if sha(transcript.as_bytes()) != b.input_sha256
+            || !exact_quotes(&self.result.extraction, transcript)
+            || (b.transcript_evidence_kind.as_deref() == Some("machine_unreviewed")
+                && self.result.extraction["pages"][0]["legibility"] == "clear")
+        {
+            return Err("Audio organization does not match its bound transcript".into());
+        }
+        Ok(())
+    }
     pub fn validate(
         &self,
         vault_id: &str,
@@ -347,13 +412,13 @@ impl OrganizationProposal {
     }
 }
 
-fn sha(bytes: &[u8]) -> String {
+pub(crate) fn sha(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
-fn uuid(value: &str) -> bool {
+pub(crate) fn uuid(value: &str) -> bool {
     Uuid::parse_str(value).is_ok_and(|v| v.to_string() == value)
 }
-fn hex64(value: &str) -> bool {
+pub(crate) fn hex64(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
@@ -383,6 +448,16 @@ impl OrganizationRequest {
                     return Err("Text exceeds the organization limit".into());
                 }
             }
+            ("audio_transcript", "text/plain; charset=utf-8") => {
+                let text = std::str::from_utf8(body).map_err(|_| "Transcript is invalid UTF-8")?;
+                if text.is_empty()
+                    || text.chars().count() > MAX_TEXT_CHARS
+                    || body.len() > MAX_TEXT_BYTES
+                    || text.contains('\0')
+                {
+                    return Err("Transcript exceeds the organization limit".into());
+                }
+            }
             ("photo", "image/png" | "image/jpeg" | "image/webp")
                 if body.len() <= MAX_PHOTO && b.input_sha256 == b.source_sha256 =>
             {
@@ -408,7 +483,12 @@ impl OrganizationRequest {
         if bytes.len() > MAX_CONTEXT_BINDING {
             return Err("Organization context binding exceeds its limit".into());
         }
-        let header = format!("v2.{}", base64url_no_pad(&bytes));
+        let prefix = if self.binding.schema_version == "3.0" {
+            "v3"
+        } else {
+            "v2"
+        };
+        let header = format!("{prefix}.{}", base64url_no_pad(&bytes));
         if header.len() > MAX_CONTEXT_HEADER || !header.is_ascii() {
             return Err("Organization context header exceeds its limit".into());
         }
@@ -501,6 +581,28 @@ impl OrganizationReceipt {
                         }
                         Ok(())
                     }
+                    "audio_transcript" if result.derivative.is_none() => {
+                        if let Some(body) = body {
+                            let text = std::str::from_utf8(body)
+                                .map_err(|_| "Invalid bound transcript")?;
+                            if result.extraction["pages"][0]["transcription"] != text
+                                || !exact_quotes(&result.extraction, text)
+                            {
+                                return Err(
+                                    "Organization changed or misquoted the submitted transcript"
+                                        .into(),
+                                );
+                            }
+                        }
+                        // "clear" is never claimed for unreviewed machine wording.
+                        if request.binding.transcript_evidence_kind.as_deref()
+                            == Some("machine_unreviewed")
+                            && result.extraction["pages"][0]["legibility"] == "clear"
+                        {
+                            return Err("Machine transcript cannot be marked clear".into());
+                        }
+                        Ok(())
+                    }
                     "photo"
                         if result.derivative.as_ref().is_some_and(|d| {
                             hex64(&d.sha256)
@@ -517,7 +619,7 @@ impl OrganizationReceipt {
         }
     }
 }
-fn exact_quotes(value: &Value, body: &str) -> bool {
+pub(crate) fn exact_quotes(value: &Value, body: &str) -> bool {
     match value {
         Value::Object(map) => map.iter().all(|(key, value)| {
             if key == "quote" {
@@ -538,7 +640,7 @@ pub(crate) fn text_result_matches_input(extraction: &Value, body: &str) -> bool 
 impl OrganizationRequest {
     pub(crate) fn validate_binding(&self) -> Result<()> {
         let b = &self.binding;
-        if !matches!(b.schema_version.as_str(), "1.0" | "2.0")
+        if !matches!(b.schema_version.as_str(), "1.0" | "2.0" | "3.0")
             || !uuid(&b.operation_id)
             || !uuid(&b.vault_id)
             || !uuid(&b.memory_id)
@@ -549,6 +651,14 @@ impl OrganizationRequest {
             || b.consent_epoch == 0
         {
             return Err("Invalid organization binding".into());
+        }
+        let audio_fields = (
+            b.derivative_sha256.as_deref(),
+            b.transcript_revision,
+            b.transcript_evidence_kind.as_deref(),
+        );
+        if b.schema_version != "3.0" && audio_fields != (None, None, None) {
+            return Err("Audio transcript fields require a 3.0 binding".into());
         }
         match b.schema_version.as_str() {
             "1.0" if b.context.is_none() && b.context_coverage.is_none() => Ok(()),
@@ -592,6 +702,28 @@ impl OrganizationRequest {
                 let encoded = serde_json::to_vec(b).map_err(|_| "Invalid organization binding")?;
                 if encoded.len() > MAX_CONTEXT_BINDING {
                     return Err("Organization context binding exceeds its limit".into());
+                }
+                Ok(())
+            }
+            "3.0" => {
+                // Audio transcript binding: no related-memory context in this version.
+                if b.source_kind != "audio_transcript"
+                    || b.context.is_some()
+                    || b.context_coverage.is_some()
+                    || !audio_fields.0.is_some_and(hex64)
+                    || !audio_fields
+                        .1
+                        .is_some_and(|r| (1..=9_007_199_254_740_991).contains(&r))
+                    || !matches!(
+                        audio_fields.2,
+                        Some("machine_unreviewed" | "human_corrected")
+                    )
+                {
+                    return Err("Invalid audio transcript binding".into());
+                }
+                let encoded = serde_json::to_vec(b).map_err(|_| "Invalid organization binding")?;
+                if encoded.len() > MAX_CONTEXT_BINDING {
+                    return Err("Organization binding exceeds its limit".into());
                 }
                 Ok(())
             }
@@ -645,7 +777,7 @@ fn validate_related_context(
     Ok(())
 }
 
-fn base64url_no_pad(bytes: &[u8]) -> String {
+pub(crate) fn base64url_no_pad(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut output = String::with_capacity((bytes.len() * 4 + 2) / 3);
     for chunk in bytes.chunks(3) {
@@ -669,7 +801,7 @@ pub enum OrganizationLookup {
     NotFound,
 }
 
-fn recover_then_dispatch(
+pub(crate) fn recover_then_dispatch(
     lookup: Result<OrganizationLookup>,
     expected: &OrganizationRequest,
     revalidate: impl FnOnce() -> Result<(OrganizationRequest, Vec<u8>)>,
@@ -716,7 +848,7 @@ pub struct LocalOrganizationTransport {
     client: Client,
     connection: IntelligenceConnection,
 }
-fn parsed_origin(raw: &str) -> Result<Url> {
+pub(crate) fn parsed_origin(raw: &str) -> Result<Url> {
     let url = Url::parse(raw).map_err(|_| "Organization service is unavailable")?;
     if url.scheme() != "https"
         || url.host_str().is_none()
@@ -730,7 +862,7 @@ fn parsed_origin(raw: &str) -> Result<Url> {
     }
     Ok(url)
 }
-fn bounded<T: for<'de> Deserialize<'de>>(response: Response) -> Result<T> {
+pub(crate) fn bounded<T: for<'de> Deserialize<'de>>(response: Response) -> Result<T> {
     if response.content_length().is_some_and(|n| n > MAX_RESPONSE) {
         return Err("Organization response exceeds its size limit".into());
     }
@@ -763,9 +895,19 @@ impl LocalOrganizationTransport {
             .map_err(|_| "Organization service unavailable".into())
     }
     pub fn capability(&self) -> Result<OrganizationCapability> {
+        self.capability_at("v1/local-intelligence/organization-capability", "organize")
+    }
+    /// The separate, purpose-specific audio-transcript organization capability.
+    pub fn audio_capability(&self) -> Result<OrganizationCapability> {
+        self.capability_at(
+            "v1/local-intelligence/audio-organization-capability",
+            "organize_audio",
+        )
+    }
+    fn capability_at(&self, path: &str, purpose: &str) -> Result<OrganizationCapability> {
         let response = self
             .client
-            .get(self.url("v1/local-intelligence/organization-capability")?)
+            .get(self.url(path)?)
             .bearer_auth(&self.connection.secret)
             .send()
             .map_err(|_| "Organization capability unavailable")?;
@@ -775,7 +917,7 @@ impl LocalOrganizationTransport {
         let cap: OrganizationCapability = bounded(response)?;
         if cap.schema_version != "1.0"
             || cap.scope != "vault_intelligence"
-            || cap.purpose != "organize"
+            || cap.purpose != purpose
             || cap.vault_id != self.connection.vault_id
             || !matches!(cap.consent.as_str(), "active" | "missing" | "outdated")
         {
@@ -788,13 +930,39 @@ impl LocalOrganizationTransport {
         cap: &OrganizationCapability,
         enabled: bool,
     ) -> Result<OrganizationCapability> {
+        self.set_consent_at(
+            "v1/local-intelligence/organization-consent",
+            "organize",
+            cap,
+            enabled,
+        )
+    }
+    pub fn set_audio_consent(
+        &self,
+        cap: &OrganizationCapability,
+        enabled: bool,
+    ) -> Result<OrganizationCapability> {
+        self.set_consent_at(
+            "v1/local-intelligence/audio-organization-consent",
+            "organize_audio",
+            cap,
+            enabled,
+        )
+    }
+    fn set_consent_at(
+        &self,
+        path: &str,
+        purpose: &str,
+        cap: &OrganizationCapability,
+        enabled: bool,
+    ) -> Result<OrganizationCapability> {
         let body = serde_json::to_vec(&serde_json::json!({"schema_version":"1.0","policy_version":cap.policy_version,"enabled":enabled,"expected_consent_epoch":cap.consent_epoch})).map_err(|_| "Cannot encode organization consent")?;
         if body.len() > 1024 {
             return Err("Organization consent request exceeds its limit".into());
         }
         let response = self
             .client
-            .post(self.url("v1/local-intelligence/organization-consent")?)
+            .post(self.url(path)?)
             .bearer_auth(&self.connection.secret)
             .header("Content-Type", "application/json")
             .body(body)
@@ -805,7 +973,14 @@ impl LocalOrganizationTransport {
                 Err("Organization consent changed; refresh capability".into())
             }
             Ok(_) => Err("Organization consent was rejected".into()),
-            Err(_) => self.capability(), // ambiguous POST: authenticated GET, never repeat POST
+            Err(_) => self.capability_at(
+                if purpose == "organize" {
+                    "v1/local-intelligence/organization-capability"
+                } else {
+                    "v1/local-intelligence/audio-organization-capability"
+                },
+                purpose,
+            ), // ambiguous POST: authenticated GET, never repeat POST
         }
     }
     pub fn post(&self, req: &OrganizationRequest, body: Vec<u8>) -> Result<OrganizationReceipt> {
@@ -1320,6 +1495,9 @@ mod tests {
                 source_sha256: "a".repeat(64),
                 expected_revision: 1,
                 input_sha256: "a".repeat(64),
+                derivative_sha256: None,
+                transcript_revision: None,
+                transcript_evidence_kind: None,
                 consent_epoch: 1,
                 captured_at: "2026-10-09T12:00:00Z".into(),
                 context_coverage: None,

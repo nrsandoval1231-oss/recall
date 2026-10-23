@@ -54,14 +54,39 @@ _SEMANTIC_FIELDS = (
     "uncertainties",
 )
 MAX_V2_HEADER_BYTES = 3072
-MAX_V2_BINDING_BYTES = 2300
+MAX_V2_BINDING_BYTES = 2300  # also bounds the decoded version 3.0 audio binding
+# Text/photo (1.0/2.0) and audio-transcript (3.0) consent live in separate tables with identical shape. The two
+# fixed statements per purpose keep any request data out of SQL text.
+_CONSENT_SELECT = {
+    False: (
+        "select enabled,policy_version,consent_epoch,decided_at from vault_intelligence_organize_consents "
+        "where workspace_id=%s and device_id=%s and vault_id=%s"
+    ),
+    True: (
+        "select enabled,policy_version,consent_epoch,decided_at from vault_intelligence_audio_organize_consents "
+        "where workspace_id=%s and device_id=%s and vault_id=%s"
+    ),
+}
+_CONSENT_UPSERT_TAIL = (
+    "policy_version,decided_by,consent_epoch) values(%s,%s,%s,%s,%s,%s,%s) "
+    "on conflict(workspace_id,device_id,vault_id) do update set enabled=excluded.enabled,"
+    "policy_version=excluded.policy_version,decided_by=excluded.decided_by,decided_at=now(),"
+    "consent_epoch=excluded.consent_epoch"
+)
+_CONSENT_UPSERT = {
+    False: "insert into vault_intelligence_organize_consents(workspace_id,device_id,vault_id,enabled,"
+    + _CONSENT_UPSERT_TAIL,
+    True: "insert into vault_intelligence_audio_organize_consents(workspace_id,device_id,vault_id,enabled,"
+    + _CONSENT_UPSERT_TAIL,
+}
+_AUDIO_TRANSCRIPT_EVIDENCE = {"machine_unreviewed", "human_corrected"}
 _EVIDENCE_KINDS = {"text_source", "human_note", "human_reading_correction", "machine_reading"}
 _EPISTEMIC_STATES = {"reported", "uncertain", "question", "unreviewed"}
 
 
 def parse_binding(raw: str) -> dict[str, Any]:
     try:
-        if raw.startswith("v2."):
+        if raw.startswith(("v2.", "v3.")):
             if not raw.isascii() or len(raw) > MAX_V2_HEADER_BYTES:
                 raise ValueError
             encoded = raw[3:]
@@ -85,7 +110,10 @@ def parse_binding(raw: str) -> dict[str, Any]:
                 raise ValueError
             if not isinstance(binding, dict):
                 raise ValueError
-            _validate_v2_binding(binding)
+            if raw.startswith("v3."):
+                _validate_v3_binding(binding)
+            else:
+                _validate_v2_binding(binding)
             return binding
         if len(raw.encode("utf-8", errors="strict")) > 4096:
             raise ValueError
@@ -126,7 +154,54 @@ def parse_binding(raw: str) -> dict[str, Any]:
             raise ValueError
         return binding
     except (UnicodeError, ValueError, TypeError, AttributeError, binascii.Error):
-        raise validation("X-Recall-Organization must contain a valid version 1.0 or 2.0 binding.") from None
+        raise validation("X-Recall-Organization must contain a valid version 1.0, 2.0 or 3.0 binding.") from None
+
+
+def _validate_v3_binding(binding: Any) -> None:
+    """Audio-transcript binding: no related-memory context fields (a context-bearing audio binding is 3.1)."""
+    keys = {
+        "schema_version",
+        "operation_id",
+        "vault_id",
+        "memory_id",
+        "source_kind",
+        "source_sha256",
+        "expected_revision",
+        "input_sha256",
+        "derivative_sha256",
+        "transcript_revision",
+        "transcript_evidence_kind",
+        "consent_epoch",
+        "captured_at",
+    }
+    if not isinstance(binding, dict) or set(binding) != keys:
+        raise ValueError
+    if binding["schema_version"] != "3.0" or any(
+        not _canonical_uuid(binding[k]) for k in ("operation_id", "vault_id", "memory_id")
+    ):
+        raise ValueError
+    if binding["source_kind"] != "audio_transcript":
+        raise ValueError
+    if any(
+        not isinstance(binding[k], str) or _SHA.fullmatch(binding[k]) is None
+        for k in ("source_sha256", "input_sha256", "derivative_sha256")
+    ):
+        raise ValueError
+    for key in ("expected_revision", "transcript_revision"):
+        if type(binding[key]) is not int or not 1 <= binding[key] <= 2**53 - 1:
+            raise ValueError
+    if (
+        not isinstance(binding["transcript_evidence_kind"], str)
+        or binding["transcript_evidence_kind"] not in _AUDIO_TRANSCRIPT_EVIDENCE
+    ):
+        raise ValueError
+    if type(binding["consent_epoch"]) is not int or binding["consent_epoch"] < 1:
+        raise ValueError
+    captured = binding["captured_at"]
+    if not isinstance(captured, str) or len(captured) > 40 or _DATE.fullmatch(captured) is None:
+        raise ValueError
+    if datetime.fromisoformat(captured.replace("Z", "+00:00")).tzinfo is None:
+        raise ValueError
 
 
 def _validate_v2_binding(binding: Any) -> None:
@@ -243,48 +318,43 @@ class LocalOrganizationService:
             pass
         return grant
 
+    def _policy_version(self, audio: bool) -> str:
+        return self.settings.audio_organize_policy_version if audio else self.settings.organize_policy_version
+
     def _decision(
-        self, tx: Tx, grant: IntelligenceGrant, *, lock: bool = False
+        self, tx: Tx, grant: IntelligenceGrant, *, lock: bool = False, audio: bool = False
     ) -> tuple[bool, str | None, int, datetime | None, bool]:
-        if lock:
-            query = (
-                "select enabled,policy_version,consent_epoch,decided_at from vault_intelligence_organize_consents "
-                "where workspace_id=%s and device_id=%s and vault_id=%s for update"
-            )
-        else:
-            query = (
-                "select enabled,policy_version,consent_epoch,decided_at from vault_intelligence_organize_consents "
-                "where workspace_id=%s and device_id=%s and vault_id=%s"
-            )
+        query = _CONSENT_SELECT[audio] + (" for update" if lock else "")
         row = tx.one(query, (tx.workspace_id, grant.device_id, grant.vault_id))
         if row is None:
             return False, None, 0, None, False
         policy = row["policy_version"]
-        active = bool(row["enabled"] and policy == self.settings.organize_policy_version)
+        active = bool(row["enabled"] and policy == self._policy_version(audio))
         return active, policy, row["consent_epoch"], row["decided_at"], bool(row["enabled"])
 
-    def _capability(self, grant: IntelligenceGrant, tx: Tx) -> dict[str, Any]:
-        active, policy, epoch, decided_at, saved_enabled = self._decision(tx, grant)
+    def _capability(self, grant: IntelligenceGrant, tx: Tx, *, audio: bool = False) -> dict[str, Any]:
+        active, policy, epoch, decided_at, saved_enabled = self._decision(tx, grant, audio=audio)
         configured = bool(self.settings.ai_configured and self.provider is not None)
         consent = "active" if active else "outdated" if saved_enabled else "missing"
+        flag = self.settings.local_audio_organization_enabled if audio else self.settings.local_organization_enabled
         return {
             "schema_version": "1.0",
             "scope": "vault_intelligence",
-            "purpose": "organize",
+            "purpose": "organize_audio" if audio else "organize",
             "vault_id": str(grant.vault_id),
-            "policy_version": self.settings.organize_policy_version,
+            "policy_version": self._policy_version(audio),
             "provider": self.settings.ai_provider if configured else None,
             "consent": consent,
-            "enabled": bool(active and self.settings.local_organization_enabled and configured),
+            "enabled": bool(active and flag and configured),
             "consent_epoch": epoch,
             "decided_at": decided_at.isoformat().replace("+00:00", "Z") if decided_at else None,
         }
 
-    def capability(self, grant: IntelligenceGrant) -> dict[str, Any]:
-        if len(self.settings.organize_policy_version.encode("utf-8")) > 160:
+    def capability(self, grant: IntelligenceGrant, *, audio: bool = False) -> dict[str, Any]:
+        if len(self._policy_version(audio).encode("utf-8")) > 160:
             raise RuntimeError("organization policy version exceeds its database bound")
         with self.tx(grant) as tx:
-            return self._capability(grant, tx)
+            return self._capability(grant, tx, audio=audio)
 
     @staticmethod
     def parse_consent(raw: bytes) -> dict[str, Any]:
@@ -316,16 +386,20 @@ class LocalOrganizationService:
             raise validation("Organization consent values are invalid.")
         return value
 
-    def set_consent(self, authorization: str | None, grant: IntelligenceGrant, body: dict[str, Any]) -> dict[str, Any]:
+    def set_consent(
+        self, authorization: str | None, grant: IntelligenceGrant, body: dict[str, Any], *, audio: bool = False
+    ) -> dict[str, Any]:
+        policy_version = self._policy_version(audio)
         with self.tx(grant) as tx:
             if not self.grant_active(tx, authorization, grant):
                 raise forbidden("Device connection changed.")
+            suffix = "audio-organize-consent" if audio else "organize-consent"
             tx.run(
                 "select pg_advisory_xact_lock(hashtextextended(%s,0))",
-                (f"{grant.workspace_id}:{grant.device_id}:{grant.vault_id}:organize-consent",),
+                (f"{grant.workspace_id}:{grant.device_id}:{grant.vault_id}:{suffix}",),
             )
-            _, _, epoch, _, _ = self._decision(tx, grant, lock=True)
-            if body["policy_version"] != self.settings.organize_policy_version:
+            _, _, epoch, _, _ = self._decision(tx, grant, lock=True, audio=audio)
+            if body["policy_version"] != policy_version:
                 raise ApiError("POLICY_STALE", "Organization policy changed; refresh capability.", 409)
             if body["expected_consent_epoch"] != epoch:
                 raise ApiError("CONSENT_STALE", "Organization consent changed; refresh capability.", 409)
@@ -337,23 +411,19 @@ class LocalOrganizationService:
                 raise forbidden("Organization consent requires the associated owner.")
             next_epoch = epoch + 1
             tx.run(
-                "insert into vault_intelligence_organize_consents(workspace_id,device_id,vault_id,enabled,"
-                "policy_version,decided_by,consent_epoch) values(%s,%s,%s,%s,%s,%s,%s) "
-                "on conflict(workspace_id,device_id,vault_id) do update set enabled=excluded.enabled,"
-                "policy_version=excluded.policy_version,decided_by=excluded.decided_by,decided_at=now(),"
-                "consent_epoch=excluded.consent_epoch",
+                _CONSENT_UPSERT[audio],
                 (
                     grant.workspace_id,
                     grant.device_id,
                     grant.vault_id,
                     body["enabled"],
-                    self.settings.organize_policy_version,
+                    policy_version,
                     grant.user_id,
                     next_epoch,
                 ),
             )
         with self.tx(grant) as tx:
-            return self._capability(grant, tx)
+            return self._capability(grant, tx, audio=audio)
 
     @staticmethod
     def grant_active(tx: Tx, authorization: str | None, grant: IntelligenceGrant) -> bool:
@@ -368,11 +438,12 @@ class LocalOrganizationService:
             and row["vault_id"] == grant.vault_id
         )
 
-    def require_consent(self, grant: IntelligenceGrant, epoch: int) -> tuple[str, int]:
+    def require_consent(self, grant: IntelligenceGrant, epoch: int, *, audio: bool = False) -> tuple[str, int]:
         with self.tx(grant) as tx:
-            active, policy, current_epoch, _, _ = self._decision(tx, grant)
-        if not active or policy != self.settings.organize_policy_version or current_epoch != epoch:
+            active, policy, current_epoch, _, _ = self._decision(tx, grant, audio=audio)
+        if not active or policy != self._policy_version(audio) or current_epoch != epoch:
             raise forbidden("Organization consent is unavailable or has changed.")
+        assert policy is not None
         return policy, current_epoch
 
     def _view(self, row: Row) -> dict[str, Any]:
@@ -404,7 +475,9 @@ class LocalOrganizationService:
             )
             if row is None:
                 raise not_found()
-            decision = self._decision(tx, grant, lock=True)
+            # A receipt is judged only against the consent purpose of the binding it was created under.
+            receipt_audio = isinstance(row["binding"], dict) and row["binding"].get("schema_version") == "3.0"
+            decision = self._decision(tx, grant, lock=True, audio=receipt_audio)
             if not (
                 decision[0] and decision[1] == row["consent_policy_version"] and decision[2] == row["consent_epoch"]
             ):
@@ -432,6 +505,7 @@ class LocalOrganizationService:
         digest: str,
         semantic_schema: dict[str, Any],
         extraction_schema: dict[str, Any],
+        legibility: str = "clear",
     ) -> Validated:
         try:
             semantic = json.loads(
@@ -474,7 +548,7 @@ class LocalOrganizationService:
             "schema_version": "1.1",
             "capture_id": binding["memory_id"],
             "input_manifest_sha256": digest,
-            "pages": [{"page_id": binding["memory_id"], "ordinal": 1, "transcription": text, "legibility": "clear"}],
+            "pages": [{"page_id": binding["memory_id"], "ordinal": 1, "transcription": text, "legibility": legibility}],
             **semantic,
         }
         validated = validate_extraction(
@@ -499,7 +573,8 @@ class LocalOrganizationService:
         if binding["vault_id"] != str(grant.vault_id):
             raise forbidden("Device vault scope does not match.")
         is_v2 = binding["schema_version"] == "2.0"
-        is_text = binding["source_kind"] == "text"
+        is_audio = binding["schema_version"] == "3.0"
+        is_text = binding["source_kind"] in ("text", "audio_transcript")
         if (is_text and media_type != "text/plain; charset=utf-8") or (
             not is_text and media_type not in {"image/jpeg", "image/png", "image/webp"}
         ):
@@ -516,7 +591,7 @@ class LocalOrganizationService:
                 text = body.decode("utf-8", errors="strict")
             except UnicodeDecodeError:
                 raise validation("Organization text must be valid UTF-8.") from None
-            if "\x00" in text or len(text) > 30_000:
+            if "\x00" in text or len(text) > 30_000 or (is_audio and len(body) > 120_000):
                 raise validation("Organization text must be 1 to 30000 Unicode characters.")
         else:
             if binding["input_sha256"] != binding["source_sha256"]:
@@ -558,7 +633,7 @@ class LocalOrganizationService:
         digest = hashlib.sha256(canonical).hexdigest()
         self.expire()
         self.authorize(authorization, grant)
-        consent_policy, consent_epoch = self.require_consent(grant, binding["consent_epoch"])
+        consent_policy, consent_epoch = self.require_consent(grant, binding["consent_epoch"], audio=is_audio)
         prior_result: dict[str, Any] | None = None
         with self.tx(grant) as tx:
             row = tx.one(
@@ -574,13 +649,17 @@ class LocalOrganizationService:
                 prior_result = self._view(row)
             else:
                 if (
-                    not self.settings.local_organization_enabled
+                    not (
+                        self.settings.local_audio_organization_enabled
+                        if is_audio
+                        else self.settings.local_organization_enabled
+                    )
                     or not self.settings.ai_configured
                     or self.provider is None
                 ):
                     raise ApiError("AI_NOT_CONFIGURED", "Local organization is not currently enabled.", 409)
                 try:
-                    tx_decision = self._decision(tx, grant, lock=True)
+                    tx_decision = self._decision(tx, grant, lock=True, audio=is_audio)
                     if tx_decision[:3] != (True, consent_policy, consent_epoch):
                         raise processing.BudgetReservationError("CONSENT_REQUIRED")
                     reservation = processing.reserve_provider_budget(
@@ -591,7 +670,8 @@ class LocalOrganizationService:
                         max_input_tokens=max_input_tokens,
                         max_output_tokens=MAX_INTERPRET_OUTPUT_TOKENS,
                         consent_check=lambda scoped_tx, _settings: (
-                            self._decision(scoped_tx, grant)[:3] == (True, consent_policy, consent_epoch)
+                            self._decision(scoped_tx, grant, audio=is_audio)[:3]
+                            == (True, consent_policy, consent_epoch)
                         ),
                     )
                 except processing.BudgetReservationError as exc:
@@ -621,7 +701,7 @@ class LocalOrganizationService:
         assert self.provider is not None
         try:
             self.authorize(authorization, grant)
-            self.require_consent(grant, consent_epoch)
+            self.require_consent(grant, consent_epoch, audio=is_audio)
             envelope = {
                 "capture_id": binding["memory_id"],
                 "input_manifest_sha256": digest,
@@ -654,9 +734,20 @@ class LocalOrganizationService:
                 }
             if is_text:
                 assert text is not None
-                provider_result = self.provider.interpret_text(
-                    InterpretTextRequest(text, envelope, provider_schema, binding.get("context") if is_v2 else None)
-                )
+                if is_audio:
+                    text_request = InterpretTextRequest(
+                        text,
+                        envelope,
+                        provider_schema,
+                        None,
+                        source_kind="audio_transcript",
+                        transcript_evidence_kind=binding["transcript_evidence_kind"],
+                    )
+                else:
+                    text_request = InterpretTextRequest(
+                        text, envelope, provider_schema, binding.get("context") if is_v2 else None
+                    )
+                provider_result = self.provider.interpret_text(text_request)
             else:
                 assert derivative is not None
                 provider_result = self.provider.interpret(
@@ -707,6 +798,10 @@ class LocalOrganizationService:
                     digest=digest,
                     semantic_schema=self.semantic_schema,
                     extraction_schema=self.extraction_schema,
+                    # Machine wording is never "clear"; only a person's own corrected wording may be.
+                    legibility=(
+                        "mixed" if is_audio and binding["transcript_evidence_kind"] == "machine_unreviewed" else "clear"
+                    ),
                 )
             else:
                 validated = validate_selected_extraction(
@@ -794,7 +889,7 @@ class LocalOrganizationService:
             processing.finalize_provider_reservation(
                 tx, self.settings, reservation, purpose="organize", job_id=None, result=usage, uncertain=uncertain
             )
-            current = self._decision(tx, grant, lock=True)
+            current = self._decision(tx, grant, lock=True, audio=is_audio)
             if state == "complete" and (
                 current[0] is not True
                 or current[1] != consent_policy

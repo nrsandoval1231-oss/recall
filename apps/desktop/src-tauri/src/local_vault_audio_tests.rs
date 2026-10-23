@@ -928,3 +928,105 @@ fn segments_must_be_monotonic_and_strictly_within_the_recording() {
         );
     }
 }
+
+#[test]
+fn forged_or_mismatched_audio_proposals_are_rejected_by_event_validation() {
+    use crate::local_audio_organization::tests::{queued, run};
+    let (_env, guard, memory, fake) = queued();
+    let vault = &guard.vault;
+    run(&guard, &fake).unwrap();
+    let good = vault.records(&memory.id).unwrap().pop().unwrap();
+    assert_eq!(good.kind, "audio_organization");
+    vault.event_valid(&good).unwrap();
+    let reject = |mutate: &dyn Fn(&mut Event)| {
+        let mut e = good.clone();
+        mutate(&mut e);
+        assert!(vault.event_valid(&e).is_err());
+    };
+    reject(&|e| {
+        e.memory
+            .audio_organization
+            .as_mut()
+            .unwrap()
+            .binding
+            .input_sha256 = "0".repeat(64)
+    });
+    reject(&|e| e.memory.audio_organization.as_mut().unwrap().suppressed = true);
+    reject(&|e| {
+        e.memory
+            .audio_organization
+            .as_mut()
+            .unwrap()
+            .binding
+            .source_sha256 = "0".repeat(64)
+    });
+    reject(&|e| {
+        e.memory
+            .audio_organization
+            .as_mut()
+            .unwrap()
+            .binding
+            .schema_version = "2.0".into()
+    });
+    reject(&|e| {
+        e.memory
+            .audio_organization
+            .as_mut()
+            .unwrap()
+            .result
+            .extraction["pages"][0]["transcription"] = "different words".into()
+    });
+    reject(&|e| e.origin = "human:recall".into());
+    reject(&|e| e.memory.audio_organization = None);
+    // A proposal on a text memory is never valid.
+    let text = vault.capture_text(&op(), "plain").unwrap();
+    let mut text_event = vault.records(&text.id).unwrap().remove(0);
+    text_event.memory.audio_organization = good.memory.audio_organization.clone();
+    assert!(vault.event_valid(&text_event).is_err());
+    // Transition rules: an unsuppressed proposal cannot survive a correction, vanish, or be forged.
+    let mut survives = good.clone();
+    survives.kind = "audio_transcript_correction".into();
+    assert!(vault.audio_transition(&good, &survives).is_err());
+}
+
+#[test]
+fn existing_v9_audio_events_keep_their_digest_and_never_serialize_an_empty_proposal() {
+    let f = Fx::new();
+    let vault = f.vault();
+    let m = recorded(&vault);
+    let saved = vault
+        .audio_apply_machine_transcript(&m.id, machine_for(&m, "Call the dentist.", 2800.0, &op()))
+        .unwrap();
+    for revision in [1, saved.revision] {
+        let text = fs::read_to_string(vault.history_path(&m.id, revision)).unwrap();
+        assert!(
+            !text.contains("audio_organization"),
+            "older events carry no new key"
+        );
+        // Recompute the pre-AUDIO-ORG v9 digest chain literally and compare.
+        let e: Event = serde_json::from_str(&text).unwrap();
+        let base = payload(
+            &e.kind,
+            &e.memory.id,
+            e.expected_revision,
+            &e.memory.note,
+            &e.memory.source_sha256,
+            &e.memory.source_name,
+        )
+        .unwrap();
+        let chain = hash(&json(&(base, &e.memory.reading)).unwrap());
+        let chain = hash(&json(&(chain, &e.memory.organization)).unwrap());
+        let expected = hash(
+            &json(&(
+                chain,
+                &e.context_link_projection,
+                &e.memory.imported_text,
+                &e.memory.audio_source,
+                &e.memory.audio_transcript,
+            ))
+            .unwrap(),
+        );
+        assert_eq!(e.payload_sha256, expected, "revision {revision}");
+    }
+    assert!(serde_json::to_value(&saved).unwrap()["audio_organization"].is_null());
+}

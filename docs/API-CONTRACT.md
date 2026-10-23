@@ -36,6 +36,8 @@ This contract uses the protected `vault_intelligence` grant and a separate, revo
 | --- | --- | --- |
 | `GET /v1/local-intelligence/organization-capability` | Exact scoped bearer | Configured provider/policy, consent state, epoch and availability |
 | `POST /v1/local-intelligence/organization-consent` | Strict policy echo, enabled decision and expected epoch | Updated capability; stale decisions reject |
+| `GET /v1/local-intelligence/audio-organization-capability` | Protected inference grant | Separate voice-transcript purpose (`organize_audio`), policy version, consent state, epoch; disabled unless the audio flag, provider and active audio consent all hold |
+| `POST /v1/local-intelligence/audio-organization-consent` | Strict policy echo, enabled decision and expected epoch | Updated audio capability; stale decisions reject; never enrolls text/photo |
 | `POST /v1/local-intelligence/organizations` | Strict `X-Recall-Organization` binding plus raw text or photo bytes | Bound receipt; no canonical server memory |
 | `GET /v1/local-intelligence/organizations/{operation_id}` | Same scoped bearer and operation | Recovery receipt or authenticated absence |
 

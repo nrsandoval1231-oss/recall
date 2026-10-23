@@ -45,6 +45,7 @@ TABLES = [
     "local_intelligence_receipts",
     "vault_intelligence_organize_consents",
     "local_organization_receipts",
+    "vault_intelligence_audio_organize_consents",
 ]
 
 MIGRATIONS = [
@@ -59,6 +60,7 @@ MIGRATIONS = [
     "0009_device_pairing.sql",
     "0010_local_intelligence.sql",
     "0011_local_organization.sql",
+    "0012_local_audio_organization.sql",
 ]
 
 
