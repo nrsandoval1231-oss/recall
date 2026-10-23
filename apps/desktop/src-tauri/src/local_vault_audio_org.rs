@@ -240,6 +240,16 @@ impl Vault {
             let unsent = ["awaiting_transcript", "queued"].contains(&intent.state.as_str())
                 || (intent.state == "processing" && !intent.sent);
             if !unsent {
+                // Sent work must not sit on "processing" forever once consent is gone: it becomes
+                // ambiguous (`unknown`) with the reason. This only writes state; it never sends.
+                if intent.state == "processing" && intent.sent {
+                    let code = match &marker {
+                        Some(m) if m.local_epoch == intent.local_epoch => continue,
+                        Some(_) => "CONSENT_EPOCH_CHANGED",
+                        None => "CONSENT_REVOKED",
+                    };
+                    self.update_audio_org_intent(&mut intent, "unknown", Some(code), None)?;
+                }
                 continue;
             }
             match &marker {
@@ -372,6 +382,10 @@ impl Vault {
         let _ = self.recover()?;
         let mut intent = self.audio_org_intent_by_operation(op)?;
         if !["processing", "unknown"].contains(&intent.state.as_str()) {
+            return Ok(false);
+        }
+        // The marker must still be the one this intent was enrolled under.
+        if self.audio_org_marker_matches(&intent)?.is_err() {
             return Ok(false);
         }
         if !intent.sent {
@@ -770,5 +784,13 @@ impl Vault {
 impl Vault {
     pub fn root_for_test(&self) -> PathBuf {
         self.root.clone()
+    }
+}
+
+#[cfg(test)]
+impl Vault {
+    /// Test-only: hold the writer lock so another operation sees "vault is busy".
+    pub fn hold_lock_for_test(&self) -> Result<File> {
+        self.lock()
     }
 }

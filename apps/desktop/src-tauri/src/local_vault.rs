@@ -1751,6 +1751,13 @@ fn payload(
 ) -> Result<String> {
     Ok(hash(&json(&(kind, memory, rev, note, source, name))?))
 }
+/// Work that has provably not left the device: not yet dispatched, or `processing` with the
+/// durable `sent` marker still unset. Only such work may be retired by a consent change; a
+/// sent or ambiguous (`unknown`) request is resolved only through its receipt.
+fn unsent_organization_work(intent: &OrganizationIntent) -> bool {
+    ["prepared", "queued"].contains(&intent.state.as_str())
+        || (intent.state == "processing" && !intent.sent)
+}
 impl Vault {
     pub fn open(root: &Path) -> Result<Self> {
         safe(root)?;
@@ -2007,6 +2014,10 @@ impl Vault {
     ) -> Result<()> {
         intent.state = state.into();
         intent.error_code = error;
+        // Only in-flight intents carry the `sent` key; a terminal state drops it again.
+        if ["organized", "failed", "stale", "saved_local"].contains(&state) {
+            intent.sent = false;
+        }
         self.save_organization_intent(intent, true)
     }
     pub fn set_organization_marker(&self, marker: Option<OrganizationMarker>) -> Result<()> {
@@ -2035,14 +2046,21 @@ impl Vault {
                     continue;
                 }
                 let mut i: OrganizationIntent = decode(&p)?;
-                if i.local_epoch != marker.local_epoch
-                    && ["prepared", "queued"].contains(&i.state.as_str())
-                {
-                    self.update_organization_intent(
-                        &mut i,
-                        "stale",
-                        Some("CONSENT_EPOCH_CHANGED".into()),
-                    )?;
+                if i.local_epoch != marker.local_epoch {
+                    if unsent_organization_work(&i) {
+                        self.update_organization_intent(
+                            &mut i,
+                            "stale",
+                            Some("CONSENT_EPOCH_CHANGED".into()),
+                        )?;
+                    } else if i.state == "processing" && i.sent {
+                        // Sent work must not hang on "processing": it becomes ambiguous.
+                        self.update_organization_intent(
+                            &mut i,
+                            "unknown",
+                            Some("CONSENT_EPOCH_CHANGED".into()),
+                        )?;
+                    }
                 }
             }
         } else {
@@ -2056,10 +2074,16 @@ impl Vault {
                     continue;
                 }
                 let mut i: OrganizationIntent = decode(&p)?;
-                if ["prepared", "queued"].contains(&i.state.as_str()) {
+                if unsent_organization_work(&i) {
                     self.update_organization_intent(
                         &mut i,
                         "stale",
+                        Some("CONSENT_REVOKED".into()),
+                    )?;
+                } else if i.state == "processing" && i.sent {
+                    self.update_organization_intent(
+                        &mut i,
+                        "unknown",
                         Some("CONSENT_REVOKED".into()),
                     )?;
                 }
@@ -2156,7 +2180,7 @@ impl Vault {
             return Ok(None);
         }
         let Some(marker) = self.load_organization_marker()? else {
-            if ["prepared", "queued"].contains(&intent.state.as_str()) {
+            if unsent_organization_work(&intent) {
                 self.update_organization_intent(
                     &mut intent,
                     "stale",
@@ -2169,7 +2193,7 @@ impl Vault {
             || marker.consent_epoch != intent.binding.consent_epoch
             || marker.connection_fingerprint != intent.connection_fingerprint
         {
-            if ["prepared", "queued"].contains(&intent.state.as_str()) {
+            if unsent_organization_work(&intent) {
                 self.update_organization_intent(
                     &mut intent,
                     "stale",
@@ -2272,6 +2296,9 @@ impl Vault {
         }
         Ok(true)
     }
+    /// Unconditional setter, for tests only. Production transitions go through
+    /// [`Self::transition_organization_state`] so a retired state is never overwritten.
+    #[cfg(test)]
     pub fn set_organization_operation_state(
         &self,
         operation: &str,
@@ -2305,6 +2332,83 @@ impl Vault {
             error_code: intent.error_code,
         })
     }
+    /// Compare-and-set: move the operation to `to` only if it is currently in one of the
+    /// `from` states; otherwise write nothing and return `None`.
+    pub fn transition_organization_state(
+        &self,
+        operation: &str,
+        from: &[&str],
+        to: &str,
+        error: Option<&str>,
+    ) -> Result<Option<OrganizationOperation>> {
+        let _lock = self.lock()?;
+        let _ = self.recover()?;
+        let mut intent = self
+            .organization_intent(operation)?
+            .ok_or("Organization operation not found")?;
+        if ![
+            "prepared",
+            "queued",
+            "processing",
+            "unknown",
+            "organized",
+            "failed",
+            "stale",
+            "saved_local",
+        ]
+        .contains(&to)
+        {
+            return Err("Invalid organization operation state".into());
+        }
+        if !from.contains(&intent.state.as_str()) {
+            return Ok(None);
+        }
+        self.update_organization_intent(&mut intent, to, error.map(str::to_owned))?;
+        Ok(Some(OrganizationOperation {
+            operation_id: operation.into(),
+            memory_id: intent.binding.memory_id,
+            state: intent.state,
+            error_code: intent.error_code,
+        }))
+    }
+    /// Durable "may have been sent" marker, written under the vault lock right before the POST.
+    /// Refused (false) unless the operation is `processing` or `unknown`.
+    pub fn mark_organization_sent(&self, operation: &str) -> Result<bool> {
+        let _lock = self.lock()?;
+        let _ = self.recover()?;
+        let mut intent = self
+            .organization_intent(operation)?
+            .ok_or("Organization operation not found")?;
+        if !["processing", "unknown"].contains(&intent.state.as_str()) {
+            return Ok(false);
+        }
+        // The marker must still be the one this intent was enrolled under.
+        let current_marker = self.load_organization_marker()?;
+        if current_marker.as_ref().is_none_or(|marker| {
+            marker.local_epoch != intent.local_epoch
+                || marker.consent_epoch != intent.binding.consent_epoch
+                || marker.connection_fingerprint != intent.connection_fingerprint
+        }) {
+            return Ok(false);
+        }
+        if !intent.sent {
+            intent.sent = true;
+            self.save_organization_intent(&intent, true)?;
+        }
+        Ok(true)
+    }
+    /// A `processing` operation that was never sent returns to `queued`.
+    pub fn revert_organization_unsent(&self, operation: &str) -> Result<()> {
+        let _lock = self.lock()?;
+        let _ = self.recover()?;
+        let mut intent = self
+            .organization_intent(operation)?
+            .ok_or("Organization operation not found")?;
+        if intent.state == "processing" && !intent.sent {
+            self.update_organization_intent(&mut intent, "queued", None)?;
+        }
+        Ok(())
+    }
     pub fn promote_organization(
         &self,
         request: &OrganizationRequest,
@@ -2316,6 +2420,16 @@ impl Vault {
         let mut intent = self
             .organization_intent(&request.binding.operation_id)?
             .ok_or("Organization operation not found")?;
+        // A retired operation (stale after a revoke, failed, saved_local, organized) never
+        // promotes late: the late result is dropped without touching the vault.
+        if !["prepared", "queued", "processing", "unknown"].contains(&intent.state.as_str()) {
+            return Ok(OrganizationOperation {
+                operation_id: request.binding.operation_id.clone(),
+                memory_id: intent.binding.memory_id,
+                state: intent.state,
+                error_code: intent.error_code,
+            });
+        }
         let marker = self
             .load_organization_marker()?
             .ok_or("Organization consent was revoked")?;
@@ -2513,6 +2627,7 @@ impl Vault {
             local_epoch: marker.local_epoch,
             state: if oversized { "saved_local" } else { "prepared" }.into(),
             error_code: oversized.then(|| "INPUT_LIMIT_EXCEEDED".into()),
+            sent: false,
         };
         self.save_organization_intent(&intent, false)?;
         Ok(Some(intent))

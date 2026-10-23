@@ -464,6 +464,12 @@ fn automatic_stop_at_120_seconds_saves_the_clip_without_a_stop_command() {
     assert_eq!(source.source_bytes, 44 + 3_840_000);
     let bytes = source_bytes(&env, &id_);
     assert_eq!(parse_wav(&bytes).unwrap().data_len, 3_840_000);
+    // The saved result is visible before the recorder thread releases its session, so
+    // allow a bounded moment for it under load; it must end without any Stop command.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while audio.is_busy() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
     assert!(!audio.is_busy(), "the session ended without Stop");
     // A late Stop is an idempotent read of the durable result.
     let late = audio.stop(&guard, &id_).unwrap();

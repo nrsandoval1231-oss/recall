@@ -238,14 +238,6 @@ fn commit_confirmed_consent(
     Ok(native_capability(vault, expected_connection, server))
 }
 
-pub(crate) fn post_if_selected<T>(
-    guard: &SelectionGuard,
-    post: impl FnOnce() -> Result<T>,
-) -> Result<T> {
-    guard.active()?;
-    post()
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct OrganizationProposal {
@@ -280,6 +272,13 @@ pub struct OrganizationIntent {
     pub local_epoch: String,
     pub state: String,
     pub error_code: Option<String>,
+    /// Set durably right before the POST. Skipped when false, so unsent intent files keep
+    /// their exact earlier bytes and older files (without the key) still load.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub sent: bool,
+}
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -801,25 +800,6 @@ pub enum OrganizationLookup {
     NotFound,
 }
 
-pub(crate) fn recover_then_dispatch(
-    lookup: Result<OrganizationLookup>,
-    expected: &OrganizationRequest,
-    revalidate: impl FnOnce() -> Result<(OrganizationRequest, Vec<u8>)>,
-    dispatch: impl FnOnce(&OrganizationRequest, Vec<u8>) -> Result<OrganizationReceipt>,
-) -> Result<Option<OrganizationReceipt>> {
-    match lookup? {
-        OrganizationLookup::Receipt(receipt) => Ok(Some(receipt)),
-        OrganizationLookup::NotFound => {
-            let (request, body) = revalidate()?;
-            if &request != expected {
-                return Err("Organization operation changed during recovery".into());
-            }
-            request.validate(&body)?;
-            dispatch(&request, body).map(Some)
-        }
-    }
-}
-
 fn fresh_dispatch_material(
     vault: &Vault,
     operation_id: &str,
@@ -834,10 +814,12 @@ fn fresh_dispatch_material(
         || &request != expected
         || body != expected_body
     {
-        let _ = vault.set_organization_operation_state(
+        // Best effort: a busy vault leaves the state as is and the next trigger retries.
+        let _ = vault.transition_organization_state(
             operation_id,
+            &["prepared", "queued", "processing", "unknown"],
             "stale",
-            Some("SOURCE_OR_CONNECTION_CHANGED".into()),
+            Some("SOURCE_OR_CONNECTION_CHANGED"),
         );
         return Ok(None);
     }
@@ -1291,6 +1273,29 @@ fn run_scoped(
         return Ok(false);
     }
     let transport = LocalOrganizationTransport::new(connection.clone())?;
+    run_scoped_with(
+        guard,
+        operation_id,
+        attempted,
+        &marker,
+        &connection.fingerprint,
+        &|| Ok(pairing::confirmed_intelligence(&vault.id)?.fingerprint),
+        &transport,
+    )
+}
+
+/// The sweep body, generic over the transport and the protected-pairing reader so tests can
+/// drive the production code path with a fake.
+pub(crate) fn run_scoped_with<T: OrganizationDispatchTransport>(
+    guard: &SelectionGuard,
+    operation_id: Option<&str>,
+    attempted: &mut HashSet<String>,
+    marker: &OrganizationMarker,
+    fingerprint: &str,
+    current_fingerprint: &dyn Fn() -> Result<String>,
+    transport: &T,
+) -> Result<bool> {
+    let vault = &guard.vault;
     run_batches(
         operation_id,
         ORGANIZATION_BATCH_SIZE,
@@ -1303,9 +1308,7 @@ fn run_scoped(
             let Some(current_marker) = vault.organization_marker()? else {
                 return Ok(false);
             };
-            let current_connection = pairing::confirmed_intelligence(&vault.id)?;
-            if current_marker != marker || current_connection.fingerprint != connection.fingerprint
-            {
+            if current_marker != *marker || current_fingerprint()? != fingerprint {
                 return Ok(false);
             }
             let capability = transport.capability()?;
@@ -1315,155 +1318,288 @@ fn run_scoped(
                 && capability.policy_version == marker.policy_version
                 && capability.consent_epoch == marker.consent_epoch)
         },
-        |pending| process_intent(guard, vault, pending, &marker, &connection, &transport),
+        |pending| {
+            process_intent(
+                guard,
+                vault,
+                pending,
+                marker,
+                fingerprint,
+                current_fingerprint,
+                transport,
+            )
+        },
         attempted,
     )
 }
 
-fn process_intent(
+/// The remote surface text/photo dispatch needs. The production implementation is the
+/// fixed HTTPS transport; tests inject a fake and never touch the network.
+pub(crate) trait OrganizationDispatchTransport {
+    fn capability(&self) -> Result<OrganizationCapability>;
+    fn get(&self, request: &OrganizationRequest) -> Result<OrganizationLookup>;
+    fn post(&self, request: &OrganizationRequest, body: Vec<u8>) -> Result<OrganizationReceipt>;
+}
+impl OrganizationDispatchTransport for LocalOrganizationTransport {
+    fn capability(&self) -> Result<OrganizationCapability> {
+        LocalOrganizationTransport::capability(self)
+    }
+    fn get(&self, request: &OrganizationRequest) -> Result<OrganizationLookup> {
+        LocalOrganizationTransport::get(self, request)
+    }
+    fn post(&self, request: &OrganizationRequest, body: Vec<u8>) -> Result<OrganizationReceipt> {
+        LocalOrganizationTransport::post(self, request, body)
+    }
+}
+
+/// Why the pre-send re-check failed. `Stale` retires the operation with its precise code
+/// and nothing is sent; `Transient` (service off, network, vault busy) means nothing is
+/// wrong with the operation itself, so an unsent request simply goes back to `queued`.
+pub(crate) enum Recheck {
+    Stale(String),
+    Transient,
+}
+pub(crate) enum DispatchFailure {
+    Stale(String),
+    /// Nothing left the device (the durable "sent" marker was not written).
+    NotSent,
+    /// The POST failed after the "sent" marker: the outcome is ambiguous.
+    Ambiguous,
+}
+pub(crate) enum Attempt {
+    Receipt(OrganizationReceipt),
+    Stale(String),
+    Transient,
+    LookupFailed,
+    Ambiguous,
+}
+
+/// Receipt first; only an authenticated "not found" may lead to a (re-checked) send, with
+/// the same operation ID. Typed outcomes keep "stale before dispatch" apart from real
+/// transport errors, so only an actual lookup/POST failure can ever become `unknown`.
+pub(crate) fn typed_recover_then_dispatch(
+    lookup: Result<OrganizationLookup>,
+    expected: &OrganizationRequest,
+    recheck: impl FnOnce() -> std::result::Result<(OrganizationRequest, Vec<u8>), Recheck>,
+    dispatch: impl FnOnce(
+        &OrganizationRequest,
+        Vec<u8>,
+    ) -> std::result::Result<OrganizationReceipt, DispatchFailure>,
+) -> Attempt {
+    match lookup {
+        Err(_) => Attempt::LookupFailed,
+        Ok(OrganizationLookup::Receipt(receipt)) => Attempt::Receipt(receipt),
+        Ok(OrganizationLookup::NotFound) => {
+            let (request, body) = match recheck() {
+                Ok(fresh) => fresh,
+                Err(Recheck::Stale(code)) => return Attempt::Stale(code),
+                Err(Recheck::Transient) => return Attempt::Transient,
+            };
+            if &request != expected || request.validate(&body).is_err() {
+                return Attempt::Stale("SOURCE_OR_REVISION_CHANGED".into());
+            }
+            match dispatch(&request, body) {
+                Ok(receipt) => Attempt::Receipt(receipt),
+                Err(DispatchFailure::Stale(code)) => Attempt::Stale(code),
+                Err(DispatchFailure::NotSent) => Attempt::Transient,
+                Err(DispatchFailure::Ambiguous) => Attempt::Ambiguous,
+            }
+        }
+    }
+}
+
+const LIVE: [&str; 3] = ["queued", "processing", "unknown"];
+const IN_FLIGHT: [&str; 2] = ["processing", "unknown"];
+
+pub(crate) fn process_intent<T: OrganizationDispatchTransport>(
     guard: &SelectionGuard,
     vault: &Vault,
     pending: &OrganizationIntent,
     marker: &OrganizationMarker,
-    connection: &IntelligenceConnection,
-    transport: &LocalOrganizationTransport,
+    fingerprint: &str,
+    current_fingerprint: &dyn Fn() -> Result<String>,
+    transport: &T,
 ) -> Result<()> {
     guard.active()?;
-    let Some((intent, request, body)) =
-        vault.organization_dispatch_material(&pending.binding.operation_id)?
-    else {
+    let op = pending.binding.operation_id.as_str();
+    let Some((intent, request, body)) = vault.organization_dispatch_material(op)? else {
         return Ok(());
     };
-    if intent.connection_fingerprint != connection.fingerprint {
-        let _ = vault.set_organization_operation_state(
-            &intent.binding.operation_id,
-            "stale",
-            Some("CONNECTION_CHANGED".into()),
-        );
+    if intent.connection_fingerprint != fingerprint {
+        let _ = vault.transition_organization_state(op, &LIVE, "stale", Some("CONNECTION_CHANGED"));
         return Ok(());
     }
     let first_send = intent.state == "queued";
-    if first_send {
-        vault.set_organization_operation_state(&intent.binding.operation_id, "processing", None)?;
+    if first_send
+        && !matches!(
+            vault.transition_organization_state(op, &["queued"], "processing", None),
+            Ok(Some(_))
+        )
+    {
+        // Retired between the material check and now (e.g. consent revoked), or the vault was
+        // busy: never send; a busy vault is simply retried by the next trigger.
+        return Ok(());
     }
-    let receipt = recover_then_dispatch(
+    let attempt = typed_recover_then_dispatch(
         transport.get(&request),
         &request,
         || {
-            guard.active()?;
-            let current = pairing::confirmed_intelligence(&vault.id)?;
-            if current.fingerprint != connection.fingerprint {
-                return Err("Organization connection changed during recovery".into());
+            guard.active().map_err(|_| Recheck::Transient)?;
+            let now = current_fingerprint().map_err(|_| Recheck::Transient)?;
+            if now != fingerprint {
+                return Err(Recheck::Stale("CONNECTION_CHANGED".into()));
             }
-            let current_marker = vault
-                .organization_marker()?
-                .ok_or("Organization consent was revoked")?;
-            if current_marker != *marker {
-                return Err("Organization consent changed during recovery".into());
+            match vault.organization_marker() {
+                Ok(None) => return Err(Recheck::Stale("CONSENT_REVOKED".into())),
+                Ok(Some(current)) if current != *marker => {
+                    return Err(Recheck::Stale("CONSENT_EPOCH_CHANGED".into()));
+                }
+                Ok(Some(_)) => {}
+                Err(_) => return Err(Recheck::Transient),
             }
-            let latest = transport.capability()?;
-            if !latest.enabled
-                || latest.consent != "active"
+            let latest = transport.capability().map_err(|_| Recheck::Transient)?;
+            if latest.consent != "active"
                 || latest.policy_version != marker.policy_version
                 || latest.consent_epoch != marker.consent_epoch
             {
-                return Err("Organization consent changed during recovery".into());
+                return Err(Recheck::Stale("CONSENT_CHANGED".into()));
             }
-            if pairing::confirmed_intelligence(&vault.id)?.fingerprint != connection.fingerprint {
-                return Err("Organization connection changed during recovery".into());
+            if !latest.enabled {
+                // Consent is unchanged but the service is switched off right now.
+                return Err(Recheck::Transient);
             }
-            fresh_dispatch_material(
-                vault,
-                &intent.binding.operation_id,
-                &request,
-                &body,
-                &connection.fingerprint,
-            )?
-            .ok_or_else(|| "Organization source or connection changed during recovery".to_string())
+            match fresh_dispatch_material(vault, op, &request, &body, fingerprint) {
+                Ok(Some(material)) => Ok(material),
+                Ok(None) => Err(Recheck::Stale("SOURCE_OR_CONNECTION_CHANGED".into())),
+                Err(_) => Err(Recheck::Transient),
+            }
         },
         |fresh_request, fresh_body| {
-            post_if_selected(guard, || transport.post(fresh_request, fresh_body))
+            guard.active().map_err(|_| DispatchFailure::NotSent)?;
+            // Durable marker first: from here on a failure is ambiguous, never "not sent".
+            match vault.mark_organization_sent(op) {
+                Ok(true) => {}
+                Ok(false) => return Err(DispatchFailure::Stale("STATE_CHANGED".into())),
+                Err(_) => return Err(DispatchFailure::NotSent),
+            }
+            transport
+                .post(fresh_request, fresh_body)
+                .map_err(|_| DispatchFailure::Ambiguous)
         },
     );
-    let receipt = match receipt {
-        Ok(receipt) => receipt,
-        Err(_) => {
-            let _ = vault.set_organization_operation_state(
-                &intent.binding.operation_id,
+    let receipt = match attempt {
+        Attempt::Receipt(receipt) => receipt,
+        Attempt::Stale(code) => {
+            let _ = vault.transition_organization_state(op, &LIVE, "stale", Some(&code));
+            return Ok(());
+        }
+        Attempt::Transient => {
+            let _ = vault.revert_organization_unsent(op);
+            return Ok(());
+        }
+        Attempt::LookupFailed => {
+            let code = if first_send {
+                "NOT_DISPATCHED"
+            } else {
+                "RECEIPT_UNAVAILABLE"
+            };
+            let _ = vault.transition_organization_state(op, &LIVE, "unknown", Some(code));
+            return Ok(());
+        }
+        Attempt::Ambiguous => {
+            let _ = vault.transition_organization_state(
+                op,
+                &IN_FLIGHT,
                 "unknown",
-                Some(
-                    if first_send {
-                        "NOT_DISPATCHED"
-                    } else {
-                        "RECEIPT_UNAVAILABLE"
-                    }
-                    .into(),
-                ),
+                Some("RECEIPT_UNAVAILABLE"),
             );
             return Ok(());
         }
     };
-    let Some(receipt) = receipt else {
+    // A receipt that fails validation never aborts the sweep and is never re-sent: the
+    // service holds a record for this operation, so it stays ambiguous with a safe code.
+    if receipt.validate(&request, Some(&body)).is_err() {
+        let _ =
+            vault.transition_organization_state(op, &IN_FLIGHT, "unknown", Some("RECEIPT_INVALID"));
         return Ok(());
-    };
-    receipt.validate(&request, Some(&body))?;
+    }
     match receipt.state.as_str() {
         "complete" => {
-            let latest = transport.capability()?;
-            let current = pairing::confirmed_intelligence(&vault.id)?;
-            let current_marker = vault.organization_marker()?;
-            let fresh = fresh_dispatch_material(
-                vault,
-                &intent.binding.operation_id,
-                &request,
-                &body,
-                &connection.fingerprint,
-            )?;
-            if guard.active().is_err()
-                || current.fingerprint != connection.fingerprint
-                || current_marker.as_ref() != Some(marker)
-                || fresh.is_none()
-                || !latest.enabled
-                || latest.consent != "active"
-                || latest.policy_version != marker.policy_version
-                || latest.consent_epoch != marker.consent_epoch
-            {
-                let _ = vault.set_organization_operation_state(
-                    &intent.binding.operation_id,
-                    "stale",
-                    Some("CONSENT_CHANGED".into()),
-                );
-                return Ok(());
-            }
-            // `with` holds the selection mutex only for the validated journal
-            // promotion, making the final session check and commit indivisible.
-            guard.with(|current_vault| {
-                let latest_marker = current_vault.organization_marker()?;
-                if latest_marker.as_ref() != Some(marker) {
-                    return Err("Vault selection changed".into());
+            let verdict = (|| -> Result<bool> {
+                let latest = transport.capability()?;
+                let now_fingerprint = current_fingerprint()?;
+                let current_marker = vault.organization_marker()?;
+                let fresh = fresh_dispatch_material(vault, op, &request, &body, fingerprint)?;
+                Ok(guard.active().is_ok()
+                    && now_fingerprint == fingerprint
+                    && current_marker.as_ref() == Some(marker)
+                    && fresh.is_some()
+                    && latest.enabled
+                    && latest.consent == "active"
+                    && latest.policy_version == marker.policy_version
+                    && latest.consent_epoch == marker.consent_epoch)
+            })();
+            match verdict {
+                Err(_) => {
+                    let _ = vault.transition_organization_state(
+                        op,
+                        &IN_FLIGHT,
+                        "unknown",
+                        Some("RECEIPT_UNAVAILABLE"),
+                    );
                 }
-                current_vault
-                    .promote_organization(&request, &body, &receipt)
-                    .map(|_| ())
-            })?;
+                Ok(false) => {
+                    let _ = vault.transition_organization_state(
+                        op,
+                        &IN_FLIGHT,
+                        "stale",
+                        Some("CONSENT_CHANGED"),
+                    );
+                }
+                Ok(true) => {
+                    // `with` holds the selection mutex only for the validated journal
+                    // promotion, making the final session check and commit indivisible.
+                    let promoted = guard.with(|current_vault| {
+                        let latest_marker = current_vault.organization_marker()?;
+                        if latest_marker.as_ref() != Some(marker) {
+                            return Err("Vault selection changed".into());
+                        }
+                        current_vault
+                            .promote_organization(&request, &body, &receipt)
+                            .map(|_| ())
+                    });
+                    if promoted.is_err() {
+                        // The service holds the result; recover it by receipt, never re-send.
+                        let _ = vault.transition_organization_state(
+                            op,
+                            &IN_FLIGHT,
+                            "unknown",
+                            Some("PROMOTION_FAILED"),
+                        );
+                    }
+                }
+            }
         }
         "failed" | "expired" => {
-            let _ = vault.set_organization_operation_state(
-                &intent.binding.operation_id,
+            let _ = vault.transition_organization_state(
+                op,
+                &IN_FLIGHT,
                 "failed",
-                receipt.error_code.clone(),
+                receipt.error_code.as_deref(),
             );
         }
         _ => {
-            let _ = vault.set_organization_operation_state(
-                &intent.binding.operation_id,
+            let _ = vault.transition_organization_state(
+                op,
+                &IN_FLIGHT,
                 "unknown",
-                receipt.error_code.clone(),
+                receipt.error_code.as_deref(),
             );
         }
     }
     Ok(())
 }
+
 async fn process_operation(
     guard: SelectionGuard,
     operation_id: &str,
@@ -1478,6 +1614,10 @@ async fn process_operation(
     .await
     .map_err(|_| "Organization recovery failed")?
 }
+
+#[cfg(test)]
+#[path = "local_organization_state_tests.rs"]
+mod state_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1509,6 +1649,7 @@ mod tests {
             local_epoch: Uuid::new_v4().to_string(),
             state: state.into(),
             error_code: None,
+            sent: false,
         }
     }
 
@@ -1655,7 +1796,7 @@ mod tests {
         assert!(processed.borrow().values().all(|count| *count == 1));
     }
 
-    fn fixture_request() -> (OrganizationRequest, Vec<u8>) {
+    pub(super) fn fixture_request() -> (OrganizationRequest, Vec<u8>) {
         let fixture: Value = serde_json::from_str(include_str!(
             "../../../../packages/contracts/fixtures/local-organization-synthetic.json"
         ))
@@ -1668,59 +1809,6 @@ mod tests {
         };
         let body = fixture["body_text"].as_str().unwrap().as_bytes().to_vec();
         (request, body)
-    }
-
-    #[test]
-    fn unknown_recovery_never_dispatches_and_authenticated_404_dispatches_same_operation_only() {
-        let (request, body) = fixture_request();
-        let sent = std::cell::Cell::new(false);
-        let unknown = recover_then_dispatch(
-            Err::<OrganizationLookup, String>("receipt unavailable".into()),
-            &request,
-            || unreachable!(),
-            |_, _| unreachable!(),
-        );
-        assert!(unknown.is_err());
-        assert!(!sent.get());
-
-        let expected_id = request.binding.operation_id.clone();
-        let receipt = recover_then_dispatch(
-            Ok(OrganizationLookup::NotFound),
-            &request,
-            || Ok((request.clone(), body.clone())),
-            |retry, bytes| {
-                sent.set(true);
-                assert_eq!(retry.binding.operation_id, expected_id);
-                assert_eq!(retry, &request);
-                retry.validate(&bytes)?;
-                Ok(OrganizationReceipt {
-                    schema_version: "1.0".into(),
-                    binding: retry.binding.clone(),
-                    payload_sha256: retry.payload_sha256()?,
-                    state: "in_flight".into(),
-                    result: None,
-                    error_code: None,
-                })
-            },
-        )
-        .unwrap()
-        .unwrap();
-        assert!(sent.get());
-        assert_eq!(receipt.binding.operation_id, expected_id);
-    }
-
-    #[test]
-    fn recovery_refuses_changed_binding_before_post() {
-        let (request, body) = fixture_request();
-        let mut changed = request.clone();
-        changed.binding.operation_id = Uuid::new_v4().to_string();
-        let result = recover_then_dispatch(
-            Ok(OrganizationLookup::NotFound),
-            &request,
-            || Ok((changed, body)),
-            |_, _| panic!("changed operation must never be posted"),
-        );
-        assert!(result.is_err());
     }
 
     #[test]
@@ -1932,34 +2020,5 @@ mod tests {
             "queued"
         );
         std::fs::remove_dir_all(&root).unwrap();
-    }
-
-    #[test]
-    fn delayed_receipt_or_capability_switch_prevents_post_callback_and_late_promotion() {
-        use std::{cell::Cell, path::PathBuf};
-        let root = std::env::temp_dir().join(format!("recall-organize-session-{}", Uuid::new_v4()));
-        std::fs::create_dir(&root).unwrap();
-        let state = LocalVaultState::new(PathBuf::from(root.join("selection.json")));
-        let first = state.select_path(&root).unwrap();
-        let guard = state.session(first.vault_id.as_deref().unwrap()).unwrap();
-        // This is the deliberate delayed-network boundary: selection changes before
-        // the callback that would otherwise issue POST or journal promotion.
-        state.select_path(&root).unwrap();
-        let posted = Cell::new(false);
-        assert!(post_if_selected(&guard, || {
-            posted.set(true);
-            Ok(())
-        })
-        .is_err());
-        assert!(!posted.get());
-        let promoted = Cell::new(false);
-        assert!(guard
-            .with(|_| {
-                promoted.set(true);
-                Ok(())
-            })
-            .is_err());
-        assert!(!promoted.get());
-        std::fs::remove_dir_all(root).unwrap();
     }
 }

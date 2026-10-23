@@ -342,6 +342,30 @@ it("recovers the same unknown organization operation and hides duplicate manual 
   await userEvent.click(screen.getByRole("button", { name: "Check processing status" }));
   expect(recoverOrganization).toHaveBeenCalledWith("session-a", "same-org-op");
 });
+it.each([
+  ["RECEIPT_INVALID", /the service’s answer could not be trusted, so nothing was added to the note/],
+  ["PROMOTION_FAILED", /the result could not be saved to the note/],
+  ["CONSENT_REVOKED", /permission changed after this may already have been sent, so Recall cannot confirm the outcome/],
+  ["CONSENT_EPOCH_CHANGED", /permission changed after this may already have been sent, so Recall cannot confirm the outcome/],
+] as const)("explains the unknown text/photo organization outcome %s and still offers the status check", async (error_code, text) => {
+  const operation: OrganizationOperation = { operation_id: "same-org-op", memory_id: memory.id, state: "unknown", error_code };
+  expect(operationLabel(operation, memory)).toMatch(text);
+  expect(operationLabel(operation, memory)).toMatch(/^Processing status uncertain · /);
+  expect(operationLabel(operation, memory)).not.toMatch(/updated|verified|confirmed fact/i);
+  const recoverOrganization = vi.fn(async () => ({ ...operation, state: "organized" as const }));
+  mount(vault({ organizationOperations: vi.fn(async () => [operation]), recoverOrganization }));
+  await userEvent.click(await screen.findByRole("button", { name: /Synthetic garden note/ }));
+  expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
+  await userEvent.click(await screen.findByRole("button", { name: "Check processing status" }));
+  expect(recoverOrganization).toHaveBeenCalledWith("session-a", "same-org-op");
+});
+it("keeps the existing generic unknown label and stale/failed mappings unchanged", () => {
+  const label = (state: OrganizationOperation["state"], error_code: string | null) => operationLabel({ operation_id: "operation", memory_id: memory.id, state, error_code }, memory);
+  expect(label("unknown", "OUTCOME_UNKNOWN")).toBe("Processing status uncertain · check status");
+  expect(label("unknown", null)).toBe("Processing status uncertain · check status");
+  expect(label("stale", "CONSENT_REVOKED")).toBe("Saved locally · organization no longer applies");
+  expect(label("failed", "RECEIPT_UNAVAILABLE")).toBe("Saved locally · processing status could not be confirmed; check processing status");
+});
 it("maps organization failures to plain guidance without exposing operation codes", () => {
   const failed = (error_code: string) => operationLabel({ operation_id: "operation", memory_id: memory.id, state: "failed", error_code }, memory);
   expect(failed("INPUT_LIMIT_EXCEEDED")).toBe("Saved locally · this note is too long to organize");

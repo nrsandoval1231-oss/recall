@@ -1982,11 +1982,73 @@ fn revoking_during_processing_retires_unsent_work_and_keeps_the_revoke_code() {
         .unwrap();
     assert!(vault.mark_audio_organization_sent(&op_id).unwrap());
     vault.set_audio_organization_marker(None).unwrap();
+    // Sent work is never retired as stale, but it must not hang on "organizing" either: it
+    // becomes ambiguous with the reason, and nothing is sent.
+    let o = operation(vault, &memory.id);
     assert_eq!(
-        operation(vault, &memory.id).state,
-        "processing",
-        "sent work is not retired by a revoke"
+        (o.state.as_str(), o.error_code.as_deref()),
+        ("unknown", Some("CONSENT_REVOKED"))
     );
+    assert!(intent_of(vault, &memory.id).sent);
+}
+
+#[test]
+fn a_new_consent_epoch_moves_sent_work_to_unknown_and_never_sends() {
+    let (_env, guard, memory, fake) = queued();
+    let vault = &guard.vault;
+    let op_id = operation(vault, &memory.id).operation_id;
+    vault
+        .set_audio_organization_operation_state(&op_id, "processing", None)
+        .unwrap();
+    assert!(vault.mark_audio_organization_sent(&op_id).unwrap());
+    vault
+        .set_audio_organization_marker(Some(marker(vault, 2)))
+        .unwrap();
+    let o = operation(vault, &memory.id);
+    assert_eq!(
+        (o.state.as_str(), o.error_code.as_deref()),
+        ("unknown", Some("CONSENT_EPOCH_CHANGED"))
+    );
+    assert_eq!(fake.posts.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn the_audio_sent_marker_is_refused_unless_the_consent_marker_still_matches() {
+    let (_env, guard, memory, _fake) = queued();
+    let vault = &guard.vault;
+    let original = vault.audio_organization_marker().unwrap().unwrap();
+    let op_id = operation(vault, &memory.id).operation_id;
+    // `unknown` is not retired by a consent change, so only the marker check can refuse.
+    vault
+        .set_audio_organization_operation_state(
+            &op_id,
+            "unknown",
+            Some("RECEIPT_UNAVAILABLE".into()),
+        )
+        .unwrap();
+    let mut other_local = original.clone();
+    other_local.local_epoch = op();
+    vault
+        .set_audio_organization_marker(Some(other_local))
+        .unwrap();
+    assert!(!vault.mark_audio_organization_sent(&op_id).unwrap());
+    let mut other_epoch = original.clone();
+    other_epoch.consent_epoch = 7;
+    vault
+        .set_audio_organization_marker(Some(other_epoch))
+        .unwrap();
+    assert!(!vault.mark_audio_organization_sent(&op_id).unwrap());
+    let mut other_connection = original.clone();
+    other_connection.connection_fingerprint = "b".repeat(64);
+    vault
+        .set_audio_organization_marker(Some(other_connection))
+        .unwrap();
+    assert!(!vault.mark_audio_organization_sent(&op_id).unwrap());
+    vault.set_audio_organization_marker(None).unwrap();
+    assert!(!vault.mark_audio_organization_sent(&op_id).unwrap());
+    assert!(!intent_of(vault, &memory.id).sent);
+    vault.set_audio_organization_marker(Some(original)).unwrap();
+    assert!(vault.mark_audio_organization_sent(&op_id).unwrap());
 }
 
 // Scenario C: revoked between the revalidated material and the `processing` write.

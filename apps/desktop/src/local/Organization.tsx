@@ -167,10 +167,18 @@ export function operationLabel(operation: OrganizationOperation | undefined, mem
   if (!operation) return "Saved in vault · Stored on this device";
   if (operation.state === "prepared" || operation.state === "queued") return "Saved locally · waiting for organization";
   if (operation.state === "processing") return "Organizing in the background…";
-  if (operation.state === "unknown") return "Processing status uncertain · check status";
+  if (operation.state === "unknown") { const why = unknownGuidance(operation.error_code); return why ? `Processing status uncertain · ${why}` : "Processing status uncertain · check status"; }
   if (operation.state === "failed") return `Saved locally · ${operationGuidance(operation.error_code)}`;
   if (operation.state === "stale") return "Saved locally · organization no longer applies";
   return "Saved in vault · organization proposal unavailable";
+}
+
+// Specific reasons an outcome is unknown. None of them says the note was updated; each points to the existing status check.
+function unknownGuidance(code: string | null): string {
+  if (code === "RECEIPT_INVALID") return "the service’s answer could not be trusted, so nothing was added to the note; check processing status";
+  if (code === "PROMOTION_FAILED") return "the result could not be saved to the note; check processing status";
+  if (code === "CONSENT_REVOKED" || code === "CONSENT_EPOCH_CHANGED") return "permission changed after this may already have been sent, so Recall cannot confirm the outcome; check processing status";
+  return "";
 }
 
 function operationGuidance(code: string | null): string {
