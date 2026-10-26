@@ -16,8 +16,14 @@ export interface CloudStore {
   accept(scope: string, operation: string, record: VaultMemory): Promise<void>;
   remote(scope: string, record: VaultMemory, source: VaultSource | null): Promise<void>;
   conflict(scope: string, operation: string, error: string): Promise<void>;
+  /**
+   * Replaces the reviewed pending edits for one conflicted memory with `record` plus a rebase chain (empty = adopt
+   * the cloud record). Refused unless the memory's pending edits are still exactly `reviewed`.
+   */
+  resolve(scope: string, memory: string, reviewed: string[], record: VaultMemory, mutations: CloudMutation[]): Promise<void>;
 }
 function result<T>(request: IDBRequest<T>): Promise<T> { return new Promise((resolve, reject) => {request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);}); }
+function sameOperations(current: string[], reviewed: string[]) { const want = new Set(reviewed); return current.length === want.size && current.every(id => want.has(id)); }
 function complete(tx: IDBTransaction): Promise<void> { return new Promise((resolve, reject) => {tx.oncomplete = () => resolve(); tx.onabort = tx.onerror = () => reject(tx.error || new Error("Offline storage transaction failed"));}); }
 
 export class BrowserCloudStore implements CloudStore {
@@ -78,6 +84,21 @@ export class BrowserCloudStore implements CloudStore {
       if (current) outbox.put({...current, error});
     });
   }
+  async resolve(scope: string, memory: string, reviewed: string[], record: VaultMemory, mutations: CloudMutation[]) {
+    await this.write(async (memories, outbox) => {
+      const pending = (await result(outbox.index("scope").getAll(scope)) as PendingMutation[]).filter(row => row.memory === memory);
+      if (!pending.some(row => row.error)) throw new Error("This memory has no conflict to resolve.");
+      if (!sameOperations(pending.map(row => row.operation), reviewed)) throw new Error("This memory changed on this device since the review opened. Nothing was changed; review it again.");
+      let expected = record.revision - mutations.length;
+      for (const mutation of mutations) {
+        if (mutation.memory_id !== memory || mutation.expected_revision !== expected++) throw new Error("Resolution does not follow the cloud revision.");
+      }
+      for (const row of pending) outbox.delete([scope, row.operation]);
+      const current = await result(memories.get([scope, memory])) as StoredMemory | undefined;
+      memories.put({scope, id: memory, record, source: current?.source ?? null});
+      for (const mutation of mutations) outbox.put({scope, operation: mutation.operation_id, memory, body: mutation, error: null});
+    });
+  }
 }
 
 /** Windows uses the existing SQLite database, not a browser-only persistence claim. */
@@ -92,4 +113,5 @@ export class NativeCloudStore implements CloudStore {
   accept(scope: string, operation: string, record: VaultMemory) { return this.call<void>("accept", scope, {operation, record}); }
   remote(scope: string, record: VaultMemory, source: VaultSource | null) { return this.call<void>("remote", scope, {record, source}); }
   conflict(scope: string, operation: string, error: string) { return this.call<void>("conflict", scope, {operation, error}); }
+  resolve(scope: string, memory: string, reviewed: string[], record: VaultMemory, mutations: CloudMutation[]) { return this.call<void>("resolve", scope, {memory, reviewed, record, mutations}); }
 }
