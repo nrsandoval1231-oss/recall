@@ -137,6 +137,8 @@ pub enum StoreError {
     CacheLimit(&'static str),
     #[error("unsafe local source path")]
     UnsafePath,
+    #[error("This memory changed on this device since the review opened. Nothing was changed; review it again.")]
+    StaleReview,
     #[error("filesystem: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -1601,7 +1603,7 @@ mod tests {
     }
 
     #[test]
-    fn cloud_conflict_resolution_rebases_or_adopts_cloud_and_refuses_unconflicted() {
+    fn cloud_conflict_resolution_rebases_or_adopts_cloud_and_refuses_unconflicted_or_stale() {
         let (store, base) = temp_store("cloud-resolve");
         let scope = WORKSPACE_ID;
         let id = SOURCE_ID;
@@ -1610,22 +1612,30 @@ mod tests {
         store.cloud_cache("commit", scope, serde_json::json!({"record": first, "source": {"bytes": [7]}, "mutation": {"operation_id": id, "memory_id": id, "expected_revision": 0, "action": "capture"}})).unwrap();
         let cloud = serde_json::json!({"id": id, "revision": 3, "note": "SYNTHETIC cloud"});
         // No conflict recorded yet: resolution is refused and nothing changes.
-        assert!(store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": cloud, "mutations": []})).is_err());
+        assert!(store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "reviewed": [id], "record": cloud, "mutations": []})).is_err());
         assert_eq!(store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap().as_array().unwrap().len(), 1);
         store.cloud_cache("conflict", scope, serde_json::json!({"operation": id, "error": "Concurrent edit"})).unwrap();
         // A rebase chain must start exactly one revision after the cloud record minus its length.
         let bad = serde_json::json!({"id": id, "revision": 9, "note": "SYNTHETIC mine"});
-        assert!(store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": bad, "mutations": [op(USER_ID, 3)]})).is_err());
+        assert!(store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "reviewed": [id], "record": bad, "mutations": [op(USER_ID, 3)]})).is_err());
         assert_eq!(store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap()[0]["error"], "Concurrent edit");
+        // A review that does not match the current pending edits (a newer local edit, or a missing one) is refused.
         let mine = serde_json::json!({"id": id, "revision": 4, "note": "SYNTHETIC mine"});
-        store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": mine, "mutations": [op(USER_ID, 3)]})).unwrap();
+        for reviewed in [serde_json::json!([]), serde_json::json!([USER_ID]), serde_json::json!([id, USER_ID])] {
+            let refused = store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "reviewed": reviewed, "record": mine, "mutations": [op(USER_ID, 3)]}));
+            assert!(matches!(refused, Err(StoreError::StaleReview)));
+        }
+        let pending = store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap();
+        assert_eq!((pending.as_array().unwrap().len(), pending[0]["operation"].as_str()), (1, Some(id)));
+        assert_eq!(store.cloud_cache("list", scope, serde_json::Value::Null).unwrap()[0]["note"], "SYNTHETIC original");
+        store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "reviewed": [id], "record": mine, "mutations": [op(USER_ID, 3)]})).unwrap();
         let pending = store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap();
         assert_eq!(pending.as_array().unwrap().len(), 1);
         assert_eq!(pending[0]["operation"], USER_ID);
         assert!(pending[0]["error"].is_null());
         assert_eq!(store.cloud_cache("list", scope, serde_json::Value::Null).unwrap()[0]["note"], "SYNTHETIC mine");
         store.cloud_cache("conflict", scope, serde_json::json!({"operation": USER_ID, "error": "Again"})).unwrap();
-        store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "record": cloud, "mutations": []})).unwrap();
+        store.cloud_cache("resolve", scope, serde_json::json!({"memory": id, "reviewed": [USER_ID], "record": cloud, "mutations": []})).unwrap();
         assert_eq!(store.cloud_cache("pending", scope, serde_json::Value::Null).unwrap(), serde_json::json!([]));
         assert_eq!(store.cloud_cache("list", scope, serde_json::Value::Null).unwrap()[0]["note"], "SYNTHETIC cloud");
         assert_eq!(store.cloud_cache("source", scope, serde_json::json!({"id": id})).unwrap()["bytes"], serde_json::json!([7]));
@@ -1716,6 +1726,12 @@ impl NativeStore {
                 let mutations = payload.get("mutations").and_then(serde_json::Value::as_array).ok_or(StoreError::InvalidIdentifier)?;
                 let blocked:i64=tx.query_row("SELECT count(*) FROM cloud_operations WHERE scope=?1 AND memory=?2 AND error IS NOT NULL",params![scope,id],|row|row.get(0))?;
                 if blocked == 0 { return Err(StoreError::InvalidIdentifier); }
+                // Only the edits the user reviewed may be replaced; a newer local edit refuses the resolution.
+                let reviewed: std::collections::BTreeSet<&str> = payload.get("reviewed").and_then(serde_json::Value::as_array).ok_or(StoreError::InvalidIdentifier)?
+                    .iter().map(|v| v.as_str().ok_or(StoreError::InvalidIdentifier)).collect::<Result<_, _>>()?;
+                let current: std::collections::BTreeSet<String> = tx.prepare("SELECT operation FROM cloud_operations WHERE scope=?1 AND memory=?2")?
+                    .query_map(params![scope,id],|row|row.get::<_, String>(0))?.collect::<Result<_, _>>()?;
+                if current.len() != reviewed.len() || !current.iter().all(|op| reviewed.contains(op.as_str())) { return Err(StoreError::StaleReview); }
                 tx.execute("DELETE FROM cloud_operations WHERE scope=?1 AND memory=?2",params![scope,id])?;
                 let mut expected = revision - mutations.len() as i64;
                 for mutation in mutations {

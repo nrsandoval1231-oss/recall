@@ -33,12 +33,12 @@ export function CloudControls({vault, request}: {vault: CloudVault; request: typ
   const [busy, setBusy] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictReview[]>([]);
   async function loadConflicts() { try {setConflicts(await vault.conflictReviews());} catch {setConflicts([]);} }
-  async function resolve(memory: string, choice: ConflictChoice) {
+  async function resolve(review: ConflictReview, choice: ConflictChoice) {
     setBusy(true);
     try {
-      await vault.resolveConflict(memory, choice);
+      await vault.resolveConflict(review, choice);
       setMessage(choice.kind === "cloud" ? "Using the cloud version." : "Your resolution is saved and will sync.");
-    } catch (error) {setMessage(error instanceof Error ? error.message : "The conflict could not be resolved.");}
+    } catch (error) {setMessage(error instanceof Error ? error.message : typeof error === "string" && error ? error : "The conflict could not be resolved.");}
     finally {setBusy(false); await loadConflicts();}
   }
   async function show() {
@@ -67,7 +67,7 @@ export function CloudControls({vault, request}: {vault: CloudVault; request: typ
       <p>Conflicting edits stay on this device and are included in your export. They are never automatically overwritten.</p>
       {conflicts.length > 0 && <>
         <h3>Edits to review</h3>
-        {conflicts.map(review => <ConflictCard key={review.memory} review={review} busy={busy} onResolve={choice => void resolve(review.memory, choice)} />)}
+        {conflicts.map(review => <ConflictCard key={review.memory} review={review} busy={busy} onResolve={choice => void resolve(review, choice)} />)}
       </>}
       <button disabled={busy} onClick={() => void exportData()}>{busy ? "Exporting…" : "Export memories and pending edits"}</button>
       {ai && <>

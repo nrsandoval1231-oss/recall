@@ -42,8 +42,13 @@ export async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes))), x => x.toString(16).padStart(2, "0")).join("");
 }
 
-/** One memory whose local edits the cloud refused. `remote` is null while the cloud version is unreachable. */
-export interface ConflictReview { memory: string; operations: number; error: string; local: VaultMemory; remote: VaultMemory | null }
+/** The server's limit for one note (`services/backend/src/recall/library/service.py`). */
+const MAX_NOTE_BYTES = 262144;
+/**
+ * One memory whose local edits the cloud refused. `pending` holds the operation IDs shown in the review;
+ * `remote` is null while the cloud version is unreachable.
+ */
+export interface ConflictReview { memory: string; pending: string[]; error: string; local: VaultMemory; remote: VaultMemory | null }
 export type ConflictChoice = {kind: "mine"} | {kind: "cloud"} | {kind: "merged"; note: string};
 
 export class CloudVault implements LocalVault {
@@ -128,24 +133,29 @@ export class CloudVault implements LocalVault {
     const local = await this.store.list(scope);
     let remote: VaultMemory[] = [];
     try { remote = await this.request<VaultMemory[]>("/library/memories?include_deleted=true"); } catch { /* reviewed read-only while offline */ }
+    const pending = await this.store.pending(scope);
     const reviews: ConflictReview[] = [];
     for (const memory of new Set(blocked.map(row => row.memory))) {
       const mine = local.find(row => row.id === memory);
-      if (mine) reviews.push({memory, operations: (await this.store.pending(scope)).filter(row => row.memory === memory).length, error: blocked.find(row => row.memory === memory)!.error!, local: mine, remote: remote.find(row => row.id === memory) ?? null});
+      if (mine) reviews.push({memory, pending: pending.filter(row => row.memory === memory).map(row => row.operation), error: blocked.find(row => row.memory === memory)!.error!, local: mine, remote: remote.find(row => row.id === memory) ?? null});
     }
     return reviews;
   }
   /**
    * Explicit user resolution. Nothing is silently overwritten: "mine"/"merged" append new revisions on top of
    * the current cloud revision (the cloud text stays in history); "cloud" adopts the cloud record and drops the
-   * reviewed local edits, which is why the UI shows them and asks first.
+   * reviewed local edits, which is why the UI shows them and asks first. The choice applies only to what was
+   * reviewed: a newer local edit or a newer cloud revision refuses it so the user can review again.
    */
-  async resolveConflict(memory: string, choice: ConflictChoice): Promise<VaultMemory> {
+  async resolveConflict(review: ConflictReview, choice: ConflictChoice): Promise<VaultMemory> {
     if (!this.scope) await this.status();
     const scope = this.scope!;
+    const memory = review.memory;
+    if (!review.remote) throw new Error("The cloud version is unavailable. Your edits are retained.");
     const remote = (await this.request<VaultMemory[]>("/library/memories?include_deleted=true")).find(row => row.id === memory);
     const local = (await this.store.list(scope)).find(row => row.id === memory);
     if (!remote || !local) throw new Error("The cloud version is unavailable. Your edits are retained.");
+    if (remote.revision !== review.remote.revision) throw new Error("The cloud version changed since this review opened. Nothing was changed; review it again.");
     const mutations: CloudMutation[] = [];
     let revision = remote.revision;
     const add = (action: CloudMutation["action"], note?: string) => {
@@ -157,13 +167,16 @@ export class CloudVault implements LocalVault {
       if (removing) { if (remote.state !== "deleted") add("remove"); }
       else {
         if (remote.state === "deleted") add("restore");
-        if (remote.state === "deleted" || note !== remote.note) add("correct", note);
+        if (remote.state === "deleted" || note !== remote.note) {
+          if (new TextEncoder().encode(note).length > MAX_NOTE_BYTES) throw new Error("This text is larger than the cloud's 256 KiB note limit. Shorten it; nothing was changed.");
+          add("correct", note);
+        }
       }
     }
     const record: VaultMemory = mutations.length
       ? {...remote, revision, state: removing ? "deleted" : "active", note: removing ? remote.note : note, updated_at: new Date().toISOString(), conflict: null}
       : remote;
-    await this.store.resolve(scope, memory, record, mutations);
+    await this.store.resolve(scope, memory, review.pending, record, mutations);
     this.notify(mutations.length ? "Resolution saved on this device. Sync pending." : "Using the cloud version.");
     void this.synchronize();
     return record;

@@ -76,7 +76,7 @@ it("lists a conflict with both versions and keeps my edit as a new revision on t
   const review = (await vault.conflictReviews())[0]!;
   expect(review.local.note).toBe("SYNTHETIC local change");
   expect(review.remote?.note).toBe("SYNTHETIC remote change");
-  await vault.resolveConflict(id, {kind: "mine"}); await vault.synchronize();
+  await vault.resolveConflict(review, {kind: "mine"}); await vault.synchronize();
   expect(await vault.conflicts()).toHaveLength(0);
   expect(api.rows.get(id)).toMatchObject({revision: 3, note: "SYNTHETIC local change"});
   expect(await store.pending(api.scope)).toHaveLength(0);
@@ -85,7 +85,7 @@ it("lists a conflict with both versions and keeps my edit as a new revision on t
 
 it("adopts the cloud version only on explicit choice and then accepts later cloud refreshes", async () => {
   const {api, store, vault, id} = await conflicted();
-  await vault.resolveConflict(id, {kind: "cloud"}); await vault.synchronize();
+  await vault.resolveConflict((await vault.conflictReviews())[0]!, {kind: "cloud"}); await vault.synchronize();
   expect(await store.pending(api.scope)).toHaveLength(0);
   expect((await store.list(api.scope))[0]).toMatchObject({revision: 2, note: "SYNTHETIC remote change"});
   api.rows.set(id, {...api.rows.get(id)!, revision: 3, note: "SYNTHETIC later cloud"});
@@ -95,7 +95,7 @@ it("adopts the cloud version only on explicit choice and then accepts later clou
 
 it("saves edited combined text as the next revision, and restores before editing a memory deleted in the cloud", async () => {
   const {api, vault, id} = await conflicted();
-  await vault.resolveConflict(id, {kind: "merged", note: "SYNTHETIC combined"}); await vault.synchronize();
+  await vault.resolveConflict((await vault.conflictReviews())[0]!, {kind: "merged", note: "SYNTHETIC combined"}); await vault.synchronize();
   expect(api.rows.get(id)).toMatchObject({revision: 3, note: "SYNTHETIC combined"});
   const second = await conflicted();
   second.api.rows.set(second.id, {...second.api.rows.get(second.id)!, revision: 3, state: "deleted"});
@@ -103,7 +103,7 @@ it("saves edited combined text as the next revision, and restores before editing
   const inner = second.api.request;
   const vault2 = new CloudVault(second.store, (async (path: string, init?: RequestInit) => { if (init?.body) seen.push(JSON.parse(init.body as string).action); return inner(path, init); }) as typeof cloudRequest);
   await vault2.status();
-  await vault2.resolveConflict(second.id, {kind: "mine"}); await vault2.synchronize();
+  await vault2.resolveConflict((await vault2.conflictReviews())[0]!, {kind: "mine"}); await vault2.synchronize();
   expect(seen).toEqual(["restore", "correct"]);
   expect(second.api.rows.get(second.id)).toMatchObject({revision: 5, note: "SYNTHETIC local change"});
 });
@@ -112,7 +112,42 @@ it("refuses to resolve a memory that has no conflict", async () => {
   const api = server(); const vault = new CloudVault(new BrowserCloudStore(), api.request);
   await vault.status(); const id = crypto.randomUUID();
   await vault.captureNote(api.scope,id,"SYNTHETIC base"); await vault.synchronize();
-  await expect(vault.resolveConflict(id, {kind: "cloud"})).rejects.toThrow("no conflict");
+  const record = (await vault.list(api.scope, ""))[0]!;
+  await expect(vault.resolveConflict({memory: id, pending: [], error: "", local: record, remote: record}, {kind: "cloud"})).rejects.toThrow("no conflict");
+});
+
+it("refuses a resolution when a newer local edit was saved after the review opened, and keeps every edit", async () => {
+  const {api, store, vault, id} = await conflicted();
+  const review = (await vault.conflictReviews())[0]!;
+  api.setOnline(false);
+  await vault.correct(api.scope, id, 2, crypto.randomUUID(), "SYNTHETIC newer local edit");
+  api.setOnline(true);
+  for (const choice of [{kind: "cloud"}, {kind: "merged", note: "SYNTHETIC stale combined"}] as const) {
+    await expect(vault.resolveConflict(review, choice)).rejects.toThrow("review it again");
+  }
+  expect(await store.pending(api.scope)).toHaveLength(2);
+  expect((await store.list(api.scope))[0]?.note).toBe("SYNTHETIC newer local edit");
+  const fresh = (await vault.conflictReviews())[0]!;
+  expect(fresh.pending).toHaveLength(2);
+  await vault.resolveConflict(fresh, {kind: "mine"}); await vault.synchronize();
+  expect(api.rows.get(id)).toMatchObject({revision: 3, note: "SYNTHETIC newer local edit"});
+});
+
+it("refuses a resolution when the cloud version changed after the review opened", async () => {
+  const {api, store, vault, id} = await conflicted();
+  const review = (await vault.conflictReviews())[0]!;
+  api.rows.set(id, {...api.rows.get(id)!, revision: 3, note: "SYNTHETIC newest remote"});
+  await expect(vault.resolveConflict(review, {kind: "merged", note: "SYNTHETIC combined"})).rejects.toThrow("cloud version changed");
+  expect(await vault.conflicts()).toHaveLength(1);
+  expect((await store.list(api.scope))[0]?.note).toBe("SYNTHETIC local change");
+});
+
+it("refuses combined text over the cloud note limit before changing anything", async () => {
+  const {api, store, vault} = await conflicted();
+  const review = (await vault.conflictReviews())[0]!;
+  await expect(vault.resolveConflict(review, {kind: "merged", note: "é".repeat(131073)})).rejects.toThrow("256 KiB");
+  expect(await vault.conflicts()).toHaveLength(1);
+  expect((await store.pending(api.scope))[0]?.error).toBeTruthy();
 });
 
 it("atomically rejects stale-window writes and does not create orphaned outbox items", async () => {

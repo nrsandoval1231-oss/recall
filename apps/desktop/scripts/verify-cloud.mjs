@@ -1,4 +1,4 @@
-/* global document, innerWidth, navigator, fetch */
+/* global crypto, document, innerWidth, navigator, fetch */
 // Real HTTP API + PostgreSQL. No Tauri mocks, no desktop process, synthetic content only.
 import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -24,6 +24,37 @@ try {
   await page.getByLabel("Your correction").fill("SYNTHETIC CLOUD ACCEPTANCE: Blue pump corrected to 43 psi.");
   await page.getByRole("button", {name: "Save correction", exact: true}).click();
   await page.getByText(/original source is unchanged/).waitFor();
+  // Conflict review: another device changes the memory first, so the server refuses this device's edit (409).
+  const other = "SYNTHETIC OTHER DEVICE: Blue pump read 44 psi on the other device.";
+  const mine = "SYNTHETIC THIS DEVICE: Blue pump corrected to 45 psi here.";
+  const before = await page.evaluate(async note => {
+    const [memory] = await (await fetch("/v1/library/memories")).json();
+    const response = await fetch("/v1/library/mutations", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({operation_id: crypto.randomUUID(), memory_id: memory.id, expected_revision: memory.revision, action: "correct", note})});
+    if (!response.ok) throw Error(`Other-device edit failed: ${response.status}`);
+    return {id: memory.id, revision: memory.revision + 1};
+  }, other);
+  await page.getByLabel("Your correction").fill(mine);
+  await page.getByRole("button", {name: "Save correction", exact: true}).click();
+  await expect(page.getByText(/memory conflict/).first()).toBeVisible({timeout: 30000});
+  await page.getByRole("button", {name: "Cloud settings", exact: true}).click();
+  const conflict = page.getByRole("region", {name: /^Conflict:/});
+  await expect(conflict.locator("pre").first()).toHaveText(mine);
+  await expect(conflict.locator("pre").nth(1)).toHaveText(other);
+  await expect(conflict.getByText(`revision ${before.revision}`, {exact: false})).toBeVisible();
+  await page.screenshot({path: `${output}/web-conflict-review.png`});
+  const conflictAxe = await new AxeBuilder({page}).analyze();
+  if (conflictAxe.violations.length) throw Error(JSON.stringify(conflictAxe.violations.map(v => ({id: v.id, nodes: v.nodes.map(n => n.target)}))));
+  await page.setViewportSize({width: 390, height: 844});
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error("Conflict review overflows at 390px");
+  await page.screenshot({path: `${output}/mobile-conflict-review.png`});
+  await page.setViewportSize({width: 1182, height: 789});
+  await conflict.getByRole("button", {name: "Keep my edit", exact: true}).click();
+  await expect(conflict).toHaveCount(0);
+  await expect(page.getByText("All changes synced to your private cloud library.").first()).toBeVisible({timeout: 30000});
+  const after = await page.evaluate(async id => (await (await fetch("/v1/library/memories")).json()).find(row => row.id === id), before.id);
+  if (after.note !== mine || after.revision !== before.revision + 1) throw Error(`Kept edit not rebased: ${JSON.stringify({note: after.note, revision: after.revision})}`);
+  await page.getByRole("button", {name: "Close settings", exact: true}).click();
   await page.keyboard.press("Escape");
   await page.getByRole("button", {name: "Graph View", exact: true}).click();
   await page.locator(".graph-node").first().waitFor();
@@ -69,6 +100,6 @@ try {
   await page.getByRole("button", {name: "Sign out", exact:true}).click();
   await page.getByLabel("Owner access code").waitFor();
   if (errors.length) throw Error(errors.join("\n"));
-  fs.writeFileSync(`${output}/verification.json`, JSON.stringify({synthetic:true, nativeIPC:false, productionPWA:process.env.MEGRAPH_TEST_PWA === "1", database:"real PostgreSQL", checked:["cookie login", "capture", "correct", "original hash", "graph", "keyword search", "reload persistence", "mobile capture", "axe", "logout"], errors}, null, 2));
-  process.stdout.write("PASS: real cloud HTTP capture/edit/search/source/graph, mobile layout, session and reload checks\n");
+  fs.writeFileSync(`${output}/verification.json`, JSON.stringify({synthetic:true, nativeIPC:false, productionPWA:process.env.MEGRAPH_TEST_PWA === "1", database:"real PostgreSQL", checked:["cookie login", "capture", "correct", "409 conflict review and keep-my-edit rebase", "original hash", "graph", "keyword search", "reload persistence", "mobile capture", "axe", "logout"], errors}, null, 2));
+  process.stdout.write("PASS: real cloud HTTP capture/edit/conflict review/search/source/graph, mobile layout, session and reload checks\n");
 } finally { await browser.close(); }
