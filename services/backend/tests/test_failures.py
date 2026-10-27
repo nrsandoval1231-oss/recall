@@ -22,10 +22,10 @@ from conftest import (
     synthetic_image,
     upload_all,
 )
-from recall.api.app import create_app
-from recall.api.auth import StaticKeyResolver, TokenVerifier
-from recall.db.database import Database
-from recall.domain.tokens import issue_upload_token
+from monolith.api.app import create_app
+from monolith.api.auth import StaticKeyResolver, TokenVerifier
+from monolith.db.database import Database
+from monolith.domain.tokens import issue_upload_token
 
 
 def _setup(env: Env, n: int = 1):  # type: ignore[no-untyped-def]

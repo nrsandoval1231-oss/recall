@@ -338,7 +338,7 @@ it("shows a direct Obsidian annotation as the user’s own text, and uses audio 
   await press(/Voice recording/);
   expect(await screen.findByRole("heading", { name: "Your annotation" })).toBeTruthy();
   expect(screen.getByText("SYNTHETIC garden idea")).toBeTruthy();
-  await press("Remove from Recall");
+  await press("Remove from Monolith");
   const confirm = await screen.findByLabelText("Confirm removal");
   expect(confirm.textContent).toMatch(/original recording, transcripts/); expect(confirm.textContent).not.toMatch(/photo/i);
   expect(document.body.textContent).not.toMatch(/saved photo readings/);
@@ -363,7 +363,7 @@ it("shows the retained transcript of an audio citation with audio wording, a .wa
   expect(screen.getByText("Your transcript correction · reported")).toBeTruthy(); expect(screen.getByText("SYNTHETIC human wording")).toBeTruthy();
   expect(view.container.textContent).not.toMatch(/photo reading|saved note or photo/i);
   expect(view.container.querySelector("audio")).not.toBeNull();
-  expect(view.container.querySelector("a")?.getAttribute("download")).toBe(`recall-original-${UUID}.wav`);
+  expect(view.container.querySelector("a")?.getAttribute("download")).toBe(`monolith-original-${UUID}.wav`);
   view.unmount();
   const machineOnly = render(<HistoricalSourceView source={retainedSource({ machine, human_correction: null })} onClose={() => {}} />);
   expect(screen.getByText("Machine transcript · unreviewed")).toBeTruthy(); expect(screen.getByText(machine.text)).toBeTruthy(); expect(screen.getByText(TRANSCRIPT_CAVEAT)).toBeTruthy();

@@ -8,10 +8,10 @@ import zipfile
 
 from conftest import Env
 from fake_provider import FakeProvider
-from recall.ingestion.worker import Worker
-from test_recall import capture_with, consent, drain
+from monolith.ingestion.worker import Worker
+from test_monolith import capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def test_export_is_deterministic_private_and_retains_corrected_history(

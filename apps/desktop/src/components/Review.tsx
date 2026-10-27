@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { ApiError, type Action, type RecallApiClient } from "@recall/api-client";
+import { ApiError, type Action, type MonolithApiClient } from "@monolith/api-client";
 import type { CacheScope, CachedRecord, NativeCache } from "../platform/native-cache";
 
-type ReviewApi = Pick<RecallApiClient, "listActions" | "updateAction">;
+type ReviewApi = Pick<MonolithApiClient, "listActions" | "updateAction">;
 
 export function Review({ api, onClose, cache, scope }: { api: ReviewApi; onClose: () => void; cache?: NativeCache; scope?: CacheScope | null }) {
   const [actions, setActions] = useState<Action[]>([]);

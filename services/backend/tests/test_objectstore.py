@@ -9,9 +9,9 @@ from pathlib import Path
 import httpx
 import pytest
 
-from recall.storage import ObjectNotFound, StoredObjectConflict, hash_stream
-from recall.storage.local import LocalObjectStore
-from recall.storage.supabase import SupabaseObjectStore
+from monolith.storage import ObjectNotFound, StoredObjectConflict, hash_stream
+from monolith.storage.local import LocalObjectStore
+from monolith.storage.supabase import SupabaseObjectStore
 
 
 def _file(tmp_path: Path, name: str, data: bytes) -> tuple[Path, str]:

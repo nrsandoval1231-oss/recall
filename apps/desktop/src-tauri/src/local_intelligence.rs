@@ -2246,7 +2246,7 @@ mod tests {
     fn audio_evidence_enters_current_ask_only_through_verified_eligible_candidates() {
         use crate::audio_wav::fixtures::synthetic_wav;
         let dir = std::env::temp_dir().join(format!(
-            "recall-synthetic-ask-audio-{}",
+            "monolith-synthetic-ask-audio-{}",
             uuid::Uuid::new_v4()
         ));
         fs::create_dir(&dir).unwrap();
@@ -2364,7 +2364,7 @@ mod tests {
     }
     #[test]
     fn photo_annotation_and_effective_reading_are_revalidated_as_distinct_current_evidence() {
-        let root = std::env::temp_dir().join(format!("recall-ask-photo-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("monolith-ask-photo-{}", Uuid::new_v4()));
         fs::create_dir(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let captured = vault
@@ -2688,7 +2688,7 @@ mod tests {
         assert!(history_authorized(&active, &intent));
         assert!(!history_authorized(&outdated, &intent));
 
-        let root = std::env::temp_dir().join(format!("recall-history-stale-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("monolith-history-stale-{}", Uuid::new_v4()));
         std::fs::create_dir(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let saved = vault
@@ -2844,7 +2844,8 @@ mod tests {
             SuspendedHistoryMutation::Consent,
             SuspendedHistoryMutation::SelectedSession,
         ] {
-            let root = std::env::temp_dir().join(format!("recall-history-race-{}", Uuid::new_v4()));
+            let root =
+                std::env::temp_dir().join(format!("monolith-history-race-{}", Uuid::new_v4()));
             let vault_root = root.join("vault");
             let other_vault_root = root.join("other-vault");
             fs::create_dir_all(&vault_root).unwrap();
@@ -2941,7 +2942,7 @@ mod tests {
                     }
                     SuspendedHistoryMutation::SourceBytes => fs::write(
                         vault_root
-                            .join("Recall/Sources")
+                            .join(format!("{}/Sources", crate::local_vault::DIR))
                             .join(format!("{}.txt", saved.id)),
                         b"tampered source bytes",
                     )
@@ -3092,7 +3093,7 @@ mod tests {
 
     #[test]
     fn real_filesystem_ask_snapshot_uses_current_text_and_intent_is_operational_only() {
-        let root = std::env::temp_dir().join(format!("recall-ask-native-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("monolith-ask-native-{}", Uuid::new_v4()));
         fs::create_dir(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let capture_id = Uuid::new_v4().to_string();
@@ -3135,7 +3136,10 @@ mod tests {
         assert!(vault.save_ask_intent(&operation, b"different").is_err());
         assert_eq!(vault.history(&captured.id).unwrap().len(), 2);
         fs::write(
-            root.join(format!("Recall/Sources/{capture_id}.txt")),
+            root.join(format!(
+                "{}/Sources/{capture_id}.txt",
+                crate::local_vault::DIR
+            )),
             "tampered source",
         )
         .unwrap();
@@ -3147,7 +3151,7 @@ mod tests {
 
     #[test]
     fn empty_current_text_does_not_revive_immutable_original() {
-        let root = std::env::temp_dir().join(format!("recall-ask-empty-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("monolith-ask-empty-{}", Uuid::new_v4()));
         fs::create_dir(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let captured = vault

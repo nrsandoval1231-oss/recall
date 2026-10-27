@@ -31,7 +31,7 @@ struct Env {
 }
 impl Env {
     fn new() -> Self {
-        let dir = std::env::temp_dir().join(format!("recall-synthetic-orgstate-{}", op()));
+        let dir = std::env::temp_dir().join(format!("monolith-synthetic-orgstate-{}", op()));
         let root = dir.join("vault");
         fs::create_dir_all(&root).unwrap();
         let state = LocalVaultState::new(dir.join("selected.json"));
@@ -119,7 +119,8 @@ impl OrganizationDispatchTransport for Fake {
         self.posts.fetch_add(1, Ordering::SeqCst);
         if let Some(vault) = self.vault.lock().unwrap().as_ref() {
             let path = vault.root_for_test().join(format!(
-                "Recall/_meta/organize/{}.json",
+                "{}/_meta/organize/{}.json",
+                crate::local_vault::DIR,
                 request.binding.operation_id
             ));
             assert!(
@@ -707,10 +708,11 @@ fn unsent_intents_serialize_byte_identically_and_old_files_load() {
     );
     // On disk: a real unsent intent file has no `sent` key until the POST marker is written.
     let c = case(Kind::Text);
-    let path = c
-        .vault()
-        .root_for_test()
-        .join(format!("Recall/_meta/organize/{}.json", c.operation));
+    let path = c.vault().root_for_test().join(format!(
+        "{}/_meta/organize/{}.json",
+        crate::local_vault::DIR,
+        c.operation
+    ));
     assert!(!fs::read_to_string(&path).unwrap().contains("\"sent\""));
     c.vault()
         .set_organization_operation_state(&c.operation, "processing", None)
@@ -738,9 +740,11 @@ fn the_v2_scenarios_really_carry_bound_context() {
 // --------------------------------------------------------------------------------
 
 fn intent_file(c: &Case) -> PathBuf {
-    c.vault()
-        .root_for_test()
-        .join(format!("Recall/_meta/organize/{}.json", c.operation))
+    c.vault().root_for_test().join(format!(
+        "{}/_meta/organize/{}.json",
+        crate::local_vault::DIR,
+        c.operation
+    ))
 }
 fn real_request(c: &Case) -> (OrganizationRequest, Vec<u8>) {
     let (_, request, body) = c
@@ -890,10 +894,11 @@ fn a_failed_promotion_becomes_unknown_and_recovery_promotes_without_resending() 
     let receipt = text_receipt(&request, &body);
     *c.fake.complete_with.lock().unwrap() = Some(receipt.clone());
     // The journal slot of the promotion event is occupied, so the commit itself fails.
-    let blocker = c
-        .vault()
-        .root_for_test()
-        .join(format!("Recall/_meta/journal/{}.json", c.operation));
+    let blocker = c.vault().root_for_test().join(format!(
+        "{}/_meta/journal/{}.json",
+        crate::local_vault::DIR,
+        c.operation
+    ));
     let hook_blocker = blocker.clone();
     *c.fake.on_post.lock().unwrap() = Some(Box::new(move || {
         fs::create_dir(&hook_blocker).unwrap();

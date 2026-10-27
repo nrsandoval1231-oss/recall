@@ -1,18 +1,18 @@
-# Recall
+# Monolith
 
 **Your life remembers itself.**
 
-Recall lets people drop in the notes, photos, voice recordings and files they already have. It preserves the original, understands and organizes useful memory into the user's Obsidian vault, then helps retrieve it later from an incomplete, natural question with its source attached. People should not need to learn Markdown, folders, tags or a filing system.
+Monolith lets people drop in the notes, photos, voice recordings and files they already have. It preserves the original, understands and organizes useful memory into the user's Obsidian vault, then helps retrieve it later from an incomplete, natural question with its source attached. People should not need to learn Markdown, folders, tags or a filing system.
 
 ```text
 Capture -> Understand -> Organize -> Remember -> Ask -> Evidence
 ```
 
-Obsidian is the user-owned memory spine. Recall supplies low-friction capture, interpretation, correction, retrieval and the Memory Surface. The Memory Surface is one adaptive experience that moves between capture, understanding, context and original evidence; it is not a set of separate apps or a taxonomy users must learn. See [UX](docs/UX-SPEC.md).
+Obsidian is the user-owned memory spine. Monolith supplies low-friction capture, interpretation, correction, retrieval and the Memory Surface. The Memory Surface is one adaptive experience that moves between capture, understanding, context and original evidence; it is not a set of separate apps or a taxonomy users must learn. See [UX](docs/UX-SPEC.md).
 
 ## Product target and delivery
 
-Photos, text, voice and files are required capture forms. The staged build sequence is photo organization, text capture, grounded natural-language Ask, then voice and broader file adapters. No stage changes the destination: the user captures, Recall organizes, and later recall remains tied to evidence.
+Photos, text, voice and files are required capture forms. The staged build sequence is photo organization, text capture, grounded natural-language Ask, then voice and broader file adapters. No stage changes the destination: the user captures, Monolith organizes, and later recall remains tied to evidence.
 
 ## Current implementation
 

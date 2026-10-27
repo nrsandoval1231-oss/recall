@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
 import sys
 import uuid
 from pathlib import Path
@@ -14,6 +13,7 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 
+from ..envcompat import getenv
 from .migrate import DEFAULT_DIR
 
 REQUIRED_PUBLIC_TABLES = frozenset(
@@ -64,12 +64,22 @@ class BootstrapError(ValueError):
     pass
 
 
+DEFAULT_WORKSPACE_NAME = "Monolith"
+# The workspace name is persisted data. Realms bootstrapped before the Recall to Monolith rename hold
+# "Recall"; re-running the documented command against one must still be an exact replay.
+WORKSPACE_NAME_ALIASES = frozenset({"Recall", DEFAULT_WORKSPACE_NAME})
+
+
+def _same_workspace_name(existing: str, requested: str) -> bool:
+    return existing == requested or (existing in WORKSPACE_NAME_ALIASES and requested in WORKSPACE_NAME_ALIASES)
+
+
 def _bootstrap_owner(
     dsn: str,
     owner_id: uuid.UUID,
     workspace_id: uuid.UUID,
     *,
-    name: str = "Recall",
+    name: str = "Monolith",
     migration_dir: Path = DEFAULT_DIR,
 ) -> bool:
     """Return True on creation and False for an exact idempotent replay."""
@@ -104,7 +114,7 @@ def _bootstrap_owner(
                         and len(memberships) == 1
                         and table_rows["workspaces"] == 1
                         and table_rows["workspace_members"] == 1
-                        and workspace["name"] == name
+                        and _same_workspace_name(workspace["name"], name)
                         and workspace["created_by"] == owner_id
                         and workspace["personal_for_user"] == owner_id
                         and memberships[0]["workspace_id"] == workspace_id
@@ -181,7 +191,7 @@ def bootstrap_owner(
     owner_id: uuid.UUID,
     workspace_id: uuid.UUID,
     *,
-    name: str = "Recall",
+    name: str = "Monolith",
     migration_dir: Path = DEFAULT_DIR,
 ) -> bool:
     """Retry an exact concurrent insert after PostgreSQL has resolved its unique-key race."""
@@ -200,13 +210,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--owner-id", required=True, type=uuid.UUID)
     parser.add_argument("--workspace-id", required=True, type=uuid.UUID)
-    parser.add_argument("--name", default="Recall")
+    parser.add_argument("--name", default="Monolith")
     parser.add_argument("--profile", required=True, choices=("inference",))
     parser.add_argument("--approve", action="store_true", help="confirm this exact fresh operational owner/workspace")
     args = parser.parse_args()
-    dsn = os.environ.get("RECALL_BOOTSTRAP_DATABASE_URL")
+    dsn = getenv("MONOLITH_BOOTSTRAP_DATABASE_URL")
     if not dsn:
-        print("RECALL_BOOTSTRAP_DATABASE_URL (protected BYPASSRLS/superuser role) is required", file=sys.stderr)
+        print("MONOLITH_BOOTSTRAP_DATABASE_URL (protected BYPASSRLS/superuser role) is required", file=sys.stderr)
         return 2
     if not args.approve:
         print(

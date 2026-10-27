@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { BrowserAuth, BrowserSession } from "./auth/session";
 import type { Draft } from "./storage";
-import { ApiError, type RecallApiClient } from "@recall/api-client";
+import { ApiError, type MonolithApiClient } from "@monolith/api-client";
 
 const storage = vi.hoisted(() => ({
   clearDrafts: vi.fn(async () => undefined),
@@ -101,8 +101,8 @@ function makeAuth(
   };
 }
 function makeApi(
-  overrides: Partial<Record<keyof RecallApiClient, unknown>> = {},
-): RecallApiClient {
+  overrides: Partial<Record<keyof MonolithApiClient, unknown>> = {},
+): MonolithApiClient {
   return {
     me: vi.fn(async () => ({
       user_id: "u1",
@@ -130,7 +130,7 @@ function makeApi(
     finalize: vi.fn(),
     fetchSource: vi.fn(),
     ...overrides,
-  } as unknown as RecallApiClient;
+  } as unknown as MonolithApiClient;
 }
 
 beforeEach(() => {
@@ -160,7 +160,7 @@ afterEach(() => {
 describe("web capture privacy and source boundary", () => {
   it("shows sign-in without invoking private API reads while signed out", async () => {
     const auth = makeAuth(null);
-    const api = {} as RecallApiClient;
+    const api = {} as MonolithApiClient;
     render(<App services={{ auth, api }} />);
     expect(await screen.findByText("Keep what matters.")).toBeTruthy();
   });
@@ -266,7 +266,7 @@ describe("web capture privacy and source boundary", () => {
     auth.requestSignIn = vi.fn(async () => {
       throw new Error("EMAIL_RATE_LIMITED");
     });
-    const api = {} as RecallApiClient;
+    const api = {} as MonolithApiClient;
     render(<App services={{ auth, api }} />);
     await screen.findByText("Keep what matters.");
     fireEvent.change(screen.getByLabelText("Email"), {

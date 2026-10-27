@@ -1,6 +1,6 @@
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { color, copy, radius, space } from "@recall/design-tokens";
+import { color, copy, radius, space } from "@monolith/design-tokens";
 import type { RecentRow } from "../viewmodel";
 import { Button, StatusPill, text } from "../ui/kit";
 import { Pressable } from "react-native";

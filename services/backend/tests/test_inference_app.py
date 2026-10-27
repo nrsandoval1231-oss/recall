@@ -8,12 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from recall.api.app import create_app
-from recall.api.inference import create_inference_app
-from recall.config import Settings
-from recall.db.database import Database
-from recall.db.inference_bootstrap import bootstrap_owner
-from recall.pairing import create_invitation, digest
+from monolith.api.app import create_app
+from monolith.api.inference import create_inference_app
+from monolith.config import Settings
+from monolith.db.database import Database
+from monolith.db.inference_bootstrap import bootstrap_owner
+from monolith.pairing import create_invitation, digest
 
 
 def inference_settings(app_dsn: str) -> Settings:
@@ -176,7 +176,7 @@ def test_inference_profile_routes_and_real_pairing(pg_cluster) -> None:  # type:
 
 
 def test_inference_provider_uses_no_retries_or_fallback(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    import recall.ingestion.anthropic_provider as anthropic_provider
+    import monolith.ingestion.anthropic_provider as anthropic_provider
 
     captured: dict[str, object] = {}
 
@@ -201,7 +201,7 @@ def test_inference_provider_uses_no_retries_or_fallback(monkeypatch) -> None:  #
 
 
 def test_worker_stops_before_opening_services_for_inference(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    from recall.ingestion import worker
+    from monolith.ingestion import worker
 
     monkeypatch.setattr(worker, "get_settings", lambda: inference_settings("postgresql://unused"))
     assert worker.main() == 2

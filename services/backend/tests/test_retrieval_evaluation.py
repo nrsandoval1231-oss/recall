@@ -13,9 +13,9 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from recall.db.database import Tx
-from recall.ingestion.embeddings import EmbeddingConfig
-from recall.retrieval.hybrid import hybrid_search
+from monolith.db.database import Tx
+from monolith.ingestion.embeddings import EmbeddingConfig
+from monolith.retrieval.hybrid import hybrid_search
 
 CORPUS = Path(__file__).parents[3] / "tests" / "evaluation" / "rcl003b_hybrid_corpus.json"
 pytest_plugins = ("test_hybrid_retrieval",)

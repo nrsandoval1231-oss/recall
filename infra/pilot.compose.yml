@@ -2,7 +2,7 @@
 # API/worker credentials are separate; table-owner credentials never enter these containers.
 services:
   api:
-    image: recall-backend:local
+    image: monolith-backend:local
     build:
       context: ..
       dockerfile: services/backend/Dockerfile
@@ -23,8 +23,8 @@ services:
       timeout: 10s
       retries: 3
   worker:
-    image: recall-backend:local
-    command: [python, -m, recall.ingestion.worker]
+    image: monolith-backend:local
+    command: [python, -m, monolith.ingestion.worker]
     env_file: worker.env
     restart: unless-stopped
     read_only: true

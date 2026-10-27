@@ -23,17 +23,24 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from recall.api.app import create_app
-from recall.api.auth import StaticKeyResolver, TokenVerifier
-from recall.config import Settings
-from recall.db.database import Database
-from recall.db.migrate import migrate
-from recall.storage.local import LocalObjectStore
+from monolith.api.app import create_app
+from monolith.api.auth import StaticKeyResolver, TokenVerifier
+from monolith.config import Settings
+from monolith.db.database import Database
+from monolith.db.migrate import migrate
+from monolith.storage.local import LocalObjectStore
 
 ISSUER = "https://test-project.supabase.example/auth/v1"
 AUDIENCE = "authenticated"
 SIGNING_SECRET = "test-signing-secret-0123456789abcdef-not-real"
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+@pytest.fixture(autouse=True)
+def _no_inherited_legacy_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests must not depend on pre-rename RECALL_* variables left in the developer's shell."""
+    for key in [name for name in os.environ if name.upper().startswith("RECALL_")]:
+        monkeypatch.delenv(key)
 
 
 def _pg_bin() -> Path:
@@ -62,7 +69,7 @@ class PgCluster:
 
     def __init__(self) -> None:
         self.bin = _pg_bin()
-        self.dir = Path(tempfile.mkdtemp(prefix="recall-pg-"))
+        self.dir = Path(tempfile.mkdtemp(prefix="monolith-pg-"))
         self.port = _free_port()
         self.as_user: str | None = None
         if os.name != "nt" and os.geteuid() == 0:
@@ -114,7 +121,7 @@ def pg_cluster() -> Iterator[PgCluster]:
 
 def make_database(cluster: PgCluster, *, apply_migrations: bool = True) -> tuple[str, str]:
     """Fresh database. Returns (owner_dsn, app_dsn). The app role is NOT the owner."""
-    name = f"recall_{uuid.uuid4().hex[:12]}"
+    name = f"monolith_{uuid.uuid4().hex[:12]}"
     with psycopg.connect(cluster.dsn(), autocommit=True) as conn:
         conn.execute(f'create database "{name}"')
         if conn.execute("select 1 from pg_roles where rolname='recall_owner'").fetchone() is None:

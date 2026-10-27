@@ -6,12 +6,13 @@ use crate::audio_wav::fixtures::{synthetic_pcm, synthetic_wav};
 struct Fx(PathBuf);
 impl Fx {
     fn new() -> Self {
-        let p = std::env::temp_dir().join(format!("recall-synthetic-audio-{}", Uuid::new_v4()));
+        let p = std::env::temp_dir().join(format!("monolith-synthetic-audio-{}", Uuid::new_v4()));
         fs::create_dir(&p).unwrap();
         Self(p)
     }
+    // Pre-rename vault (`Recall/`): the audio byte-exact suite proves legacy vaults are unchanged.
     fn vault(&self) -> Vault {
-        Vault::open(&self.0).unwrap()
+        Vault::open_legacy_for_test(&self.0).unwrap()
     }
 }
 impl Drop for Fx {
@@ -1029,4 +1030,24 @@ fn existing_v9_audio_events_keep_their_digest_and_never_serialize_an_empty_propo
         assert_eq!(e.payload_sha256, expected, "revision {revision}");
     }
     assert!(serde_json::to_value(&saved).unwrap()["audio_organization"].is_null());
+}
+
+#[test]
+fn audio_notes_link_the_vault_folder_in_legacy_and_new_vaults() {
+    let (legacy, fresh) = (Fx::new(), Fx::new());
+    let (lv, nv) = (legacy.vault(), Vault::open(&fresh.0).unwrap());
+    assert_eq!(nv.dir_for_test(), "Monolith");
+    let (lm, nm) = (recorded(&lv), recorded(&nv));
+    let old = fs::read_to_string(lv.note_path(&lm.id)).unwrap();
+    let new = fs::read_to_string(nv.note_path(&nm.id)).unwrap();
+    assert!(old.contains(&format!("source: \"[[Recall/Sources/{}.wav]]\"", lm.id)));
+    assert!(new.contains(&format!("source: \"[[Monolith/Sources/{}.wav]]\"", nm.id)));
+    // Everything else, including the frozen persisted marker, is identical apart from ids/time.
+    assert!(old.contains("<!-- Recall memory ") && new.contains("<!-- Recall memory "));
+    assert!(!old.contains("Monolith/") && !new.contains("Recall/"));
+    assert!(fresh
+        .0
+        .join(format!("Monolith/Sources/{}.wav", nm.id))
+        .is_file());
+    assert!(!fresh.0.join("Recall").exists());
 }

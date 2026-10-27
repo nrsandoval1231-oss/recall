@@ -12,9 +12,9 @@ Follow [CONTEXT-01](../.agent/CONTEXT-01.md) and its replay addendum. Use synthe
 
 Preserve the accepted [ORGANIZE-01](../.agent/ORGANIZE-01.md) behavior. Use a disposable synthetic vault and fake provider for development. Verify that pre-opt-in captures stay local, future text/photo captures save immediately and queue automatically, and offline processing preserves saved sources. Exercise restart recovery, revocation followed by renewed consent, changed source/revision, and corrections both during and after processing. None may duplicate an unknown paid operation or revive stale semantics.
 
-The separate `RECALL_LOCAL_ORGANIZATION_ENABLED` flag defaults to false. Migration 0011 supplies organization receipts and consent keyed by workspace/device/vault. The service additionally requires the exact protected grant, configured provider/budget and current purpose consent. Enabling the flag alone does not opt in a vault. The desktop settings decision establishes the local future-capture marker only after the scoped service decision succeeds.
+The separate `MONOLITH_LOCAL_ORGANIZATION_ENABLED` flag defaults to false. Migration 0011 supplies organization receipts and consent keyed by workspace/device/vault. The service additionally requires the exact protected grant, configured provider/budget and current purpose consent. Enabling the flag alone does not opt in a vault. The desktop settings decision establishes the local future-capture marker only after the scoped service decision succeeds.
 
-Voice-transcript organization (AUDIO-ORG-01, local candidate, not activated) is gated by its own `RECALL_LOCAL_AUDIO_ORGANIZATION_ENABLED` flag (default false). Migration 0012 adds `vault_intelligence_audio_organize_consents` with the same key, owner-only row-level security and epoch semantics as the text/photo table, and purge revokes it. Text/photo consent never authorizes audio and audio consent never authorizes text/photo. Routes: `GET /v1/local-intelligence/audio-organization-capability` and `POST /v1/local-intelligence/audio-organization-consent`; the shared organizations routes accept the `v3.` Binding 3.0 header for transcripts only. See `.agent/AUDIO-ORG-01.md`.
+Voice-transcript organization (AUDIO-ORG-01, local candidate, not activated) is gated by its own `MONOLITH_LOCAL_AUDIO_ORGANIZATION_ENABLED` flag (default false). Migration 0012 adds `vault_intelligence_audio_organize_consents` with the same key, owner-only row-level security and epoch semantics as the text/photo table, and purge revokes it. Text/photo consent never authorizes audio and audio consent never authorizes text/photo. Routes: `GET /v1/local-intelligence/audio-organization-capability` and `POST /v1/local-intelligence/audio-organization-consent`; the shared organizations routes accept the `v3.` Binding 3.0 header for transcripts only. See `.agent/AUDIO-ORG-01.md`.
 
 To run the database-backed backend tests on this Windows host, use WSL: `PATH=/usr/lib/postgresql/18/bin:/home/nrsan/.local/recall-backend/bin:$PATH PYTHONPATH=$PWD/src ESBUILD_BINARY_PATH=/home/nrsan/.local/recall-node-tools/node_modules/@esbuild/linux-x64/bin/esbuild python -m pytest -q -p no:cacheprovider` from `services/backend`. Without `initdb` on `PATH` those tests skip silently.
 
@@ -22,9 +22,9 @@ Run migration and real PostgreSQL authorization/receipt tests, native journal/co
 
 ## Local Ask development and activation boundary
 
-The inference app registers `/v1/local-intelligence/ask`, receipt recovery and capability routes. `RECALL_LOCAL_INTELLIGENCE_ENABLED` defaults to false. Migration 0010, a separately scoped owner/device/vault grant, current versioned Ask consent, configured provider and budget policy are required. Local capture and keyword search do not depend on these services.
+The inference app registers `/v1/local-intelligence/ask`, receipt recovery and capability routes. `MONOLITH_LOCAL_INTELLIGENCE_ENABLED` defaults to false. Migration 0010, a separately scoped owner/device/vault grant, current versioned Ask consent, configured provider and budget policy are required. Local capture and keyword search do not depend on these services.
 
-On an explicitly authorized secured operator host, `python -m recall.pairing_cli --scope vault_intelligence` supplies the separate invitation/revocation path. Invitation creation also requires owner/workspace/device/vault IDs, the fingerprint prepared by the native settings flow and `--approve`. Separate consent uses `--scope vault_intelligence --ask-consent enable` (or `revoke`) with owner/workspace IDs, exact configured `--policy-version` and `--approve`. The CLI requires the owner-role `RECALL_MIGRATION_DATABASE_URL`; never put that credential in the renderer or vault. These are operator instructions, not authorization to activate or spend. Existing photo-only setup remains unchanged.
+On an explicitly authorized secured operator host, `python -m monolith.pairing_cli --scope vault_intelligence` supplies the separate invitation/revocation path. Invitation creation also requires owner/workspace/device/vault IDs, the fingerprint prepared by the native settings flow and `--approve`. Separate consent uses `--scope vault_intelligence --ask-consent enable` (or `revoke`) with owner/workspace IDs, exact configured `--policy-version` and `--approve`. The CLI requires the owner-role `MONOLITH_MIGRATION_DATABASE_URL`; never put that credential in the renderer or vault. These are operator instructions, not authorization to activate or spend. Existing photo-only setup remains unchanged.
 
 Windows native checks use the MSVC Rust toolchain. WSL backend tests use real temporary PostgreSQL/pgvector; cross-platform Node tests require an esbuild executable matching the host OS and repository version. Do not replace existing Windows `node_modules` with Linux dependencies. An isolated Linux binary can be selected with `ESBUILD_BINARY_PATH`. Docker Compose configuration validation is offline and can run on Windows when the WSL Docker Desktop wrapper is unavailable. Record split-platform results and actual skips explicitly.
 
@@ -36,12 +36,12 @@ Requires Node 22+, npm, Rust 1.89+ and Tauri platform prerequisites. Windows nee
 
 ```bash
 npm ci
-npm run tauri -w @recall/desktop -- dev
+npm run tauri -w @monolith/desktop -- dev
 ```
 
 No API, Supabase, AI key, account, `.env`, or cloud configuration is needed for local capture, annotation, evidence and keyword search. Choose a disposable vault folder through the native picker, import a clearly synthetic PNG/JPEG/WebP and optionally add a human note; then search words from the note or filename, view the original, correct the note and inspect History. Optional selected-photo reading requires an owner-associated inference connection, choosing **Read this photo with Claude**, and confirming cloud processing for that photo. A completed proposal appears as an automatically organized Obsidian note candidate; no reading is dispatched merely by opening, searching or importing. For direct Obsidian edits, change only the trailing **Human annotation** region and preserve generated properties, reading sections and the source link. Changes to generated content conflict instead of being overwritten; use **Correct reading** for transcription. Cancelled folder/photo pickers preserve drafts. A correction racing an external annotation edit requires reload and explicit review before saving again.
 
-`npm run dev -w @recall/desktop` runs only the browser preview: it cannot persist a native vault. `npm run build -w @recall/desktop` builds renderer assets; `npm run tauri -w @recall/desktop -- build` builds the native bundle. PR11 CI successfully emitted unsigned artifact `11521925107` in run `37708945255` without cloud variables, with seven-day retention. The lifecycle slice retains this configuration, but needs its own exact-head CI/artifact verification. Neither artifact is a signed release or proof of installation acceptance.
+`npm run dev -w @monolith/desktop` runs only the browser preview: it cannot persist a native vault. `npm run build -w @monolith/desktop` builds renderer assets; `npm run tauri -w @monolith/desktop -- build` builds the native bundle. PR11 CI successfully emitted unsigned artifact `11521925107` in run `37708945255` without cloud variables, with seven-day retention. The lifecycle slice retains this configuration, but needs its own exact-head CI/artifact verification. Neither artifact is a signed release or proof of installation acceptance.
 
 ```bash
 npm run lint
@@ -55,13 +55,13 @@ cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 
 On Windows, WSL2 is an optional way to run the native Rust unit suite when the Windows Rust toolchain is unavailable. From the repository root, run `wsl.exe -- bash -c 'cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml'` with Cargo installed in that WSL distribution. The tests use synthetic fixtures and temporary directories; they do not need a vault path, API key or other user secret. This Linux check does not build or verify the Windows/Tauri application.
 
-Set `RECALL_CHROMIUM=/path/to/chromium` to use a system browser. The separate local suite starts a fresh Vite server on `127.0.0.1:1422` with desktop `VITE_*` cloud settings explicitly empty and injects synthetic Tauri command responses only in tests. It never reuses the regular port-1420 dev server. Rust tests separately exercise native filesystem behavior. Local keyword search over human annotation/filename is not natural-language Ask; selected-photo Claude reading is a separate explicit, connected path and is not OCR or offline generation. See [evidence and limits](implementation/local-vault/README.md). Lifecycle removal/tombstones and explicit missing-note restore retain files/history and provide no secure purge or undelete. Phone-to-vault synchronization, QR pairing, real-data migration and full semantic reconstruction remain open. Failed correction drafts survive the current focus session and cancelled vault selection, but not application restart or deliberate memory/vault exit. Pending import intents persist for explicit retry. Corrupt intent/metadata and publication conflicts can require owner-managed recovery; never delete recovery files to conceal an error.
+Set `MONOLITH_CHROMIUM=/path/to/chromium` to use a system browser. The separate local suite starts a fresh Vite server on `127.0.0.1:1422` with desktop `VITE_*` cloud settings explicitly empty and injects synthetic Tauri command responses only in tests. It never reuses the regular port-1420 dev server. Rust tests separately exercise native filesystem behavior. Local keyword search over human annotation/filename is not natural-language Ask; selected-photo Claude reading is a separate explicit, connected path and is not OCR or offline generation. See [evidence and limits](implementation/local-vault/README.md). Lifecycle removal/tombstones and explicit missing-note restore retain files/history and provide no secure purge or undelete. Phone-to-vault synchronization, QR pairing, real-data migration and full semantic reconstruction remain open. Failed correction drafts survive the current focus session and cancelled vault selection, but not application restart or deliberate memory/vault exit. Pending import intents persist for explicit retry. Corrupt intent/metadata and publication conflicts can require owner-managed recovery; never delete recovery files to conceal an error.
 
 ## Local lifecycle checks and compatibility
 
-On a disposable synthetic vault, a unique Markdown rename must stay directly inside `Recall/Memories`; preserve its stable-ID header and source link. Refresh or rebuild, search the new basename, and confirm corrections keep that name. Nested moves are unsupported; a nested directory may cause conservative conflict rather than a restore option. Duplicate IDs, changed headers and occupied paths must remain diagnostics.
+On a disposable synthetic vault, a unique Markdown rename must stay directly inside `Monolith/Memories`; preserve its stable-ID header and source link. Refresh or rebuild, search the new basename, and confirm corrections keep that name. Nested moves are unsupported; a nested directory may cause conservative conflict rather than a restore option. Duplicate IDs, changed headers and occupied paths must remain diagnostics.
 
-When a note is missing, Recall offers explicit **Restore missing note** or **Remove from Recall**. Removal requires confirmation, appends a logical tombstone and retains original/Markdown/history files. **Removed items** exposes retained history; removed memories are excluded from active keyword search and source viewing. There is no in-app undelete or secure purge. **Rebuild local search** revalidates annotation records, not OCR/AI/semantic memory; failure keeps the prior rows labeled unverified.
+When a note is missing, Monolith offers explicit **Restore missing note** or **Remove from Monolith**. Removal requires confirmation, appends a logical tombstone and retains original/Markdown/history files. **Removed items** exposes retained history; removed memories are excluded from active keyword search and source viewing. There is no in-app undelete or secure purge. **Rebuild local search** revalidates annotation records, not OCR/AI/semantic memory; failure keeps the prior rows labeled unverified.
 
 Failed restore/removal keeps its original revision/state/operation for **Retry same**. **Reload current state** permits explicit review of a new decision or closing the old one. Decisions survive focus navigation and cancelled selection in that session, but are not persisted across application restart. A stale capture/correction receipt returns current deleted state and must not claim a new save. Interrupted restore after note publication can remain a preserved conflict requiring manual recovery; do not delete journals or originals to hide it.
 
@@ -103,28 +103,30 @@ cd services/backend && uv sync    # uses uv.lock
 
 ## Backend
 
+Backend and operator environment variables use the `MONOLITH_` prefix; the old `RECALL_` names still work (see [Naming and legacy identifiers](#naming-and-legacy-identifiers)).
+
 Environment variables are listed in `.env.example` (names only). Minimum for local development:
 
 ```bash
 scripts/dev-db.sh up              # Docker PG16, roles, migrations; prints the exports below
 export DATABASE_URL=...           # recall_api role (NOT the owner)
-export RECALL_MIGRATION_DATABASE_URL=...   # recall_owner role
-export RECALL_SIGNING_SECRET=...  # >= 32 chars
-export RECALL_AUTH_ISSUER=https://<project>.supabase.co/auth/v1
-export RECALL_AUTH_JWKS_URL=https://<project>.supabase.co/auth/v1/.well-known/jwks.json
-export RECALL_STORAGE_BACKEND=local RECALL_LOCAL_STORAGE_DIR=.recall-storage
+export MONOLITH_MIGRATION_DATABASE_URL=...   # recall_owner role
+export MONOLITH_SIGNING_SECRET=...  # >= 32 chars
+export MONOLITH_AUTH_ISSUER=https://<project>.supabase.co/auth/v1
+export MONOLITH_AUTH_JWKS_URL=https://<project>.supabase.co/auth/v1/.well-known/jwks.json
+export MONOLITH_STORAGE_BACKEND=local MONOLITH_LOCAL_STORAGE_DIR=.monolith-storage
 cd services/backend
-uv run python -m recall.db.migrate                       # apply; add --check to verify nothing is pending
-uv run uvicorn recall.api.app:app_factory --factory --port 8000
+uv run python -m monolith.db.migrate                       # apply; add --check to verify nothing is pending
+uv run uvicorn monolith.api.app:app_factory --factory --port 8000
 ```
 
 Without Docker, create two login roles yourself in any PostgreSQL 16: an **owner** (`createrole`, owns the database) and an **API role** (`nosuperuser nobypassrls`); run migrations as the owner, then `grant recall_app to <api role>`. The API refuses to start if its role is a superuser, has `BYPASSRLS`, or owns the tables.
 
-Migrations are plain ordered SQL in `services/backend/migrations/`, checksummed in `schema_migrations`; editing an applied file is an error. If `RECALL_AUTO_PROVISION_WORKSPACES=false`, provision a user with `python -m recall.db.provision <auth-user-uuid>`.
+Migrations are plain ordered SQL in `services/backend/migrations/`, checksummed in `schema_migrations`; editing an applied file is an error. If `MONOLITH_AUTO_PROVISION_WORKSPACES=false`, provision a user with `python -m monolith.db.provision <auth-user-uuid>`.
 
 ### Local object storage
 
-`RECALL_STORAGE_BACKEND=local` writes originals under `RECALL_LOCAL_STORAGE_DIR` (private dir, write-once, server-assigned keys). For Supabase set `RECALL_STORAGE_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server only), and create a **private** bucket named `RECALL_STORAGE_BUCKET`. See [infra/supabase](../infra/supabase/README.md).
+`MONOLITH_STORAGE_BACKEND=local` writes originals under `MONOLITH_LOCAL_STORAGE_DIR` (private dir, write-once, server-assigned keys). For Supabase set `MONOLITH_STORAGE_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server only), and create a **private** bucket named `MONOLITH_STORAGE_BUCKET`. See [infra/supabase](../infra/supabase/README.md).
 
 ## AI processing (RCL-002, optional)
 
@@ -132,9 +134,9 @@ Off unless every `AI_*`/budget variable in `.env.example` is set **and** a works
 
 ```bash
 # server env (both API and worker): AI_PROVIDER=anthropic AI_MODEL_ID=claude-opus-5-5 AI_API_KEY=... \
-#   AI_INPUT_USD_PER_MTOK=... AI_OUTPUT_USD_PER_MTOK=... RECALL_AI_DAILY_BUDGET_USD=... RECALL_AI_MONTHLY_BUDGET_USD=...
-export RECALL_WORKER_DATABASE_URL=...   # login role that inherits recall_worker (scripts/dev-db.sh creates recall_worker_login)
-cd services/backend && uv run python -m recall.ingestion.worker
+#   AI_INPUT_USD_PER_MTOK=... AI_OUTPUT_USD_PER_MTOK=... MONOLITH_AI_DAILY_BUDGET_USD=... MONOLITH_AI_MONTHLY_BUDGET_USD=...
+export MONOLITH_WORKER_DATABASE_URL=...   # login role that inherits recall_worker (scripts/dev-db.sh creates recall_worker_login)
+cd services/backend && uv run python -m monolith.ingestion.worker
 ```
 
 Prices must be the provider's current published prices for the configured model; they are only used to stop spending at the budget. The worker refuses to start with an owner, superuser, `BYPASSRLS`, or non-`recall_worker` role.
@@ -163,7 +165,35 @@ npm run typecheck && npm test
 cd src-tauri && cargo test --lib && cargo check
 ```
 
-Add the desktop origin to the API: `RECALL_CORS_ORIGINS=http://tauri.localhost` (Tauri 2 on Windows). Dev server: `http://localhost:1420`.
+Add the desktop origin to the API: `MONOLITH_CORS_ORIGINS=http://tauri.localhost` (Tauri 2 on Windows). Dev server: `http://localhost:1420`.
+
+## Naming and legacy identifiers
+
+The product was renamed from Recall to Monolith. New code, documentation, package and binary names, UI strings, environment variables and temporary-file names use Monolith. Anything that older builds persisted, signed, hashed or sent to an already-deployed service keeps its historical spelling, and older installs keep working without a manual step.
+
+**Renamed.** Python package `recall` -> `monolith` (`python -m monolith.api.app`, `monolith.ingestion.worker`, `monolith.db.migrate`, ...); npm workspaces `@recall/*` -> `@monolith/*`; Rust crate `monolith-desktop` / `monolith_desktop_lib`; Tauri `productName`, window title and installer (`Monolith_*-setup.exe`); Docker image tags and the container user; `RECALL_*` environment variables -> `MONOLITH_*`; the default workspace name of new inference realms ("Monolith").
+
+**Compatibility and migration.** Each item below has automated tests with temporary directories or in-memory stores; none of it has been exercised against a real installed app, a real Windows Credential Manager or a real WebView2 profile.
+
+- *Environment variables.* The backend settings, `infra/do-inference/ops/*.py`, `infra/check-pilot-secrets.sh` and `scripts/dev-db.sh` read `RECALL_X` only when `MONOLITH_X` is not set at all. One rule applies everywhere: the new name always wins across every source (process environment, `.env`, env files), and a variable that is set, even to the empty string, counts as set, exactly as before the rename, so an empty `MONOLITH_X` is not replaced by `RECALL_X`. Priority in the backend is process `MONOLITH_*`, `.env` `MONOLITH_*`, process `RECALL_*`, `.env` `RECALL_*`. The mapping is `services/backend/src/monolith/envcompat.py` and `config.py`. At desktop compile time `MONOLITH_PAIRING_ORIGIN` is read first, then `RECALL_PAIRING_ORIGIN` (same rule); `build.rs` reruns when either changes.
+- *Vault folder.* `Vault::open` resolves the memory folder once per opened vault. A folder counts as ours only if it holds `_meta/manifest.json`. An existing `Recall/` vault keeps being used and is never renamed, so its `[[Recall/Sources/...]]` links, `_meta` paths and history bytes stay exactly as written, and an unrelated user folder named `Monolith` beside it is never touched. An existing `Monolith/` vault is used as is. If both are ours the vault is refused with an error and nothing is merged. A vault with neither gets a new `Monolith/` subtree; an unrelated manifest-less `Recall/` or `Monolith/` folder is refused as an unsupported subtree. Notes in a `Monolith/` vault link `[[Monolith/Sources/...]]`. The managed Markdown export applies a presence-based version of the same choice to its destination folder (`Recall` if it exists, else `Monolith`, both refused).
+- *Export bookkeeping files.* An existing `.recall-export-manifest.json` / `.recall-export-journal.json` keeps being used (an interrupted journal is never renamed mid-recovery); otherwise `.monolith-export-*` are written. Both journal names present is a recovery conflict. Transient names changed from `.recall-init-*` / `.recall-atomic-*` to `.monolith-init-*` / `.monolith-atomic-*`. No new cleanup of leftovers was added: stale transient files of either prefix are simply ignored.
+- *Native SQLite cache.* If `monolith.sqlite3` does not exist, `recall.sqlite3` is renamed to it before the database opens: sidecars (`-wal`, `-shm`, `-journal`) first and the main file last, so an interruption leaves the legacy main file in place and the next launch resumes with whatever sidecars remain. "New exists" is decided only by the main file. Sidecars with no main file anywhere are left alone. If a rename fails the steps already taken are undone; if that also fails, whichever main file exists is opened.
+- *App data directories and WebView profile.* The Tauri identifier is `com.example.monolith.desktop`. Before the database or any webview opens, `com.example.recall.desktop` under the roaming and the local app-data parents (the latter holds the WebView2 profile and `localStorage`) is renamed into place as one all-or-nothing unit: if the second rename fails the first is moved back. These are renames only; there is no copy fallback and nothing is ever deleted. An empty pre-created target is replaced; a target that already holds data is never merged and the legacy directory is left alone. If a rename fails (typically because the old Recall app is still running) Monolith shows a native error dialog asking the user to close Recall and reopen Monolith, then exits without creating any new data directory, so the next launch retries. The old Recall app is not uninstalled and loses nothing unless its data was already migrated; the WebView2 profile move has only been tested with temporary directories.
+- *OS credential store.* New services are `app.monolith.desktop.{session,selected-photo-reading,vault-intelligence}`. A read tries the new service, then `app.recall.desktop.*`; a legacy hit is written forward, read back and compared, and only then deleted (a failed copy keeps the legacy entry and still returns the value). Writes go to the new service only; delete/revoke/clear remove both and report an error if either fails.
+- *Local storage default.* The legacy cloud backend and the evaluation scripts default to `.monolith-storage`, but keep using an existing `.recall-storage` when the new directory does not exist. Both are ignored by Git.
+- *Export spool.* The legacy cloud backend writes plaintext export archives to `$TMP/monolith-private-exports/monolith-export-*.zip`; its janitor also expires `$TMP/recall-private-exports/recall-export-*.zip` left by older builds under the same 24-hour rule.
+- *Inference bootstrap.* The default workspace name for new realms is "Monolith"; replaying the documented command against a realm created as "Recall" is reported as already bootstrapped.
+
+**Frozen legacy identifiers (intentionally not renamed).** These are persisted, hashed, versioned, deployed or on the wire, so changing them would break existing data, receipts or services:
+
+- Vault and note formats: `recall-local-vault-v1`..`v9`, event origins `human:recall` / `system:recall`, note markers `<!-- Recall memory ... -->` and `<!-- Recall imported annotation boundary -->`, and the text "recorded in Recall" inside persisted v9 audio notes (the UI itself says Monolith).
+- Export, backup and record formats: `recall.export.v1`, `recall.export.manifest.v1`, `recall.markdown-export.v1`, `recall.markdown-export-journal.v1`, `recall.backup.v1`, `recall.do-inference.*.v1`, the archive entry `recall.json`, and the JSON schema titles.
+- Wire: HTTP headers `X-Recall-Organization`, `X-Recall-Reading`, `X-Recall-Source-SHA256`, `X-Recall-Workspace`; cookies `__Host-recall_session`, `recall_session`, `recall_login`; HKDF contexts `recall-reading-connection-v1` and `recall-vault-intelligence-connection-v1`.
+- Browser and device storage: localStorage keys `recall.local.{capture,ask,audio}:*`, `recall-web-device-id`, `recall-signin-limited-until`, `recall-device-id.txt`, the IndexedDB name `recall-web`, the mobile document directory, Expo slug and iOS/Android bundle identifier (`com.example.recall.dev`; the mobile display name is Monolith).
+- PostgreSQL: database names `recall` and `recall_restore`; roles `recall_api`, `recall_worker`, `recall_worker_login`, `recall_owner`, `recall_migrator`, `recall_operator`, `recall_app`, `recall_restore`; every `recall_*` SQL function and setting; migration files and their recorded checksums; the persisted workspace name of realms bootstrapped before the rename.
+- Live deployments: the compose project name `recall-do-inference` (it prefixes volumes), the Supabase bucket `recall-originals-private`, the `recall-pilot` host, the Cloudflare worker `recall-web` and its URLs, GitHub repository URLs.
+- Prompt text and model-visible wording that is version- or hash-pinned.
 
 ## Tests
 

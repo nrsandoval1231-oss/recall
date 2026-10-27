@@ -7,10 +7,10 @@ from typing import Any
 
 from conftest import Env
 from fake_provider import FakeProvider
-from recall.ingestion.worker import Worker
-from test_recall import admin, capture_with, consent, drain
+from monolith.ingestion.worker import Worker
+from test_monolith import admin, capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def _relationship_extraction(data: dict[str, Any]) -> None:

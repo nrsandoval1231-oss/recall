@@ -79,7 +79,7 @@ The product target is low-friction capture of notes, photos, voice and files; au
 | `scripts/README.md` | Inspected against the current tree; component-specific setup and behavior are accurate, with no conflicting active product claim. |
 | `services/backend/README.md` | Reconciled actual API/worker, AI/retrieval and selected-photo inference modules. |
 | `services/backend/migrations/README.md` | Inspected against the current tree; component-specific setup and behavior are accurate, with no conflicting active product claim. |
-| `services/backend/src/recall/README.md` | Replaced obsolete reserved sync/export claims with implemented route/service locations. |
+| `services/backend/src/monolith/README.md` | Replaced obsolete reserved sync/export claims with implemented route/service locations. |
 | `services/backend/tests/README.md` | Inspected against the current tree; component-specific setup and behavior are accurate, with no conflicting active product claim. |
 | `tests/e2e/README.md` | Inspected against the current tree; component-specific setup and behavior are accurate, with no conflicting active product claim. |
 | `tests/evaluation/README.md` | Corrected obsolete reserved/no-harness description; records synthetic tools and explicit provider-call boundary. |

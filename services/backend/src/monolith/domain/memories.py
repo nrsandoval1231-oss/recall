@@ -34,9 +34,9 @@ from .manifest import request_digest
 from .tokens import TokenError, decode_cursor, encode_cursor
 
 AI_EXPLANATION = (
-    "When on, Recall sends a processed copy of each saved page (orientation fixed, metadata removed) to "
+    "When on, Monolith sends a processed copy of each saved page (orientation fixed, metadata removed) to "
     "the configured AI provider to transcribe and organise it, and sends matching excerpts when you ask a "
-    "question. Originals stay in Recall's private storage. Turning this off stops new processing."
+    "question. Originals stay in Monolith's private storage. Turning this off stops new processing."
 )
 
 _RELATIVE_TIME = re.compile(r"\b(last|this|next|yesterday|today|recently|earlier|ago|week|month|year)\b", re.I)
@@ -54,7 +54,10 @@ _EXPLICIT_TEMPORAL = re.compile(
 def infer_temporal_mode(question: str) -> tuple[str | None, str | None]:
     """Infer only bounded historical language; relative dates remain ambiguous."""
     if _RELATIVE_TIME.search(question):
-        return None, "Relative time references need an explicit ISO-8601 As of date before Recall can compare history."
+        return (
+            None,
+            "Relative time references need an explicit ISO-8601 As of date before Monolith can compare history.",
+        )
     for mode, pattern in _TEMPORAL_MODES.items():
         if pattern.search(question):
             return mode, None

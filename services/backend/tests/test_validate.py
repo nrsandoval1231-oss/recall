@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from conftest import REPO_ROOT
-from recall.ingestion.validate import InvalidExtraction, validate_extraction
+from monolith.ingestion.validate import InvalidExtraction, validate_extraction
 
 SCHEMA = json.loads((REPO_ROOT / "packages/contracts/extraction.schema.json").read_text())
 CAP, FP, P1 = str(uuid.uuid4()), "a" * 64, str(uuid.uuid4())

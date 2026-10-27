@@ -1,5 +1,7 @@
 mod audio_asr;
 mod audio_wav;
+mod keychain;
+mod legacy_migration;
 mod local_audio;
 mod local_audio_organization;
 mod local_intelligence;
@@ -388,6 +390,13 @@ fn vault_history(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    // Move data stored under the pre-rename app identifier before any database or webview opens,
+    // so the WebView2 profile and localStorage travel with it. If that is impossible (typically the
+    // old app still runs) do not start on fresh data: tell the user and exit so the next launch retries.
+    if let Err(error) = legacy_migration::migrate_for_launch(&context.config().identifier) {
+        legacy_migration::refuse_launch(&error);
+    }
     tauri::Builder::default()
         .setup(|app| {
             let data_dir = app
@@ -396,9 +405,9 @@ pub fn run() {
                 .expect("app data directory unavailable");
             std::fs::create_dir_all(&data_dir).expect("cannot create app data directory");
             // A corrupt legacy cloud cache must not prevent the local-only vault UI.
-            let store =
-                NativeStore::open(data_dir.join("recall.sqlite3"), data_dir.join("sources"))
-                    .map_err(fail);
+            let database =
+                legacy_migration::sqlite_path_to_open(&data_dir, &legacy_migration::fs_rename);
+            let store = NativeStore::open(database, data_dir.join("sources")).map_err(fail);
             app.manage(local_vault::LocalVaultState::new(
                 data_dir.join("selected-vault.json"),
             ));
@@ -506,6 +515,6 @@ pub fn run() {
             export_save_archive,
             export_apply_markdown_archive
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Recall");
+        .run(context)
+        .expect("error while running Monolith");
 }

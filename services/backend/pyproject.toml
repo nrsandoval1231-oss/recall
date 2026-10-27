@@ -1,7 +1,7 @@
 [project]
-name = "recall-backend"
+name = "monolith-backend"
 version = "0.1.0"
-description = "Recall memory API (RCL-001: trusted capture)"
+description = "Monolith memory API (RCL-001: trusted capture)"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi",
@@ -30,7 +30,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/recall"]
+packages = ["src/monolith"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

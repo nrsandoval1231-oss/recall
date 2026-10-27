@@ -17,22 +17,22 @@ export function limitText(reason: string | null | undefined): string {
 // Honest, specific wording for native failure codes; unknown codes are shown, not hidden.
 export function audioProblem(code: string | null | undefined): string {
   switch (code) {
-    case "permission_denied": return "Microphone access was denied. Allow Recall to use the microphone in Windows privacy settings, then record again. Nothing was saved.";
-    case "unsupported_device": return "This computer’s microphone format isn’t supported. Recall records 16-bit audio at 16, 32, 44.1 or 48 kHz, mono or stereo. You can import a WAV file instead. Nothing was saved.";
+    case "permission_denied": return "Microphone access was denied. Allow Monolith to use the microphone in Windows privacy settings, then record again. Nothing was saved.";
+    case "unsupported_device": return "This computer’s microphone format isn’t supported. Monolith records 16-bit audio at 16, 32, 44.1 or 48 kHz, mono or stereo. You can import a WAV file instead. Nothing was saved.";
     case "device_busy": return "The microphone is in use by another app. Close that app and record again.";
     case "device_lost": return "The microphone stopped working or was unplugged during recording.";
     case "queue_overflow": case "capture_gap": return "The computer couldn’t keep up with the microphone, so the recording has gaps.";
-    case "stage_write_failed": return "Recall couldn’t write the recording to this computer’s private storage.";
-    case "unfinished_recording": return "Recall was closed or restarted while recording. What was captured is held privately and is not in your vault yet.";
+    case "stage_write_failed": return "Monolith couldn’t write the recording to this computer’s private storage.";
+    case "unfinished_recording": return "Monolith was closed or restarted while recording. What was captured is held privately and is not in your vault yet.";
     case "empty_recording": return "Nothing was recorded.";
-    case "finalize_failed": case "commit_failed": return "Recall couldn’t finish saving this recording to your vault.";
+    case "finalize_failed": case "commit_failed": return "Monolith couldn’t finish saving this recording to your vault.";
     case "capture_failed": return "The recording was interrupted.";
     default: return code ? `The recording ran into a problem (${code}).` : "";
   }
 }
 export function transcriptProblem(code: string | null | undefined): string {
   switch (code) {
-    case "asr_assets_missing": case "asr_hash_mismatch": return "Recall’s local speech recognizer is missing or failed its integrity check.";
+    case "asr_assets_missing": case "asr_hash_mismatch": return "Monolith’s local speech recognizer is missing or failed its integrity check.";
     case "unsupported_cpu": return "This computer’s processor can’t run the local speech recognizer.";
     case "asr_timeout": return "Transcription took too long and was stopped.";
     // Native reports the first quality flag as the code when recognition finished but its result is not usable.
@@ -41,11 +41,11 @@ export function transcriptProblem(code: string | null | undefined): string {
     case "non_speech_annotation": return "Recognition finished, but it only detected background sound, not clear speech.";
     case "no_usable_transcript": return "Recognition finished, but no clear speech was found.";
     case "asr_exit_nonzero": return "The local speech recognizer stopped with an error.";
-    case "asr_bad_output": return "The local speech recognizer returned a result Recall couldn’t trust.";
+    case "asr_bad_output": return "The local speech recognizer returned a result Monolith couldn’t trust.";
     case "asr_launch_failed": return "The local speech recognizer couldn’t be started.";
-    case "asr_staging_failed": return "Recall couldn’t prepare the recording for the local speech recognizer.";
+    case "asr_staging_failed": return "Monolith couldn’t prepare the recording for the local speech recognizer.";
     case "asr_error": case "asr_failed": return "The local speech recognizer ran into a problem.";
-    case "asr_outcome_unknown": return "Recall can’t confirm whether transcription finished.";
+    case "asr_outcome_unknown": return "Monolith can’t confirm whether transcription finished.";
     case undefined: case null: case "": return "";
     default: return `Transcription didn’t finish (${code}).`;
   }
@@ -79,17 +79,17 @@ const STALE: Record<string, string> = {
   INPUT_CHANGED: "the text to organize changed",
   REQUEST_CHANGED: "the prepared request no longer matched the recording",
   NOT_QUEUED: "it was never queued to be sent",
-  STATE_CHANGED: "something changed while it was being prepared, so Recall retired it",
+  STATE_CHANGED: "something changed while it was being prepared, so Monolith retired it",
 };
 const LOCAL: Record<string, string> = {
-  TRANSCRIPT_INELIGIBLE: "Recall found no clear speech to organize, so nothing was sent",
+  TRANSCRIPT_INELIGIBLE: "Monolith found no clear speech to organize, so nothing was sent",
   TRANSCRIPTION_FAILED: "transcription did not complete, so there was nothing to organize",
   INPUT_LIMIT_EXCEEDED: "the transcript is too long to organize (over 30,000 characters or 120,000 bytes)",
   EMPTY_CORRECTION: "your correction is empty, so there is nothing to organize",
   REQUEST_INVALID: "the transcript could not be prepared for organization",
 };
 const UNKNOWN: Record<string, string> = {
-  NOT_DISPATCHED: "Recall could not confirm whether the transcript text was sent",
+  NOT_DISPATCHED: "Monolith could not confirm whether the transcript text was sent",
   RECEIPT_UNAVAILABLE: "the private service has no receipt for it yet",
   PROVIDER_OUTCOME_UNKNOWN: "the service did not confirm the outcome",
   RECEIPT_INVALID: "the service’s answer could not be trusted, so nothing was added to the note",
@@ -107,7 +107,7 @@ export function audioOrganizationText(op: OrganizationOperation): { headline: st
     case "awaiting_transcript": return { headline: "Waiting for a usable transcript", detail: "Once there is one, its text is sent to Claude automatically. The recording is never sent." };
     case "queued": case "prepared": return { headline: "Queued for organization", detail: "The transcript text will be sent to Claude automatically. The recording is never sent." };
     case "processing": return { headline: "Organizing the transcript…", detail: "Only the transcript text is sent to Claude; the recording never is." };
-    case "unknown": return { headline: `Organization result uncertain${why(UNKNOWN)}`, detail: "Your recording and transcript are safe. Check the result to look up the same request; Recall will not send it again blindly." };
+    case "unknown": return { headline: `Organization result uncertain${why(UNKNOWN)}`, detail: "Your recording and transcript are safe. Check the result to look up the same request; Monolith will not send it again blindly." };
     case "organized": return { headline: "Organized", detail: "The proposals below are unreviewed machine suggestions, not facts." };
     case "failed": return { headline: `Not organized — the service reported a problem${why(FAILED)}`, detail: "Your recording and transcript are unchanged." };
     case "stale": return { headline: `Not organized — retired without being sent${why(STALE)}`, detail: "Nothing from this request was applied. Your recording and transcript are unchanged." };

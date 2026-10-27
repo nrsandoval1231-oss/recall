@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Recall",
+    "name": "Monolith",
     "slug": "recall",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -12,8 +12,8 @@
       "infoPlist": { "ITSAppUsesNonExemptEncryption": false }
     },
     "plugins": [
-      ["expo-camera", { "cameraPermission": "Recall uses the camera so you can photograph pages you don't want to lose.", "microphonePermission": false, "recordAudioAndroid": false }],
-      ["expo-image-picker", { "photosPermission": "Recall reads only the photos you choose to add as pages.", "cameraPermission": false, "microphonePermission": false }],
+      ["expo-camera", { "cameraPermission": "Monolith uses the camera so you can photograph pages you don't want to lose.", "microphonePermission": false, "recordAudioAndroid": false }],
+      ["expo-image-picker", { "photosPermission": "Monolith reads only the photos you choose to add as pages.", "cameraPermission": false, "microphonePermission": false }],
       "expo-secure-store"
     ]
   }

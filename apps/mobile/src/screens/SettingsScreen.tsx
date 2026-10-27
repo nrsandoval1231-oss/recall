@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { color, copy, minTarget, space } from "@recall/design-tokens";
-import type { AiSettings } from "@recall/api-client";
+import { color, copy, minTarget, space } from "@monolith/design-tokens";
+import type { AiSettings } from "@monolith/api-client";
 import type { Services } from "../services";
 import { Button, text } from "../ui/kit";
 
@@ -27,11 +27,11 @@ export function SettingsScreen({ services, onBack, onSignOut }: { services: Serv
         <View style={{ marginTop: space.lg }}>
           <Text style={text.heading}>{copy.aiToggle}</Text>
           {!settings.ai_configured ? (
-            <Text style={[text.body, { marginTop: space.sm }]}>AI reading isn't set up on this Recall server yet. Your originals are stored and viewable either way.</Text>
+            <Text style={[text.body, { marginTop: space.sm }]}>AI reading isn't set up on this Monolith server yet. Your originals are stored and viewable either way.</Text>
           ) : (
             <>
               <Text style={[text.body, { marginTop: space.sm }]}>{settings.explanation}</Text>
-              {settings.consent_outdated && <Text style={[text.muted, { marginTop: space.sm }]}>What Recall sends has changed since you agreed. Please review and turn it on again.</Text>}
+              {settings.consent_outdated && <Text style={[text.muted, { marginTop: space.sm }]}>What Monolith sends has changed since you agreed. Please review and turn it on again.</Text>}
               <View style={styles.row}>
                 <Text style={text.body}>{settings.enabled ? "On" : "Off"}</Text>
                 <Switch accessibilityLabel={copy.aiToggle} value={settings.enabled} onValueChange={(v) => void toggle(v)} />

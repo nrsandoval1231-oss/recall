@@ -20,7 +20,7 @@ async function accessible(page: Page) {
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
 }
 async function screenshot(page: Page, info: TestInfo, name: string) {
-  if (process.env.RECALL_SCREENSHOTS === "1" && info.project.name === "desktop")
+  if (process.env.MONOLITH_SCREENSHOTS === "1" && info.project.name === "desktop")
     await page.screenshot({ path: `docs/implementation/local-vault-lifecycle/synthetic-${name}.png`, fullPage: true, animations: "disabled" });
 }
 async function calls(page: Page, command: string) {
@@ -65,15 +65,15 @@ test("flat renamed basename is searchable; missing note requires explicit restor
 
 test("removal requires confirmation; removed history survives reload and stale capture retry", async ({ page }, info) => {
   const originalCapture = (await calls(page, "vault_capture"))[0]!.args;
-  await row(page).click(); await page.getByRole("button", { name: "Remove from Recall", exact: true }).click();
+  await row(page).click(); await page.getByRole("button", { name: "Remove from Monolith", exact: true }).click();
   await expect(page.getByRole("region", { name: "Confirm removal" })).toBeVisible();
   await expect(page.getByText(/There is no in-app undo/)).toBeVisible();
   await accessible(page); await screenshot(page, info, "confirmation");
   await page.getByRole("button", { name: "Cancel removal" }).click();
   expect(await calls(page, "vault_remove")).toHaveLength(0);
-  await page.getByRole("button", { name: "Remove from Recall", exact: true }).click();
+  await page.getByRole("button", { name: "Remove from Monolith", exact: true }).click();
   await page.getByRole("button", { name: "Confirm removal", exact: true }).click();
-  await expect(page.getByText("Removed from Recall · files retained", { exact: true })).toBeVisible();
+  await expect(page.getByText("Removed from Monolith · files retained", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "View original" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Correct note" })).toBeDisabled();
   await page.getByRole("button", { name: "Back to memories" }).click();
@@ -109,7 +109,7 @@ test("removal requires confirmation; removed history survives reload and stale c
 });
 
 test("failed removal retains exact decision across cancellation and supports explicit current-state review", async ({ page }) => {
-  await row(page).click(); await page.getByRole("button", { name: "Remove from Recall", exact: true }).click();
+  await row(page).click(); await page.getByRole("button", { name: "Remove from Monolith", exact: true }).click();
   await control(page, { failRemovalOnce: true });
   await page.getByRole("button", { name: "Confirm removal", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("SYNTHETIC removal interrupted");
@@ -121,7 +121,7 @@ test("failed removal retains exact decision across cancellation and supports exp
   await page.getByRole("button", { name: "Reload current state" }).click();
   await expect(page.getByText("Current state · active · revision 1", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Retry same removal" }).click();
-  await expect(page.getByText("Removed from Recall · files retained", { exact: true })).toBeVisible();
+  await expect(page.getByText("Removed from Monolith · files retained", { exact: true })).toBeVisible();
   expect((await calls(page, "vault_remove"))[1]!.args).toEqual(submitted);
 });
 
@@ -148,13 +148,13 @@ test("failed rebuild preserves query and stale rows; successful rebuild revalida
 });
 
 test("late removal reply cannot expose old-vault state after successful selection", async ({ page }) => {
-  await row(page).click(); await page.getByRole("button", { name: "Remove from Recall", exact: true }).click();
+  await row(page).click(); await page.getByRole("button", { name: "Remove from Monolith", exact: true }).click();
   await control(page, { delayRemoval: true }); await page.getByRole("button", { name: "Confirm removal", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { syntheticVault: { removalPending: boolean } }).syntheticVault.removalPending)).toBe(true);
   await control(page, { switchVault: true }); await page.getByRole("button", { name: "Switch vault" }).click();
   await expect(page.getByText("/synthetic/vault-b")).toBeVisible();
   await page.evaluate(() => (window as unknown as { syntheticVault: { releaseRemoval: () => void } }).syntheticVault.releaseRemoval());
   await expect(page.getByText("Nothing captured yet")).toBeVisible();
-  await expect(page.getByText("Removed from Recall · files retained", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Removed from Monolith · files retained", { exact: true })).toHaveCount(0);
   await expect(row(page)).toHaveCount(0);
 });

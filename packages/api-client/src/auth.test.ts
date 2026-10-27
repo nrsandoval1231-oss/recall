@@ -67,7 +67,7 @@ describe("createAuth", () => {
       storage: { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() },
     });
 
-    await expect(auth.verifyEmailLink(link)).rejects.toThrow(/valid Recall sign-in link/);
+    await expect(auth.verifyEmailLink(link)).rejects.toThrow(/valid Monolith sign-in link/);
     expect(supabase.auth.verifyOtp).not.toHaveBeenCalled();
   });
 });

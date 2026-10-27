@@ -1,8 +1,8 @@
 {
-  "name": "recall",
+  "name": "monolith",
   "private": true,
   "version": "0.1.0",
-  "description": "Recall monorepo (RCL-001: trusted capture)",
+  "description": "Monolith monorepo (RCL-001: trusted capture)",
   "type": "module",
   "workspaces": [
     "packages/*",

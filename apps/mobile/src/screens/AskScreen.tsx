@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { color, copy, minTarget, radius, space } from "@recall/design-tokens";
-import type { AskResponse, Citation } from "@recall/api-client";
+import { color, copy, minTarget, radius, space } from "@monolith/design-tokens";
+import type { AskResponse, Citation } from "@monolith/api-client";
 import type { Services } from "../services";
 import { Button, text } from "../ui/kit";
 import { askWithPolicy } from "../askviewmodel";

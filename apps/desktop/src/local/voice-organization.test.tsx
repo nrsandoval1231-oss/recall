@@ -52,7 +52,7 @@ it("discloses that only future transcript text is sent, never the recording, and
   mount(vault({ audioOrganizationCapability: vi.fn(async () => cap()), setAudioOrganizationConsent: vi.fn(), reconcileAudioOrganizationConsent: vi.fn() }));
   const details = await openAudioSettings();
   const copy = details.textContent ?? "";
-  expect(copy).toMatch(/transcript text of voice notes you record or import from then on is sent, via your private Recall service, to Anthropic Claude/);
+  expect(copy).toMatch(/transcript text of voice notes you record or import from then on is sent, via your private Monolith service, to Anthropic Claude/);
   expect(copy).toMatch(/The recording or audio file itself is never sent/);
   expect(copy).toMatch(/Recordings and imported audio you already have are not affected/);
   expect(copy).toMatch(/remembered until you turn it off/);
@@ -129,7 +129,7 @@ it.each([
   ["queued", null, /Queued for organization/],
   ["processing", null, /Organizing the transcript/],
   ["organized", null, /^Organized/],
-  ["unknown", "NOT_DISPATCHED", /Organization result uncertain — Recall could not confirm whether the transcript text was sent/],
+  ["unknown", "NOT_DISPATCHED", /Organization result uncertain — Monolith could not confirm whether the transcript text was sent/],
   ["unknown", "RECEIPT_UNAVAILABLE", /no receipt for it yet/],
   ["unknown", "PROVIDER_OUTCOME_UNKNOWN", /did not confirm the outcome/],
   ["failed", "INVALID_EXTRACTION", /service could not produce a valid result/],
@@ -153,7 +153,7 @@ it.each([
   ["unknown", "RECEIPT_INVALID", /Organization result uncertain — the service’s answer could not be trusted, so nothing was added to the note/],
   ["unknown", "PROMOTION_FAILED", /Organization result uncertain — the result could not be saved to the note/],
   ["saved_local", "REQUEST_INVALID", /Saved locally, not organized — the transcript could not be prepared for organization/],
-  ["stale", "STATE_CHANGED", /something changed while it was being prepared, so Recall retired it/],
+  ["stale", "STATE_CHANGED", /something changed while it was being prepared, so Monolith retired it/],
   ["failed", "BRAND_NEW_CODE", /\(BRAND_NEW_CODE\)/],
   ["stale", "BRAND_NEW_CODE", /\(BRAND_NEW_CODE\)/],
 ] as const)("describes a %s operation (%s) in plain words", (state, code, text) => {

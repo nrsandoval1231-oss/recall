@@ -46,7 +46,7 @@ export interface SourceBytes {
   serverSha256: string | null;
 }
 
-export class RecallApiClient {
+export class MonolithApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
 
@@ -78,13 +78,13 @@ export class RecallApiClient {
     try {
       response = await this.fetchImpl(this.resolve(path), { method, headers, body, credentials: this.options.useSessionCookie ? "include" : undefined });
     } catch (cause) {
-      throw new NetworkError("Could not reach Recall. Check your connection.", { cause });
+      throw new NetworkError("Could not reach Monolith. Check your connection.", { cause });
     }
     if (!response.ok) throw await toApiError(response);
     return response;
   }
 
-  private async json<T>(method: string, path: string, init?: Parameters<RecallApiClient["send"]>[2]): Promise<T> {
+  private async json<T>(method: string, path: string, init?: Parameters<MonolithApiClient["send"]>[2]): Promise<T> {
     return (await (await this.send(method, path, init)).json()) as T;
   }
 

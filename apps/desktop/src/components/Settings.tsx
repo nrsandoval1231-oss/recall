@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { copy } from "@recall/design-tokens";
-import type { AiSettings, RecallApiClient, WorkspaceDeletionPreview } from "@recall/api-client";
+import { copy } from "@monolith/design-tokens";
+import type { AiSettings, MonolithApiClient, WorkspaceDeletionPreview } from "@monolith/api-client";
 
-export function Settings({ api, onClose }: { api: Pick<RecallApiClient, "getAiSettings" | "setAiEnabled"> & Partial<Pick<RecallApiClient, "workspaceDeletionPreview" | "deleteWorkspaceData">>; onClose: () => void }) {
+export function Settings({ api, onClose }: { api: Pick<MonolithApiClient, "getAiSettings" | "setAiEnabled"> & Partial<Pick<MonolithApiClient, "workspaceDeletionPreview" | "deleteWorkspaceData">>; onClose: () => void }) {
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<WorkspaceDeletionPreview | null>(null);
@@ -33,11 +33,11 @@ export function Settings({ api, onClose }: { api: Pick<RecallApiClient, "getAiSe
         <section>
           <h2>{copy.aiToggle}</h2>
           {!settings.ai_configured ? (
-            <p className="note">AI reading isn't set up on this Recall server yet. Your originals are stored and viewable either way.</p>
+            <p className="note">AI reading isn't set up on this Monolith server yet. Your originals are stored and viewable either way.</p>
           ) : (
             <>
               <p>{settings.explanation}</p>
-              {settings.consent_outdated && <p className="note">What Recall sends has changed since you agreed. Please review and turn it on again.</p>}
+              {settings.consent_outdated && <p className="note">What Monolith sends has changed since you agreed. Please review and turn it on again.</p>}
               <label className="switch">
                 <input type="checkbox" checked={settings.enabled} onChange={(e) => void toggle(e.target.checked)} />
                 {settings.enabled ? "On" : "Off"}

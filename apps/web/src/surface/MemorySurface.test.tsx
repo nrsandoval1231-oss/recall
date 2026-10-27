@@ -13,7 +13,7 @@ import type {
   AskResponse,
   MemoryDetail,
   EntityDetail,
-} from "@recall/api-client";
+} from "@monolith/api-client";
 
 const person = {
   entity_id: "person",
@@ -127,7 +127,7 @@ async function ask(question = "Campus?") {
   fireEvent.change(screen.getByLabelText("What do you need to remember?"), {
     target: { value: question },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Ask Recall" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask Monolith" }));
   await screen.findByText(answer.answer!);
 }
 async function focusMemory() {
@@ -190,8 +190,8 @@ it("rejects stale Ask after navigating home", async () => {
   fireEvent.change(screen.getByLabelText("What do you need to remember?"), {
     target: { value: "Campus?" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Ask Recall" }));
-  fireEvent.click(screen.getByRole("button", { name: "Recall home" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask Monolith" }));
+  fireEvent.click(screen.getByRole("button", { name: "Monolith home" }));
   await act(async () => release(answer));
   expect(screen.queryByText(answer.answer!)).toBeNull();
 });
@@ -249,7 +249,7 @@ it("previews human statement correction and writes with revision precondition", 
   render(<MemorySurface api={client} captures={[]} />);
   await focusMemory();
   fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
-  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+  fireEvent.change(screen.getByLabelText("What should Monolith understand?"), {
     target: { value: "Startup moved to March 2027." },
   });
   fireEvent.click(
@@ -341,7 +341,7 @@ it("restores expanded supporting context on Back", async () => {
   );
 });
 it("does not restore denied evidence or prior private understanding", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   const denied = vi.fn();
   const client = api({
     fetchSource: vi.fn(async () => {
@@ -389,7 +389,7 @@ it("ignores an evidence response after Back and releases verified URLs on sessio
   unmount();
 });
 it("shows a correction conflict without replacing newer knowledge", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   render(
     <MemorySurface
       api={api({
@@ -402,7 +402,7 @@ it("shows a correction conflict without replacing newer knowledge", async () => 
   );
   await focusMemory();
   fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
-  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+  fireEvent.change(screen.getByLabelText("What should Monolith understand?"), {
     target: { value: "March 2027" },
   });
   fireEvent.click(
@@ -419,7 +419,7 @@ it("summary remains correctable alongside statements and correction restores key
   const opening = screen.getByRole("button", { name: "Correct understanding" });
   opening.focus();
   fireEvent.click(opening);
-  const input = screen.getByLabelText("What should Recall understand?");
+  const input = screen.getByLabelText("What should Monolith understand?");
   expect(document.activeElement).toBe(input);
   fireEvent.change(input, {
     target: { value: "The updated project summary." },
@@ -453,7 +453,7 @@ function concurrentMemory(revision: number): MemoryDetail {
 async function startCorrection() {
   await focusMemory();
   fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
-  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+  fireEvent.change(screen.getByLabelText("What should Monolith understand?"), {
     target: { value: "My preserved correction draft." },
   });
   fireEvent.click(
@@ -470,7 +470,7 @@ async function reloadCorrection(revision: number) {
   expect(
     (
       screen.getByLabelText(
-        "What should Recall understand?",
+        "What should Monolith understand?",
       ) as HTMLTextAreaElement
     ).value,
   ).toBe("My preserved correction draft.");
@@ -489,7 +489,7 @@ async function reloadCorrection(revision: number) {
   );
 }
 it("conflict reload preserves draft and requires review before retrying the latest revision", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   let server = memory;
   const writes: { revision: number; operation: string }[] = [];
   const client = api({
@@ -510,7 +510,7 @@ it("conflict reload preserves draft and requires review before retrying the late
   await focusMemory();
   server = concurrentMemory(3);
   fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
-  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+  fireEvent.change(screen.getByLabelText("What should Monolith understand?"), {
     target: { value: "My preserved correction draft." },
   });
   fireEvent.click(
@@ -530,7 +530,7 @@ it("conflict reload preserves draft and requires review before retrying the late
   expect(writes[0]!.operation).not.toBe(writes[1]!.operation);
 });
 it("repeated conflicts require a fresh reload and review each time", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   let revision = 3;
   const client = api({
     getMemory: vi
@@ -558,7 +558,7 @@ it("repeated conflicts require a fresh reload and review each time", async () =>
   expect(screen.getByText(/in revision 4/)).toBeTruthy();
 });
 it("cancelling a conflicted reload ignores its late response and does not lose the previous context", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   let resolve!: (value: MemoryDetail) => void;
   const client = api({
     getMemory: vi
@@ -588,7 +588,7 @@ it("cancelling a conflicted reload ignores its late response and does not lose t
 });
 
 it("failed conflict reload preserves the draft and keeps retry blocked", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   const client = api({
     getMemory: vi
       .fn()
@@ -607,7 +607,7 @@ it("failed conflict reload preserves the draft and keeps retry blocked", async (
   expect(
     (
       screen.getByLabelText(
-        "What should Recall understand?",
+        "What should Monolith understand?",
       ) as HTMLTextAreaElement
     ).value,
   ).toBe("My preserved correction draft.");
@@ -620,7 +620,7 @@ it("failed conflict reload preserves the draft and keeps retry blocked", async (
   ).toBe(true);
 });
 it("revoked access during conflict recovery clears private memory and history", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   const denied = vi.fn();
   const client = api({
     getMemory: vi
@@ -640,11 +640,11 @@ it("revoked access during conflict recovery clears private memory and history", 
   );
   await waitFor(() => expect(denied).toHaveBeenCalledOnce());
   expect(screen.queryByText("Campus visit")).toBeNull();
-  expect(screen.queryByLabelText("What should Recall understand?")).toBeNull();
+  expect(screen.queryByLabelText("What should Monolith understand?")).toBeNull();
   expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
 });
 it("removed correction target cannot be silently redirected to a summary or another statement", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   const client = api({
     getMemory: vi
       .fn()
@@ -663,7 +663,7 @@ it("removed correction target cannot be silently redirected to a summary or anot
   expect(
     (
       screen.getByLabelText(
-        "What should Recall understand?",
+        "What should Monolith understand?",
       ) as HTMLTextAreaElement
     ).value,
   ).toBe("My preserved correction draft.");
@@ -684,7 +684,7 @@ it("removed correction target cannot be silently redirected to a summary or anot
   expect(document.activeElement).toBe(document.getElementById("surface-focus"));
 });
 it("conflict reload and correction preserve an earlier historical reconstruction and its original citation", async () => {
-  const { ApiError } = await import("@recall/api-client");
+  const { ApiError } = await import("@monolith/api-client");
   let current = memory;
   const client = api({
     ask: async () => ({ ...answer, temporal_mode: "original" }),
@@ -724,7 +724,7 @@ it("conflict reload and correction preserve an earlier historical reconstruction
   await screen.findByText("Campus visit");
   current = concurrentMemory(3);
   fireEvent.click(screen.getByRole("button", { name: "Correct statement" }));
-  fireEvent.change(screen.getByLabelText("What should Recall understand?"), {
+  fireEvent.change(screen.getByLabelText("What should Monolith understand?"), {
     target: { value: "My preserved correction draft." },
   });
   fireEvent.click(

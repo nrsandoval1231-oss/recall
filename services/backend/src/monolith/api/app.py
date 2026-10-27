@@ -38,7 +38,7 @@ from .deletion import register_routes as register_deletion_routes
 from .export import register_routes as register_export_routes
 from .local_reading import register_routes as register_local_reading_routes
 
-log = logging.getLogger("recall")
+log = logging.getLogger("monolith")
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{8,200}$")
 READ_CHUNK = 64 * 1024
@@ -150,7 +150,7 @@ def create_app(
             if database is None:
                 db.close()
 
-    app = FastAPI(title="Recall API", version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(title="Monolith API", version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(RequestIdMiddleware)
     if settings.cors_allow_origins:
         app.add_middleware(
@@ -289,7 +289,7 @@ def create_app(
         size = 0
         spool_path: Path | None = None
         try:
-            with tempfile.NamedTemporaryFile(prefix="recall-upload-", delete=False) as spool:
+            with tempfile.NamedTemporaryFile(prefix="monolith-upload-", delete=False) as spool:
                 spool_path = Path(spool.name)
                 async for chunk in request.stream():
                     size += len(chunk)
@@ -431,5 +431,5 @@ def _json(payload: Any, status: int = 200) -> JSONResponse:
 
 
 def app_factory() -> FastAPI:
-    """uvicorn entrypoint: `uvicorn recall.api.app:app_factory --factory`."""
+    """uvicorn entrypoint: `uvicorn monolith.api.app:app_factory --factory`."""
     return create_app()

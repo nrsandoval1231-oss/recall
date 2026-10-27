@@ -1,4 +1,4 @@
-# Recall acceptance and evaluation
+# Monolith acceptance and evaluation
 
 ## TEXT-FILE-01 — accepted bounded local result
 
@@ -76,8 +76,8 @@ Record exact commit, environment/device, provider/configuration, dataset version
 The target requires an Obsidian vault as durable user-owned memory, not one-way export. Existing V1 evidence below is pre-migration and does not satisfy this gate.
 
 - Capture durably commits the original and supported memory to the workspace's vault; unavailable vaults retain pending originals and truthful status.
-- Edit a memory directly in Obsidian, reconcile it into Recall, and retrieve the accepted understanding with original evidence. Concurrent edits preserve both versions for explicit resolution.
-- Recall corrections, uncertainty, temporal revisions and source hashes survive restart and vault synchronization; reprocessing does not undo accepted human changes.
+- Edit a memory directly in Obsidian, reconcile it into Monolith, and retrieve the accepted understanding with original evidence. Concurrent edits preserve both versions for explicit resolution.
+- Monolith corrections, uncertainty, temporal revisions and source hashes survive restart and vault synchronization; reprocessing does not undo accepted human changes.
 - Rebuild semantic/search projections from vault notes, attachments and versioned metadata/history without relying on the old database as the exclusive memory store. Preserve IDs, citations and tombstones.
 - Exercise interrupted writes, retries, disk-full/read-only roots, renames, cross-device edits, deleted memory and revoked/cross-workspace access. Vault text must not modify service permissions.
 - Demonstrate migration parity and rollback for existing memory. No paid sync subscription, community plugin or manual taxonomy is necessary for the memory loop.
@@ -209,7 +209,7 @@ Local originals are kept after upload (no cleanup yet). Draft pages exist only i
 
 ## RCL-002 evidence (First Useful Recall)
 
-Candidate: branch `rcl-002-first-useful-recall` (exact SHA in the PR). Same environment as RCL-001. **Every interpretation and answer below was produced by a SYNTHETIC scripted fake provider** (`services/backend/tests/fake_provider.py`). That tests Recall's own gates, jobs, validation, retrieval, and citation checks; it says nothing about how well a real model reads real handwriting. No live provider was called (no key or budget has been authorized).
+Candidate: branch `rcl-002-first-useful-recall` (exact SHA in the PR). Same environment as RCL-001. **Every interpretation and answer below was produced by a SYNTHETIC scripted fake provider** (`services/backend/tests/fake_provider.py`). That tests Monolith's own gates, jobs, validation, retrieval, and citation checks; it says nothing about how well a real model reads real handwriting. No live provider was called (no key or budget has been authorized).
 
 ### Automated results
 

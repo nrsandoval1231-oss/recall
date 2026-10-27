@@ -11,12 +11,12 @@ import pytest
 
 from conftest import Env, PgCluster, make_database
 from fake_provider import FakeProvider
-from recall.db.backup import backup, restore
-from recall.ingestion.worker import Worker
-from recall.storage.local import LocalObjectStore
-from test_recall import capture_with, consent, drain
+from monolith.db.backup import backup, restore
+from monolith.ingestion.worker import Worker
+from monolith.storage.local import LocalObjectStore
+from test_monolith import capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def test_restore_preserves_sources_history_graph_corrections_and_sync(

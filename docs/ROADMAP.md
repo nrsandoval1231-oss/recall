@@ -1,4 +1,4 @@
-# Recall build roadmap
+# Monolith build roadmap
 
 ## Active continuation — VOICE-01 native implementation
 
@@ -76,7 +76,7 @@ Add SQLite cache, downloaded-original inventory, local text search, durable outb
 
 Status: export/delete/backup/managed Markdown implemented; partial processed-source erasure safely restricted.
 
-Objective: Recall is not a data trap.
+Objective: Monolith is not a data trap.
 
 Add complete Markdown/JSON/original export, deletion/purge, controlled-cache tombstones, backup/restore, and the existing managed Markdown exporter with local-edit conflict protection.
 
@@ -84,13 +84,13 @@ The existing exporter is insufficient for the required Obsidian spine. Its confl
 
 ## RCL-005A — Canonical Memory Surface
 
-Objective: replace conventional dashboard/page presentation with the approved Recall interaction language without changing canonical memory semantics.
+Objective: replace conventional dashboard/page presentation with the approved Monolith interaction language without changing canonical memory semantics.
 
 Build the smallest real vertical slice first: sparse Home -> Ask reconstruction -> contextual glass boards -> memory focus -> original evidence forward -> entity refocus -> historical/current state -> correction -> Back restores context. Mobile adapts this to one primary board at a time.
 
 The visual semantics are locked in [UX-SPEC](UX-SPEC.md): glass = understanding; physical artifacts = evidence; light = intelligence; space = relationships; depth = context; time = memory evolution. DOM/CSS-first; add GPU/WebGL only where measured value justifies it. Preserve keyboard/reduced-motion/accessibility and honest loading/error/uncertain states. Do not hard-code the synthetic Brooks Campus design fixture.
 
-Exit: the vertical slice runs against real Recall contracts/data, remains source-grounded, passes interaction/accessibility regression coverage, and is visually recognizable as Recall rather than a generic notes/dashboard/chat application.
+Exit: the vertical slice runs against real Monolith contracts/data, remains source-grounded, passes interaction/accessibility regression coverage, and is visually recognizable as Monolith rather than a generic notes/dashboard/chat application.
 
 ## RCL-005B — Required Obsidian memory spine
 
@@ -98,9 +98,9 @@ Status: **bounded local desktop foundation/lifecycle and selected-photo reading 
 
 [Review the RCL-005B design](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md). Product requirement: no account/password/email-link sign-in, including first use. Private local-only use needs no remote account. Cross-device private use needs secure owner-approved device association; PAIR-01 implements a manual inference-only invitation, while one-time QR pairing remains proposed. Subsequent owner direction authorized the [local-only plan](superpowers/plans/2026-10-07-local-vault-foundation.md), implemented with independent reviews and [synthetic evidence](implementation/local-vault/README.md). The separately authorized [lifecycle plan](superpowers/plans/2026-10-08-local-vault-lifecycle.md) now adds flat renames, missing-note restore, retained tombstones and annotation-search rebuild, with [bounded evidence](implementation/local-vault-lifecycle/README.md). Phone transport, secure purge/undelete, semantic reconstruction and migration remain excluded. Historical email-auth acceptance is not the new target.
 
-Make an Obsidian vault the user-owned durable memory spine while retaining Recall's Memory Surface and universal memory model. Specify the versioned vault schema, workspace association, authorized browser/mobile bridge, direct-edit reconciliation and migration/rollback before changing storage authority. Keep PostgreSQL/jobs/authorization and SQLite where useful as supporting services/projections, not exclusive owners of semantic memory.
+Make an Obsidian vault the user-owned durable memory spine while retaining Monolith's Memory Surface and universal memory model. Specify the versioned vault schema, workspace association, authorized browser/mobile bridge, direct-edit reconciliation and migration/rollback before changing storage authority. Keep PostgreSQL/jobs/authorization and SQLite where useful as supporting services/projections, not exclusive owners of semantic memory.
 
-Build the smallest real round trip: capture -> preserved vault original and memory -> edit in Obsidian -> validated Recall understanding -> grounded Ask -> correction/history retained in vault. Do not require manual folders/tags, a community plugin, paid Obsidian Sync, or account sign-in. Stage local vault correctness before optional device pairing and transport; preserve phone drafts when the desktop is off and label relay receipt separately from vault commitment.
+Build the smallest real round trip: capture -> preserved vault original and memory -> edit in Obsidian -> validated Monolith understanding -> grounded Ask -> correction/history retained in vault. Do not require manual folders/tags, a community plugin, paid Obsidian Sync, or account sign-in. Stage local vault correctness before optional device pairing and transport; preserve phone drafts when the desktop is off and label relay receipt separately from vault commitment.
 
 Exit: crash-safe/idempotent vault writes, direct-edit conflicts, concurrent devices, immutable sources/hash checks, temporal/correction/tombstone preservation, revoked access and cross-workspace isolation, and reconstruction of memory/search projections from vault data. Existing users' memory must migrate with verified parity and a safe rollback; legacy Markdown export alone does not pass.
 
@@ -108,7 +108,7 @@ The selected-photo Claude path adds full-page vision, explicit one-photo cloud c
 
 ## RCL-006 — Private multi-domain pilot
 
-Objective: prove Recall solves real memory retrieval, not merely Paul's specific note structure.
+Objective: prove Monolith solves real memory retrieval, not merely Paul's specific note structure.
 
 Run the private Paul pilot plus general-domain acceptance fixtures/tasks spanning people, places, education, travel, household/personal logistics, ideas, and professional work. Measure capture burden, vague-recall success, correction burden, trust, latency, and cost.
 

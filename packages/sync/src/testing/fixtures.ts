@@ -51,7 +51,7 @@ export function syntheticPng(seed: number, size = 16): Buffer {
 
 /** Write synthetic "camera temp files" and return their paths (simulating temporary URIs). */
 export function makeTempPhotos(count: number, startSeed = 1): { dir: string; uris: string[]; bytes: Buffer[] } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "recall-camera-tmp-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "monolith-camera-tmp-"));
   const bytes = Array.from({ length: count }, (_, i) => syntheticPng(startSeed + i));
   const uris = bytes.map((b, i) => {
     const uri = path.join(dir, `IMG_${i + 1}.png`);
@@ -62,5 +62,5 @@ export function makeTempPhotos(count: number, startSeed = 1): { dir: string; uri
 }
 
 export function tempRoot(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "recall-app-private-"));
+  return fs.mkdtempSync(path.join(os.tmpdir(), "monolith-app-private-"));
 }

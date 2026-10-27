@@ -31,7 +31,7 @@ from .local_intelligence import register_routes as register_local_intelligence_r
 from .local_organization import register_routes as register_local_organization_routes
 from .local_reading import register_routes as register_local_reading_routes
 
-log = logging.getLogger("recall.inference")
+log = logging.getLogger("monolith.inference")
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 
 
@@ -43,7 +43,7 @@ def create_inference_app(
 ) -> FastAPI:
     settings = settings or get_settings()
     if settings.service_profile != "inference":
-        raise RuntimeError("inference app requires RECALL_SERVICE_PROFILE=inference")
+        raise RuntimeError("inference app requires MONOLITH_SERVICE_PROFILE=inference")
     db = database or Database(settings.database_url)
     if provider is None and settings.ai_configured:
         from ..ingestion.anthropic_provider import AnthropicProvider
@@ -92,7 +92,7 @@ def create_inference_app(
                 db.close()
 
     app = FastAPI(
-        title="Recall Inference API",
+        title="Monolith Inference API",
         version="0.1.0",
         lifespan=lifespan,
         docs_url=None,

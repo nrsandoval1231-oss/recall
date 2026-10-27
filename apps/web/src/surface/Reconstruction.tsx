@@ -1,4 +1,4 @@
-import type { AskResponse, Citation } from "@recall/api-client";
+import type { AskResponse, Citation } from "@monolith/api-client";
 import { GlassBoard, ArrowIcon, displayDate } from "./primitives";
 import { AskForm } from "./AskSurface";
 const statusLabel = {
@@ -49,7 +49,7 @@ export function Reconstruction({
         className="primary-board answer-board"
       >
         <p className="eyebrow">
-          {historical ? "Historical understanding" : "Recall understands"}
+          {historical ? "Historical understanding" : "Monolith understands"}
         </p>
         <h1>{view.response.question}</h1>
         <p className="status-heading" data-status={view.response.status}>

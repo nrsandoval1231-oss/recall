@@ -1,9 +1,9 @@
 # Repository tree and ownership
 
-This is an illustrative top-level map, not an exhaustive file tree. The repository now has runnable mobile, desktop, web, backend, shared-contract/sync and infrastructure surfaces. The backend's `ingestion` and `retrieval` modules implement the preserved cloud processing and Ask paths; `sync` implements the authenticated change feed; export commands live in `domain/export.py` and `api/export.py`. There is no separate `recall.exports` package. The native local-vault and selected-photo reading implementation lives in `apps/desktop/src-tauri`; current product truth and implementation limits are in [PRD](PRD.md), [architecture](ARCHITECTURE.md), [roadmap](ROADMAP.md) and [status](V1-STATUS.md).
+This is an illustrative top-level map, not an exhaustive file tree. The repository now has runnable mobile, desktop, web, backend, shared-contract/sync and infrastructure surfaces. The backend's `ingestion` and `retrieval` modules implement the preserved cloud processing and Ask paths; `sync` implements the authenticated change feed; export commands live in `domain/export.py` and `api/export.py`. There is no separate `monolith.exports` package. The native local-vault and selected-photo reading implementation lives in `apps/desktop/src-tauri`; current product truth and implementation limits are in [PRD](PRD.md), [architecture](ARCHITECTURE.md), [roadmap](ROADMAP.md) and [status](V1-STATUS.md).
 
 ```text
-recall/
+monolith/
   README.md
   AGENTS.md
   .editorconfig
@@ -42,7 +42,7 @@ recall/
       migrations/
         README.md
       src/
-        recall/
+        monolith/
           README.md
           api/
           domain/

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ServerCapture } from "@recall/api-client";
-import type { LocalCapture } from "@recall/sync";
+import type { ServerCapture } from "@monolith/api-client";
+import type { LocalCapture } from "@monolith/sync";
 import { mergeRecent } from "./viewmodel";
 import { readConfig } from "./config";
 

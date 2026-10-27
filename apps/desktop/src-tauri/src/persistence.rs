@@ -200,7 +200,7 @@ impl NativeStore {
     pub fn memory() -> Result<Self, StoreError> {
         Self::open(
             ":memory:",
-            std::env::temp_dir().join("recall-native-memory-cache"),
+            std::env::temp_dir().join("monolith-native-memory-cache"),
         )
     }
 
@@ -1110,7 +1110,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         let base = std::env::temp_dir().join(format!(
-            "recall-native-{label}-{}-{nonce}",
+            "monolith-native-{label}-{}-{nonce}",
             std::process::id()
         ));
         fs::create_dir_all(&base).unwrap();

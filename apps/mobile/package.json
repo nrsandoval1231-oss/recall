@@ -1,5 +1,5 @@
 {
-  "name": "@recall/mobile",
+  "name": "@monolith/mobile",
   "version": "0.1.0",
   "private": true,
   "main": "index.ts",
@@ -8,12 +8,12 @@
     "ios": "expo start --ios",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "export:ios": "expo export --platform ios --output-dir /tmp/recall-mobile-export"
+    "export:ios": "expo export --platform ios --output-dir /tmp/monolith-mobile-export"
   },
   "dependencies": {
-    "@recall/api-client": "*",
-    "@recall/design-tokens": "*",
-    "@recall/sync": "*",
+    "@monolith/api-client": "*",
+    "@monolith/design-tokens": "*",
+    "@monolith/sync": "*",
     "expo": "~57.0.27",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",

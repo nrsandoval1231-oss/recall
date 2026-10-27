@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Recall",
+  "productName": "Monolith",
   "version": "0.1.0",
-  "identifier": "com.example.recall.desktop",
+  "identifier": "com.example.monolith.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Recall", "width": 1100, "height": 780, "minWidth": 720, "minHeight": 560 }],
+    "windows": [{ "title": "Monolith", "width": 1100, "height": 780, "minWidth": 720, "minHeight": 560 }],
     "security": {
       "csp": "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:8000 http://127.0.0.1:8000"
     }

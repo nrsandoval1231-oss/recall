@@ -5,12 +5,12 @@ import {
   type ExpectedPage,
   type ServerCapture,
   type UploadAuthorization,
-} from "@recall/api-client";
+} from "@monolith/api-client";
 import type { Clock, FileUploader, LocalFiles } from "./ports";
 import { LocalCaptureStore, toManifest } from "./local-store";
 import type { LocalCapture, LocalPage } from "./types";
 
-/** The subset of RecallApiClient the engine needs (so tests and platforms can substitute transport). */
+/** The subset of MonolithApiClient the engine needs (so tests and platforms can substitute transport). */
 export interface SyncApi {
   createCapture(manifest: ReturnType<typeof toManifest>, idempotencyKey: string): Promise<ServerCapture>;
   authorizeUploads(captureId: string, sourceIds?: string[]): Promise<UploadAuthorization[]>;

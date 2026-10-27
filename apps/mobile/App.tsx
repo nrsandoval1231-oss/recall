@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, SafeAreaView, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import type { ServerCapture } from "@recall/api-client";
+import type { ServerCapture } from "@monolith/api-client";
 import { loadConfig } from "./src/config";
 import { createServices, type Services } from "./src/services";
 import { mergeRecent, type RecentRow } from "./src/viewmodel";
@@ -21,8 +21,8 @@ export default function App() {
   if ("missing" in loaded) {
     return (
       <SafeAreaView style={{ flex: 1, padding: 24, justifyContent: "center" }}>
-        <Text style={text.heading}>Recall isn't configured</Text>
-        <Text style={text.body}>Missing: {loaded.missing.join(", ")}. See docs/DEVELOPMENT.md. Recall will not run in a pretend mode.</Text>
+        <Text style={text.heading}>Monolith isn't configured</Text>
+        <Text style={text.body}>Missing: {loaded.missing.join(", ")}. See docs/DEVELOPMENT.md. Monolith will not run in a pretend mode.</Text>
       </SafeAreaView>
     );
   }
@@ -66,7 +66,7 @@ function Main({ services }: { services: Services }) {
       remote.current = (await services.api.listCaptures({ limit: 50 })).items;
       setBanner(null);
     } catch {
-      setBanner("Offline or can't reach Recall. Showing what's on this device.");
+      setBanner("Offline or can't reach Monolith. Showing what's on this device.");
     }
     await rebuild();
     setRefreshing(false);

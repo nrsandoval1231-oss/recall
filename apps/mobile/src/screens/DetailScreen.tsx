@@ -3,9 +3,9 @@ import { Dimensions, FlatList, Pressable, StyleSheet, Text, TextInput, View } fr
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import * as Crypto from "expo-crypto";
-import { color, copy, space } from "@recall/design-tokens";
-import type { MemoryDetail, ServerCapture } from "@recall/api-client";
-import type { LocalCapture } from "@recall/sync";
+import { color, copy, space } from "@monolith/design-tokens";
+import type { MemoryDetail, ServerCapture } from "@monolith/api-client";
+import type { LocalCapture } from "@monolith/sync";
 import type { Services } from "../services";
 import { Button, StatusPill, text } from "../ui/kit";
 import type { RecentRow } from "../viewmodel";
@@ -117,7 +117,7 @@ export function DetailScreen({ services, row, onBack, initialSourceId }: { servi
           {claims.filter((s) => { const evidence = (s as { evidence?: { page_id: string }[] }).evidence; return !evidence || evidence.some((e) => e.page_id === current?.sourceId); }).map((s) => <View key={s.claim_id} style={{ marginTop: space.xs }}><Text style={text.muted}>{s.text} ({s.epistemic_state || "reported"}){s.temporal_text ? ` · ${s.temporal_text}` : ""}</Text>{row.memoryId && <Button kind="secondary" label="Correct" onPress={() => setEditing({ claimId: s.claim_id, text: s.text })} />}</View>)}
           {editing && <View style={{ marginTop: space.sm }}><TextInput value={editing.text} onChangeText={(textValue) => setEditing({ ...editing, text: textValue })} multiline style={styles.editor} accessibilityLabel="Correction text" /><Button label="Save correction" onPress={() => void saveCorrection()} /><Button kind="secondary" label="Cancel" onPress={() => setEditing(null)} /></View>}
           {correctionNote && <Text style={[text.muted, { marginTop: space.xs }]} accessibilityLiveRegion="polite">{correctionNote}</Text>}
-          {memory.validation_notes.length > 0 && <Text style={[text.muted, { marginTop: space.xs }]}>{memory.validation_notes.length} thing(s) Recall couldn't confirm against the page.</Text>}
+          {memory.validation_notes.length > 0 && <Text style={[text.muted, { marginTop: space.xs }]}>{memory.validation_notes.length} thing(s) Monolith couldn't confirm against the page.</Text>}
         </View>
       )}
     </SafeAreaView>

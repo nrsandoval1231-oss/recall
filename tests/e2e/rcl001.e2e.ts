@@ -5,7 +5,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { RecallApiClient, sha256Hex, ApiError, NetworkError } from "../../packages/api-client/src";
+import { MonolithApiClient, sha256Hex, ApiError, NetworkError } from "../../packages/api-client/src";
 import { CaptureSyncer } from "../../packages/sync/src";
 import { NodeFiles } from "../../packages/sync/src/testing/node-files";
 import { makeTempPhotos, tempRoot } from "../../packages/sync/src/testing/fixtures";
@@ -16,7 +16,7 @@ const tokenB = process.env.E2E_TOKEN_B as string;
 const clock = { now: () => new Date() };
 
 function client(token: string) {
-  return new RecallApiClient({ baseUrl: base, getAccessToken: async () => token });
+  return new MonolithApiClient({ baseUrl: base, getAccessToken: async () => token });
 }
 
 function uploaderFor(files: NodeFiles, failSecondPutOnce: { armed: boolean }) {

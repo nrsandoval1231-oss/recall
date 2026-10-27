@@ -53,6 +53,7 @@ apps/desktop/src-tauri/binaries/whisper-cli-*.exe
 
 # Local dev storage/state
 .recall-storage/
+.monolith-storage/
 .env.local-dev
 
 # Cloudflare local secrets and generated runtime state
@@ -64,3 +65,6 @@ apps/desktop/src-tauri/binaries/whisper-cli-*.exe
 # Browser verification artifacts (synthetic screenshots are explicitly saved under docs)
 /test-results/
 /playwright-report/
+
+# Built installers are evidence artifacts, never committed (hash recorded in the packet)
+.agent/**/*-setup.exe

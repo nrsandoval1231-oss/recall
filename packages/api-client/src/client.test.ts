@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, NetworkError, RecallApiClient, summarizeFailure, chunkedSecretStorage, sha256Hex } from "./index";
+import { ApiError, NetworkError, MonolithApiClient, summarizeFailure, chunkedSecretStorage, sha256Hex } from "./index";
 
 function client(fetchImpl: typeof fetch, token: string | null = "tok") {
-  return new RecallApiClient({ baseUrl: "http://api.test/", getAccessToken: async () => token, fetch: fetchImpl });
+  return new MonolithApiClient({ baseUrl: "http://api.test/", getAccessToken: async () => token, fetch: fetchImpl });
 }
 
-describe("RecallApiClient", () => {
+describe("MonolithApiClient", () => {
   it("sends the bearer token and Idempotency-Key, never a workspace id", async () => {
     let seen: { url: string; init: RequestInit } | undefined;
     const c = client(async (url, init) => {

@@ -1,18 +1,19 @@
 """Ordered, checksummed SQL migrations. Run as the database OWNER role.
 
-python -m recall.db.migrate            # apply pending migrations
-python -m recall.db.migrate --check    # fail if anything is pending or an applied file changed
+python -m monolith.db.migrate            # apply pending migrations
+python -m monolith.db.migrate --check    # fail if anything is pending or an applied file changed
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import os
 import sys
 from pathlib import Path
 
 import psycopg
+
+from ..envcompat import getenv
 
 DEFAULT_DIR = Path(__file__).resolve().parents[3] / "migrations"
 LOCK_ID = 7_402_001
@@ -68,9 +69,9 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--dir", type=Path, default=DEFAULT_DIR)
     args = parser.parse_args()
-    dsn = os.environ.get("RECALL_MIGRATION_DATABASE_URL")
+    dsn = getenv("MONOLITH_MIGRATION_DATABASE_URL")
     if not dsn:
-        print("RECALL_MIGRATION_DATABASE_URL (owner role) is required", file=sys.stderr)
+        print("MONOLITH_MIGRATION_DATABASE_URL (owner role) is required", file=sys.stderr)
         return 2
     try:
         applied = migrate(dsn, args.dir, check_only=args.check)

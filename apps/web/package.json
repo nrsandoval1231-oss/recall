@@ -1,5 +1,5 @@
 {
-  "name": "@recall/web",
+  "name": "@monolith/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@recall/api-client": "*",
-    "@recall/design-tokens": "*",
+    "@monolith/api-client": "*",
+    "@monolith/design-tokens": "*",
     "@supabase/supabase-js": "^2.58.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"

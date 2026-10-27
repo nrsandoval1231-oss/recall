@@ -20,7 +20,7 @@ async function calls(page: Page, command: string) {
 }
 async function accessible(page: Page) { expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]); }
 async function screenshot(page: Page, info: TestInfo, name: string) {
-  if (process.env.RECALL_SCREENSHOTS === "1" && info.project.name === "desktop") await page.screenshot({ path: `docs/implementation/claude-vault-reading/synthetic-${name}.png`, fullPage: true, animations: "disabled" });
+  if (process.env.MONOLITH_SCREENSHOTS === "1" && info.project.name === "desktop") await page.screenshot({ path: `docs/implementation/claude-vault-reading/synthetic-${name}.png`, fullPage: true, animations: "disabled" });
 }
 test.beforeEach(async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: info.project.use.contextOptions?.reducedMotion ?? "no-preference" });

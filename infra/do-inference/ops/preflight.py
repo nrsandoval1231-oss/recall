@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+# Accept the pre-rename RECALL_* variable names: a MONOLITH_* value always wins.
+for _legacy in [k for k in os.environ if k.startswith("RECALL_")]:
+    os.environ.setdefault("MONOLITH_" + _legacy[len("RECALL_") :], os.environ[_legacy])
+
 REQUIRED_TABLES = {
     "schema_migrations",
     "workspaces",
@@ -94,11 +98,11 @@ def decimal(value: object) -> Decimal:
 
 
 try:
-    activation = read_json("RECALL_ACTIVATION_RECORD_FILE")
-    hold = read_json("RECALL_RECOVERY_HOLD_FILE")
-    dsn_path = Path(os.environ["RECALL_API_DATABASE_URL_FILE"])
+    activation = read_json("MONOLITH_ACTIVATION_RECORD_FILE")
+    hold = read_json("MONOLITH_RECOVERY_HOLD_FILE")
+    dsn_path = Path(os.environ["MONOLITH_API_DATABASE_URL_FILE"])
     dsn = dsn_path.read_text(encoding="utf-8").strip()
-    key_path = Path(os.environ["RECALL_AI_API_KEY_FILE"])
+    key_path = Path(os.environ["MONOLITH_AI_API_KEY_FILE"])
     api_key = key_path.read_text(encoding="utf-8").strip()
 except (KeyError, OSError):
     fail()
@@ -132,7 +136,7 @@ for field in ("owner_id", "workspace_id", "device_id", "vault_id"):
     except ValueError:
         fail()
 
-origin = os.environ.get("RECALL_PUBLIC_ORIGIN", "")
+origin = os.environ.get("MONOLITH_PUBLIC_ORIGIN", "")
 try:
     parsed_origin = urlsplit(origin)
 except ValueError:
@@ -147,12 +151,12 @@ if (
     fail()
 if (
     activation.get("origin") != origin
-    or os.environ.get("RECALL_SERVICE_PROFILE") != "inference"
+    or os.environ.get("MONOLITH_SERVICE_PROFILE") != "inference"
 ):
     fail()
 if (
-    os.environ.get("RECALL_AUTO_PROVISION_WORKSPACES") != "false"
-    or os.environ.get("RECALL_DEVICE_PAIRING_ENABLED") != "true"
+    os.environ.get("MONOLITH_AUTO_PROVISION_WORKSPACES") != "false"
+    or os.environ.get("MONOLITH_DEVICE_PAIRING_ENABLED") != "true"
 ):
     fail()
 if (
@@ -165,8 +169,8 @@ if not api_key or not dsn:
 for env_name, record_name in (
     ("AI_INPUT_USD_PER_MTOK", "input_usd_per_mtok"),
     ("AI_OUTPUT_USD_PER_MTOK", "output_usd_per_mtok"),
-    ("RECALL_AI_DAILY_BUDGET_USD", "daily_budget_usd"),
-    ("RECALL_AI_MONTHLY_BUDGET_USD", "monthly_budget_usd"),
+    ("MONOLITH_AI_DAILY_BUDGET_USD", "daily_budget_usd"),
+    ("MONOLITH_AI_MONTHLY_BUDGET_USD", "monthly_budget_usd"),
 ):
     if decimal(os.environ.get(env_name, "")) != decimal(activation.get(record_name)):
         fail()
@@ -184,17 +188,17 @@ if header:
 if any(
     os.environ.get(name)
     for name in (
-        "RECALL_AUTH_ISSUER",
-        "RECALL_AUTH_JWKS_URL",
-        "RECALL_AUTH_JWT_SECRET",
-        "RECALL_SIGNING_SECRET",
+        "MONOLITH_AUTH_ISSUER",
+        "MONOLITH_AUTH_JWKS_URL",
+        "MONOLITH_AUTH_JWT_SECRET",
+        "MONOLITH_SIGNING_SECRET",
         "SUPABASE_URL",
         "SUPABASE_SERVICE_ROLE_KEY",
-        "RECALL_MIGRATION_DATABASE_URL",
-        "RECALL_WORKER_DATABASE_URL",
-        "RECALL_EMBEDDING_PROVIDER",
-        "RECALL_EMBEDDING_MODEL_ID",
-        "RECALL_EMBEDDING_API_KEY",
+        "MONOLITH_MIGRATION_DATABASE_URL",
+        "MONOLITH_WORKER_DATABASE_URL",
+        "MONOLITH_EMBEDDING_PROVIDER",
+        "MONOLITH_EMBEDDING_MODEL_ID",
+        "MONOLITH_EMBEDDING_API_KEY",
     )
 ):
     fail()

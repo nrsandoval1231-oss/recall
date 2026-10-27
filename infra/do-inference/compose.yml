@@ -57,13 +57,13 @@ services:
       start_period: 20s
 
   migrate:
-    image: recall-do-inference:local
+    image: monolith-do-inference:local
     build:
       context: ../..
       dockerfile: services/backend/Dockerfile
     profiles: [maintenance]
     environment:
-      RECALL_MIGRATION_DSN_FILE: /run/secrets/migration_database_url
+      MONOLITH_MIGRATION_DSN_FILE: /run/secrets/migration_database_url
     secrets:
       - migration_database_url
     volumes:
@@ -82,13 +82,13 @@ services:
     cpus: 0.5
 
   bootstrap:
-    image: recall-do-inference:local
+    image: monolith-do-inference:local
     build:
       context: ../..
       dockerfile: services/backend/Dockerfile
     profiles: [maintenance]
     environment:
-      RECALL_BOOTSTRAP_DSN_FILE: /run/secrets/operator_database_url
+      MONOLITH_BOOTSTRAP_DSN_FILE: /run/secrets/operator_database_url
     secrets:
       - operator_database_url
     volumes:
@@ -106,19 +106,19 @@ services:
     cpus: 0.5
 
   api:
-    image: recall-do-inference:local
+    image: monolith-do-inference:local
     build:
       context: ../..
       dockerfile: services/backend/Dockerfile
     profiles: [runtime]
     environment:
-      RECALL_SERVICE_PROFILE: inference
-      RECALL_AUTO_PROVISION_WORKSPACES: "false"
-      RECALL_DEVICE_PAIRING_ENABLED: "true"
-      RECALL_ACTIVATION_RECORD_FILE: /run/secrets/activation_record
-      RECALL_RECOVERY_HOLD_FILE: /recovery/hold.json
-      RECALL_API_DATABASE_URL_FILE: /run/secrets/api_database_url
-      RECALL_AI_API_KEY_FILE: /run/secrets/ai_api_key
+      MONOLITH_SERVICE_PROFILE: inference
+      MONOLITH_AUTO_PROVISION_WORKSPACES: "false"
+      MONOLITH_DEVICE_PAIRING_ENABLED: "true"
+      MONOLITH_ACTIVATION_RECORD_FILE: /run/secrets/activation_record
+      MONOLITH_RECOVERY_HOLD_FILE: /recovery/hold.json
+      MONOLITH_API_DATABASE_URL_FILE: /run/secrets/api_database_url
+      MONOLITH_AI_API_KEY_FILE: /run/secrets/ai_api_key
     secrets:
       - api_database_url
       - activation_record

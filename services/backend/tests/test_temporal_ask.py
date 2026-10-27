@@ -3,12 +3,12 @@ import uuid
 
 from conftest import Env
 from fake_provider import FakeProvider
-from recall.domain.memories import infer_temporal_mode, infer_temporal_request
-from recall.ingestion.provider import AnswerRequest
-from recall.ingestion.worker import Worker
-from test_recall import capture_with, consent, drain
+from monolith.domain.memories import infer_temporal_mode, infer_temporal_request
+from monolith.ingestion.provider import AnswerRequest
+from monolith.ingestion.worker import Worker
+from test_monolith import capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def test_natural_temporal_modes_are_bounded() -> None:

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
-import { color, copy, minTarget, radius, space } from "@recall/design-tokens";
+import { color, copy, minTarget, radius, space } from "@monolith/design-tokens";
 import type { Services } from "../services";
 import { Button, text } from "../ui/kit";
 

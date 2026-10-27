@@ -361,7 +361,33 @@ fn basename(value: &str) -> Result<()> {
 #[derive(Clone)]
 pub struct Vault {
     root: PathBuf,
+    /// Memory subtree name under the vault root: `Recall` for vaults created before the Monolith
+    /// rename (never renamed in place, so immutable history keeps its wikilinks), `Monolith` for new ones.
+    dir: &'static str,
     pub id: String,
+}
+/// Memory subtree name used by vaults created before the Recall to Monolith rename.
+pub(crate) const LEGACY_DIR: &str = "Recall";
+/// Memory subtree name for vaults created after the rename.
+pub(crate) const DIR: &str = "Monolith";
+/// Resolve which memory subtree name a vault root uses. A folder counts as ours only if it holds
+/// `_meta/manifest.json`. A legacy `Recall` subtree keeps being used (an unrelated user folder
+/// named `Monolith` beside it is never touched); an existing `Monolith` subtree is used as is; both
+/// present is refused (never merged). With neither, an unrelated `Recall` or `Monolith` folder is
+/// returned so opening it is refused as an unsupported subtree, exactly as an unrelated `Recall`
+/// folder always was; a vault with neither folder gets a new `Monolith` subtree.
+pub(crate) fn resolve_dir_name(root: &Path) -> Result<&'static str> {
+    let present = |name: &str| fs::symlink_metadata(root.join(name)).is_ok();
+    let ours = |name: &str| root.join(name).join("_meta/manifest.json").exists();
+    match (ours(LEGACY_DIR), ours(DIR)) {
+        (true, true) => Err(format!(
+            "Both a {LEGACY_DIR} and a {DIR} memory folder exist here; they are never merged. Remove or rename one of them, then try again"
+        )),
+        (true, false) => Ok(LEGACY_DIR),
+        (false, true) => Ok(DIR),
+        (false, false) if present(LEGACY_DIR) => Ok(LEGACY_DIR),
+        (false, false) => Ok(DIR),
+    }
 }
 
 // Compiled out entirely outside unit tests; no production fault controls.
@@ -1217,10 +1243,10 @@ fn structured_search_text(m: &VaultMemory, require_summary_evidence: bool) -> St
     }
     fields.join(" ")
 }
-fn v4_markdown(m: &VaultMemory) -> String {
+fn v4_markdown(dir: &str, m: &VaultMemory) -> String {
     let ext = m.source_name.rsplit('.').next().unwrap_or("png");
     let source = format!("../Sources/{}.{}", m.id, ext);
-    let source_property = format!("[[Recall/Sources/{}.{}]]", m.id, ext);
+    let source_property = format!("[[{dir}/Sources/{}.{}]]", m.id, ext);
     let review = match m.reading.as_ref() {
         None => "not_read",
         Some(r) if r.human_correction.is_some() => "corrected",
@@ -1392,21 +1418,21 @@ fn v4_markdown(m: &VaultMemory) -> String {
     out.push_str(&format!("\n## Human annotation\n\n{}", m.note));
     out
 }
-fn v5_markdown(m: &VaultMemory) -> String {
+fn v5_markdown(dir: &str, m: &VaultMemory) -> String {
     if m.source_name == "note.txt" {
         return format!(
             "---\nid: {}\nstatus: {}\ncaptured: {}\nsource: {}\nreview: not_read\n---\n\n<!-- Recall memory {} | human annotation -->\n[Original text](../Sources/{}.txt)\n\n## Human annotation\n\n{}",
             yaml(&m.id), yaml("saved"), yaml(&m.captured_at),
-            yaml(&format!("[[Recall/Sources/{}.txt]]", m.id)), m.id, m.id, m.note
+            yaml(&format!("[[{dir}/Sources/{}.txt]]", m.id)), m.id, m.id, m.note
         );
     }
     // Preserve the v4 photo renderer byte-for-byte for the new format.
-    v4_markdown(m)
+    v4_markdown(dir, m)
 }
 fn markdown_text(value: &str) -> String {
     md_text(&value.replace('\r', " ").replace('\n', " "))
 }
-fn v6_markdown(m: &VaultMemory) -> String {
+fn v6_markdown(dir: &str, m: &VaultMemory) -> String {
     let Some(org) = m.organization.as_ref().filter(|o| {
         !o.suppressed
             && o.review_state == "unreviewed"
@@ -1417,7 +1443,7 @@ fn v6_markdown(m: &VaultMemory) -> String {
                     o.binding.source_sha256.clone()
                 }
     }) else {
-        return v5_markdown(m);
+        return v5_markdown(dir, m);
     };
     let source = if org.binding.source_kind == "text" {
         "txt"
@@ -1439,7 +1465,7 @@ fn v6_markdown(m: &VaultMemory) -> String {
     };
     let mut out = format!(
         "---\nid: {}\nstatus: {}\ncaptured: {}\nsource: {}\norganization: unreviewed\n---\n\n<!-- Recall memory {} | generated organization -->\n",
-        yaml(&m.id), yaml("saved"), yaml(&m.captured_at), yaml(&format!("[[Recall/Sources/{}.{}]]", m.id, source)), m.id
+        yaml(&m.id), yaml("saved"), yaml(&m.captured_at), yaml(&format!("[[{dir}/Sources/{}.{}]]", m.id, source)), m.id
     );
     let extraction = &org.result.extraction;
     if let Some(summary) = extraction["summary"]
@@ -1597,36 +1623,36 @@ fn v6_markdown(m: &VaultMemory) -> String {
     out.push_str(&format!("\n<!-- Recall memory {} | human annotation -->\n[Original {}](../Sources/{}.{})\n\n## Human annotation\n\n{}", m.id, if source=="txt" {"text"} else {"photo"}, m.id, source, m.note));
     out
 }
-fn markdown_for(format: &str, m: &VaultMemory) -> String {
+fn markdown_for(dir: &str, format: &str, m: &VaultMemory) -> String {
     match format {
-        FORMAT_V4 => v4_markdown(m),
-        FORMAT_V5 => v5_markdown(m),
-        FORMAT_V6 => v6_markdown(m),
-        FORMAT_V7 => v6_markdown(m),
+        FORMAT_V4 => v4_markdown(dir, m),
+        FORMAT_V5 => v5_markdown(dir, m),
+        FORMAT_V6 => v6_markdown(dir, m),
+        FORMAT_V7 => v6_markdown(dir, m),
         FORMAT_V8 if m.imported_text.is_some() => {
             let mut render = m.clone();
             render.source_name = "note.txt".into();
             render.note.clear();
-            v8_imported_markdown(m, v6_markdown(&render))
+            v8_imported_markdown(m, v6_markdown(dir, &render))
         }
-        FORMAT_V8 => v6_markdown(m),
-        FORMAT_V9 if m.audio_source.is_some() => audio_markdown(m),
+        FORMAT_V8 => v6_markdown(dir, m),
+        FORMAT_V9 if m.audio_source.is_some() => audio_markdown(dir, m),
         FORMAT_V9 if m.imported_text.is_some() => {
             let mut render = m.clone();
             render.source_name = "note.txt".into();
             render.note.clear();
-            v8_imported_markdown(m, v6_markdown(&render))
+            v8_imported_markdown(m, v6_markdown(dir, &render))
         }
-        FORMAT_V9 => v6_markdown(m),
+        FORMAT_V9 => v6_markdown(dir, m),
         _ => markdown_v1_v3(m),
     }
 }
-fn markdown_for_event(e: &Event) -> Result<String> {
+fn markdown_for_event(dir: &str, e: &Event) -> Result<String> {
     if e.format == FORMAT_V9 && e.memory.audio_source.is_some() {
         e.context_link_projection
             .as_deref()
             .ok_or("Missing v9 context link projection")?;
-        return Ok(audio_markdown(&e.memory));
+        return Ok(audio_markdown(dir, &e.memory));
     }
     if [FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()) {
         let mut render_memory = e.memory.clone();
@@ -1637,6 +1663,7 @@ fn markdown_for_event(e: &Event) -> Result<String> {
             render_memory.note.clear();
         }
         let mut rendered = v7_markdown(
+            dir,
             &render_memory,
             e.context_link_projection
                 .as_deref()
@@ -1647,7 +1674,7 @@ fn markdown_for_event(e: &Event) -> Result<String> {
         }
         Ok(rendered)
     } else {
-        Ok(markdown_for(&e.format, &e.memory))
+        Ok(markdown_for(dir, &e.format, &e.memory))
     }
 }
 fn v8_imported_markdown(memory: &VaultMemory, output: String) -> String {
@@ -1677,8 +1704,12 @@ fn v8_imported_markdown(memory: &VaultMemory, output: String) -> String {
         if captured { "" } else { &memory.note }
     )
 }
-fn v7_markdown(memory: &VaultMemory, projection: &[ContextLinkProjection]) -> Result<String> {
-    let mut output = v6_markdown(memory);
+fn v7_markdown(
+    dir: &str,
+    memory: &VaultMemory,
+    projection: &[ContextLinkProjection],
+) -> Result<String> {
+    let mut output = v6_markdown(dir, memory);
     let links = memory
         .organization
         .as_ref()
@@ -1764,11 +1795,17 @@ impl Vault {
         if !root.is_dir() || !root.is_absolute() {
             return Err("Select an existing absolute vault folder".into());
         }
-        let recall = root.join("Recall");
-        safe(&recall)?;
-        if !recall.exists() {
+        Self::open_in(root, resolve_dir_name(root)?)
+    }
+    /// Open (creating when absent) the memory subtree named `dir`. Production resolves the name with
+    /// `resolve_dir_name`; tests call this with `LEGACY_DIR` to create a pre-rename vault.
+    fn open_in(root: &Path, dir: &'static str) -> Result<Self> {
+        safe(root)?;
+        let monolith = root.join(dir);
+        safe(&monolith)?;
+        if !monolith.exists() {
             // Build the whole empty subtree privately, then publish without merging.
-            let staging = root.join(format!(".recall-init-{}", Uuid::new_v4()));
+            let staging = root.join(format!(".monolith-init-{}", Uuid::new_v4()));
             fs::create_dir(&staging).map_err(fail)?;
             for d in [
                 "Memories",
@@ -1798,30 +1835,31 @@ impl Vault {
             ] {
                 sync_dir(&staging.join(d))?;
             }
-            if recall.exists() {
-                return Err("Recall subtree appeared during initialization".into());
+            if monolith.exists() {
+                return Err(format!("{dir} subtree appeared during initialization"));
             }
-            rename(&staging, &recall)?;
+            rename(&staging, &monolith)?;
         }
-        let manifest: Manifest = decode(&recall.join("_meta/manifest.json"))?;
+        let manifest: Manifest = decode(&monolith.join("_meta/manifest.json"))?;
         if ![
             FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
             FORMAT_V9,
         ]
         .contains(&manifest.format.as_str())
         {
-            return Err("Unsupported or legacy Recall subtree".into());
+            return Err(format!("Unsupported or legacy {dir} subtree"));
         }
         id(&manifest.vault_id)?;
         let v = Self {
             root: root.to_path_buf(),
+            dir,
             id: manifest.vault_id,
         };
         v.validate()?;
         Ok(v)
     }
     fn path(&self, p: &str) -> PathBuf {
-        self.root.join("Recall").join(p)
+        self.root.join(self.dir).join(p)
     }
     fn note_path(&self, id: &str) -> PathBuf {
         self.path(&format!("Memories/{id}.md"))
@@ -2563,9 +2601,13 @@ impl Vault {
             expected_state: None,
             previous_markdown: Some(last.markdown),
             markdown: if format == FORMAT_V7 {
-                v7_markdown(&memory, context_link_projection.as_deref().unwrap_or(&[]))?
+                v7_markdown(
+                    self.dir,
+                    &memory,
+                    context_link_projection.as_deref().unwrap_or(&[]),
+                )?
             } else {
-                markdown_for(FORMAT_V6, &memory)
+                markdown_for(self.dir, FORMAT_V6, &memory)
             },
             memory,
             context_link_projection,
@@ -2699,7 +2741,7 @@ impl Vault {
             .open(p)
             .map_err(fail)?;
         f.try_lock()
-            .map_err(|_| "Vault is busy in another Recall process".to_string())?;
+            .map_err(|_| "Vault is busy in another Monolith process".to_string())?;
         self.validate()?;
         Ok(f)
     }
@@ -3074,7 +3116,7 @@ impl Vault {
                     .contains(&e.memory.source_name.rsplit('.').next().unwrap_or("")))
             || e.memory.captured_at.len() != 20
             || e.memory.updated_at.len() != 20
-            || markdown_for_event(e).as_deref() != Ok(e.markdown.as_str())
+            || markdown_for_event(self.dir, e).as_deref() != Ok(e.markdown.as_str())
             || ([FORMAT_V7, FORMAT_V8, FORMAT_V9].contains(&e.format.as_str()))
                 != e.context_link_projection.is_some()
             || (e.memory.revision == 1) != (e.parent_sha256.is_none())
@@ -3485,7 +3527,7 @@ impl Vault {
                 && Some(String::from_utf8(read(&backup, MAX_JSON)?).map_err(fail)?)
                     != e.previous_markdown
             {
-                return Err("Concurrent editor draft retained in Recall/_meta/preserved; manual resolution required".into());
+                return Err(format!("Concurrent editor draft retained in {}/_meta/preserved; manual resolution required", self.dir));
             }
             out.push(e);
         }
@@ -3890,9 +3932,10 @@ impl Vault {
                 if Some(String::from_utf8(read(&backup, MAX_JSON)?).map_err(fail)?)
                     != e.previous_markdown
                 {
-                    return Err(
-                        "Concurrent editor draft preserved in Recall/_meta/preserved".into(),
-                    );
+                    return Err(format!(
+                        "Concurrent editor draft preserved in {}/_meta/preserved",
+                        self.dir
+                    ));
                 }
             }
             if e.kind != "external" {
@@ -3911,7 +3954,10 @@ impl Vault {
             && Some(String::from_utf8(read(&backup, MAX_JSON)?).map_err(fail)?)
                 != e.previous_markdown
         {
-            return Err("Concurrent editor draft preserved in Recall/_meta/preserved".into());
+            return Err(format!(
+                "Concurrent editor draft preserved in {}/_meta/preserved",
+                self.dir
+            ));
         }
         immutable(&hp, &bytes)?;
         boundary!("before_receipt", &self.done_path(&e.operation_id));
@@ -3986,7 +4032,7 @@ impl Vault {
                     proposal.suppressed = true;
                 }
             }
-            normalized.markdown = markdown_for_event(&normalized)?;
+            normalized.markdown = markdown_for_event(self.dir, &normalized)?;
         } else if e.format == FORMAT_V7 || manifest.format == FORMAT_V7 {
             normalized.format = FORMAT_V7.into();
             if normalized.context_link_projection.is_none() {
@@ -4021,18 +4067,18 @@ impl Vault {
                         .for_each(|entry| entry.suppressed = true);
                 }
             }
-            normalized.markdown = markdown_for_event(&normalized)?;
+            normalized.markdown = markdown_for_event(self.dir, &normalized)?;
         } else if e.kind == "external" {
             normalized.format = e.format.clone();
         } else if e.format == FORMAT_V6 || manifest.format == FORMAT_V6 {
             normalized.format = FORMAT_V6.into();
-            normalized.markdown = markdown_for(&FORMAT_V6, &normalized.memory);
+            normalized.markdown = markdown_for(self.dir, &FORMAT_V6, &normalized.memory);
         } else if e.format == FORMAT_V5 || manifest.format == FORMAT_V5 {
             normalized.format = FORMAT_V5.into();
-            normalized.markdown = markdown_for(&FORMAT_V5, &normalized.memory);
+            normalized.markdown = markdown_for(self.dir, &FORMAT_V5, &normalized.memory);
         } else if e.memory.reading.is_some() || manifest.format == FORMAT_V4 {
             normalized.format = FORMAT_V4.into();
-            normalized.markdown = v4_markdown(&normalized.memory);
+            normalized.markdown = v4_markdown(self.dir, &normalized.memory);
         } else if manifest.format == FORMAT_V3 {
             normalized.format = FORMAT_V3.into();
         }
@@ -4331,7 +4377,7 @@ impl Vault {
             memory: memory.clone(),
             context_link_projection: Some(Vec::new()),
         };
-        event.markdown = markdown_for_event(&event)?;
+        event.markdown = markdown_for_event(self.dir, &event)?;
         self.preflight_capacity(&event)?;
         memory = self.commit(&event)?;
         let _ = self.finish_capture_organization(organization_intent, &memory);
@@ -4411,7 +4457,7 @@ impl Vault {
             memory,
             context_link_projection: Some(Vec::new()),
         };
-        event.markdown = markdown_for_event(&event)?;
+        event.markdown = markdown_for_event(self.dir, &event)?;
         // Persist the consent-bound organization intent before capture commit. If the
         // process stops after the receipt is durable, replay can finish this intent.
         let organization_intent = self.import_organization_intent(&intent, true)?;
@@ -4574,7 +4620,7 @@ impl Vault {
             payload_sha256,
             parent_sha256: None,
             origin: "human:recall".into(),
-            markdown: markdown_for(FORMAT_V2, &memory),
+            markdown: markdown_for(self.dir, FORMAT_V2, &memory),
             previous_markdown: None,
             memory,
             context_link_projection: None,
@@ -4651,7 +4697,7 @@ impl Vault {
             note_path: Some(format!("{operation_id}.md")),
             expected_state: None,
             previous_markdown: None,
-            markdown: markdown_for(FORMAT_V5, &memory),
+            markdown: markdown_for(self.dir, FORMAT_V5, &memory),
             memory,
             context_link_projection: None,
         };
@@ -4736,6 +4782,7 @@ impl Vault {
             }
         } else {
             markdown_for(
+                self.dir,
                 render_format,
                 &VaultMemory {
                     note: String::new(),
@@ -4812,9 +4859,13 @@ impl Vault {
             origin: "human:obsidian".into(),
             previous_markdown: Some(last.markdown.clone()),
             markdown: if event_format == FORMAT_V7 {
-                v7_markdown(&m, context_link_projection.as_deref().unwrap_or(&[]))?
+                v7_markdown(
+                    self.dir,
+                    &m,
+                    context_link_projection.as_deref().unwrap_or(&[]),
+                )?
             } else if event_format == FORMAT_V6 {
-                markdown_for(FORMAT_V6, &m)
+                markdown_for(self.dir, FORMAT_V6, &m)
             } else {
                 disk
             },
@@ -5120,7 +5171,7 @@ impl Vault {
                 note_path: last.note_path.clone(),
                 expected_state: None,
                 previous_markdown: Some(last.markdown.clone()),
-                markdown: v7_markdown(&memory, &projection)?,
+                markdown: v7_markdown(self.dir, &memory, &projection)?,
                 memory,
                 context_link_projection: Some(projection),
             };
@@ -6036,7 +6087,8 @@ impl LocalVaultState {
             .and_then(|s| {
                 let root = PathBuf::from(s.root?);
                 let expected = s.vault_id?;
-                if !root.join("Recall/_meta/manifest.json").exists() {
+                let dir = resolve_dir_name(&root).ok()?;
+                if !root.join(dir).join("_meta/manifest.json").exists() {
                     return None;
                 }
                 Vault::open(&root).ok().filter(|v| v.id == expected)

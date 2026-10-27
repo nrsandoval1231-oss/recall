@@ -1,6 +1,6 @@
 """Owner-operated consistent database + verified-original backup. No client credentials.
 
-Run with RECALL_BACKUP_DATABASE_URL (a dedicated privileged operator connection)
+Run with MONOLITH_BACKUP_DATABASE_URL (a dedicated privileged operator connection)
 and the normal storage configuration. Restore only into an empty database/store.
 Archives contain private plaintext; keep them on an owner-controlled encrypted disk.
 """
@@ -23,6 +23,7 @@ from typing import Any
 import psycopg
 from psycopg.conninfo import conninfo_to_dict
 
+from ..envcompat import require_env
 from ..storage import ObjectStore, hash_stream
 
 MAX_ARCHIVE_BYTES = 10 * 1024**3
@@ -84,7 +85,7 @@ def backup(dsn: str, store: ObjectStore, destination: Path) -> dict[str, Any]:
     if destination.exists():
         raise ValueError("Backup destination already exists.")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="recall-backup-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="monolith-backup-") as scratch:
         root = Path(scratch)
         originals: list[dict[str, Any]] = []
         with _locked_database(dsn) as conn, conn.transaction():
@@ -166,7 +167,7 @@ def backup(dsn: str, store: ObjectStore, destination: Path) -> dict[str, Any]:
 
 
 def restore(dsn: str, store: ObjectStore, archive_path: Path) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="recall-restore-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="monolith-restore-") as scratch:
         root = Path(scratch)
         with zipfile.ZipFile(archive_path) as archive:
             entries = archive.infolist()
@@ -232,7 +233,7 @@ def main() -> None:
     parser.add_argument("operation", choices=["backup", "restore"])
     parser.add_argument("archive", type=Path)
     args = parser.parse_args()
-    dsn = os.environ["RECALL_BACKUP_DATABASE_URL"]
+    dsn = require_env("MONOLITH_BACKUP_DATABASE_URL")
     settings = get_settings()
     store = build_object_store(settings)
     result = backup(dsn, store, args.archive) if args.operation == "backup" else restore(dsn, store, args.archive)

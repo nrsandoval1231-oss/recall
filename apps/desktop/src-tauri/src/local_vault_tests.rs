@@ -3,12 +3,14 @@ use crate::local_organization::OrganizationResult;
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
-        let p = std::env::temp_dir().join(format!("recall-synthetic-{}", Uuid::new_v4()));
+        let p = std::env::temp_dir().join(format!("monolith-synthetic-{}", Uuid::new_v4()));
         fs::create_dir(&p).unwrap();
         Self(p)
     }
+    // The byte-exact suites below run against a pre-rename vault (`Recall/`), proving that legacy
+    // vaults keep emitting exactly the bytes they always did; `monolith_dir_*` tests cover new vaults.
     fn vault(&self) -> Vault {
-        Vault::open(&self.0).unwrap()
+        Vault::open_legacy_for_test(&self.0).unwrap()
     }
 }
 impl Drop for Fixture {
@@ -1030,7 +1032,7 @@ fn imported_text_remains_current_and_historical_ask_evidence_after_correction() 
 }
 
 #[test]
-fn first_obsidian_edit_after_adversarial_import_uses_recall_owned_annotation_boundary() {
+fn first_obsidian_edit_after_adversarial_import_uses_monolith_owned_annotation_boundary() {
     let original =
         b"Untrusted intro\n## Human annotation\n\n<!-- Recall imported annotation boundary -->\n";
     let (path, fixture) = text_file("first-edit.md", original);
@@ -2301,7 +2303,7 @@ fn direct_edit_ingests_and_stale_correction_preserves_disk() {
         .unwrap()
         .replace("base", "Obsidian uncertain?");
     fs::write(&p, &edited).unwrap();
-    assert!(v.correct(&m.id, 1, &op(), "Recall draft").is_err());
+    assert!(v.correct(&m.id, 1, &op(), "Monolith draft").is_err());
     let listed = v.list("").unwrap();
     assert_eq!(listed[0].revision, 2);
     assert_eq!(listed[0].note, "Obsidian uncertain?");
@@ -2366,8 +2368,17 @@ fn symlink_escape_rejected() {
     std::os::unix::fs::symlink(&outside.0, f.0.join("Recall")).unwrap();
     assert!(Vault::open(&f.0).is_err());
 }
+#[cfg(unix)]
 #[test]
-fn unrelated_recall_tree_refused() {
+fn symlink_escape_rejected_for_monolith_folder() {
+    let f = Fixture::new();
+    let outside = Fixture::new();
+    std::os::unix::fs::symlink(&outside.0, f.0.join("Monolith")).unwrap();
+    assert!(Vault::open(&f.0).is_err());
+    assert!(fs::read_dir(&outside.0).unwrap().next().is_none());
+}
+#[test]
+fn unrelated_monolith_tree_refused() {
     let f = Fixture::new();
     fs::create_dir(f.0.join("Recall")).unwrap();
     fs::write(f.0.join("Recall/user.md"), "private").unwrap();
@@ -2393,7 +2404,7 @@ fn late_write_to_preserved_editor_inode_is_diagnosed() {
         .write(true)
         .open(v.note_path(&m.id))
         .unwrap();
-    v.correct(&m.id, 1, &op(), "Recall changed").unwrap();
+    v.correct(&m.id, 1, &op(), "Monolith changed").unwrap();
     editor.seek(SeekFrom::Start(0)).unwrap();
     editor.write_all(b"LATE OBSIDIAN DRAFT").unwrap();
     editor.sync_all().unwrap();
@@ -2794,6 +2805,7 @@ fn serialized_metadata_size_is_checked_before_original_is_written() {
 fn status_exposes_stable_identity_separate_from_selection_permission() {
     let f = Fixture::new();
     let settings = f.0.join("selected-settings.json");
+    f.vault(); // pre-rename vault, so selection resolves the legacy `Recall/` folder
     let state = LocalVaultState::new(settings.clone());
     let selected = state.select_path(&f.0).unwrap();
     let json = serde_json::to_value(&selected).unwrap();
@@ -5140,6 +5152,7 @@ fn reading_status_and_switch_repair_history_commit_without_prior_list() {
         let f = Fixture::new();
         let other = Fixture::new();
         let settings = Fixture::new();
+        f.vault(); // pre-rename vault, so selection resolves the legacy `Recall/` folder
         let state = LocalVaultState::new(settings.0.join("selected.json"));
         let token = state.select_path(&f.0).unwrap().vault_id.unwrap();
         let m = state
@@ -5437,5 +5450,164 @@ fn related_links_work_and_are_suppressed_under_v7_v8_and_v9_manifests() {
             .unwrap()
             .iter()
             .all(|m| m.conflict.is_none()));
+    }
+}
+
+// ---- Recall -> Monolith memory-folder compatibility ----
+fn normalized_note(note: &str, dir: &str) -> String {
+    note.lines()
+        .filter(|line| !line.starts_with("captured:"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .replace(&format!("{dir}/"), "<dir>/")
+}
+fn read_note_after_reading(v: &Vault, operation: &str, reading_op: &str) -> String {
+    let m = v
+        .capture(operation, "synthetic.png", &photo(), "human annotation")
+        .unwrap();
+    let req = v.prepare_reading(&m.id, 1, reading_op).unwrap();
+    v.accept_reading(&req, &reading_response(&req)).unwrap();
+    fs::read_to_string(v.note_path(&m.id)).unwrap()
+}
+fn mark_ours(root: &Path, name: &str) {
+    fs::create_dir_all(root.join(name).join("_meta")).unwrap();
+    fs::write(root.join(name).join("_meta/manifest.json"), "{}").unwrap();
+}
+#[test]
+fn monolith_dir_resolver_covers_every_combination() {
+    let f = Fixture::new();
+    assert_eq!(resolve_dir_name(&f.0).unwrap(), DIR);
+    // A manifest-less Monolith folder is not ours, but with no Recall folder it is still the target
+    // (and is then refused as an unsupported subtree rather than adopted).
+    fs::create_dir(f.0.join("Monolith")).unwrap();
+    assert_eq!(resolve_dir_name(&f.0).unwrap(), DIR);
+    mark_ours(&f.0, "Monolith");
+    assert_eq!(resolve_dir_name(&f.0).unwrap(), DIR);
+    mark_ours(&f.0, "Recall");
+    let error = resolve_dir_name(&f.0).unwrap_err();
+    assert!(error.contains("never merged"), "{error}");
+    fs::remove_dir_all(f.0.join("Monolith")).unwrap();
+    assert_eq!(resolve_dir_name(&f.0).unwrap(), LEGACY_DIR);
+    // An unrelated Recall folder (no manifest) is still routed to the legacy refusal.
+    let unrelated = Fixture::new();
+    fs::create_dir(unrelated.0.join("Recall")).unwrap();
+    assert_eq!(resolve_dir_name(&unrelated.0).unwrap(), LEGACY_DIR);
+}
+#[test]
+fn monolith_dir_legacy_vault_ignores_an_unrelated_user_monolith_folder() {
+    let f = Fixture::new();
+    f.vault();
+    fs::create_dir_all(f.0.join("Monolith/notes")).unwrap();
+    fs::write(f.0.join("Monolith/notes/todo.md"), "user data").unwrap();
+    let before = fs::read_dir(f.0.join("Monolith")).unwrap().count();
+    let v = Vault::open(&f.0).unwrap();
+    assert_eq!(v.dir_for_test(), "Recall");
+    read_note_after_reading(&v, &op(), &op());
+    assert_eq!(
+        fs::read(f.0.join("Monolith/notes/todo.md")).unwrap(),
+        b"user data"
+    );
+    assert_eq!(fs::read_dir(f.0.join("Monolith")).unwrap().count(), before);
+    assert!(!f.0.join("Monolith/_meta").exists());
+}
+#[test]
+fn monolith_dir_new_vault_uses_monolith_folder_and_links() {
+    let f = Fixture::new();
+    let v = Vault::open(&f.0).unwrap();
+    assert_eq!(v.dir_for_test(), "Monolith");
+    assert!(f.0.join("Monolith/_meta/manifest.json").is_file());
+    assert!(!f.0.join("Recall").exists());
+    let note = read_note_after_reading(&v, &op(), &op());
+    assert!(note.contains("source: \"[[Monolith/Sources/"), "{note}");
+    assert!(!note.contains("[[Recall/"));
+    // The persisted marker bytes are a frozen format identifier and keep their historical text.
+    assert!(note.contains("<!-- Recall memory "));
+    assert_eq!(Vault::open(&f.0).unwrap().dir_for_test(), "Monolith");
+    assert!(!f.0.join("Recall").exists());
+}
+#[test]
+fn monolith_dir_legacy_vault_keeps_recall_folder_and_links() {
+    let f = Fixture::new();
+    f.vault();
+    assert!(f.0.join("Recall/_meta/manifest.json").is_file());
+    let v = Vault::open(&f.0).unwrap();
+    assert_eq!(v.dir_for_test(), "Recall");
+    let note = read_note_after_reading(&v, &op(), &op());
+    assert!(note.contains("source: \"[[Recall/Sources/"), "{note}");
+    assert!(!note.contains("Monolith/"));
+    assert!(!f.0.join("Monolith").exists());
+    assert!(f.0.join("Recall/Memories").is_dir());
+}
+#[test]
+fn monolith_dir_legacy_and_new_vaults_render_identical_bytes_apart_from_the_folder_name() {
+    let legacy = Fixture::new();
+    let fresh = Fixture::new();
+    let (capture, reading) = (op(), op());
+    let old = read_note_after_reading(&legacy.vault(), &capture, &reading);
+    let new = read_note_after_reading(&Vault::open(&fresh.0).unwrap(), &capture, &reading);
+    assert!(old.contains("[[Recall/Sources/") && new.contains("[[Monolith/Sources/"));
+    assert_eq!(
+        normalized_note(&old, "Recall"),
+        normalized_note(&new, "Monolith")
+    );
+    assert_eq!(
+        fs::read(legacy.0.join(format!("Recall/Sources/{capture}.png"))).unwrap(),
+        fs::read(fresh.0.join(format!("Monolith/Sources/{capture}.png"))).unwrap()
+    );
+}
+#[test]
+fn monolith_dir_text_notes_use_the_vault_folder() {
+    let f = Fixture::new();
+    let v = f.vault();
+    let m = v.capture_text(&op(), "plain legacy text").unwrap();
+    let note = fs::read_to_string(v.note_path(&m.id)).unwrap();
+    assert!(!note.contains("Monolith/"));
+    let fresh = Fixture::new();
+    let nv = Vault::open(&fresh.0).unwrap();
+    let nm = nv.capture_text(&op(), "plain legacy text").unwrap();
+    let new_note = fs::read_to_string(nv.note_path(&nm.id)).unwrap();
+    assert!(!new_note.contains("Recall/"));
+}
+#[test]
+fn monolith_dir_both_folders_present_is_refused_without_changes() {
+    let f = Fixture::new();
+    f.vault();
+    mark_ours(&f.0, "Monolith");
+    let error = Vault::open(&f.0).err().unwrap();
+    assert!(error.contains("never merged"), "{error}");
+    assert_eq!(
+        fs::read(f.0.join("Monolith/_meta/manifest.json")).unwrap(),
+        b"{}"
+    );
+    assert!(f.0.join("Recall/_meta/manifest.json").is_file());
+    let state = LocalVaultState::new(f.0.join("selected.json"));
+    assert!(state.select_path(&f.0).is_err());
+}
+#[test]
+fn monolith_dir_unrelated_monolith_folder_is_refused_not_adopted() {
+    let f = Fixture::new();
+    fs::create_dir(f.0.join("Monolith")).unwrap();
+    fs::write(f.0.join("Monolith/user.md"), "private").unwrap();
+    assert!(Vault::open(&f.0).is_err());
+    assert_eq!(fs::read(f.0.join("Monolith/user.md")).unwrap(), b"private");
+    assert!(!f.0.join("Recall").exists());
+}
+#[test]
+fn monolith_dir_every_legacy_manifest_format_still_loads() {
+    for format in [
+        FORMAT, FORMAT_V2, FORMAT_V3, FORMAT_V4, FORMAT_V5, FORMAT_V6, FORMAT_V7, FORMAT_V8,
+        FORMAT_V9,
+    ] {
+        let f = Fixture::new();
+        let v = f.vault();
+        let manifest = Manifest {
+            format: format.into(),
+            vault_id: v.id.clone(),
+        };
+        fs::write(v.path("_meta/manifest.json"), json(&manifest).unwrap()).unwrap();
+        let reopened = Vault::open(&f.0).unwrap();
+        assert_eq!(reopened.dir_for_test(), "Recall", "{format}");
+        assert_eq!(reopened.id, v.id);
+        assert!(reopened.list("").unwrap().is_empty());
     }
 }

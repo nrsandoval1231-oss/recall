@@ -7,8 +7,8 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:5173",
     browserName: "chromium",
-    launchOptions: process.env.RECALL_CHROMIUM
-      ? { executablePath: process.env.RECALL_CHROMIUM }
+    launchOptions: process.env.MONOLITH_CHROMIUM
+      ? { executablePath: process.env.MONOLITH_CHROMIUM }
       : {},
     trace: "retain-on-failure",
   },
@@ -31,7 +31,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev -w @recall/web -- --host 127.0.0.1",
+    command: "npm run dev -w @monolith/web -- --host 127.0.0.1",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
   },

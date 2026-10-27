@@ -1,4 +1,4 @@
-import type { EntityDetail } from "@recall/api-client";
+import type { EntityDetail } from "@monolith/api-client";
 import { GlassBoard, ArrowIcon, displayDate } from "./primitives";
 interface Props {
   view: { entity: EntityDetail; invalidated?: boolean };

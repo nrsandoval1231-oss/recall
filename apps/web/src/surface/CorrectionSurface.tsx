@@ -3,8 +3,8 @@ import {
   ApiError,
   type Claim,
   type MemoryDetail,
-  type RecallApiClient,
-} from "@recall/api-client";
+  type MonolithApiClient,
+} from "@monolith/api-client";
 import { GlassBoard } from "./primitives";
 
 export function CorrectionSurface({
@@ -19,7 +19,7 @@ export function CorrectionSurface({
 }: {
   memory: MemoryDetail;
   claim: Claim | null;
-  api: Pick<RecallApiClient, "correctMemory" | "getMemory">;
+  api: Pick<MonolithApiClient, "correctMemory" | "getMemory">;
   onSaved: (memory: MemoryDetail) => void;
   onReloaded: (memory: MemoryDetail) => void;
   onCancel: () => void;
@@ -167,7 +167,7 @@ export function CorrectionSurface({
       label="Correct understanding"
     >
       <p className="eyebrow">A better understanding</p>
-      <h1>What should Recall understand?</h1>
+      <h1>What should Monolith understand?</h1>
       <blockquote>{original}</blockquote>
       {reviewRequired && (
         <section aria-label="Latest understanding to review">
@@ -232,7 +232,7 @@ export function CorrectionSurface({
           }}
         >
           <label htmlFor="correction-text">
-            What should Recall understand?
+            What should Monolith understand?
           </label>
           <textarea
             ref={textInput}
@@ -263,7 +263,7 @@ export function CorrectionSurface({
           <p className="statement">{text}</p>
           <p>
             This replaces {claim ? "one statement" : "the summary"} in revision{" "}
-            {baseline.revision} of this memory. Recall’s derived understanding
+            {baseline.revision} of this memory. Monolith’s derived understanding
             and search may change.
           </p>
           <p>

@@ -21,7 +21,7 @@ export function createBrowserAuth(fetchImpl: typeof fetch = fetch, basePath = ""
     if (globalThis.location?.pathname === "/auth/callback") await redeemEmailCallback(fetchImpl, basePath);
     const response = await fetchImpl(url("/auth/me"), { credentials: "include" });
     if (response.status === 401) return null;
-    if (!response.ok) throw new Error("Could not check the Recall session.");
+    if (!response.ok) throw new Error("Could not check the Monolith session.");
     return parseSession(await response.json());
   };
   return {

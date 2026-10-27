@@ -11,11 +11,11 @@ The [RCL-005B design proposal](superpowers/specs/2026-10-07-rcl-005b-no-signin-v
 
 ## Required target — vault-backed memory
 
-Obsidian is the required user-owned memory spine, not an optional export destination. Vault notes, links, immutable source attachments and versioned structured history/provenance hold durable memory. Recall must reconcile direct vault edits, service operations and offline commands without silent overwrite or resurrection. Memory/search projections must be rebuildable from the vault; operational permissions remain protected service state.
+Obsidian is the required user-owned memory spine, not an optional export destination. Vault notes, links, immutable source attachments and versioned structured history/provenance hold durable memory. Monolith must reconcile direct vault edits, service operations and offline commands without silent overwrite or resurrection. Memory/search projections must be rebuildable from the vault; operational permissions remain protected service state.
 
 The target requires a workspace-scoped vault association, journaled/idempotent commits, stable IDs independent of filenames, explicit conflicts, source hashes, temporal/correction history and tombstones. Capture remains locally durable when the vault is unavailable, with explicit vault-pending state. A cloud upload alone cannot be represented as completed vault synchronization. Browser/mobile need an authorized vault bridge or replica transport; neither a specific paid sync service nor a community plugin is assumed. Transport, vault schema and conflict protocol remain open implementation work.
 
-Acceptance must include capture reaching the vault, Obsidian edits returning to Recall, correction history surviving restart/reindex, rebuilding memory/search projections from the vault, and deletion/privacy/crash recovery. The sections below document the existing pre-migration implementation and its safe exporter, not fulfillment of the required target.
+Acceptance must include capture reaching the vault, Obsidian edits returning to Monolith, correction history surviving restart/reindex, rebuilding memory/search projections from the vault, and deletion/privacy/crash recovery. The sections below document the existing pre-migration implementation and its safe exporter, not fulfillment of the required target.
 
 ## V1 implementation details
 
@@ -23,7 +23,7 @@ The server serializes workspace changes into monotonic identifier events. Native
 
 Portable exports include canonical JSON and full revision/identity/correction history, source UUIDs/hashes, deterministic Markdown and byte-preserved verified originals. Private storage keys are excluded. Manifest snapshot metadata identifies the exported sync state; unverified originals are listed as unavailable. Source/model text is fenced as literal content in Markdown. Server exports are bounded and abandoned private temporary archives expire after 24 hours; normal responses unlink immediately.
 
-The existing one-way native adapter writes only UUID memory files beneath a selected `Recall` root, uses a manifest and recovery journal, and reports conflicts when generated files were edited locally. Arbitrary user files are preserved. A subsequent managed export removes unchanged managed files that no longer exist canonically; offline exports cannot be remotely revoked. Native ZIP IPC is capped at 32 MiB for the pilot; use the portable ZIP independently for larger exports. Backups are a distinct owner-operated format, not portable ZIP import.
+The existing one-way native adapter writes only UUID memory files beneath a selected `Monolith` root, uses a manifest and recovery journal, and reports conflicts when generated files were edited locally. Arbitrary user files are preserved. A subsequent managed export removes unchanged managed files that no longer exist canonically; offline exports cannot be remotely revoked. Native ZIP IPC is capped at 32 MiB for the pilot; use the portable ZIP independently for larger exports. Backups are a distinct owner-operated format, not portable ZIP import.
 
 
 Version: 0.2 | Required bidirectional vault integration remains unimplemented
@@ -80,14 +80,14 @@ Mobile guarantees durable offline drafts in V1; full offline library/Ask parity 
 
 ## 6. Existing safe Markdown exporter — insufficient as the spine
 
-The user chooses an existing vault or a new export destination. Create a dedicated `Recall/` subfolder. V1 writes nowhere else and does not ingest or relocate existing Paul-Intelligence notes automatically.
+The user chooses an existing vault or a new export destination. Create a dedicated `Monolith/` subfolder. V1 writes nowhere else and does not ingest or relocate existing Paul-Intelligence notes automatically. (Vaults created before the rename keep their `Recall/` folder and `[[Recall/Sources/...]]` links unchanged; see "Naming and legacy identifiers" in `docs/DEVELOPMENT.md`.)
 
 Example managed layout:
 
 ```text
 <chosen vault>/
   Personal Notes/                 # untouched, user-managed
-  Recall/
+  Monolith/
     HOME.md
     Memories/
     People/
@@ -100,20 +100,20 @@ Example managed layout:
     _manifest.json
 ```
 
-Exported notes contain stable Recall IDs, source revision, generated timestamp, verification qualifiers, links, and original-source references. Only claim a local original is present after its download and hash check succeed. Use supported relative Markdown/wikilinks; never require a community plugin.
+Exported notes contain stable Monolith IDs, source revision, generated timestamp, verification qualifiers, links, and original-source references. Only claim a local original is present after its download and hash check succeed. Use supported relative Markdown/wikilinks; never require a community plugin.
 
 Filenames use a readable sanitized title plus short stable ID. Resolve Windows reserved names, invalid characters, long paths, collisions, and case-insensitive equivalence deterministically. IDs, not titles, control identity.
 
 ## 7. Preserve manual edits
 
-For each managed file, store the last generated content hash and corresponding Recall revision in the local export manifest. Before replacing a file, compare its current on-disk hash to the last generated hash.
+For each managed file, store the last generated content hash and corresponding Monolith revision in the local export manifest. Before replacing a file, compare its current on-disk hash to the last generated hash.
 
 - Unchanged: write to a temporary file in the same directory, flush, then atomically replace where supported.
 - Changed locally: preserve it untouched; record an export conflict and offer the generated version separately without overwriting the original.
 - Unmanaged file/path collision: never replace it; select a safe ID-qualified path or require resolution.
 - Missing file: recreate only according to the selected export policy and show that it is managed output.
 
-There is currently no automatic import of Obsidian edits. This is a required architecture gap, not the intended product boundary. Paul can retain a personal note or explicitly apply the correction in Recall. The UI must explain this before export is enabled. Do not put Recall-managed output under multiple competing live sync engines.
+There is currently no automatic import of Obsidian edits. This is a required architecture gap, not the intended product boundary. Paul can retain a personal note or explicitly apply the correction in Monolith. The UI must explain this before export is enabled. Do not put Monolith-managed output under multiple competing live sync engines.
 
 ## 8. Filesystem boundary
 

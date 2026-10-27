@@ -1,9 +1,9 @@
 /**
- * In-memory stand-in for the Recall API, used ONLY for fast unit tests of the client engine's
+ * In-memory stand-in for the Monolith API, used ONLY for fast unit tests of the client engine's
  * retry/idempotency behaviour with failure injection. It computes real SHA-256s from real bytes.
  * Server correctness is established separately: services/backend tests + tests/e2e (real server).
  */
-import { ApiError, NetworkError, type ExpectedPage, type ServerCapture, type UploadAuthorization, type CaptureManifest } from "@recall/api-client";
+import { ApiError, NetworkError, type ExpectedPage, type ServerCapture, type UploadAuthorization, type CaptureManifest } from "@monolith/api-client";
 import type { FileUploader, LocalFiles } from "../ports";
 import type { SyncApi } from "../syncer";
 

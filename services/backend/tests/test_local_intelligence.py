@@ -17,17 +17,17 @@ from fastapi.testclient import TestClient
 
 from conftest import make_database
 from fake_provider import FakeProvider, outage
-from recall.api.inference import create_inference_app
-from recall.db.database import Database
-from recall.db.inference_bootstrap import bootstrap_owner
-from recall.errors import ApiError
-from recall.ingestion.local_intelligence import (
+from monolith.api.inference import create_inference_app
+from monolith.db.database import Database
+from monolith.db.inference_bootstrap import bootstrap_owner
+from monolith.errors import ApiError
+from monolith.ingestion.local_intelligence import (
     LocalIntelligenceService,
     create_intelligence_invitation,
     parse_request,
     set_ask_consent,
 )
-from recall.pairing import create_invitation, digest
+from monolith.pairing import create_invitation, digest
 from test_inference_app import inference_settings
 
 
@@ -930,8 +930,8 @@ def _audio_hits(kind: str = "machine_audio_transcript", state: str = "unreviewed
 
 
 def test_audio_evidence_is_presented_as_untrusted_unreviewed_machine_transcription() -> None:
-    from recall.ingestion.prompts import ANSWER_SYSTEM
-    from recall.retrieval.ask import answer_max_input_tokens, build_packet
+    from monolith.ingestion.prompts import ANSWER_SYSTEM
+    from monolith.retrieval.ask import answer_max_input_tokens, build_packet
 
     machine = build_packet(_audio_hits())[0]
     assert machine["kind"] == "machine_audio_transcript" and machine["epistemic_state"] == "unreviewed"
@@ -947,7 +947,7 @@ def test_audio_evidence_is_presented_as_untrusted_unreviewed_machine_transcripti
 
 
 def test_citations_to_audio_evidence_are_quote_validated_against_the_supplied_excerpt() -> None:
-    from recall.retrieval.ask import verify_answer
+    from monolith.retrieval.ask import verify_answer
 
     hits = _audio_hits()
     excerpt = hits[0]["excerpt"]
@@ -997,7 +997,7 @@ def test_reliance_on_machine_audio_transcript_adds_one_deterministic_limitation(
 
 
 def test_abstention_over_audio_evidence_is_unchanged() -> None:
-    from recall.retrieval.ask import verify_answer
+    from monolith.retrieval.ask import verify_answer
 
     hits = _audio_hits()
     raw = json.dumps({"status": "insufficient_evidence", "sentences": [], "limitations": ["Transcript unclear."]})

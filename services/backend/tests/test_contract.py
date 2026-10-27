@@ -57,8 +57,8 @@ def test_error_envelope_shape_and_request_id(env: Env) -> None:
 def test_cors_is_closed_by_default_and_explicit_when_configured(env: Env) -> None:
     from fastapi.testclient import TestClient
 
-    from recall.api.app import create_app
-    from recall.api.auth import StaticKeyResolver, TokenVerifier
+    from monolith.api.app import create_app
+    from monolith.api.auth import StaticKeyResolver, TokenVerifier
 
     preflight = {
         "Origin": "http://tauri.localhost",
@@ -75,7 +75,7 @@ def test_cors_is_closed_by_default_and_explicit_when_configured(env: Env) -> Non
         assert "access-control-allow-origin" not in evil.headers
     import pytest
 
-    from recall.config import Settings
+    from monolith.config import Settings
 
     with pytest.raises(ValueError, match="explicit origins"):
         Settings(
@@ -88,13 +88,13 @@ def test_cors_is_closed_by_default_and_explicit_when_configured(env: Env) -> Non
 
 
 def test_cors_origins_accept_comma_separated_environment(monkeypatch) -> None:
-    from recall.config import Settings
+    from monolith.config import Settings
 
     monkeypatch.setenv("DATABASE_URL", "postgresql://recall@example.test/recall")
-    monkeypatch.setenv("RECALL_AUTH_ISSUER", "https://issuer.example.test")
-    monkeypatch.setenv("RECALL_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
-    monkeypatch.setenv("RECALL_SIGNING_SECRET", "s" * 32)
-    monkeypatch.setenv("RECALL_CORS_ORIGINS", "http://tauri.localhost, https://tauri.localhost")
+    monkeypatch.setenv("MONOLITH_AUTH_ISSUER", "https://issuer.example.test")
+    monkeypatch.setenv("MONOLITH_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
+    monkeypatch.setenv("MONOLITH_SIGNING_SECRET", "s" * 32)
+    monkeypatch.setenv("MONOLITH_CORS_ORIGINS", "http://tauri.localhost, https://tauri.localhost")
 
     settings = Settings()
 
@@ -102,13 +102,13 @@ def test_cors_origins_accept_comma_separated_environment(monkeypatch) -> None:
 
 
 def test_cors_origins_accept_json_array_environment(monkeypatch) -> None:
-    from recall.config import Settings
+    from monolith.config import Settings
 
     monkeypatch.setenv("DATABASE_URL", "postgresql://recall@example.test/recall")
-    monkeypatch.setenv("RECALL_AUTH_ISSUER", "https://issuer.example.test")
-    monkeypatch.setenv("RECALL_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
-    monkeypatch.setenv("RECALL_SIGNING_SECRET", "s" * 32)
-    monkeypatch.setenv("RECALL_CORS_ORIGINS", '["http://tauri.localhost", "https://tauri.localhost"]')
+    monkeypatch.setenv("MONOLITH_AUTH_ISSUER", "https://issuer.example.test")
+    monkeypatch.setenv("MONOLITH_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
+    monkeypatch.setenv("MONOLITH_SIGNING_SECRET", "s" * 32)
+    monkeypatch.setenv("MONOLITH_CORS_ORIGINS", '["http://tauri.localhost", "https://tauri.localhost"]')
 
     settings = Settings()
 
@@ -117,13 +117,13 @@ def test_cors_origins_accept_json_array_environment(monkeypatch) -> None:
 
 @pytest.mark.parametrize("origins", ["*", '["*"]'])
 def test_cors_wildcard_is_rejected_from_environment(monkeypatch, origins: str) -> None:
-    from recall.config import Settings
+    from monolith.config import Settings
 
     monkeypatch.setenv("DATABASE_URL", "postgresql://recall@example.test/recall")
-    monkeypatch.setenv("RECALL_AUTH_ISSUER", "https://issuer.example.test")
-    monkeypatch.setenv("RECALL_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
-    monkeypatch.setenv("RECALL_SIGNING_SECRET", "s" * 32)
-    monkeypatch.setenv("RECALL_CORS_ORIGINS", origins)
+    monkeypatch.setenv("MONOLITH_AUTH_ISSUER", "https://issuer.example.test")
+    monkeypatch.setenv("MONOLITH_AUTH_JWKS_URL", "https://issuer.example.test/.well-known/jwks.json")
+    monkeypatch.setenv("MONOLITH_SIGNING_SECRET", "s" * 32)
+    monkeypatch.setenv("MONOLITH_CORS_ORIGINS", origins)
 
     with pytest.raises(ValueError, match="explicit origins"):
         Settings()

@@ -18,11 +18,11 @@ from fastapi.testclient import TestClient
 
 from conftest import sha, synthetic_image
 from fake_provider import FakeProvider, faithful_extraction
-from recall.api.inference import create_inference_app
-from recall.config import Settings
-from recall.db.database import Database
-from recall.db.inference_bootstrap import bootstrap_owner
-from recall.pairing import create_invitation, digest
+from monolith.api.inference import create_inference_app
+from monolith.config import Settings
+from monolith.db.database import Database
+from monolith.db.inference_bootstrap import bootstrap_owner
+from monolith.pairing import create_invitation, digest
 
 
 @pytest.mark.skipif(shutil.which("docker") is None, reason="requires Docker Compose CLI for offline config resolution")
@@ -51,7 +51,7 @@ def test_do_ops_compose_resolves_tmpfs_as_single_mount(tmp_path) -> None:  # typ
             "docker",
             "compose",
             "-p",
-            "recall-do-inference-test",
+            "monolith-do-inference-test",
             "-f",
             "compose.yml",
             "--profile",
@@ -117,7 +117,7 @@ def test_ci_preflight_negatives_use_supported_compose_run_and_prove_refusal_mark
         'sudo install -o 10001 -g 10001 -m 0400 "$original_activation" secrets/activation_record.local\n          run_preflight',
         'cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local\n          run_preflight\n          sed -i \'s/^AI_MODEL_ID=',
         'cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local\n          run_preflight\n          sed -i \'s/^ANTHROPIC_CUSTOM_HEADERS=',
-        'cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local\n          run_preflight\n          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql',
+        'cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local\n          run_preflight\n          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T db psql',
         "-c 'REVOKE pg_read_all_data FROM recall_api'\n          run_preflight",
         "WHERE version='0001_trusted_capture.sql'\"\n          run_preflight",
     )
@@ -314,10 +314,10 @@ def test_restore_checksum_refusal_sets_external_hold(tmp_path, monkeypatch) -> N
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("RECALL_RESTORE_ARCHIVE", str(archive))
-    monkeypatch.setenv("RECALL_RESTORE_AGE_IDENTITY_FILE", str(tmp_path / "unused-key"))
-    monkeypatch.setenv("RECALL_RESTORE_DATABASE_URL_FILE", str(dsn))
-    monkeypatch.setenv("RECALL_RESTORE_HOLD_PATH", str(hold))
+    monkeypatch.setenv("MONOLITH_RESTORE_ARCHIVE", str(archive))
+    monkeypatch.setenv("MONOLITH_RESTORE_AGE_IDENTITY_FILE", str(tmp_path / "unused-key"))
+    monkeypatch.setenv("MONOLITH_RESTORE_DATABASE_URL_FILE", str(dsn))
+    monkeypatch.setenv("MONOLITH_RESTORE_HOLD_PATH", str(hold))
     with pytest.raises(SystemExit, match="checksum mismatch"):
         _restore_module().main()
     assert json.loads(hold.read_text(encoding="utf-8"))["hold"] is True
@@ -391,10 +391,10 @@ def test_runtime_preflight_rejects_unapproved_example_without_echoing_settings(t
     dsn.write_text("postgresql://recall_api:synthetic-marker@db/recall", encoding="utf-8")
     key.write_text("synthetic-provider-key-marker", encoding="utf-8")
     environment = {
-        "RECALL_ACTIVATION_RECORD_FILE": str(activation),
-        "RECALL_RECOVERY_HOLD_FILE": str(hold),
-        "RECALL_API_DATABASE_URL_FILE": str(dsn),
-        "RECALL_AI_API_KEY_FILE": str(key),
+        "MONOLITH_ACTIVATION_RECORD_FILE": str(activation),
+        "MONOLITH_RECOVERY_HOLD_FILE": str(hold),
+        "MONOLITH_API_DATABASE_URL_FILE": str(dsn),
+        "MONOLITH_AI_API_KEY_FILE": str(key),
     }
     result = subprocess.run(
         [sys.executable, str(ops / "preflight.py")],
@@ -461,20 +461,20 @@ def test_runtime_preflight_rejects_production_gate_mismatches_before_database_ac
     dsn.write_text("postgresql://recall_api:synthetic-marker@127.0.0.1:1/recall", encoding="utf-8")
     key.write_text("synthetic-provider-key-marker", encoding="utf-8")
     env = {
-        "RECALL_ACTIVATION_RECORD_FILE": str(activation_path),
-        "RECALL_RECOVERY_HOLD_FILE": str(hold_path),
-        "RECALL_API_DATABASE_URL_FILE": str(dsn),
-        "RECALL_AI_API_KEY_FILE": str(key),
-        "RECALL_PUBLIC_ORIGIN": "https://synthetic.invalid",
-        "RECALL_SERVICE_PROFILE": "inference",
-        "RECALL_AUTO_PROVISION_WORKSPACES": "false",
-        "RECALL_DEVICE_PAIRING_ENABLED": "true",
+        "MONOLITH_ACTIVATION_RECORD_FILE": str(activation_path),
+        "MONOLITH_RECOVERY_HOLD_FILE": str(hold_path),
+        "MONOLITH_API_DATABASE_URL_FILE": str(dsn),
+        "MONOLITH_AI_API_KEY_FILE": str(key),
+        "MONOLITH_PUBLIC_ORIGIN": "https://synthetic.invalid",
+        "MONOLITH_SERVICE_PROFILE": "inference",
+        "MONOLITH_AUTO_PROVISION_WORKSPACES": "false",
+        "MONOLITH_DEVICE_PAIRING_ENABLED": "true",
         "AI_PROVIDER": "anthropic",
         "AI_MODEL_ID": "synthetic-ci-model",
         "AI_INPUT_USD_PER_MTOK": "1",
         "AI_OUTPUT_USD_PER_MTOK": "1",
-        "RECALL_AI_DAILY_BUDGET_USD": "0",
-        "RECALL_AI_MONTHLY_BUDGET_USD": "0",
+        "MONOLITH_AI_DAILY_BUDGET_USD": "0",
+        "MONOLITH_AI_MONTHLY_BUDGET_USD": "0",
         "ANTHROPIC_CUSTOM_HEADERS": "anthropic-workspace-id: wrong-synthetic-workspace",
     }
     if failure != "wrong-workspace-header":

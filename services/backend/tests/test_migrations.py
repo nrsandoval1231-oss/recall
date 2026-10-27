@@ -10,8 +10,8 @@ import psycopg
 import pytest
 
 from conftest import PgCluster, make_database
-from recall.db.database import Database
-from recall.db.migrate import DEFAULT_DIR, MigrationError, migrate
+from monolith.db.database import Database
+from monolith.db.migrate import DEFAULT_DIR, MigrationError, migrate
 
 TABLES = [
     "workspaces",

@@ -18,8 +18,12 @@ const MAX_ORIGINAL_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_CANONICAL_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_FILES: usize = 10_000;
-const MANIFEST_NAME: &str = ".recall-export-manifest.json";
-const JOURNAL_NAME: &str = ".recall-export-journal.json";
+const MANIFEST_NAME: &str = ".monolith-export-manifest.json";
+const JOURNAL_NAME: &str = ".monolith-export-journal.json";
+// Names used before the Recall to Monolith rename. An existing legacy file keeps being used, so a
+// destination (or an interrupted journal) is never renamed in the middle of an export.
+const LEGACY_MANIFEST_NAME: &str = ".recall-export-manifest.json";
+const LEGACY_JOURNAL_NAME: &str = ".recall-export-journal.json";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
@@ -29,7 +33,7 @@ pub enum ExportError {
     Json(#[from] serde_json::Error),
     #[error("archive: {0}")]
     Zip(#[from] zip::result::ZipError),
-    #[error("invalid or unsupported Recall export archive")]
+    #[error("invalid or unsupported Monolith export archive")]
     InvalidArchive,
     #[error("export archive exceeds the local size limit")]
     ArchiveTooLarge,
@@ -41,7 +45,7 @@ pub enum ExportError {
     DestinationExists,
     #[error("select a managed Markdown destination first")]
     RootNotSelected,
-    #[error("selected destination belongs to a different Recall workspace")]
+    #[error("selected destination belongs to a different Monolith workspace")]
     WorkspaceMismatch,
     #[error("managed export recovery requires resolving local file conflicts")]
     RecoveryConflict,
@@ -192,6 +196,29 @@ fn validate_regular_file(path: &Path) -> Result<(), ExportError> {
     Ok(())
 }
 
+/// Path of a bookkeeping file: the legacy name when that file exists, otherwise the Monolith name.
+/// Both existing is ambiguous and refused rather than guessed.
+fn existing_or_new(root: &Path, legacy: &str, current: &str) -> Result<PathBuf, ExportError> {
+    let legacy_path = root.join(legacy);
+    let current_path = root.join(current);
+    match (
+        fs::symlink_metadata(&legacy_path).is_ok(),
+        fs::symlink_metadata(&current_path).is_ok(),
+    ) {
+        (true, true) => Err(ExportError::RecoveryConflict),
+        (true, false) => Ok(legacy_path),
+        _ => Ok(current_path),
+    }
+}
+
+fn manifest_path(root: &Path) -> Result<PathBuf, ExportError> {
+    existing_or_new(root, LEGACY_MANIFEST_NAME, MANIFEST_NAME)
+}
+
+fn journal_path(root: &Path) -> Result<PathBuf, ExportError> {
+    existing_or_new(root, LEGACY_JOURNAL_NAME, JOURNAL_NAME)
+}
+
 fn ensure_child_directory(parent: &Path, name: &str) -> Result<PathBuf, ExportError> {
     let child = parent.join(name);
     if !child.exists() {
@@ -204,11 +231,24 @@ fn ensure_child_directory(parent: &Path, name: &str) -> Result<PathBuf, ExportEr
     Ok(child)
 }
 
+/// Export folders are plain directories (no manifest), so this is presence based: `Recall` if it
+/// exists, else `Monolith`; both present is refused rather than merged.
+fn export_dir_name(selected: &Path) -> Result<&'static str, ExportError> {
+    let present = |name: &str| fs::symlink_metadata(selected.join(name)).is_ok();
+    match (present("Recall"), present("Monolith")) {
+        (true, true) => Err(ExportError::DestinationExists),
+        (true, false) => Ok("Recall"),
+        _ => Ok("Monolith"),
+    }
+}
+
 fn selected_managed_root(selected: &Path) -> Result<PathBuf, ExportError> {
     validate_directory(selected)?;
     let selected = fs::canonicalize(selected)?;
     validate_directory(&selected)?;
-    let managed = ensure_child_directory(&selected, "Recall")?;
+    // An existing pre-rename `Recall` export folder keeps being used; new destinations get `Monolith`.
+    let name = export_dir_name(&selected)?;
+    let managed = ensure_child_directory(&selected, name)?;
     if managed.join("_meta").exists() {
         return Err(ExportError::DestinationExists);
     }
@@ -327,7 +367,7 @@ fn atomic_write(path: &Path, bytes: &[u8], replace: bool) -> Result<(), ExportEr
         }
         validate_regular_file(&path)?;
     }
-    let temp = parent.join(format!(".recall-atomic-{}.tmp", Uuid::new_v4()));
+    let temp = parent.join(format!(".monolith-atomic-{}.tmp", Uuid::new_v4()));
     let result = (|| {
         let mut file = OpenOptions::new()
             .write(true)
@@ -362,7 +402,7 @@ fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, ExportError> {
 }
 
 fn load_manifest(root: &Path, workspace_id: &str) -> Result<LocalManifest, ExportError> {
-    let path = root.join(MANIFEST_NAME);
+    let path = manifest_path(root)?;
     if !path.exists() {
         return Ok(LocalManifest {
             format: "recall.markdown-export.v1".into(),
@@ -396,7 +436,7 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), ExportError> {
 }
 
 fn recover_journal(root: &Path, manifest: &mut LocalManifest) -> Result<(), ExportError> {
-    let path = root.join(JOURNAL_NAME);
+    let path = journal_path(root)?;
     if !path.exists() {
         return Ok(());
     }
@@ -437,7 +477,7 @@ fn recover_journal(root: &Path, manifest: &mut LocalManifest) -> Result<(), Expo
             _ => return Err(ExportError::RecoveryConflict),
         }
     }
-    write_json(&root.join(MANIFEST_NAME), manifest)?;
+    write_json(&manifest_path(root)?, manifest)?;
     validate_regular_file(&path)?;
     fs::remove_file(path)?;
     Ok(())
@@ -684,7 +724,7 @@ fn apply_projection(
         workspace_id: projection.workspace_id.clone(),
         operations: operations.clone(),
     };
-    write_json(&root.join(JOURNAL_NAME), &journal)?;
+    write_json(&journal_path(&root)?, &journal)?;
     let mut written = Vec::new();
     let mut removed = Vec::new();
     for operation in &operations {
@@ -717,10 +757,10 @@ fn apply_projection(
             )
         })
         .collect();
-    write_json(&root.join(MANIFEST_NAME), &manifest)?;
-    let journal_path = root.join(JOURNAL_NAME);
-    validate_regular_file(&journal_path)?;
-    fs::remove_file(journal_path)?;
+    write_json(&manifest_path(&root)?, &manifest)?;
+    let journal_file = journal_path(&root)?;
+    validate_regular_file(&journal_file)?;
+    fs::remove_file(journal_file)?;
     Ok(ManagedExportResult {
         root: root.to_string_lossy().into(),
         written,
@@ -732,7 +772,7 @@ fn apply_projection(
 impl ManagedExportState {
     pub fn select_markdown_root(&self) -> Result<Option<String>, ExportError> {
         let Some(selected) = rfd::FileDialog::new()
-            .set_title("Choose a folder for Recall Markdown")
+            .set_title("Choose a folder for Monolith Markdown")
             .pick_folder()
         else {
             return Ok(None);
@@ -762,13 +802,13 @@ impl ManagedExportState {
         bytes: &[u8],
         expected_sha256: &str,
     ) -> Result<Option<ArchiveSaveResult>, ExportError> {
-        // Parse and validate the bounded Recall inventory before publishing any file.
+        // Parse and validate the bounded Monolith inventory before publishing any file.
         projection_from_archive(bytes, expected_sha256)?;
         let sha256 = expected_sha256.to_string();
         let Some(mut destination) = rfd::FileDialog::new()
-            .set_title("Save Recall export")
+            .set_title("Save Monolith export")
             .add_filter("ZIP archive", &["zip"])
-            .set_file_name("recall-export.zip")
+            .set_file_name("monolith-export.zip")
             .save_file()
         else {
             return Ok(None);
@@ -809,7 +849,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         let selected = std::env::temp_dir().join(format!(
-            "recall-export-{label}-{}-{nonce}",
+            "monolith-export-{label}-{}-{nonce}",
             std::process::id()
         ));
         fs::create_dir(&selected).unwrap();
@@ -991,7 +1031,7 @@ mod tests {
         use std::os::unix::fs::symlink;
         let root = root("symlink");
         let selected = root.parent().unwrap().to_path_buf();
-        let outside = std::env::temp_dir().join(format!("recall-outside-{}", Uuid::new_v4()));
+        let outside = std::env::temp_dir().join(format!("monolith-outside-{}", Uuid::new_v4()));
         fs::create_dir(&outside).unwrap();
         fs::remove_dir(root.join("Memories")).unwrap();
         symlink(&outside, root.join("Memories")).unwrap();
@@ -1002,5 +1042,156 @@ mod tests {
         assert!(fs::read_dir(&outside).unwrap().next().is_none());
         fs::remove_dir_all(selected).unwrap();
         fs::remove_dir_all(outside).unwrap();
+    }
+
+    fn selected_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let selected = std::env::temp_dir().join(format!(
+            "monolith-export-{label}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir(&selected).unwrap();
+        fs::canonicalize(selected).unwrap()
+    }
+
+    #[test]
+    fn new_destination_uses_monolith_directory_and_names() {
+        let selected = selected_dir("new-names");
+        let root = selected_managed_root(&selected).unwrap();
+        assert_eq!(root.file_name().unwrap(), "Monolith");
+        assert!(!selected.join("Recall").exists());
+        apply_projection(
+            &root,
+            projection(
+                "# One
+", 1,
+            ),
+        )
+        .unwrap();
+        assert!(root.join(".monolith-export-manifest.json").is_file());
+        assert!(!root.join(".recall-export-manifest.json").exists());
+        fs::remove_dir_all(selected).unwrap();
+    }
+
+    #[test]
+    fn existing_recall_export_directory_and_manifest_keep_being_used() {
+        let selected = selected_dir("legacy-names");
+        fs::create_dir(selected.join("Recall")).unwrap();
+        let root = selected_managed_root(&selected).unwrap();
+        assert_eq!(root.file_name().unwrap(), "Recall");
+        apply_projection(
+            &root,
+            projection(
+                "# One
+", 1,
+            ),
+        )
+        .unwrap();
+        fs::rename(
+            root.join(".monolith-export-manifest.json"),
+            root.join(".recall-export-manifest.json"),
+        )
+        .unwrap();
+        let again = selected_managed_root(&selected).unwrap();
+        assert_eq!(again, root);
+        assert!(!selected.join("Monolith").exists());
+        apply_projection(
+            &root,
+            projection(
+                "# Two
+", 2,
+            ),
+        )
+        .unwrap();
+        let manifest = fs::read_to_string(root.join(".recall-export-manifest.json")).unwrap();
+        assert!(manifest.contains("\"revision\": 2"));
+        assert!(!root.join(".monolith-export-manifest.json").exists());
+        fs::remove_dir_all(selected).unwrap();
+    }
+
+    #[test]
+    fn recall_and_monolith_export_directories_are_never_merged() {
+        let selected = selected_dir("both");
+        fs::create_dir(selected.join("Recall")).unwrap();
+        fs::create_dir(selected.join("Monolith")).unwrap();
+        assert!(selected_managed_root(&selected).is_err());
+        assert!(fs::read_dir(selected.join("Monolith"))
+            .unwrap()
+            .next()
+            .is_none());
+        assert!(fs::read_dir(selected.join("Recall"))
+            .unwrap()
+            .next()
+            .is_none());
+        fs::remove_dir_all(selected).unwrap();
+    }
+
+    #[test]
+    fn interrupted_legacy_journal_is_recovered_in_place_and_removed() {
+        let root = root("legacy-journal");
+        let selected = root.parent().unwrap().to_path_buf();
+        apply_projection(
+            &root,
+            projection(
+                "# One
+", 1,
+            ),
+        )
+        .unwrap();
+        let note = root.join("Memories").join(format!("{MEMORY_ID}.md"));
+        let after_bytes = b"# Two
+";
+        let legacy_journal = root.join(".recall-export-journal.json");
+        write_json(
+            &legacy_journal,
+            &ExportJournal {
+                format: "recall.markdown-export-journal.v1".into(),
+                workspace_id: WORKSPACE_ID.into(),
+                operations: vec![JournalOperation {
+                    record_id: MEMORY_ID.into(),
+                    before_sha256: file_hash(&note).unwrap(),
+                    after: Some(LocalManifestFile {
+                        revision: 2,
+                        sha256: hex::encode(Sha256::digest(after_bytes)),
+                    }),
+                }],
+            },
+        )
+        .unwrap();
+        atomic_write(&note, after_bytes, true).unwrap();
+        let result = apply_projection(
+            &root,
+            projection(
+                "# Two
+", 2,
+            ),
+        )
+        .unwrap();
+        assert!(result.conflicts.is_empty());
+        assert!(!legacy_journal.exists());
+        assert!(!root.join(".monolith-export-journal.json").exists());
+        fs::remove_dir_all(selected).unwrap();
+    }
+
+    #[test]
+    fn both_journal_names_present_is_a_recovery_conflict() {
+        let root = root("both-journals");
+        let selected = root.parent().unwrap().to_path_buf();
+        fs::write(root.join(".recall-export-journal.json"), b"{}").unwrap();
+        fs::write(root.join(".monolith-export-journal.json"), b"{}").unwrap();
+        assert!(matches!(
+            apply_projection(
+                &root,
+                projection(
+                    "# One
+", 1
+                )
+            ),
+            Err(ExportError::RecoveryConflict)
+        ));
+        fs::remove_dir_all(selected).unwrap();
     }
 }

@@ -1019,7 +1019,7 @@ class LocalIntelligenceService:
         if coverage["truncated_count"]:
             mandatory.append("One or more selected historical excerpts were truncated.")
         mandatory.append(
-            "Recorded time identifies when Recall stored a revision; it does not prove when an event occurred."
+            "Recorded time identifies when Monolith stored a revision; it does not prove when an event occurred."
         )
         existing = [x for x in result["limitations"] if x not in mandatory]
         return {**result, "limitations": mandatory + existing[: 6 - len(mandatory)]}

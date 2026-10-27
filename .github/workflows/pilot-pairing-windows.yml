@@ -33,7 +33,7 @@ jobs:
       - name: Build unsigned staging installer with fixed pairing origin
         working-directory: apps/desktop
         env:
-          RECALL_PAIRING_ORIGIN: https://recall.159-203-35-38.sslip.io
+          MONOLITH_PAIRING_ORIGIN: https://recall.159-203-35-38.sslip.io
           VITE_API_BASE_URL: ''
           VITE_SUPABASE_URL: ''
           VITE_SUPABASE_PUBLISHABLE_KEY: ''
@@ -51,7 +51,7 @@ jobs:
       - name: Upload paired staging installer and provenance
         uses: actions/upload-artifact@v4
         with:
-          name: recall-windows-pairing-pilot
+          name: monolith-windows-pairing-pilot
           path: |
             apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
             artifact-provenance.json

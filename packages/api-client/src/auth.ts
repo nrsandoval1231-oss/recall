@@ -60,7 +60,7 @@ export function createAuth(config: AuthConfig) {
         tokenValues.length + tokenHashValues.length !== 1 ||
         !tokenHash
       ) {
-        throw new Error("That sign-in link is not a valid Recall sign-in link.");
+        throw new Error("That sign-in link is not a valid Monolith sign-in link.");
       }
       const { error } = await client.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
       if (error) throw new Error(error.message);
@@ -87,4 +87,4 @@ export function createAuth(config: AuthConfig) {
   };
 }
 
-export type RecallAuth = ReturnType<typeof createAuth>;
+export type MonolithAuth = ReturnType<typeof createAuth>;

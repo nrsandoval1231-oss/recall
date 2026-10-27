@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { RecallApiClient, SyncChange, SyncOperation, SyncSnapshot } from "@recall/api-client";
+import type { MonolithApiClient, SyncChange, SyncOperation, SyncSnapshot } from "@monolith/api-client";
 
 export interface CacheScope { user_id: string; workspace_id: string }
 interface NativeEvent { sequence: number; workspace_id: string; kind: string; record_id: string; version: number; payload: unknown; deleted?: boolean }
@@ -15,7 +15,7 @@ export function assertNativeExportSize(bytes: ArrayBuffer): void { if (bytes.byt
 /** Tauri-only cache adapter. Browser builds report unavailable instead of pretending persistence exists. */
 export class NativeCache {
   readonly available = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-  constructor(private readonly api: Pick<RecallApiClient, "syncChanges" | "syncSnapshot" | "syncPush">) {}
+  constructor(private readonly api: Pick<MonolithApiClient, "syncChanges" | "syncSnapshot" | "syncPush">) {}
   private ensure() { if (!this.available) throw new Error("LOCAL_CACHE_UNAVAILABLE"); }
   private async scope(scope: CacheScope): Promise<CacheScope> { this.ensure(); return scope; }
   async cursor(scope: CacheScope): Promise<string> { return invoke<string>("sync_cursor", { scope: await this.scope(scope) }); }

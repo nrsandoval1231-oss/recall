@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { copy } from "@recall/design-tokens";
-import { ApiError, sha256Hex, type RecallApiClient, type ServerCapture } from "@recall/api-client";
+import { copy } from "@monolith/design-tokens";
+import { ApiError, sha256Hex, type MonolithApiClient, type ServerCapture } from "@monolith/api-client";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { formatBytes, statusOf, type IntegrityState } from "../viewmodel";
 import { MemoryPanel } from "./MemoryPanel";
@@ -16,7 +16,7 @@ export function shouldUseLocalSourceFallback(failure: unknown): boolean {
  * SHA-256 is computed locally and compared with the server-verified hash. "Verified" is only ever shown after that check.
  */
 export function Viewer({ api, capture, onClose, onDeleted, initialSourceId, cache, scope }: {
-  api: Pick<RecallApiClient, "fetchSource" | "getMemory" | "retryProcessing"> & Partial<Pick<RecallApiClient, "correctMemory" | "deleteCapture" | "deleteMemory" | "deleteSource">>;
+  api: Pick<MonolithApiClient, "fetchSource" | "getMemory" | "retryProcessing"> & Partial<Pick<MonolithApiClient, "correctMemory" | "deleteCapture" | "deleteMemory" | "deleteSource">>;
   capture: ServerCapture;
   onClose: () => void;
   initialSourceId?: string | null;
@@ -133,7 +133,7 @@ export function Viewer({ api, capture, onClose, onDeleted, initialSourceId, cach
             </dl>
             {capture.memory_id && <MemoryPanel api={api} memoryId={capture.memory_id} pageId={page.source_id} cache={cache} scope={scope} />}
             {current && (
-              <a className="button" href={current.url} download={`recall-${capture.capture_id.slice(0, 8)}-page-${page.ordinal}.${page.media_type.split("/")[1]}`}>Save exact copy</a>
+              <a className="button" href={current.url} download={`monolith-${capture.capture_id.slice(0, 8)}-page-${page.ordinal}.${page.media_type.split("/")[1]}`}>Save exact copy</a>
             )}
             {api.deleteSource && <button onClick={() => void removeSource()}>Delete this original</button>}
           </aside>

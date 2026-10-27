@@ -1,5 +1,5 @@
-import { serverStatusKey as tokensServerStatusKey, statusPresentation, type CaptureStatusKey } from "@recall/design-tokens";
-import type { ServerCapture } from "@recall/api-client";
+import { serverStatusKey as tokensServerStatusKey, statusPresentation, type CaptureStatusKey } from "@monolith/design-tokens";
+import type { ServerCapture } from "@monolith/api-client";
 
 /** Server capture → the shared user-facing status (same words as mobile). */
 export function serverStatusKey(capture: Pick<ServerCapture, "status" | "processing">): CaptureStatusKey {
