@@ -32,7 +32,7 @@ Jobs:
 
 ## 3. Product experience
 
-**Windows desktop — Memory Surface.** One adaptive MONOLITH experience with immediately available Camera / Speak / Write, Ask, source inspection, editing, correction, history and meaningful connections. Use the approved smoky-glass monochrome brand with Sora/Inter. Do not substitute an unrelated dashboard, visual noise, fabricated graph nodes or obsolete Recall/MeGraph boards.
+**Windows desktop — Memory Surface.** One adaptive MONOLITH experience with immediately available Camera / Write, Ask, source inspection, editing, correction, history and meaningful connections. Speak remains staged and unavailable until real-device acceptance. Use the approved smoky-glass monochrome brand with Sora/Inter. Do not substitute an unrelated dashboard, visual noise, fabricated graph nodes or obsolete Recall/MeGraph boards.
 
 **Phone and web.** An authenticated browser/PWA cloud library can capture and ask while the desktop is off. Retain the private Tailscale companion where useful. Cloud and local libraries must not pretend to be synchronized where parity is incomplete.
 
@@ -115,3 +115,4 @@ Avoid expanding into CRM, ERP, task management, autonomous agents, plugin market
 A single rename PR must not determine product architecture. Naming/legal clearance, actual installed-upgrade compatibility, secure hosting configuration and complete native/cloud parity remain separate gates. The canonical brand may retain technical Recall names for backwards compatibility. Any new acceptance claim must name the exact tested commit, environment, live-versus-synthetic evidence and outstanding limitations.
 
 This PRD intentionally replaces the superseded 2026-10-09 requirements without deleting their historical record on the divergent branch.
+
