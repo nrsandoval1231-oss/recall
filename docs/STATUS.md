@@ -1,6 +1,19 @@
 # MONOLITH — Status
 
-Updated 2026-10-21. This is the active record. The [prior status ledger](history/STATUS-PRE-MONOLITH-2026-10-17.md) is preserved unchanged as historical evidence; its design mandates and next steps are superseded here.
+Updated 2026-10-28 (repository reconciliation and safe cleanup; implementation acceptance evidence below remains from earlier dates). This is the active record. The [prior status ledger](history/STATUS-PRE-MONOLITH-2026-10-17.md) is preserved unchanged as historical evidence; its design mandates and next steps are superseded here.
+
+## 2026-10-28 repository reconciliation
+
+- Current product requirements are consolidated in [PRD.md](PRD.md), aligned with [VISION.md](VISION.md): **no Obsidian dependency**, independently usable local Windows library, authenticated web/PWA cloud checkpoint, consent-gated Jev → Claude → deterministic writer, and source-backed Ask. The PRD does not certify a release.
+- `main` is the canonical integration baseline. PR #69 (cloud conflict resolution) remains open; PR #70 (local-first/voice) closed without merge; PR #71 (product rename) is open against the divergent `implement/owner-device-pairing` branch, **not** `main`. The latter branch has conflicting migrations and older Obsidian/no-login decisions. Do not merge wholesale; review and selectively port valuable work.
+- [REPOSITORY-AUDIT-2026-10-28.md](REPOSITORY-AUDIT-2026-10-28.md) inventories stale files, architecture mismatches, protected compatibility identifiers and unfinished real-device release gates. The follow-on cleanup below records the one unreferenced runtime component removed.
+- Local verification for this cleanup passed `npm run check` (lint, typechecks, 318 tests), desktop and web production builds, and `git diff --check`. No installed-device, live-provider, production, or real-user-data migration tests were run.
+
+## 2026-10-28 repository cleanup
+
+The cleanup follows the MONOLITH requirements and branch guidance proposed in PR #72. The disconnected `apps/desktop/src/LegacyCloudEntry.tsx` had no imports or runtime consumers; the live entry is `CloudEntry` for browser and optional native cloud mode. The unused component was removed, and the architecture and app/backend READMEs now describe active clients and current acceptance limits accurately. The `?mode=legacy-cloud` query is retained as a compatibility path through the current entry.
+
+No databases, migration files, user libraries, original captures, compatibility identifiers, frozen history, or historical design/verification assets were deleted. Historical asset bundles remain because frozen ledgers link to them. No production resources or data were touched.
 
 ## Where the project stands
 
@@ -14,7 +27,7 @@ Main is at the merge of PR #67 (capture enrichment). The MONOLITH guide and M as
 
 ## Known gaps
 
-Native-library cloud semantic indexing, audio/Speak (stays explicitly unavailable), secondary attachments and their migration/offline sync (imports of such memories are refused), conflict review/merge, incremental large-library sync (bounded full snapshots remain), full export/import parity, and accepted cloud relationship projection (enrichment suggestions remain proposals). Native Markdown folders remain independent, not continuously bidirectionally synchronized. No owner data has been migrated. `npm install` reports 22 existing dependency advisories (7 moderate, 15 high); no upgrade was made. The CSS compatibility aliases `--recall-sage/copper/…` hold MONOLITH values; renaming them is cosmetic and untouched.
+Native-library cloud semantic indexing, audio/Speak (stays explicitly unavailable), secondary attachments and their migration/offline sync (imports of such memories are refused), conflict review/merge, incremental large-library sync (bounded full snapshots remain), full export/import parity, and accepted cloud relationship projection (enrichment suggestions remain proposals). Native Markdown folders remain independent, not continuously bidirectionally synchronized. No owner data has been migrated. `npm ci` on the cleanup branch reported 12 dependency advisories (5 low, 3 moderate, 4 high); no upgrades were made. The CSS compatibility aliases `--recall-sage/copper/…` hold MONOLITH values; renaming them is cosmetic and untouched.
 
 ## Owner decisions pending
 
@@ -24,3 +37,4 @@ Native-library cloud semantic indexing, audio/Speak (stays explicitly unavailabl
 ## Release gates not yet met
 
 No visual parity, installed-device, live-provider or deployment claim is made. Still required: cloud implementation gaps above; installed Windows build and credential store; physical iPhone/Safari/keyboard/PC-off behavior; live providers and handwriting; real clean-machine backup/restore; assistive technology; live HTTP cloud integration and deployed offline PWA. Hostinger SSH/Docker/proxy/DNS access, approved hostname, remote provider keys/model/prices and an encrypted off-host backup destination remain unavailable, so no production URL, installer or deployment is claimed. No merge or deployment is authorized beyond what the owner states.
+
