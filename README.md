@@ -12,15 +12,16 @@ A private, local-first external memory. Photograph your notes or type a brain-du
 
 ## Docs (read in this order)
 
-1. [VISION.md](docs/VISION.md): what we're building and the trust rules. **The product authority.**
-2. [STATUS.md](docs/STATUS.md): what works, what's unproven, what's next.
-3. [ARCHITECTURE.md](docs/ARCHITECTURE.md): how the code is organized.
-4. [DESIGN.md](docs/DESIGN.md): **the only UI and brand authority**, across desktop and mobile.
-5. [DEVELOPMENT.md](docs/DEVELOPMENT.md): build, run, test.
-6. [ACCEPTANCE.md](docs/ACCEPTANCE.md): the real-device v1 checklist.
-7. [TESTING.md](docs/TESTING.md): guide for friends testing a release.
+1. [VISION.md](docs/VISION.md): product direction and trust principles. **Scope authority.**
+2. [PRD.md](docs/PRD.md): feature requirements, release criteria and priorities.
+3. [STATUS.md](docs/STATUS.md): what works, what's unproven, what's next.
+4. [ARCHITECTURE.md](docs/ARCHITECTURE.md): how the code is organized.
+5. [DESIGN.md](docs/DESIGN.md): **the only UI and brand authority**, across desktop and mobile.
+6. [DEVELOPMENT.md](docs/DEVELOPMENT.md): build, run, test.
+7. [ACCEPTANCE.md](docs/ACCEPTANCE.md): the real-device v1 checklist.
+8. [TESTING.md](docs/TESTING.md): guide for friends testing a release.
 
-`docs/history/` is frozen evidence, not design guidance. `docs/legacy-cloud/` is historical documentation; the backend is reused by the active cloud checkpoint.
+[Repository audit (2026-10-28)](docs/REPOSITORY-AUDIT-2026-10-28.md) records known drift and cleanup boundaries. `docs/history/` is frozen evidence, not design guidance. `docs/legacy-cloud/` is historical documentation; the backend is reused by the active cloud checkpoint.
 
 ## Quick start
 
