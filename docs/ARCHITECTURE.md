@@ -1,6 +1,8 @@
 # MONOLITH — Architecture
 
-Describes the code as it exists today. Product intent lives in [VISION.md](VISION.md). If this file drifts from the code, fix this file in the same PR.
+Describes the code and its migration history. Product intent lives in [VISION.md](VISION.md) and requirements in [PRD.md](PRD.md). If this file drifts from code, correct it in the same implementation PR.
+
+**Reading guide (2026-10-28):** The cloud-checkpoint sections describe the current `main` integration. The older local diagrams, `Recall/` paths and historic names below are retained as compatibility descriptions, not instructions to build an Obsidian integration or reverse approved cloud access. The separate `implement/owner-device-pairing` / PR #71 line is *not* merged into this architecture. Actual deployed, installed-device and cross-device synchronization claims remain unverified; see STATUS.
 
 ## MONOLITH cloud evolution — owner decision 2026-10-17
 
