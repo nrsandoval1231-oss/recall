@@ -27,7 +27,7 @@ Main is at the merge of PR #67 (capture enrichment). The MONOLITH guide and M as
 
 ## Known gaps
 
-Native-library cloud semantic indexing, audio/Speak (stays explicitly unavailable), secondary attachments and their migration/offline sync (imports of such memories are refused), conflict review/merge, incremental large-library sync (bounded full snapshots remain), full export/import parity, and accepted cloud relationship projection (enrichment suggestions remain proposals). Native Markdown folders remain independent, not continuously bidirectionally synchronized. No owner data has been migrated. `npm install` reports 22 existing dependency advisories (7 moderate, 15 high); no upgrade was made. The CSS compatibility aliases `--recall-sage/copper/…` hold MONOLITH values; renaming them is cosmetic and untouched.
+Native-library cloud semantic indexing, audio/Speak (stays explicitly unavailable), secondary attachments and their migration/offline sync (imports of such memories are refused), conflict review/merge, incremental large-library sync (bounded full snapshots remain), full export/import parity, and accepted cloud relationship projection (enrichment suggestions remain proposals). Native Markdown folders remain independent, not continuously bidirectionally synchronized. No owner data has been migrated. `npm ci` on the cleanup branch reported 12 dependency advisories (5 low, 3 moderate, 4 high); no upgrades were made. The CSS compatibility aliases `--recall-sage/copper/…` hold MONOLITH values; renaming them is cosmetic and untouched.
 
 ## Owner decisions pending
 
