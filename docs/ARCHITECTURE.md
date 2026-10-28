@@ -81,7 +81,7 @@ Cloud native records use additive `library_processing` rows with forced RLS. The
 - `surface/MemoryEditor.tsx`, `editor-session.ts`: native editor with autosave, conflict and revision handling.
 - `surface/meeting-workflow.ts`, `native-librarian.ts`: drives the pipeline over IPC and reports honest states.
 - `platform/local-vault.ts`: the only bridge to native commands.
-- `scripts/verify-ui.mjs` and `scripts/verify-populated.mjs` inject labelled synthetic browser IPC for regression screenshots; production opens the real local library or authenticated cloud adapter. The old selectable legacy-cloud entry and unused dashboard fixture components are removed.
+- `scripts/verify-ui.mjs` and `scripts/verify-populated.mjs` inject labelled synthetic browser IPC for regression screenshots; production opens the real local library or authenticated cloud adapter. `?mode=legacy-cloud` remains a compatibility query handled by the current entry; it does not select an alternate implementation.
 
 ## Phone (`src-tauri/src/phone.rs`, `bin/recall-phone.rs`)
 
@@ -96,11 +96,12 @@ A small HTTP server in the same crate. It binds the Tailscale IPv4 only (loopbac
 
 `packages/design-tokens` supplies the approved palette and semantic tokens. Its `brand.css` is shared by desktop and the native phone renderer. `packages/api-client`, `packages/sync`, `packages/contracts` retain compatibility contracts; inspect live consumers before changing them.
 
-## Historical clients and reused backend
+## Active clients and reused backend
 
-`services/backend` (FastAPI, Postgres/pgvector, worker) is active in the authenticated cloud checkpoint described above. `apps/web` (historical PWA), `apps/mobile` (Expo) and the old desktop LegacyCloudEntry remain historical clients; the active browser entry is CloudEntry. Old docs in [legacy-cloud/](legacy-cloud/README.md) are migration context, not a freeze on the reused backend.
+`services/backend` (FastAPI, Postgres/pgvector, worker) and `apps/web` (authenticated PWA) are part of the cloud checkpoint described above. `apps/mobile` is an Expo client whose physical-device behavior remains unverified. `apps/desktop/src/CloudEntry.tsx` is the authenticated browser and optional native cloud entry. The unused `LegacyCloudEntry` component has been removed. Documents in [legacy-cloud/](legacy-cloud/README.md) preserve earlier contracts and operational details; they do not freeze the backend reused by the active cloud checkpoint.
 
 ## Constraints
 
 - Business logic in the Rust core (and the legacy Python domain package); UI stays in React; platform access goes through narrow native adapters.
 - No Redis, Kafka, microservices, graph DB, separate vector service, or model router without measured evidence and a written decision in this file.
+

@@ -1,6 +1,6 @@
-# Recall web companion (PR #16)
+# MONOLITH web companion
 
-**Frozen legacy cloud code, not the product.** See [docs/legacy-cloud](../../docs/legacy-cloud/README.md) and [VISION.md](../../docs/VISION.md).
+This authenticated PWA is part of the cloud checkpoint described in [ARCHITECTURE](../../docs/ARCHITECTURE.md) and [STATUS](../../docs/STATUS.md). Product scope and trust rules are in [VISION](../../docs/VISION.md); requirements and acceptance gates are in [PRD](../../docs/PRD.md).
 
 The Cloudflare Worker serves the Vite app and proxies only `/api/v1/*` to the Recall API. A provisioned browser opens Recall directly. There is no sign-in screen.
 
@@ -19,3 +19,4 @@ Set ignored local `.dev.vars` beside `wrangler.toml`: `API_ORIGIN`, `SITE_ORIGIN
 Historical note: an earlier pilot path used Supabase email links and `/auth/callback`. That dependency is retired for this web app. The October 2026 email-provider incident records remain in `docs/history/ACCEPTANCE-LOG-2026-10.md`.
 
 iPhone Add to Home Screen and Windows browser use of this URL are still manual acceptance gates. A green build is not that proof.
+

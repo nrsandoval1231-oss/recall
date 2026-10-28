@@ -9,6 +9,12 @@ Updated 2026-10-28 (documentation/branch audit only; implementation test evidenc
 - [REPOSITORY-AUDIT-2026-10-28.md](REPOSITORY-AUDIT-2026-10-28.md) inventories stale files, architecture mismatches, protected compatibility identifiers and unfinished real-device release gates. No runtime files were deleted or migrated by this docs packet.
 - Documentation-only validation: current repository files and branch/PR metadata inspected. No test suites, installed builds, live providers, deployment, or real user-data migrations executed in this packet.
 
+## 2026-10-28 repository cleanup
+
+The cleanup follows the MONOLITH requirements and branch guidance proposed in PR #72. The disconnected `apps/desktop/src/LegacyCloudEntry.tsx` had no imports or runtime consumers; the live entry is `CloudEntry` for browser and optional native cloud mode. The unused component was removed, and the architecture and app/backend READMEs now describe active clients and current acceptance limits accurately. The `?mode=legacy-cloud` query is retained as a compatibility path through the current entry.
+
+No databases, migration files, user libraries, original captures, compatibility identifiers, frozen history, or historical design/verification assets were deleted. Historical asset bundles remain because frozen ledgers link to them. No production resources or data were touched.
+
 ## Where the project stands
 
 Main is at the merge of PR #67 (capture enrichment). The MONOLITH guide and M assets (PR #65) are the single visual direction; the authenticated web/PWA cloud checkpoint and optional native cloud mode (PR #64) are integrated (PR #66). Product scope and trust rules live in VISION; Recall/MeGraph names survive only as technical identifiers (storage keys, package names, API paths, the `human:obsidian` legacy origin string) so existing libraries and deployments keep working.
@@ -31,3 +37,4 @@ Native-library cloud semantic indexing, audio/Speak (stays explicitly unavailabl
 ## Release gates not yet met
 
 No visual parity, installed-device, live-provider or deployment claim is made. Still required: cloud implementation gaps above; installed Windows build and credential store; physical iPhone/Safari/keyboard/PC-off behavior; live providers and handwriting; real clean-machine backup/restore; assistive technology; live HTTP cloud integration and deployed offline PWA. Hostinger SSH/Docker/proxy/DNS access, approved hostname, remote provider keys/model/prices and an encrypted off-host backup destination remain unavailable, so no production URL, installer or deployment is claimed. No merge or deployment is authorized beyond what the owner states.
+
