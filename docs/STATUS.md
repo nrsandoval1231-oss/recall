@@ -1,13 +1,13 @@
 # MONOLITH — Status
 
-Updated 2026-10-28 (documentation/branch audit only; implementation test evidence below remains from earlier dates). This is the active record. The [prior status ledger](history/STATUS-PRE-MONOLITH-2026-10-17.md) is preserved unchanged as historical evidence; its design mandates and next steps are superseded here.
+Updated 2026-10-28 (repository reconciliation and safe cleanup; implementation acceptance evidence below remains from earlier dates). This is the active record. The [prior status ledger](history/STATUS-PRE-MONOLITH-2026-10-17.md) is preserved unchanged as historical evidence; its design mandates and next steps are superseded here.
 
 ## 2026-10-28 repository reconciliation
 
 - Current product requirements are consolidated in [PRD.md](PRD.md), aligned with [VISION.md](VISION.md): **no Obsidian dependency**, independently usable local Windows library, authenticated web/PWA cloud checkpoint, consent-gated Jev → Claude → deterministic writer, and source-backed Ask. The PRD does not certify a release.
 - `main` is the canonical integration baseline. PR #69 (cloud conflict resolution) remains open; PR #70 (local-first/voice) closed without merge; PR #71 (product rename) is open against the divergent `implement/owner-device-pairing` branch, **not** `main`. The latter branch has conflicting migrations and older Obsidian/no-login decisions. Do not merge wholesale; review and selectively port valuable work.
-- [REPOSITORY-AUDIT-2026-10-28.md](REPOSITORY-AUDIT-2026-10-28.md) inventories stale files, architecture mismatches, protected compatibility identifiers and unfinished real-device release gates. No runtime files were deleted or migrated by this docs packet.
-- Documentation-only validation: current repository files and branch/PR metadata inspected. No test suites, installed builds, live providers, deployment, or real user-data migrations executed in this packet.
+- [REPOSITORY-AUDIT-2026-10-28.md](REPOSITORY-AUDIT-2026-10-28.md) inventories stale files, architecture mismatches, protected compatibility identifiers and unfinished real-device release gates. The follow-on cleanup below records the one unreferenced runtime component removed.
+- Local verification for this cleanup passed `npm run check` (lint, typechecks, 318 tests), desktop and web production builds, and `git diff --check`. No installed-device, live-provider, production, or real-user-data migration tests were run.
 
 ## 2026-10-28 repository cleanup
 

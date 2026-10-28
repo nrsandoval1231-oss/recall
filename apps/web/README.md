@@ -4,7 +4,7 @@ This authenticated PWA is part of the cloud checkpoint described in [ARCHITECTUR
 
 The Cloudflare Worker serves the Vite app and proxies only `/api/v1/*` to the Recall API. A provisioned browser opens Recall directly. There is no sign-in screen.
 
-An operator issues a single-use enrollment token from the API (`POST /v1/operator/enrollments` with `RECALL_OPERATOR_TOKEN`). Open that token on the device as a URL fragment, for example `https://<site>/#enr_...`. The page removes the fragment before rendering and posts it once to `/auth/enroll`. The Worker asks the API to consume the token and stores the resulting device session in an encrypted `__Host-` cookie: `HttpOnly`, `Secure`, `SameSite=Lax`. The session token is not written into the page, `localStorage`, or the address bar.
+An operator issues a single-use enrollment token from the API (`POST /v1/operator/enrollments` with `RECALL_OPERATOR_TOKEN`). Open that token on the device as a URL fragment, for example `https://<site>/#enr_...`. The page removes the fragment before rendering and posts it once to `/auth/enroll`. The Worker asks the API to consume the token and stores the resulting device session in an encrypted `__Host-` cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, with no `Domain` attribute. The session token is not written into the page, `localStorage`, or the address bar.
 
 The API stores only hashes. Revocation, the workspace kill switch, and the operator kill switch take effect on the next request. Browser reinstall or clearing site data requires a new enrollment. The service worker caches the app shell only; it does not cache `/api/` or `/auth/`, and it does not answer from memory while offline.
 
