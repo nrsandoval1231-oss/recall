@@ -197,3 +197,27 @@ def test_explicit_storage_dir_wins_over_both_defaults(monkeypatch: pytest.Monkey
     assert _settings().local_storage_dir == Path("legacy-explicit")
     monkeypatch.setenv("MONOLITH_LOCAL_STORAGE_DIR", "explicit")
     assert _settings().local_storage_dir == Path("explicit")
+
+
+def test_container_storage_default_preserves_legacy_deployment_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    dockerfile = (REPO_ROOT / "services/backend/Dockerfile").read_text(encoding="utf-8")
+    assert "RECALL_LOCAL_STORAGE_DIR=/app/storage" in dockerfile
+    assert "MONOLITH_LOCAL_STORAGE_DIR=/app/storage" not in dockerfile
+
+    existing_dir = tmp_path / "legacy-storage"
+    existing_dir.mkdir()
+    existing_file = existing_dir / "stored-object.bin"
+    existing_file.write_bytes(b"preserve existing user data")
+
+    # Docker runtime environment overrides the image's RECALL_* default at the same
+    # variable name, so the application's compatibility source sees the deployment path.
+    monkeypatch.setenv("RECALL_LOCAL_STORAGE_DIR", str(existing_dir))
+    settings = _settings()
+    assert settings.local_storage_dir == existing_dir
+    assert (settings.local_storage_dir / existing_file.name).read_bytes() == b"preserve existing user data"
+
+    # An explicitly configured new name remains authoritative over the legacy name.
+    monkeypatch.setenv("MONOLITH_LOCAL_STORAGE_DIR", "/new/explicit/storage")
+    assert _settings().local_storage_dir == Path("/new/explicit/storage")

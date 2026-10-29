@@ -186,12 +186,27 @@ pub(crate) enum SqliteOutcome {
     Migrated,
 }
 
-/// Move `recall.sqlite3` to `monolith.sqlite3`. "New exists" is decided only by the main file. The
-/// `-wal`/`-shm`/`-journal` sidecars move first and the main file last, so an interruption always
-/// leaves the legacy main file in place and the next attempt resumes with whatever sidecars remain.
-/// Sidecars with no main file anywhere are left alone. If a rename fails, the files already moved
-/// in this attempt are moved back.
-pub(crate) fn migrate_sqlite(dir: &Path, rename: RenameFn) -> Result<SqliteOutcome> {
+#[derive(Debug, PartialEq, Eq)]
+struct SqliteMigrationError {
+    message: String,
+    rollback_complete: bool,
+}
+
+impl std::fmt::Display for SqliteMigrationError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+/// Move `recall.sqlite3` to `monolith.sqlite3`. The main file determines whether the new database
+/// already exists. The `-wal`/`-shm`/`-journal` sidecars move first and the main file last. If a
+/// prior interruption left new-name sidecars beside the legacy main, the state is indeterminate
+/// and migration is refused; it must not guess that a later launch can safely resume. If a rename
+/// fails, files moved in this attempt are moved back, and a failed rollback is reported distinctly.
+fn migrate_sqlite(
+    dir: &Path,
+    rename: RenameFn,
+) -> std::result::Result<SqliteOutcome, SqliteMigrationError> {
     let new_main = dir.join(SQLITE_NAME);
     let legacy_main = dir.join(LEGACY_SQLITE_NAME);
     if exists(&new_main) {
@@ -199,6 +214,18 @@ pub(crate) fn migrate_sqlite(dir: &Path, rename: RenameFn) -> Result<SqliteOutco
     }
     if !exists(&legacy_main) {
         return Ok(SqliteOutcome::NothingToMigrate);
+    }
+    // A prior interrupted attempt may have stranded a Monolith sidecar beside the still-legacy
+    // main file. Treat that layout as indeterminate: moving the remaining files on a later launch
+    // can make SQLite open the legacy main without its committed WAL transactions.
+    if SQLITE_SIDECARS
+        .iter()
+        .any(|suffix| exists(&dir.join(format!("{SQLITE_NAME}{suffix}"))))
+    {
+        return Err(SqliteMigrationError {
+            message: "legacy database has stranded Monolith sidecars; refusing to guess which files are consistent".to_owned(),
+            rollback_complete: false,
+        });
     }
     let mut steps: Vec<(PathBuf, PathBuf)> = SQLITE_SIDECARS
         .iter()
@@ -214,35 +241,41 @@ pub(crate) fn migrate_sqlite(dir: &Path, rename: RenameFn) -> Result<SqliteOutco
     let mut moved: Vec<&(PathBuf, PathBuf)> = Vec::new();
     for step in &steps {
         if let Err(error) = rename(&step.0, &step.1) {
-            let mut stuck = false;
+            let mut rollback_complete = true;
             for (from, to) in moved.iter().rev().map(|s| (&s.0, &s.1)) {
-                stuck |= rename(to, from).is_err();
+                rollback_complete &= rename(to, from).is_ok();
             }
-            return Err(format!(
-                "could not rename the legacy database: {error}{}",
-                if stuck {
-                    " (and could not undo every step)"
-                } else {
-                    ""
-                }
-            ));
+            return Err(SqliteMigrationError {
+                message: format!(
+                    "could not rename the legacy database: {error}{}",
+                    if rollback_complete {
+                        ""
+                    } else {
+                        " (and could not undo every step)"
+                    }
+                ),
+                rollback_complete,
+            });
         }
         moved.push(step);
     }
     Ok(SqliteOutcome::Migrated)
 }
 
-/// The database file to open: the Monolith name after a successful (or unnecessary) migration;
-/// after a failed one, whichever main file actually exists, so existing data is never abandoned.
+/// The database file to open after a successful (or unnecessary) migration. If a failed rename
+/// was fully rolled back, the legacy database remains complete and can still be opened. If any
+/// rollback step failed, return the existing data directory itself: SQLite refuses to open a
+/// directory as a database, which prevents creating or opening a database missing committed WAL
+/// transactions. Startup then fails closed and the user's files remain available for recovery.
 pub(crate) fn sqlite_path_to_open(dir: &Path, rename: RenameFn) -> PathBuf {
     match migrate_sqlite(dir, rename) {
         Ok(_) => dir.join(SQLITE_NAME),
         Err(error) => {
-            eprintln!("{error}; opening whichever database file exists");
-            if exists(&dir.join(SQLITE_NAME)) || !exists(&dir.join(LEGACY_SQLITE_NAME)) {
-                dir.join(SQLITE_NAME)
-            } else {
+            if error.rollback_complete && exists(&dir.join(LEGACY_SQLITE_NAME)) {
                 dir.join(LEGACY_SQLITE_NAME)
+            } else {
+                eprintln!("{error}; refusing to open an inconsistent database");
+                dir.to_path_buf()
             }
         }
     }
@@ -251,7 +284,8 @@ pub(crate) fn sqlite_path_to_open(dir: &Path, rename: RenameFn) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
+    use std::process::Command;
     use uuid::Uuid;
 
     struct Temp(PathBuf);
@@ -575,42 +609,31 @@ mod tests {
     }
 
     #[test]
-    fn sqlite_a_stray_new_sidecar_alone_does_not_count_as_a_new_database() {
+    fn sqlite_a_stranded_new_sidecar_with_a_legacy_main_refuses_to_open() {
         let t = Temp::new();
         files(&t.0, LEGACY_SQLITE_NAME, &[""]);
-        // Not a rename target of ours, so it stays; only the main file decides "new exists".
+        // A sidecar without its main cannot prove which database state is complete.
         files(&t.0, SQLITE_NAME, &["-shm"]);
+        assert_eq!(sqlite_path_to_open(&t.0, &fs_rename), t.0);
         assert_eq!(
-            migrate_sqlite(&t.0, &fs_rename).unwrap(),
-            SqliteOutcome::Migrated
+            content(&t.0, LEGACY_SQLITE_NAME).unwrap(),
+            LEGACY_SQLITE_NAME
         );
-        assert_eq!(content(&t.0, SQLITE_NAME).unwrap(), LEGACY_SQLITE_NAME);
+        assert!(!t.0.join(SQLITE_NAME).exists());
     }
 
     #[test]
-    fn sqlite_interrupted_after_some_sidecars_resumes_with_what_remains() {
+    fn sqlite_interrupted_with_a_stranded_sidecar_fails_closed() {
         let t = Temp::new();
         // State left by a crash: -wal already moved, -shm and the main file still legacy.
         files(&t.0, LEGACY_SQLITE_NAME, &["", "-shm"]);
         files(&t.0, SQLITE_NAME, &["-wal"]);
-        assert_eq!(
-            migrate_sqlite(&t.0, &fs_rename).unwrap(),
-            SqliteOutcome::Migrated
-        );
-        for suffix in ["", "-wal", "-shm"] {
-            assert!(
-                t.0.join(format!("{SQLITE_NAME}{suffix}")).is_file(),
-                "{suffix}"
-            );
-            assert!(
-                !t.0.join(format!("{LEGACY_SQLITE_NAME}{suffix}")).exists(),
-                "{suffix}"
-            );
+        assert_eq!(sqlite_path_to_open(&t.0, &fs_rename), t.0);
+        for suffix in ["", "-shm"] {
+            assert!(t.0.join(format!("{LEGACY_SQLITE_NAME}{suffix}")).is_file());
         }
-        assert_eq!(
-            content(&t.0, &format!("{SQLITE_NAME}-wal")).unwrap(),
-            format!("{SQLITE_NAME}-wal")
-        );
+        assert!(t.0.join(format!("{SQLITE_NAME}-wal")).is_file());
+        assert!(!t.0.join(SQLITE_NAME).exists());
     }
 
     #[test]
@@ -676,7 +699,7 @@ mod tests {
     }
 
     #[test]
-    fn sqlite_when_rollback_also_fails_the_main_file_that_exists_is_opened() {
+    fn sqlite_when_rollback_also_fails_refuses_to_open_a_database() {
         let t = Temp::new();
         files(&t.0, LEGACY_SQLITE_NAME, &["", "-wal"]);
         // The main-file rename fails and so does moving -wal back: the legacy main is what exists.
@@ -689,13 +712,115 @@ mod tests {
                 fs::rename(from, to)
             }
         };
-        let error = migrate_sqlite(&t.0, &stuck).unwrap_err();
-        assert!(error.contains("could not undo"), "{error}");
-        assert_eq!(
-            sqlite_path_to_open(&t.0, &stuck),
-            t.0.join(LEGACY_SQLITE_NAME)
-        );
+        // Do not retry the migration or choose the remaining legacy main file: its committed WAL
+        // has already moved and could be silently omitted by SQLite.
+        let fail_closed_path = sqlite_path_to_open(&t.0, &stuck);
+        assert_eq!(fail_closed_path, t.0);
+        assert!(rusqlite::Connection::open(&fail_closed_path).is_err());
         assert!(t.0.join(LEGACY_SQLITE_NAME).is_file());
+        assert!(t.0.join(format!("{SQLITE_NAME}-wal")).is_file());
+    }
+
+    const WAL_FIXTURE_ENV: &str = "MONOLITH_SQLITE_WAL_FIXTURE_PATH";
+
+    // Run in a child process so SQLite cannot checkpoint the committed transaction on clean
+    // connection close. The abrupt exit leaves a realistic committed outbox row in -wal.
+    #[test]
+    fn sqlite_committed_wal_fixture_child() {
+        let Ok(path) = std::env::var(WAL_FIXTURE_ENV) else {
+            return;
+        };
+        let path = PathBuf::from(path);
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.pragma_update(None, "journal_mode", "WAL").unwrap();
+        db.execute("CREATE TABLE outbox (id TEXT PRIMARY KEY)", [])
+            .unwrap();
+        db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)").unwrap();
+        db.execute("INSERT INTO outbox (id) VALUES ('committed-item')", [])
+            .unwrap();
+        assert!(PathBuf::from(format!("{}-wal", path.display())).is_file());
+        std::mem::forget(db);
+        std::process::exit(0);
+    }
+
+    #[test]
+    fn sqlite_incomplete_rollback_refuses_a_database_with_a_committed_wal_record() {
+        let t = Temp::new();
+        let legacy = t.0.join(LEGACY_SQLITE_NAME);
+        let child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "legacy_migration::tests::sqlite_committed_wal_fixture_child",
+            ])
+            .env(WAL_FIXTURE_ENV, &legacy)
+            .status()
+            .unwrap();
+        assert!(child.success());
+
+        let wal_path = t.0.join(format!("{LEGACY_SQLITE_NAME}-wal"));
+        assert!(wal_path.is_file(), "fixture must retain its WAL");
+        // Confirm the entry is committed and visible while the matching WAL is still beside the
+        // legacy main file. Read-only open avoids checkpointing the fixture before the migration.
+        let reader = rusqlite::Connection::open_with_flags(
+            &legacy,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let count: i64 = reader
+            .query_row(
+                "SELECT count(*) FROM outbox WHERE id='committed-item'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+        drop(reader);
+
+        let wal_was_moved = Cell::new(false);
+        let stuck = |from: &Path, to: &Path| {
+            let from_name = from.file_name().unwrap().to_string_lossy();
+            if from_name == format!("{LEGACY_SQLITE_NAME}-wal") {
+                fs::rename(from, to)?;
+                wal_was_moved.set(true);
+                Ok(())
+            } else if from_name == LEGACY_SQLITE_NAME {
+                Err(io::Error::other("synthetic main database rename failure"))
+            } else if from_name == format!("{SQLITE_NAME}-wal") && wal_was_moved.get() {
+                Err(io::Error::other("synthetic WAL rollback failure"))
+            } else {
+                fs::rename(from, to)
+            }
+        };
+
+        // A fallback to the existing legacy main file here would omit the committed row, because
+        // its WAL is now stranded under the Monolith name. The directory result forces open to
+        // fail safely instead of creating a new/partial cache.
+        for launch in 1..=2 {
+            let database_path = sqlite_path_to_open(&t.0, &stuck);
+            assert_eq!(database_path, t.0, "launch {launch}");
+            assert!(
+                rusqlite::Connection::open(&database_path).is_err(),
+                "launch {launch} must fail closed"
+            );
+        }
+        assert!(legacy.is_file());
+        assert!(t.0.join(format!("{SQLITE_NAME}-wal")).is_file());
+        assert!(!t.0.join(SQLITE_NAME).exists());
+        // Demonstrate the exact data-loss symptom of opening the remaining legacy main file:
+        // the committed WAL record is absent because its sidecar no longer matches the basename.
+        let incomplete = rusqlite::Connection::open_with_flags(
+            &legacy,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let count: i64 = incomplete
+            .query_row(
+                "SELECT count(*) FROM outbox WHERE id='committed-item'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
     }
 
     #[test]
