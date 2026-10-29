@@ -3,7 +3,7 @@ import { webcrypto, createHash } from "node:crypto";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ApiError, type AiSettings, type AskResponse, type MemoryDetail, type ServerCapture } from "@recall/api-client";
+import { ApiError, type AiSettings, type AskResponse, type MemoryDetail, type ServerCapture } from "@monolith/api-client";
 import type { NativeCache } from "./platform/native-cache";
 import { App, type DesktopServices } from "./App";
 import { readConfig } from "./config";
@@ -125,7 +125,7 @@ function memory(): MemoryDetail {
 }
 
 function aiSettings(over: Partial<AiSettings> = {}): AiSettings {
-  return { ai_configured: true, provider: "anthropic", policy_version: "anthropic-v1", enabled: false, consent_outdated: false, decided_at: null, version: 0, explanation: "When on, Recall sends a processed copy of each saved page to the configured AI provider.", ...over };
+  return { ai_configured: true, provider: "anthropic", policy_version: "anthropic-v1", enabled: false, consent_outdated: false, decided_at: null, version: 0, explanation: "When on, Monolith sends a processed copy of each saved page to the configured AI provider.", ...over };
 }
 
 function askResponse(over: Partial<AskResponse>): AskResponse {
@@ -185,7 +185,7 @@ describe("RCL-002 desktop", () => {
     expect(screen.getByText(/Machine reading of the original/)).toBeTruthy();
     expect(screen.getByText("uncertain")).toBeTruthy();
     expect(screen.getByText(/Suggestions only/)).toBeTruthy();
-    expect(screen.getByText(/1 thing\(s\) Recall couldn't confirm/)).toBeTruthy();
+    expect(screen.getByText(/1 thing\(s\) Monolith couldn't confirm/)).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId("integrity").textContent).toMatch(/Verified/)); // original still verified
   });
 
@@ -248,7 +248,7 @@ describe("RCL-002 desktop", () => {
     expect(await screen.findByText("On")).toBeTruthy();
     unmount();
     render(<Settings api={services([], undefined, { getAiSettings: vi.fn(async () => aiSettings({ ai_configured: false })) }).api} onClose={() => undefined} />);
-    expect(await screen.findByText(/isn't set up on this Recall server/)).toBeTruthy();
+    expect(await screen.findByText(/isn't set up on this Monolith server/)).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 });

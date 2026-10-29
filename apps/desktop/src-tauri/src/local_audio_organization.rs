@@ -257,7 +257,7 @@ static PROCESS_GATE: OnceLock<Mutex<()>> = OnceLock::new();
 /// Drain eligible work in the background. No-op without an audio marker.
 pub fn schedule_pending(guard: SelectionGuard) {
     let _ = std::thread::Builder::new()
-        .name("recall-audio-organize".into())
+        .name("monolith-audio-organize".into())
         .spawn(move || {
             let gate = PROCESS_GATE.get_or_init(|| Mutex::new(()));
             if let Ok(_gate) = gate.lock() {

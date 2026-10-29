@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { NetworkError, type AskResponse, type Citation } from "@recall/api-client";
+import { NetworkError, type AskResponse, type Citation } from "@monolith/api-client";
 import { askWithPolicy, citationTarget } from "./askviewmodel";
 
 const citation: Citation = { citation_id: "c1", capture_id: "cap-1", memory_id: "mem-1", memory_revision: 1, source_id: "src-1", quote: "The key is here.", captured_at: "2026-10-06T00:00:00Z", page: 1, epistemic_state: "reported", kind: "statement" };

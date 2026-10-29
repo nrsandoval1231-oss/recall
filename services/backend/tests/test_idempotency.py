@@ -141,7 +141,7 @@ def test_finalize_same_key_different_payload_conflicts(env: Env) -> None:
 
 
 def test_concurrent_identical_creates_produce_one_capture(env: Env) -> None:
-    from recall.domain.captures import CaptureService
+    from monolith.domain.captures import CaptureService
 
     user = env.user()
     user.register_device()
@@ -166,7 +166,7 @@ def test_concurrent_identical_creates_produce_one_capture(env: Env) -> None:
 
 
 def test_concurrent_finalizes_store_once(env: Env) -> None:
-    from recall.domain.captures import CaptureService
+    from monolith.domain.captures import CaptureService
 
     user = env.user()
     user.register_device()

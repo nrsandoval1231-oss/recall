@@ -2,9 +2,8 @@
 //! service name, with strictly validated keys and bounded values. There is no generic file, shell,
 //! or HTTP capability anywhere in this app.
 
-use keyring::Entry;
+use crate::keychain::{self, SecretStore, SESSION_SERVICE, SESSION_SERVICE_LEGACY};
 
-const SERVICE: &str = "app.recall.desktop.session";
 const MAX_KEY_LEN: usize = 128;
 // Windows Credential Manager limits a blob to ~2.5 KB; the JS side chunks well below that.
 const MAX_VALUE_LEN: usize = 2000;
@@ -22,18 +21,20 @@ pub fn validate_key(key: &str) -> Result<(), String> {
     }
 }
 
-fn entry(key: &str) -> Result<Entry, String> {
+// Reads fall back to the pre-rename service and migrate forward; writes use the new service only;
+// removal clears both (see `keychain`).
+fn store(key: &str) -> Result<impl SecretStore, String> {
     validate_key(key)?;
-    Entry::new(SERVICE, key).map_err(|e| e.to_string())
+    Ok(keychain::os_store(
+        SESSION_SERVICE,
+        SESSION_SERVICE_LEGACY,
+        None,
+    ))
 }
 
 #[tauri::command]
 pub fn secret_get(key: String) -> Result<Option<String>, String> {
-    match entry(&key)?.get_password() {
-        Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(e.to_string()),
-    }
+    store(&key)?.load(&key)
 }
 
 #[tauri::command]
@@ -41,15 +42,12 @@ pub fn secret_set(key: String, value: String) -> Result<(), String> {
     if value.len() > MAX_VALUE_LEN {
         return Err("secret value too large".into());
     }
-    entry(&key)?.set_password(&value).map_err(|e| e.to_string())
+    store(&key)?.save(&key, &value)
 }
 
 #[tauri::command]
 pub fn secret_remove(key: String) -> Result<(), String> {
-    match entry(&key)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    store(&key)?.remove(&key)
 }
 
 #[cfg(test)]

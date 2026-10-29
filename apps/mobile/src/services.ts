@@ -1,7 +1,7 @@
 import { File, Paths } from "expo-file-system";
 import * as Crypto from "expo-crypto";
-import { createAuth, RecallApiClient } from "@recall/api-client";
-import { CaptureSyncer } from "@recall/sync";
+import { createAuth, MonolithApiClient } from "@monolith/api-client";
+import { CaptureSyncer } from "@monolith/sync";
 import type { AppConfig } from "./config";
 import { ExpoFiles } from "./platform/expo-files";
 import { ExpoFileUploader } from "./platform/expo-uploader";
@@ -11,7 +11,7 @@ const APP_VERSION = "0.1.0";
 
 export interface Services {
   auth: ReturnType<typeof createAuth>;
-  api: RecallApiClient;
+  api: MonolithApiClient;
   files: ExpoFiles;
   syncer: CaptureSyncer;
   deviceId: () => string;
@@ -32,7 +32,7 @@ function loadDeviceId(): string {
 
 export function createServices(config: AppConfig): Services {
   const auth = createAuth({ supabaseUrl: config.supabaseUrl, supabasePublishableKey: config.supabasePublishableKey, storage: authStorage });
-  const api = new RecallApiClient({ baseUrl: config.apiBaseUrl, getAccessToken: () => auth.getAccessToken() });
+  const api = new MonolithApiClient({ baseUrl: config.apiBaseUrl, getAccessToken: () => auth.getAccessToken() });
   const files = new ExpoFiles();
   const deviceId = loadDeviceId();
   const syncer = new CaptureSyncer({

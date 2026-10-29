@@ -1,4 +1,4 @@
-# Recall — Product Requirements Document
+# Monolith — Product Requirements Document
 
 Version: 0.6 | Date: 2026-10-09 | Product owner: Nick Sandoval
 
@@ -8,9 +8,9 @@ Status: universal product vision approved. Photo organization, text capture, gro
 
 **Your life remembers itself.**
 
-Recall is a universal external-memory system. People drop in notes, photos, voice recordings and files; an LLM understands the source, and Recall automatically organizes useful Obsidian notes, properties and links around it. Recall preserves the original, provenance and uncertainty, connects memory across time, and retrieves it later from the incomplete, associative way people actually remember. The user should not need to learn Markdown, Obsidian properties, folders, tags or a filing format.
+Monolith is a universal external-memory system. People drop in notes, photos, voice recordings and files; an LLM understands the source, and Monolith automatically organizes useful Obsidian notes, properties and links around it. Monolith preserves the original, provenance and uncertainty, connects memory across time, and retrieves it later from the incomplete, associative way people actually remember. The user should not need to learn Markdown, Obsidian properties, folders, tags or a filing format.
 
-The user captures. Recall handles the organizational work.
+The user captures. Monolith handles the organizational work.
 
 ```text
 CAPTURE -> UNDERSTAND -> CONNECT -> REMEMBER -> RECALL -> ACT
@@ -18,7 +18,7 @@ CAPTURE -> UNDERSTAND -> CONNECT -> REMEMBER -> RECALL -> ACT
 
 North-star test:
 
-> A user should be able to give Recall something today, forget that Recall exists, return six months later with only a vague human recollection, and successfully recover the right information with evidence.
+> A user should be able to give Monolith something today, forget that Monolith exists, return six months later with only a vague human recollection, and successfully recover the right information with evidence.
 
 ## 2. Problem
 
@@ -33,11 +33,11 @@ People already create enormous amounts of memory: handwritten notes, screenshots
 - What was true then versus now?
 - Can I recover it months later from a vague recollection?
 
-Traditional note tools shift organization onto the user. Recall removes that burden without destroying evidence or pretending uncertain interpretations are facts.
+Traditional note tools shift organization onto the user. Monolith removes that burden without destroying evidence or pretending uncertain interpretations are facts.
 
 ## 3. Users
 
-Recall is horizontal by design: students, consultants, salespeople, contractors, parents, mechanics, executives, travelers, entrepreneurs, researchers, and anyone who captures information they later need to recover.
+Monolith is horizontal by design: students, consultants, salespeople, contractors, parents, mechanics, executives, travelers, entrepreneurs, researchers, and anyone who captures information they later need to recover.
 
 Paul Cockerham is the first design partner and private pilot, not the market definition. His mixed handwritten workflows across consulting and generator maintenance intentionally stress handwriting, people, organizations, projects, equipment, technical numbers, commitments, and cross-domain recall.
 
@@ -62,14 +62,14 @@ Paul Cockerham is the first design partner and private pilot, not the market def
 7. AI proposes; deterministic software commits.
 8. Source access is part of recall.
 9. Complexity stays behind the glass.
-10. Obsidian is the required, user-owned memory spine. Recall adds intelligence and experience over portable vault memory; Obsidian is not merely an export adapter.
+10. Obsidian is the required, user-owned memory spine. Monolith adds intelligence and experience over portable vault memory; Obsidian is not merely an export adapter.
 11. The primary UI is one transforming Memory Surface, not a taxonomy the user must navigate.
 12. No account, password, or email-link sign-in, including first use. Remembered login does not satisfy this requirement. Local-only use is private without a remote account; cross-device private use requires secure owner-approved device association. Manual one-device photo-inference pairing is authorized in PAIR-01; one-time QR pairing remains proposed, not approved.
 13. Visual materials carry meaning: glass is understanding, physical artifacts are evidence, light is intelligence, space is relationship, depth is context, and time is memory evolution.
 
 ## 6. Memory layers
 
-**Source memory:** what actually entered Recall: original notes, photos, text, voice, files, links or other authorized sources. Adapters arrive in stages under one source contract.
+**Source memory:** what actually entered Monolith: original notes, photos, text, voice, files, links or other authorized sources. Adapters arrive in stages under one source contract.
 
 **Semantic memory:** what it appears to mean: people, organizations, places, things, events, projects, topics, observations, claims, ideas, decisions, commitments, questions, and relationships.
 
@@ -107,22 +107,22 @@ Domain concepts are projections. A generator is a thing; a client is an organiza
 ## 8. Primary experience
 
 ### Capture
-Drop in a note, photograph, voice recording or file and optionally add a short context hint. Recall saves the original before processing, then handles titles, properties, links and useful organization. Users do not need to learn Markdown, folders, tags or Obsidian conventions. Text, voice and file adapters are product requirements; they will be delivered through the same source contract in stages. Photo understanding is the first implemented path.
+Drop in a note, photograph, voice recording or file and optionally add a short context hint. Monolith saves the original before processing, then handles titles, properties, links and useful organization. Users do not need to learn Markdown, folders, tags or Obsidian conventions. Text, voice and file adapters are product requirements; they will be delivered through the same source contract in stages. Photo understanding is the first implemented path.
 
 Claude full-page vision is the primary photo-reading path. The accepted selected-photo flow saves the original, then reads it after explicit cloud-processing confirmation. Its structured Obsidian renderer has bounded local acceptance. ORGANIZE-01 now implements the intended everyday flow: one remembered, revocable opt-in for future text/photo captures, followed by automatic background interpretation without a per-note approval. This source-local flow has bounded independent acceptance; current related-memory context has separate bounded acceptance.
 
 Useful notes include source-linked summaries, mentions, statements, suggested actions, uncertainty and deterministic properties. These remain machine proposals, not verified facts. Originals and provenance stay attached; human corrections suppress stale machine semantics in current organization and retrieval while history retains earlier versions. Neither local acceptance nor synthetic tests prove live handwriting quality or full RCL-005B. See [reading evidence and limits](implementation/claude-vault-reading/README.md).
 
 ### Ask
-Ask naturally: “Who was that transformer guy I met in Houston?”, “What did Professor Miller say about mitochondrial DNA?”, or “What was that restaurant Sarah recommended in Florence?” Recall retrieves authorized evidence, answers with uncertainty intact, and exposes the source. INTELLIGENCE-01 has bounded acceptance for current-vault questions with citations or abstention. Its bounded keyword-based source selection does not establish vague associative recall quality or historical answers; those remain requirements. Local keyword search remains a separate, accurately labeled tool.
+Ask naturally: “Who was that transformer guy I met in Houston?”, “What did Professor Miller say about mitochondrial DNA?”, or “What was that restaurant Sarah recommended in Florence?” Monolith retrieves authorized evidence, answers with uncertainty intact, and exposes the source. INTELLIGENCE-01 has bounded acceptance for current-vault questions with citations or abstention. Its bounded keyword-based source selection does not establish vague associative recall quality or historical answers; those remain requirements. Local keyword search remains a separate, accurately labeled tool.
 
 ### Correct
-Correct identity, transcription, meaning, date, or relationship. Recall previews scope, versions the correction, invalidates stale derived state, and never lets later model runs silently revert it.
+Correct identity, transcription, meaning, date, or relationship. Monolith previews scope, versions the correction, invalidates stale derived state, and never lets later model runs silently revert it.
 
 ### Desktop
 Desktop adds evidence comparison, review, drag/drop, library exploration, offline cache, and exports. It is the richer workspace, not a different product.
 
-## 9. V1 — Trusted Recall
+## 9. V1 — Trusted Monolith
 
 V1 proves: **capture something -> retrieve it later correctly with evidence.**
 
@@ -150,7 +150,7 @@ Deferred:
 
 ## 10. One transforming Memory Surface
 
-Recall has one adaptive Memory Surface, not five separate primary screens. It centers on a simple capture/search/recent-memory surface, then shifts into contextual understanding, relationships, history, correction and original evidence as needed. Mobile presents one primary board at a time; desktop can compare evidence and context. Capture remains easy; maintenance controls live in an accessible settings/disclosure area. Natural-language Ask is a required destination capability, while current keyword search remains a distinct, limited implementation.
+Monolith has one adaptive Memory Surface, not five separate primary screens. It centers on a simple capture/search/recent-memory surface, then shifts into contextual understanding, relationships, history, correction and original evidence as needed. Mobile presents one primary board at a time; desktop can compare evidence and context. Capture remains easy; maintenance controls live in an accessible settings/disclosure area. Natural-language Ask is a required destination capability, while current keyword search remains a distinct, limited implementation.
 
 ## 11. Trust rules
 
@@ -205,7 +205,7 @@ Evaluation includes both Paul-style difficult handwriting and general-domain cas
 
 ## 14. Architecture constraints
 
-The Obsidian vault is the required durable memory spine. Human-readable Markdown and links coexist with immutable original attachments and versioned structured provenance/history, so memory remains owned and usable outside Recall. PostgreSQL/pgvector provide supporting transactional services, authorization, synchronization and rebuildable memory/search projections; SQLite is a cache/outbox. Neither an LLM nor a database-only record replaces vault-backed memory.
+The Obsidian vault is the required durable memory spine. Human-readable Markdown and links coexist with immutable original attachments and versioned structured provenance/history, so memory remains owned and usable outside Monolith. PostgreSQL/pgvector provide supporting transactional services, authorization, synchronization and rebuildable memory/search projections; SQLite is a cache/outbox. Neither an LLM nor a database-only record replaces vault-backed memory.
 
 The new local desktop foundation commits original images, human notes and append-only revisions to a selected vault and reconciles supported Markdown body edits. Its keyword view rebuilds from validated vault files, including supported flat renames and retained tombstones. Explicit missing-note restoration and logical removal preserve originals/history; logical removal is not secure purge or undelete. Existing cloud memory remains PostgreSQL-authoritative with one-way managed export; full semantic projection recovery and migration remain open. Cross-device transport is not implemented; no paid Obsidian Sync service or community plugin is assumed.
 
@@ -215,7 +215,7 @@ Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile a
 
 ## 15. Product roadmap
 
-**V1 — Trusted Recall:** photo and text capture -> automatic organization -> grounded natural-language retrieval, with originals and corrections retained in the Obsidian memory spine. The staged implementation delivers photo organization first, text capture second and grounded Ask third.
+**V1 — Trusted Monolith:** photo and text capture -> automatic organization -> grounded natural-language retrieval, with originals and corrections retained in the Obsidian memory spine. The staged implementation delivers photo organization first, text capture second and grounded Ask third.
 
 **V1.5 — Natural Capture:** voice, screenshots/share sheet, broader files and links. These extend the same product source contract; their staged delivery does not make them optional product outcomes.
 
@@ -225,4 +225,4 @@ Desktop defaults to the authorized no-sign-in local foundation. Browser/mobile a
 
 **V4 — Memory Everywhere:** assistant adapters, browser, email/calendar, APIs/MCP under explicit authorization.
 
-Do not pull V3/V4 forward merely because they are exciting. Recall earns the right to become proactive only after it can remember faithfully.
+Do not pull V3/V4 forward merely because they are exciting. Monolith earns the right to become proactive only after it can remember faithfully.

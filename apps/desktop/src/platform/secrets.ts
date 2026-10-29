@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { chunkedSecretStorage, type SecretBackend } from "@recall/api-client";
+import { chunkedSecretStorage, type SecretBackend } from "@monolith/api-client";
 
 /**
  * Auth session in the OS credential store (Windows Credential Manager) via narrow native commands.

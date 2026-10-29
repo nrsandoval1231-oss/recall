@@ -1,4 +1,4 @@
-"""Durable interpretation worker. `python -m recall.ingestion.worker`
+"""Durable interpretation worker. `python -m monolith.ingestion.worker`
 
 Claims one job at a time with FOR UPDATE SKIP LOCKED and a lease. The provider call happens outside
 any transaction. A result commits only if this worker still holds the lease (token match), consent is
@@ -60,7 +60,7 @@ from .projection import (
 from .provider import InterpretRequest, PageImage, Provider, ProviderError, ProviderResult
 from .validate import InvalidExtraction, Validated, validate_extraction
 
-log = logging.getLogger("recall.worker")
+log = logging.getLogger("monolith.worker")
 
 # Sonnet 5.5 can consume at most 4,784 visual tokens per high-resolution image.  The static
 # allowance covers the stable system prompt, output schema, envelope and bounded repair note.
@@ -700,10 +700,10 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO)
     settings = get_settings()
     if settings.service_profile != "legacy":
-        log.error("the legacy ingestion worker cannot run with RECALL_SERVICE_PROFILE=inference")
+        log.error("the legacy ingestion worker cannot run with MONOLITH_SERVICE_PROFILE=inference")
         return 2
     if not settings.worker_database_url:
-        log.error("RECALL_WORKER_DATABASE_URL is required")
+        log.error("MONOLITH_WORKER_DATABASE_URL is required")
         return 2
     from ..domain.deletion import PurgeWorker
 

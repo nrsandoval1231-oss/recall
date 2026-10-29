@@ -3,7 +3,7 @@ import { webcrypto } from "node:crypto";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ApiError, type Action } from "@recall/api-client";
+import { ApiError, type Action } from "@monolith/api-client";
 import { Review } from "./Review";
 
 beforeAll(() => { if (!globalThis.crypto?.randomUUID) Object.defineProperty(globalThis, "crypto", { value: webcrypto }); });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, sha256Hex } from "@recall/api-client";
-import { copy } from "@recall/design-tokens";
-import type { Citation, RecallApiClient, RecallAuth, ServerCapture } from "@recall/api-client";
+import { ApiError, sha256Hex } from "@monolith/api-client";
+import { copy } from "@monolith/design-tokens";
+import type { Citation, MonolithApiClient, MonolithAuth, ServerCapture } from "@monolith/api-client";
 import { Ask } from "./components/Ask";
 import { Settings } from "./components/Settings";
 import { SignIn } from "./components/SignIn";
@@ -16,8 +16,8 @@ export function managedExportNotice(result: { written: string[]; conflicts: { re
 }
 
 export interface DesktopServices {
-  auth: Pick<RecallAuth, "requestEmailCode" | "verifyEmailCode" | "verifyEmailLink" | "signOut" | "hasSession" | "onSignedInChange"> & Partial<Pick<RecallAuth, "getUserId">>;
-  api: Pick<RecallApiClient, "listCaptures" | "getCapture" | "fetchSource" | "me" | "ask" | "getMemory" | "retryProcessing" | "getAiSettings" | "setAiEnabled"> & Partial<Pick<RecallApiClient, "deleteCapture" | "deleteMemory" | "deleteSource" | "workspaceDeletionPreview" | "deleteWorkspaceData" | "listEntities" | "getEntity" | "listActions" | "updateAction" | "correctMemory" | "exportZip" | "identityPreview" | "applyIdentity">>;
+  auth: Pick<MonolithAuth, "requestEmailCode" | "verifyEmailCode" | "verifyEmailLink" | "signOut" | "hasSession" | "onSignedInChange"> & Partial<Pick<MonolithAuth, "getUserId">>;
+  api: Pick<MonolithApiClient, "listCaptures" | "getCapture" | "fetchSource" | "me" | "ask" | "getMemory" | "retryProcessing" | "getAiSettings" | "setAiEnabled"> & Partial<Pick<MonolithApiClient, "deleteCapture" | "deleteMemory" | "deleteSource" | "workspaceDeletionPreview" | "deleteWorkspaceData" | "listEntities" | "getEntity" | "listActions" | "updateAction" | "correctMemory" | "exportZip" | "identityPreview" | "applyIdentity">>;
   cache?: NativeCache;
 }
 
@@ -44,7 +44,7 @@ function Recent({ services }: { services: DesktopServices }) {
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const exportZip = async () => {
     if (!services.api.exportZip) return;
-    try { const bytes = await services.api.exportZip(); if (services.cache?.available) { const digest = await sha256Hex(bytes); const saved = await services.cache.saveArchive(bytes, digest); setExportNotice(saved ? `Export saved (${saved.byte_size} bytes).` : "Export cancelled."); return; } const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" })); const link = document.createElement("a"); link.href = url; link.download = "recall-export.zip"; link.click(); URL.revokeObjectURL(url); setExportNotice("Export downloaded."); }
+    try { const bytes = await services.api.exportZip(); if (services.cache?.available) { const digest = await sha256Hex(bytes); const saved = await services.cache.saveArchive(bytes, digest); setExportNotice(saved ? `Export saved (${saved.byte_size} bytes).` : "Export cancelled."); return; } const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" })); const link = document.createElement("a"); link.href = url; link.download = "monolith-export.zip"; link.click(); URL.revokeObjectURL(url); setExportNotice("Export downloaded."); }
     catch { setExportNotice("Couldn't create an export right now."); }
   };
   const exportMarkdown = async () => {
@@ -97,7 +97,7 @@ function Recent({ services }: { services: DesktopServices }) {
           setItems(cached); setError("Offline. Showing cached memories; fresh answers and changes are unavailable."); return;
         } catch { /* fall through to the honest unavailable state */ }
       }
-      setError("Can't reach Recall. Check your connection. Nothing here has been lost.");
+      setError("Can't reach Monolith. Check your connection. Nothing here has been lost.");
     }
   }, [services]);
 
@@ -121,8 +121,8 @@ function Recent({ services }: { services: DesktopServices }) {
   }, [refresh]);
 
   if (showSettings) return <Settings api={services.api} onClose={() => setShowSettings(false)} />;
-  if (surface === "library" && services.api.listEntities && services.api.getEntity) return <Library api={services.api as Pick<RecallApiClient, "listEntities" | "getEntity"> & Partial<Pick<RecallApiClient, "identityPreview" | "applyIdentity">>} cache={services.cache} scope={scope} onClose={() => setSurface("recent")} />;
-  if (surface === "review" && services.api.listActions && services.api.updateAction) return <Review api={services.api as Pick<RecallApiClient, "listActions" | "updateAction">} cache={services.cache} scope={scope} onClose={() => setSurface("recent")} />;
+  if (surface === "library" && services.api.listEntities && services.api.getEntity) return <Library api={services.api as Pick<MonolithApiClient, "listEntities" | "getEntity"> & Partial<Pick<MonolithApiClient, "identityPreview" | "applyIdentity">>} cache={services.cache} scope={scope} onClose={() => setSurface("recent")} />;
+  if (surface === "review" && services.api.listActions && services.api.updateAction) return <Review api={services.api as Pick<MonolithApiClient, "listActions" | "updateAction">} cache={services.cache} scope={scope} onClose={() => setSurface("recent")} />;
   if (open) return <Viewer api={services.api} capture={open.capture} initialSourceId={open.sourceId} cache={services.cache} scope={scope} onDeleted={() => { setOpen(null); void refresh(); }} onClose={() => { setOpen(null); void refresh(); }} />;
 
   return (
@@ -150,7 +150,7 @@ function Recent({ services }: { services: DesktopServices }) {
       {error && <p role="alert" className="error">{error}</p>}
       {items === null && !error && <p role="status">Loading…</p>}
       {items?.length === 0 && (
-        <p className="empty">{copy.emptyRecent} Photograph pages with Recall on your iPhone and they'll appear here once uploaded.</p>
+        <p className="empty">{copy.emptyRecent} Photograph pages with Monolith on your iPhone and they'll appear here once uploaded.</p>
       )}
       <ul className="list">
         {items?.map((c) => {

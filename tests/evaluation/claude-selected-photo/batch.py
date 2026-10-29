@@ -24,24 +24,20 @@ DIAG02_OUTPUT_HOLD = OUTPUT_HOLD
 DIAG02_MAX_USD = 1.50
 
 
+def _storage_root(repo: Path) -> Path:
+    """`.monolith-storage`, unless only the pre-rename `.recall-storage` exists (then keep using it)."""
+    legacy, current = repo / ".recall-storage", repo / ".monolith-storage"
+    return legacy if legacy.exists() and not current.exists() else current
+
+
 def default_journal_path() -> Path:
     """Fixed ignored repository-local state prevents selecting another batch path."""
-    return (
-        Path(__file__).resolve().parents[3]
-        / ".recall-storage"
-        / "claude-selected-photo-eval"
-        / "batch.json"
-    )
+    return _storage_root(Path(__file__).resolve().parents[3]) / "claude-selected-photo-eval" / "batch.json"
 
 
 def diag02_journal_path() -> Path:
     """Separate fixed identity for the approved two-case diagnostic run."""
-    return (
-        Path(__file__).resolve().parents[3]
-        / ".recall-storage"
-        / "claude-selected-photo-eval"
-        / "diag-02-batch.json"
-    )
+    return _storage_root(Path(__file__).resolve().parents[3]) / "claude-selected-photo-eval" / "diag-02-batch.json"
 
 
 def open_diag02_journal() -> BatchJournal:

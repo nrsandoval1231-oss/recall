@@ -15,6 +15,10 @@ import psycopg
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict
 
+# Accept the pre-rename RECALL_* variable names: a MONOLITH_* value always wins.
+for _legacy in [k for k in os.environ if k.startswith("RECALL_")]:
+    os.environ.setdefault("MONOLITH_" + _legacy[len("RECALL_") :], os.environ[_legacy])
+
 TABLES = (
     "schema_migrations",
     "workspaces",
@@ -84,18 +88,18 @@ def pg_environment(dsn: str) -> dict[str, str]:
 
 
 def main() -> int:
-    destination = Path(os.environ["RECALL_BACKUP_DESTINATION"])
+    destination = Path(os.environ["MONOLITH_BACKUP_DESTINATION"])
     dsn = (
-        Path(os.environ["RECALL_BACKUP_DATABASE_URL_FILE"])
+        Path(os.environ["MONOLITH_BACKUP_DATABASE_URL_FILE"])
         .read_text(encoding="utf-8")
         .strip()
     )
-    recipient = os.environ["RECALL_BACKUP_AGE_RECIPIENT"].strip()
+    recipient = os.environ["MONOLITH_BACKUP_AGE_RECIPIENT"].strip()
     if destination.exists() or Path(str(destination) + ".sha256").exists():
         raise SystemExit("Backup destination already exists.")
     if not recipient.startswith("age1") or any(ch.isspace() for ch in recipient):
         raise SystemExit(
-            "Supply the owner-provided age recipient in RECALL_BACKUP_AGE_RECIPIENT."
+            "Supply the owner-provided age recipient in MONOLITH_BACKUP_AGE_RECIPIENT."
         )
     pg_dump, age = shutil.which("pg_dump"), shutil.which("age")
     if pg_dump is None or age is None:
@@ -103,7 +107,7 @@ def main() -> int:
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(
-        prefix="recall-do-inference-backup-"
+        prefix="monolith-do-inference-backup-"
     ) as scratch_name:
         scratch = Path(scratch_name)
         os.chmod(scratch, 0o700)

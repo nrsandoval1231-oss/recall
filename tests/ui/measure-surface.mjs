@@ -3,7 +3,7 @@ import process from "node:process";
 import { writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 const browser = await chromium.launch({
-  executablePath: process.env.RECALL_CHROMIUM || undefined,
+  executablePath: process.env.MONOLITH_CHROMIUM || undefined,
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 await page.goto("http://127.0.0.1:5173/?fixture=memory-surface");
@@ -12,7 +12,7 @@ await page
   .waitFor();
 await page.evaluate(() => {
   const samples = { frames: [], tasks: [], running: true };
-  window.recallMeasurement = samples;
+  window.monolithMeasurement = samples;
   let last = performance.now();
   const frame = (now) => {
     if (!samples.running) return;
@@ -28,7 +28,7 @@ await page.evaluate(() => {
 await page
   .getByLabel("What do you need to remember?", { exact: true })
   .fill("What do you know about Brooks Campus?");
-await page.getByRole("button", { name: "Ask Recall", exact: true }).click();
+await page.getByRole("button", { name: "Ask Monolith", exact: true }).click();
 await page
   .getByRole("button", { name: /Focus memory/ })
   .first()
@@ -41,7 +41,7 @@ await page
   .click();
 await page.getByRole("heading", { name: "Mara Chen", exact: true }).waitFor();
 const results = await page.evaluate(() => {
-  const data = window.recallMeasurement;
+  const data = window.monolithMeasurement;
   data.running = false;
   const frames = data.frames.sort((a, b) => a - b);
   return {

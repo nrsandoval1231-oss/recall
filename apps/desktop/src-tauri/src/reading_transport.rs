@@ -3,8 +3,11 @@ use crate::reading::{ReadingReceipt, ReadingRequest, MAX_RESPONSE};
 use serde::Deserialize;
 use std::{io::Read, time::Duration};
 type Result<T> = std::result::Result<T, String>;
-// Deliberately unreachable through legacy renderer secret_get/set/remove.
-const PROTECTED_SERVICE: &str = "app.recall.desktop.selected-photo-reading";
+// Deliberately unreachable through legacy renderer secret_get/set/remove: a different service name
+// from the renderer-accessible session store, with the pre-rename twin read and migrated forward.
+use crate::keychain::{
+    self, SecretStore, READING_SERVICE as PROTECTED_SERVICE, READING_SERVICE_LEGACY,
+};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(Clone)]
@@ -71,12 +74,14 @@ impl ProtectedConnection {
         }
     }
     pub fn read(vault_id: &str) -> Result<Option<Self>> {
-        let entry = keyring::Entry::new(PROTECTED_SERVICE, vault_id)
-            .map_err(|_| "Photo reading is not connected")?;
-        match entry.get_password() {
-            Ok(raw) => Self::parse(&raw, vault_id).map(Some),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("Photo reading is not connected".into()),
+        let store = keychain::os_store(
+            PROTECTED_SERVICE,
+            READING_SERVICE_LEGACY,
+            Some("Photo reading is not connected"),
+        );
+        match store.load(vault_id)? {
+            Some(raw) => Self::parse(&raw, vault_id).map(Some),
+            None => Ok(None),
         }
     }
 }
@@ -347,10 +352,14 @@ mod tests {
                 "{origin}"
             );
         }
-        let raw=serde_json::json!({"schema_version":"1.0","vault_id":vault,"origin":"https://recall.example","credential":"synthetic"}).to_string();
+        let raw=serde_json::json!({"schema_version":"1.0","vault_id":vault,"origin":"https://monolith.example","credential":"synthetic"}).to_string();
         assert!(ProtectedConnection::parse(&raw, &vault).is_ok());
         assert!(ProtectedConnection::parse(&raw, &request().binding.memory_id).is_err());
-        assert_ne!(PROTECTED_SERVICE, "app.recall.desktop.session");
+        assert_ne!(PROTECTED_SERVICE, crate::keychain::SESSION_SERVICE);
+        assert_ne!(
+            READING_SERVICE_LEGACY,
+            crate::keychain::SESSION_SERVICE_LEGACY
+        );
     }
 }
 

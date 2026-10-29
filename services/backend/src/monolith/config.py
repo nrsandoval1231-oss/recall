@@ -3,58 +3,116 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import BaseSettings, NoDecode, PydanticBaseSettingsSource, SettingsConfigDict
+
+from .envcompat import legacy_name
 
 MIB = 1024 * 1024
 ACCEPTED_MEDIA_TYPES = ("image/jpeg", "image/png", "image/heic", "image/heif")
 
 
+def _default_storage_dir() -> Path:
+    """`.monolith-storage`, unless only the pre-rename `.recall-storage` exists (then keep using it)."""
+    legacy, current = Path(".recall-storage"), Path(".monolith-storage")
+    return legacy if legacy.exists() and not current.exists() else current
+
+
+class _LegacyNameSource(PydanticBaseSettingsSource):
+    """Pre-rename `RECALL_X` values for fields whose current name is `MONOLITH_X`.
+
+    It is registered below every `MONOLITH_*` source, so the new name wins across all sources: a
+    `.env` `MONOLITH_X` beats a process `RECALL_X`. A variable that is set, even to the empty string,
+    counts as set (the same rule the other readers use), so an empty `MONOLITH_X` is not replaced.
+    """
+
+    def __init__(self, settings_cls: type[BaseSettings], variables: Mapping[str, str | None]) -> None:
+        super().__init__(settings_cls)
+        self._variables = variables
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        alias = field.validation_alias
+        legacy = legacy_name(alias) if isinstance(alias, str) else None
+        value = self._variables.get(legacy.lower()) if legacy else None
+        return value, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        found: dict[str, Any] = {}
+        for name, field in self.settings_cls.model_fields.items():
+            value, _, _ = self.get_field_value(field, name)
+            if value is not None:
+                found[str(field.validation_alias)] = value
+        return found
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 
-    env: str = Field("development", validation_alias="RECALL_ENV")
-    service_profile: Literal["legacy", "inference"] = Field("legacy", validation_alias="RECALL_SERVICE_PROFILE")
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Priority: init, process MONOLITH_*, .env MONOLITH_*, then process RECALL_*, then .env RECALL_*.
+        env_vars: Mapping[str, str | None] = getattr(env_settings, "env_vars", {})
+        dotenv_vars: Mapping[str, str | None] = getattr(dotenv_settings, "env_vars", {})
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            _LegacyNameSource(settings_cls, env_vars),
+            _LegacyNameSource(settings_cls, dotenv_vars),
+            file_secret_settings,
+        )
+
+    env: str = Field("development", validation_alias="MONOLITH_ENV")
+    service_profile: Literal["legacy", "inference"] = Field("legacy", validation_alias="MONOLITH_SERVICE_PROFILE")
 
     # Database. `database_url` MUST be a non-owner role that inherits `recall_app`.
     database_url: str = Field(validation_alias="DATABASE_URL")
-    migration_database_url: str | None = Field(None, validation_alias="RECALL_MIGRATION_DATABASE_URL")
+    migration_database_url: str | None = Field(None, validation_alias="MONOLITH_MIGRATION_DATABASE_URL")
 
     # Auth: validate tokens issued by the provider (Supabase Auth). Never mint tokens here.
-    auth_issuer: str = Field("", validation_alias="RECALL_AUTH_ISSUER")
-    auth_audience: str = Field("authenticated", validation_alias="RECALL_AUTH_AUDIENCE")
-    auth_jwks_url: str | None = Field(None, validation_alias="RECALL_AUTH_JWKS_URL")
+    auth_issuer: str = Field("", validation_alias="MONOLITH_AUTH_ISSUER")
+    auth_audience: str = Field("authenticated", validation_alias="MONOLITH_AUTH_AUDIENCE")
+    auth_jwks_url: str | None = Field(None, validation_alias="MONOLITH_AUTH_JWKS_URL")
     # Legacy symmetric (HS256) projects only. Prefer JWKS.
-    auth_jwt_secret: str | None = Field(None, validation_alias="RECALL_AUTH_JWT_SECRET")
-    auto_provision_workspaces: bool = Field(True, validation_alias="RECALL_AUTO_PROVISION_WORKSPACES")
+    auth_jwt_secret: str | None = Field(None, validation_alias="MONOLITH_AUTH_JWT_SECRET")
+    auto_provision_workspaces: bool = Field(True, validation_alias="MONOLITH_AUTO_PROVISION_WORKSPACES")
 
     # HMAC key for upload capabilities and list cursors (server only).
-    signing_secret: str = Field("", validation_alias="RECALL_SIGNING_SECRET", repr=False)
+    signing_secret: str = Field("", validation_alias="MONOLITH_SIGNING_SECRET", repr=False)
 
     # Private object storage.
-    storage_backend: Literal["local", "supabase"] = Field("local", validation_alias="RECALL_STORAGE_BACKEND")
-    local_storage_dir: Path = Field(Path(".recall-storage"), validation_alias="RECALL_LOCAL_STORAGE_DIR")
+    storage_backend: Literal["local", "supabase"] = Field("local", validation_alias="MONOLITH_STORAGE_BACKEND")
+    local_storage_dir: Path = Field(default_factory=_default_storage_dir, validation_alias="MONOLITH_LOCAL_STORAGE_DIR")
     supabase_url: str | None = Field(None, validation_alias="SUPABASE_URL")
     supabase_service_role_key: str | None = Field(None, validation_alias="SUPABASE_SERVICE_ROLE_KEY")
-    storage_bucket: str = Field("recall-originals-private", validation_alias="RECALL_STORAGE_BUCKET")
+    storage_bucket: str = Field("recall-originals-private", validation_alias="MONOLITH_STORAGE_BUCKET")
 
     # Limits (docs/API-CONTRACT.md).
-    max_pages_per_capture: int = Field(10, validation_alias="RECALL_MAX_PAGES_PER_CAPTURE")
-    max_page_bytes: int = Field(25 * MIB, validation_alias="RECALL_MAX_PAGE_BYTES")
-    max_capture_bytes: int = Field(100 * MIB, validation_alias="RECALL_MAX_CAPTURE_BYTES")
-    upload_token_ttl_seconds: int = Field(600, validation_alias="RECALL_UPLOAD_TOKEN_TTL_SECONDS")
-    max_image_pixels: int = Field(120_000_000, validation_alias="RECALL_MAX_IMAGE_PIXELS")
+    max_pages_per_capture: int = Field(10, validation_alias="MONOLITH_MAX_PAGES_PER_CAPTURE")
+    max_page_bytes: int = Field(25 * MIB, validation_alias="MONOLITH_MAX_PAGE_BYTES")
+    max_capture_bytes: int = Field(100 * MIB, validation_alias="MONOLITH_MAX_CAPTURE_BYTES")
+    upload_token_ttl_seconds: int = Field(600, validation_alias="MONOLITH_UPLOAD_TOKEN_TTL_SECONDS")
+    max_image_pixels: int = Field(120_000_000, validation_alias="MONOLITH_MAX_IMAGE_PIXELS")
 
     # Browser/webview origins allowed to call the API (e.g. the Tauri desktop app). Empty = none.
     cors_allow_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=list, validation_alias="RECALL_CORS_ORIGINS"
+        default_factory=list, validation_alias="MONOLITH_CORS_ORIGINS"
     )
 
-    capture_schema_path: Path | None = Field(None, validation_alias="RECALL_CAPTURE_SCHEMA_PATH")
+    capture_schema_path: Path | None = Field(None, validation_alias="MONOLITH_CAPTURE_SCHEMA_PATH")
 
     # ---- RCL-002: AI processing. Every value must be set (and workspace consent given) before any
     # private content is sent to a provider. Nothing here has a "convenient" default.
@@ -65,26 +123,26 @@ class Settings(BaseSettings):
     ai_refusal_fallback: bool = Field(True, validation_alias="AI_REFUSAL_FALLBACK")
     ai_input_usd_per_mtok: float | None = Field(None, validation_alias="AI_INPUT_USD_PER_MTOK")
     ai_output_usd_per_mtok: float | None = Field(None, validation_alias="AI_OUTPUT_USD_PER_MTOK")
-    ai_daily_budget_usd: float | None = Field(None, validation_alias="RECALL_AI_DAILY_BUDGET_USD")
-    ai_monthly_budget_usd: float | None = Field(None, validation_alias="RECALL_AI_MONTHLY_BUDGET_USD")
+    ai_daily_budget_usd: float | None = Field(None, validation_alias="MONOLITH_AI_DAILY_BUDGET_USD")
+    ai_monthly_budget_usd: float | None = Field(None, validation_alias="MONOLITH_AI_MONTHLY_BUDGET_USD")
     ai_image_max_edge: int = Field(2000, validation_alias="AI_IMAGE_MAX_EDGE")
-    device_pairing_enabled: bool = Field(False, validation_alias="RECALL_DEVICE_PAIRING_ENABLED")
-    local_intelligence_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_INTELLIGENCE_ENABLED")
-    local_organization_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_ORGANIZATION_ENABLED")
-    local_audio_organization_enabled: bool = Field(False, validation_alias="RECALL_LOCAL_AUDIO_ORGANIZATION_ENABLED")
-    max_processing_attempts: int = Field(3, validation_alias="RECALL_MAX_PROCESSING_ATTEMPTS")
-    worker_database_url: str | None = Field(None, validation_alias="RECALL_WORKER_DATABASE_URL")
-    worker_lease_seconds: int = Field(900, validation_alias="RECALL_WORKER_LEASE_SECONDS")
+    device_pairing_enabled: bool = Field(False, validation_alias="MONOLITH_DEVICE_PAIRING_ENABLED")
+    local_intelligence_enabled: bool = Field(False, validation_alias="MONOLITH_LOCAL_INTELLIGENCE_ENABLED")
+    local_organization_enabled: bool = Field(False, validation_alias="MONOLITH_LOCAL_ORGANIZATION_ENABLED")
+    local_audio_organization_enabled: bool = Field(False, validation_alias="MONOLITH_LOCAL_AUDIO_ORGANIZATION_ENABLED")
+    max_processing_attempts: int = Field(3, validation_alias="MONOLITH_MAX_PROCESSING_ATTEMPTS")
+    worker_database_url: str | None = Field(None, validation_alias="MONOLITH_WORKER_DATABASE_URL")
+    worker_lease_seconds: int = Field(900, validation_alias="MONOLITH_WORKER_LEASE_SECONDS")
 
     # RCL-003B semantic retrieval. These deliberately have no defaults: enabling the
     # workspace index cannot silently start sending private text to another provider.
-    embedding_provider: Literal["voyage"] | None = Field(None, validation_alias="RECALL_EMBEDDING_PROVIDER")
-    embedding_model_id: str | None = Field(None, validation_alias="RECALL_EMBEDDING_MODEL_ID")
-    embedding_api_key: str | None = Field(None, validation_alias="RECALL_EMBEDDING_API_KEY", repr=False)
-    embedding_dimensions: int | None = Field(None, validation_alias="RECALL_EMBEDDING_DIMENSIONS")
-    embedding_version: str | None = Field(None, validation_alias="RECALL_EMBEDDING_VERSION")
-    embedding_input_usd_per_mtok: float | None = Field(None, validation_alias="RECALL_EMBEDDING_INPUT_USD_PER_MTOK")
-    embedding_max_batch_tokens: int = Field(4096, validation_alias="RECALL_EMBEDDING_MAX_BATCH_TOKENS")
+    embedding_provider: Literal["voyage"] | None = Field(None, validation_alias="MONOLITH_EMBEDDING_PROVIDER")
+    embedding_model_id: str | None = Field(None, validation_alias="MONOLITH_EMBEDDING_MODEL_ID")
+    embedding_api_key: str | None = Field(None, validation_alias="MONOLITH_EMBEDDING_API_KEY", repr=False)
+    embedding_dimensions: int | None = Field(None, validation_alias="MONOLITH_EMBEDDING_DIMENSIONS")
+    embedding_version: str | None = Field(None, validation_alias="MONOLITH_EMBEDDING_VERSION")
+    embedding_input_usd_per_mtok: float | None = Field(None, validation_alias="MONOLITH_EMBEDDING_INPUT_USD_PER_MTOK")
+    embedding_max_batch_tokens: int = Field(4096, validation_alias="MONOLITH_EMBEDDING_MAX_BATCH_TOKENS")
 
     @property
     def ai_configured(self) -> bool:
@@ -146,13 +204,14 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate(self) -> Settings:
         if "*" in self.cors_allow_origins:
-            raise ValueError("RECALL_CORS_ORIGINS must list explicit origins, never '*'")
+            raise ValueError("MONOLITH_CORS_ORIGINS must list explicit origins, never '*'")
         if self.service_profile == "legacy":
             if not self.signing_secret or len(self.signing_secret) < 32:
-                raise ValueError("RECALL_SIGNING_SECRET must be at least 32 characters")
+                raise ValueError("MONOLITH_SIGNING_SECRET must be at least 32 characters")
             if not self.auth_issuer or bool(self.auth_jwks_url) == bool(self.auth_jwt_secret):
                 raise ValueError(
-                    "configure RECALL_AUTH_ISSUER and exactly one of RECALL_AUTH_JWKS_URL or RECALL_AUTH_JWT_SECRET"
+                    "configure MONOLITH_AUTH_ISSUER and exactly one of "
+                    "MONOLITH_AUTH_JWKS_URL or MONOLITH_AUTH_JWT_SECRET"
                 )
         else:
             if self.auth_issuer or self.auth_jwks_url or self.auth_jwt_secret or self.signing_secret:
@@ -164,11 +223,11 @@ class Settings(BaseSettings):
             if not self.device_pairing_enabled:
                 raise ValueError("inference profile requires device pairing to be enabled")
         if self.auth_jwt_secret is not None and len(self.auth_jwt_secret) < 32:
-            raise ValueError("RECALL_AUTH_JWT_SECRET must be at least 32 characters")
+            raise ValueError("MONOLITH_AUTH_JWT_SECRET must be at least 32 characters")
         if self.storage_backend == "supabase" and not (self.supabase_url and self.supabase_service_role_key):
             raise ValueError("supabase storage needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
         if not 1 <= self.max_processing_attempts <= 10:
-            raise ValueError("RECALL_MAX_PROCESSING_ATTEMPTS must be 1-10")
+            raise ValueError("MONOLITH_MAX_PROCESSING_ATTEMPTS must be 1-10")
         if len(self.organize_policy_version.encode("utf-8")) > 160:
             raise ValueError("organization policy version must be at most 160 UTF-8 bytes")
         if len(self.audio_organize_policy_version.encode("utf-8")) > 160:

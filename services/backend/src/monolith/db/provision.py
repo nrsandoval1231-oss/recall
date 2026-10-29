@@ -1,15 +1,16 @@
 """Provision a personal workspace for an existing auth user (when auto-provisioning is off).
 
-python -m recall.db.provision <auth-user-uuid>      # uses RECALL_MIGRATION_DATABASE_URL
+python -m monolith.db.provision <auth-user-uuid>      # uses MONOLITH_MIGRATION_DATABASE_URL
 """
 
 from __future__ import annotations
 
-import os
 import sys
 import uuid
 
 import psycopg
+
+from ..envcompat import require_env
 
 
 def main() -> int:
@@ -17,7 +18,7 @@ def main() -> int:
         print(__doc__, file=sys.stderr)
         return 2
     user_id = uuid.UUID(sys.argv[1])
-    dsn = os.environ["RECALL_MIGRATION_DATABASE_URL"]
+    dsn = require_env("MONOLITH_MIGRATION_DATABASE_URL")
     with psycopg.connect(dsn) as conn, conn.transaction():
         conn.execute("select set_config('app.user_id', %s, true)", (str(user_id),))
         existing = conn.execute("select 1 from workspace_members where user_id = %s", (user_id,)).fetchone()

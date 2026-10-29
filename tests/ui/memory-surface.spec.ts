@@ -7,13 +7,13 @@ async function reconstruct(page: Page) {
   await page
     .getByLabel("What do you need to remember?", { exact: true })
     .fill(question);
-  await page.getByRole("button", { name: "Ask Recall", exact: true }).click();
+  await page.getByRole("button", { name: "Ask Monolith", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: question, exact: true }),
   ).toBeVisible();
 }
 async function snapshot(page: Page, name: string, project: string) {
-  if (process.env.RECALL_SCREENSHOTS === "1" && project !== "reduced-motion") {
+  if (process.env.MONOLITH_SCREENSHOTS === "1" && project !== "reduced-motion") {
     await page.screenshot({
       path: resolve(
         `docs/implementation/memory-surface/${project}-${name}.jpg`,
@@ -110,7 +110,7 @@ test("canonical journey preserves evidence, refocus and prior composition", asyn
     .first()
     .click();
   await page
-    .getByLabel("What should Recall understand?", { exact: true })
+    .getByLabel("What should Monolith understand?", { exact: true })
     .fill("Startup moved to March 2027.");
   await page
     .getByRole("button", { name: "Review affected scope", exact: true })
@@ -131,7 +131,7 @@ test("canonical journey preserves evidence, refocus and prior composition", asyn
   await expect(page.getByText(/Startup is now expected in March/)).toHaveCount(
     0,
   );
-  await page.getByRole("button", { name: "Ask Recall", exact: true }).click();
+  await page.getByRole("button", { name: "Ask Monolith", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "Supporting memories", exact: true }),
   ).toBeVisible();
@@ -248,7 +248,7 @@ test("actual browser capture survives reload and retries the preserved original"
 }, info) => {
   const { createHash } = await import("node:crypto");
   let failUpload = true;
-  let saved: import("@recall/api-client").ServerCapture | null = null;
+  let saved: import("@monolith/api-client").ServerCapture | null = null;
   const userId = "11111111-1111-4111-8111-111111111111",
     workspaceId = "22222222-2222-4222-8222-222222222222",
     sourceId = "33333333-3333-4333-8333-333333333333";
@@ -297,7 +297,7 @@ test("actual browser capture survives reload and retries the preserved original"
     }
     const manifest = route
       .request()
-      .postDataJSON() as import("@recall/api-client").CaptureManifest;
+      .postDataJSON() as import("@monolith/api-client").CaptureManifest;
     saved = {
       capture_id: "44444444-4444-4444-8444-444444444444",
       client_capture_id: manifest.client_capture_id,
@@ -427,7 +427,7 @@ test("correction keyboard preview and cancellation restore the originating contr
   });
   await origin.focus();
   await page.keyboard.press("Enter");
-  const text = page.getByLabel("What should Recall understand?", {
+  const text = page.getByLabel("What should Monolith understand?", {
     exact: true,
   });
   await expect(text).toBeFocused();

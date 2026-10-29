@@ -1,4 +1,4 @@
-import type { Citation, Claim, MemoryDetail } from "@recall/api-client";
+import type { Citation, Claim, MemoryDetail } from "@monolith/api-client";
 import { GlassBoard, ArrowIcon, displayDate } from "./primitives";
 interface Props {
   view: { memory: MemoryDetail; citation?: Citation; notice?: string };
@@ -45,7 +45,7 @@ export function MemoryFocus({
         className="primary-board memory-board"
       >
         <p className="eyebrow">
-          Recall’s interpretation · current revision {view.memory.revision}
+          Monolith’s interpretation · current revision {view.memory.revision}
         </p>
         <h1>{view.memory.context_hint ?? "A remembered moment"}</h1>
         <p className="memory-date">{displayDate(view.memory.captured_at)}</p>
@@ -168,7 +168,7 @@ export function MemoryFocus({
         ))}
         {!view.memory.entities?.length && (
           <p>
-            No resolved context yet. Recall will not guess who a name belongs
+            No resolved context yet. Monolith will not guess who a name belongs
             to.
           </p>
         )}

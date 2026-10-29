@@ -1,4 +1,4 @@
-import type { CaptureManifest, ManifestPage } from "@recall/api-client";
+import type { CaptureManifest, ManifestPage } from "@monolith/api-client";
 
 export interface Draft { id: string; scope: string; manifest: CaptureManifest; files: Record<string, Blob>; savedAt: string }
 const DB_NAME = "recall-web";
@@ -18,7 +18,7 @@ function openDb(): Promise<IDBDatabase> {
 
 export async function saveDraft(draft: Draft): Promise<void> {
   const totalBytes = Object.values(draft.files).reduce((total, file) => total + file.size, 0);
-  if (totalBytes > MAX_LOCAL_CAPTURE_BYTES) throw new Error("This original is larger than Recall's 25 MB limit.");
+  if (totalBytes > MAX_LOCAL_CAPTURE_BYTES) throw new Error("This original is larger than Monolith's 25 MB limit.");
   const db = await openDb();
   try { await new Promise<void>((resolve, reject) => { const transaction = db.transaction(STORE, "readwrite"); transaction.objectStore(STORE).put(draft); storageTestHooks.afterPut?.(transaction); transaction.oncomplete = () => resolve(); transaction.onabort = () => reject(transaction.error ?? new Error("Local capture was not durably saved.")); transaction.onerror = () => reject(transaction.error ?? new Error("Local capture could not be saved.")); }); } finally { db.close(); }
 }

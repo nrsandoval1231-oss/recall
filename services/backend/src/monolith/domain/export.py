@@ -44,7 +44,20 @@ MAX_EXPORT_ROWS = 10000
 MAX_CANONICAL_BYTES = 16 * 1024 * 1024
 MAX_ORIGINAL_BYTES = 100 * 1024 * 1024
 _EXPORT_SLOTS = threading.BoundedSemaphore(2)
-EXPORT_TEMP_ROOT = Path(tempfile.gettempdir()) / "recall-private-exports"
+EXPORT_TEMP_ROOT = Path(tempfile.gettempdir()) / "monolith-private-exports"
+# Spool location of builds before the Recall to Monolith rename. New exports never use it, but a
+# crash left plaintext exports there, so the janitor must still expire them.
+LEGACY_EXPORT_TEMP_ROOT = Path(tempfile.gettempdir()) / "recall-private-exports"
+LEGACY_EXPORT_PATTERN = "recall-export-*.zip"
+
+
+def _expire(root: Path, pattern: str, cutoff: float) -> None:
+    for path in root.glob(pattern):
+        try:
+            if not path.is_symlink() and path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            pass
 
 
 def cleanup_export_files() -> None:
@@ -54,12 +67,10 @@ def cleanup_export_files() -> None:
         raise RuntimeError("Export temporary directory must not be a symbolic link.")
     EXPORT_TEMP_ROOT.chmod(0o700)
     cutoff = time.time() - 24 * 60 * 60
-    for path in EXPORT_TEMP_ROOT.glob("recall-export-*.zip"):
-        try:
-            if not path.is_symlink() and path.is_file() and path.stat().st_mtime < cutoff:
-                path.unlink(missing_ok=True)
-        except FileNotFoundError:
-            pass
+    _expire(EXPORT_TEMP_ROOT, "monolith-export-*.zip", cutoff)
+    # Never create the legacy directory; only expire what an older build left behind.
+    if LEGACY_EXPORT_TEMP_ROOT.is_dir() and not LEGACY_EXPORT_TEMP_ROOT.is_symlink():
+        _expire(LEGACY_EXPORT_TEMP_ROOT, LEGACY_EXPORT_PATTERN, cutoff)
 
 
 async def export_janitor(stop: asyncio.Event) -> None:
@@ -71,7 +82,7 @@ async def export_janitor(stop: asyncio.Event) -> None:
             try:
                 await run_in_threadpool(cleanup_export_files)
             except OSError as error:
-                logging.getLogger("recall.export").warning("export cleanup retry: %s", type(error).__name__)
+                logging.getLogger("monolith.export").warning("export cleanup retry: %s", type(error).__name__)
 
 
 def _write(archive: zipfile.ZipFile, name: str, content: bytes) -> None:
@@ -96,7 +107,7 @@ class ExportService:
 
     def _create(self, user_id: uuid.UUID) -> Path:
         cleanup_export_files()
-        fd, name = tempfile.mkstemp(prefix="recall-export-", suffix=".zip", dir=EXPORT_TEMP_ROOT)
+        fd, name = tempfile.mkstemp(prefix="monolith-export-", suffix=".zip", dir=EXPORT_TEMP_ROOT)
         import os
 
         os.close(fd)

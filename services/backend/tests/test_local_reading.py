@@ -15,9 +15,9 @@ from fastapi.testclient import TestClient
 
 from conftest import REPO_ROOT, Env, sha, synthetic_image
 from fake_provider import FakeProvider, faithful_extraction, outage, refusal
-from recall.api.app import create_app
-from recall.errors import forbidden
-from test_recall import AI
+from monolith.api.app import create_app
+from monolith.errors import forbidden
+from test_monolith import AI
 
 
 class SyntheticAuthorization:
@@ -26,7 +26,7 @@ class SyntheticAuthorization:
         self.revoked = False
 
     def verify(self, authorization: str | None) -> Any:
-        from recall.ingestion.local_reading import DeviceGrant
+        from monolith.ingestion.local_reading import DeviceGrant
 
         if authorization != "Bearer synthetic-device-only" or self.revoked:
             raise forbidden("Device connection unavailable.")
@@ -235,7 +235,7 @@ def test_rejection_taxonomy_is_hard_and_does_not_leak_model_text(
     fault: str,
     expected_code: str,
 ) -> None:
-    from recall.ingestion import local_reading
+    from monolith.ingestion import local_reading
 
     client, grant, fake, binding, original = reading
     secret_text = "SYNTHETIC_PRIVATE_DIAGNOSTIC_VALUE"
@@ -390,7 +390,7 @@ def test_other_vault_cannot_recover_receipt(reading: Any) -> None:
 
 
 def test_provider_accounting_mismatch_retains_unknown_hold(reading: Any, env: Env) -> None:
-    from recall.ingestion.provider import ProviderResult
+    from monolith.ingestion.provider import ProviderResult
 
     client, grant, fake, binding, original = reading
 
@@ -558,7 +558,7 @@ def test_chunked_body_limit_without_content_length(reading: Any, env: Env) -> No
 def test_local_provider_disables_sdk_retry_and_refusal_fallback(monkeypatch: Any, env: Env) -> None:
     import anthropic
 
-    from recall.ingestion.anthropic_provider import AnthropicProvider
+    from monolith.ingestion.anthropic_provider import AnthropicProvider
 
     constructed = []
     real_init = AnthropicProvider.__init__
@@ -583,8 +583,8 @@ def test_local_provider_disables_sdk_retry_and_refusal_fallback(monkeypatch: Any
 
 
 def test_pairing_enabled_runtime_uses_database_grant_and_local_provider(monkeypatch: Any, env: Env) -> None:
-    from recall.ingestion.anthropic_provider import AnthropicProvider
-    from recall.pairing import digest
+    from monolith.ingestion.anthropic_provider import AnthropicProvider
+    from monolith.pairing import digest
 
     owner = env.user()
     assert owner.register_device().status_code == 201
@@ -670,7 +670,7 @@ def test_shared_native_wire_fixture_matches_actual_http_response(reading: Any) -
 
 @pytest.mark.parametrize("usage", [(-1, 2), (1000, 64001), (24785, 2)])
 def test_invalid_error_usage_keeps_unknown_budget_hold(reading: Any, env: Env, usage: tuple[int, int]) -> None:
-    from recall.ingestion.provider import ProviderError
+    from monolith.ingestion.provider import ProviderError
 
     client, grant, fake, binding, original = reading
     fake.interpret_script = [
@@ -758,7 +758,7 @@ def test_sdk_billed_error_model_controls_settlement(reading: Any, env: Env, stop
     import anthropic
     import httpx2
 
-    from recall.ingestion.anthropic_provider import AnthropicProvider
+    from monolith.ingestion.anthropic_provider import AnthropicProvider
     from test_anthropic_adapter import sse
 
     client, grant, fake, binding, original = reading
@@ -805,7 +805,7 @@ def test_sdk_invalid_stream_encoding_retains_unknown_hold(reading: Any, env: Env
     import anthropic
     import httpx2
 
-    from recall.ingestion.anthropic_provider import AnthropicProvider
+    from monolith.ingestion.anthropic_provider import AnthropicProvider
     from test_anthropic_adapter import sse
 
     client, grant, fake, binding, original = reading

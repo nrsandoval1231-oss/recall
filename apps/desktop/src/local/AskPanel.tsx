@@ -19,19 +19,19 @@ function readIntent(selected: Selected): Intent | null {
 }
 function stateText(outcome: AskOutcome | null) {
   if (!outcome) return "";
-  if (outcome.operation.state === "failed" && outcome.operation.error_code === "STALE_EVIDENCE") return "A source changed while Recall was answering. Your question is still here, but this answer has no sources. Review current memories, then choose a new Ask to try again.";
-  if (outcome.operation.state === "unknown" || outcome.operation.state === "in_flight" || outcome.operation.state === "prepared") return "Recall has not confirmed whether this request finished. Check its status before asking again; your question is saved.";
+  if (outcome.operation.state === "failed" && outcome.operation.error_code === "STALE_EVIDENCE") return "A source changed while Monolith was answering. Your question is still here, but this answer has no sources. Review current memories, then choose a new Ask to try again.";
+  if (outcome.operation.state === "unknown" || outcome.operation.state === "in_flight" || outcome.operation.state === "prepared") return "Monolith has not confirmed whether this request finished. Check its status before asking again; your question is saved.";
   if (outcome.operation.state === "expired") return "This request expired and its answer is no longer available. You can start a new Ask.";
-  if (outcome.operation.state === "failed") return "Recall could not finish this request. Your question is saved; start a new Ask when you’re ready.";
+  if (outcome.operation.state === "failed") return "Monolith could not finish this request. Your question is saved; start a new Ask when you’re ready.";
   return "";
 }
 function evidenceLabel(kind: AskCitation["evidence_kind"]) {
   return kind === "text_source" ? "Original text" : kind === "human_note" ? "Your note" : kind === "human_reading_correction" ? "Your reading correction" : kind === "machine_audio_transcript" ? "Machine transcript · unreviewed" : kind === "human_audio_correction" ? "Your transcript correction · reported" : "Machine reading · unreviewed";
 }
 function answerMessage(answer: AskAnswer) {
-  if (answer.status === "insufficient_evidence") return "Recall could not answer confidently from the sources considered.";
+  if (answer.status === "insufficient_evidence") return "Monolith could not answer confidently from the sources considered.";
   if (answer.status === "ambiguous") return "The available evidence is ambiguous.";
-  if (answer.status === "stale_evidence") return "A source changed while Recall was answering. The answer was cleared; review current memory and ask again.";
+  if (answer.status === "stale_evidence") return "A source changed while Monolith was answering. The answer was cleared; review current memory and ask again.";
   if (answer.status === "unavailable") return "Grounded Ask is unavailable. Your local keyword search remains available.";
   return "";
 }
@@ -90,7 +90,7 @@ export function HistoricalSourceView({ source, onClose }: { source: HistoryCitat
     <h4>Quoted excerpt</h4><blockquote>{source.quote}</blockquote>
     <h4>Original file</h4>
     {text !== null ? <pre>{text}</pre> : mime.startsWith("image/") && url ? <img src={url} alt="Verified original source" /> : mime.startsWith("audio/") && url ? <audio controls src={url} aria-label="Verified original recording" /> : null}
-    {url && <a href={url} download={`recall-original-${source.memory_id}${audio ? ".wav" : ""}`}>Open or download original</a>}
+    {url && <a href={url} download={`monolith-original-${source.memory_id}${audio ? ".wav" : ""}`}>Open or download original</a>}
     <button type="button" onClick={onClose}>Close retained source</button>
   </section>;
 }
@@ -152,14 +152,14 @@ export function AskPanel({ vault, selected, active, onOpenCitation }: { vault: L
       if (intent.kind === "history") await dispatchHistory(intent, valid);
       else { if (!vault.ask) throw new Error("Current Ask is unavailable in this desktop version."); const value = await vault.ask(selected.vault_id, intent.operationId, intent.question); if (!valid()) return; setOutcome(value); if (value.operation.state === "complete") saveIntent(null); }
     }
-    catch { if (valid()) { setError("Recall could not confirm whether this request finished. Your question is saved; check its status before trying again."); setOutcome({ operation: { operation_id: intent.operationId, state: "unknown", error_code: "PROVIDER_OUTCOME_UNKNOWN" }, answer: null } as AskOutcome); } }
+    catch { if (valid()) { setError("Monolith could not confirm whether this request finished. Your question is saved; check its status before trying again."); setOutcome({ operation: { operation_id: intent.operationId, state: "unknown", error_code: "PROVIDER_OUTCOME_UNKNOWN" }, answer: null } as AskOutcome); } }
     finally { if (valid()) setBusy(false); }
   }
   async function recover() {
     if (!pending || (pending.kind === "history" ? !vault.recoverHistoryAsk : !vault.recoverAsk)) return;
     const intent = pending; const valid = guards(); setError(""); setBusy(true);
     try { const value = intent.kind === "history" ? await vault.recoverHistoryAsk!(selected.vault_id, intent.operationId) : await vault.recoverAsk!(selected.vault_id, intent.operationId); if (!valid()) return; setOutcome(value); if (value.operation.state === "complete") saveIntent(null); }
-    catch { if (valid()) { setError("Recall could not check this request yet. Your question is saved; try checking its status again."); setOutcome({ operation: { operation_id: intent.operationId, state: "unknown", error_code: "RECEIPT_RECOVERY_UNKNOWN" }, answer: null } as AskOutcome); } }
+    catch { if (valid()) { setError("Monolith could not check this request yet. Your question is saved; try checking its status again."); setOutcome({ operation: { operation_id: intent.operationId, state: "unknown", error_code: "RECEIPT_RECOVERY_UNKNOWN" }, answer: null } as AskOutcome); } }
     finally { if (valid()) setBusy(false); }
   }
   async function refreshCapability() {
@@ -174,7 +174,7 @@ export function AskPanel({ vault, selected, active, onOpenCitation }: { vault: L
     try {
       const result: HistoryCapability = await vault.setHistoryConsent(selected.vault_id, enable, capability.consent_version ?? 0);
       if (valid()) setCapability({ ...capability, history_consent: result.history_consent, history_enabled: result.history_enabled, consent_version: result.consent_version, history_policy_version: result.history_policy_version });
-    } catch { if (valid()) { setError("Recall could not confirm the history decision. Refresh Ask availability before trying again."); await refreshCapability(); } }
+    } catch { if (valid()) { setError("Monolith could not confirm the history decision. Refresh Ask availability before trying again."); await refreshCapability(); } }
     finally { if (valid()) setBusy(false); }
   }
   async function runPairing(action: "prepare" | "status" | "disconnect" | "claim") {
@@ -190,7 +190,7 @@ export function AskPanel({ vault, selected, active, onOpenCitation }: { vault: L
   async function openCitation(citation: AskCitation) {
     setOutcome(null); setBusy(true); setError("");
     try { await onOpenCitation(citation); }
-    catch { setError("This source could not be verified, so Recall cleared the answer. Refresh current memories before asking again."); }
+    catch { setError("This source could not be verified, so Monolith cleared the answer. Refresh current memories before asking again."); }
     finally { setBusy(false); }
   }
   async function openHistoryCitation(citationId: string) {
@@ -199,7 +199,7 @@ export function AskPanel({ vault, selected, active, onOpenCitation }: { vault: L
     if (!operationId || !vault.askHistoryCitation) return;
     const valid = guards(); setHistoricalSource(null); setBusy(true); setError("");
     try { const value = await vault.askHistoryCitation(selected.vault_id, operationId, citationId); if (valid()) setHistoricalSource(value); }
-    catch { if (valid()) { setOutcome(null); setError("This retained source or its current status changed. Recall cleared the answer; refresh the vault before asking again."); } }
+    catch { if (valid()) { setOutcome(null); setError("This retained source or its current status changed. Monolith cleared the answer; refresh the vault before asking again."); } }
     finally { if (valid()) setBusy(false); }
   }
   const answer = outcome?.answer ?? null;
@@ -210,10 +210,10 @@ export function AskPanel({ vault, selected, active, onOpenCitation }: { vault: L
     <p className="local-eyebrow">Grounded recall</p><h2 id="local-ask-title">Ask your memories</h2>
     <p className="local-muted">{capabilityText(capability)}</p>
     <form onSubmit={e => { e.preventDefault(); void ask(); }}><label htmlFor="local-ask-question">Your question</label><textarea id="local-ask-question" rows={3} value={question} readOnly={Boolean(pending)} onChange={e => { setQuestion(e.target.value); setOutcome(null); setHistoricalSource(null); }} placeholder={clarification ? "Add a full date, such as October 1, 2026" : "What do you remember about…?"} />{clarification && <p role="status">{clarification.prompt} The original question is retained: “{clarification.original}”</p>}<div className="local-actions"><button className="local-primary" type="submit" disabled={busy || !capability?.enabled || !question.trim() || Boolean(pending)}>{busy ? "Asking…" : clarification ? "Continue" : "Ask"}</button>{retryable && <button type="button" disabled={busy} onClick={() => void recover()}>Check Ask status</button>}{pending && outcome && !retryable && <button type="button" disabled={busy} onClick={() => { saveIntent(null); setOutcome(null); setHistoricalSource(null); setError(""); }}>Ask a new question</button>}</div></form>
-    {pending && !outcome && <p role="status">Your question is saved while Recall checks whether it finished.</p>}{outcome && stateText(outcome) && <p role="status" className="local-error">{stateText(outcome)}</p>}
+    {pending && !outcome && <p role="status">Your question is saved while Monolith checks whether it finished.</p>}{outcome && stateText(outcome) && <p role="status" className="local-error">{stateText(outcome)}</p>}
     {answer && <div className="local-ask-answer" aria-label="Ask answer">{historical && outcome && "temporal" in outcome && <h3>{outcome.temporal.mode === "compare_to_current" ? "Recorded changes since" : "What was recorded on"} {readableCalendarDate(outcome.temporal.display_date, outcome.temporal.display_timezone)}</h3>}<h3>{answer.status === "answered" ? "Answer · with sources" : answer.status === "ambiguous" ? "Ambiguous evidence" : "Evidence result"}</h3>{answerMessage(answer) && <p role="status">{answerMessage(answer)}</p>}{answer.sentences.map((sentence, index) => <p key={`${index}:${sentence.text}`}>{sentence.text}{sentence.citation_ids.map(id => { const citation = answer.citations.find(item => item.citation_id === id); const historyItem = historyEvidence.find(item => item.citation_id === id); return historyItem ? <span className="local-ask-inline-source" key={id}> <button type="button" disabled={busy} onClick={() => void openHistoryCitation(id)} title={historyItem.excerpt}>Source {id.slice(1)} · {historyLabel(historyItem)}</button></span> : citation ? <span className="local-ask-inline-source" key={id}> <button type="button" disabled={busy} onClick={() => void openCitation(citation)} title={citation.quote}>Source {id.slice(1)} · {evidenceLabel(citation.evidence_kind)}</button></span> : null; })}</p>)}{historical && <ul aria-label="Historical evidence">{historyEvidence.map(item => <li key={item.citation_id}><strong>{historyLabel(item)} · {readableDate(item.recorded_at, outcome && "temporal" in outcome ? outcome.temporal.display_timezone : undefined)}</strong>{item.current_revision !== item.memory_revision && item.history_status !== "current_counterpart" && <p className="local-muted">A newer version is in the vault now.</p>}{(item.evidence_kind === "machine_audio_transcript" || item.evidence_kind === "human_audio_correction") && <p className="local-muted">{evidenceLabel(item.evidence_kind)}</p>}<p>{item.excerpt}</p><button type="button" disabled={busy} onClick={() => void openHistoryCitation(item.citation_id)}>Open saved note and original</button></li>)}</ul>}{answer.limitations.map((limitation, index) => <p className="local-muted" key={`${index}:${limitation}`}>{limitation}</p>)}{answer.coverage && <p className="local-muted">{historical ? "Historical evidence coverage" : "Current coverage"}: {answer.coverage.selected_count} of {answer.coverage.eligible_count} eligible {historical ? "items" : "records"}{answer.coverage.truncated_count ? ` · ${answer.coverage.truncated_count} excerpt${answer.coverage.truncated_count === 1 ? " was" : "s were"} shortened` : ""}.</p>}</div>}
     {historicalSource && <HistoricalSourceView source={historicalSource} onClose={() => setHistoricalSource(null)} />}
-    <details className="local-tools local-ask-settings"><summary>How Ask works and sends data</summary><p className="local-muted">Current Ask uses current eligible memories. When you ask about the past, Recall can send relevant saved versions of your notes to your connected AI service. This applies to vaults you already connected in this workspace. You can turn history off anytime. Your originals stay in the vault; an answer describes what was saved then, not necessarily what was true in the world.</p>{pending && <p className="local-muted">A pending Ask is saved. Check its status or clear its terminal result before changing this setting, since changing it can make the saved receipt unavailable.</p>}{capability?.consent === "active" && capability.history_consent !== "active" && <><p className="local-muted">{historyCapabilityText(capability)}</p><button type="button" disabled={busy || Boolean(pending) || !vault.setHistoryConsent || !capability.history_consent || capability.history_consent === "unknown"} onClick={() => void setHistoryConsent(true)}>Allow questions about the past</button></>}{capability?.history_consent === "active" && <><p className="local-muted">{historyCapabilityText(capability)}</p><button type="button" disabled={busy || Boolean(pending) || !vault.setHistoryConsent} onClick={() => void setHistoryConsent(false)}>Turn off history</button></>}</details>
+    <details className="local-tools local-ask-settings"><summary>How Ask works and sends data</summary><p className="local-muted">Current Ask uses current eligible memories. When you ask about the past, Monolith can send relevant saved versions of your notes to your connected AI service. This applies to vaults you already connected in this workspace. You can turn history off anytime. Your originals stay in the vault; an answer describes what was saved then, not necessarily what was true in the world.</p>{pending && <p className="local-muted">A pending Ask is saved. Check its status or clear its terminal result before changing this setting, since changing it can make the saved receipt unavailable.</p>}{capability?.consent === "active" && capability.history_consent !== "active" && <><p className="local-muted">{historyCapabilityText(capability)}</p><button type="button" disabled={busy || Boolean(pending) || !vault.setHistoryConsent || !capability.history_consent || capability.history_consent === "unknown"} onClick={() => void setHistoryConsent(true)}>Allow questions about the past</button></>}{capability?.history_consent === "active" && <><p className="local-muted">{historyCapabilityText(capability)}</p><button type="button" disabled={busy || Boolean(pending) || !vault.setHistoryConsent} onClick={() => void setHistoryConsent(false)}>Turn off history</button></>}</details>
     <details className="local-tools local-ask-settings"><summary>Ask connection settings</summary><p className="local-muted">Ask has its own connection and owner approval. Prepare only when an owner-issued invitation is expected, then enter that invitation here.</p>{pairing && <><p role="status">Ask connection · {pairing.state}</p><dl className="local-ask-pairing"><dt>Device ID</dt><dd>{pairing.device_id ?? "Not available"}</dd><dt>Vault ID</dt><dd>{pairing.vault_id}</dd><dt>Connection fingerprint</dt><dd>{pairing.fingerprint ?? "Available after connection"}</dd></dl></>}<div className="local-actions"><button type="button" disabled={busy || !vault.intelligencePairingPrepare} onClick={() => void runPairing("prepare")}>Prepare Ask connection</button><button type="button" disabled={busy || !vault.intelligencePairingStatus} onClick={() => void runPairing("status")}>Check Ask connection</button><button type="button" disabled={busy || !vault.intelligencePairingDisconnect} onClick={() => void runPairing("disconnect")}>Disconnect Ask</button></div><label htmlFor="ask-invitation">Owner-issued Ask invitation</label><div className="local-row"><input id="ask-invitation" value={invitation} onChange={e => setInvitation(e.target.value)} autoComplete="off" /><button type="button" disabled={busy || !invitation.trim() || !vault.intelligencePairingClaim} onClick={() => void runPairing("claim")}>Claim Ask invitation</button></div><button type="button" disabled={busy} onClick={() => void refreshCapability()}>Refresh Ask availability</button></details>
     {error && <p role="alert" className="local-error">{error}</p>}
   </section>;

@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }, info) => {
 });
 
 async function screenshot(page: Page, info: TestInfo, name: string) {
-  if (process.env.RECALL_SCREENSHOTS === "1" && info.project.name === "desktop")
+  if (process.env.MONOLITH_SCREENSHOTS === "1" && info.project.name === "desktop")
     await page.screenshot({ path: `docs/implementation/local-vault/synthetic-${name}.png`, fullPage: true, animations: "disabled" });
 }
 async function accessible(page: Page) {
@@ -254,7 +254,7 @@ test("remembered organization is future-only, recoverable and presents concise t
   expect(await operationCount(preOptInId)).toBe(0);
 
   await page.getByText("Automatically organize new notes and photos", { exact: true }).click();
-  await expect(page.getByText(/Anthropic Claude through your private Recall service/)).toBeVisible();
+  await expect(page.getByText(/Anthropic Claude through your private Monolith service/)).toBeVisible();
   await page.getByRole("button", { name: "Turn on" }).click();
   await expect(page.getByText(/Automatic organization is on/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Finish setup" })).toHaveCount(0);
@@ -395,7 +395,7 @@ test("historical Ask clarifies before dispatch, recovers its saved interval, and
   await expect(page.getByText("Historical Ask is enabled for this workspace.")).toBeVisible();
   await page.getByLabel("Your question").fill("What did I know then?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page.getByText(/Which full calendar date should Recall use/)).toBeVisible();
+  await expect(page.getByText(/Which full calendar date should Monolith use/)).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { syntheticVault: { calls: { command: string }[] } }).syntheticVault.calls.some(call => call.command === "vault_ask_history" || call.command === "vault_ask"))).toBe(false);
   await page.getByLabel("Your question").fill("October 8, 2026");
   await page.getByRole("button", { name: "Continue" }).click();
@@ -454,7 +454,7 @@ test("home stays sparse and a new photo reading shows its unreviewed summary wit
   await expect(page.getByRole("button", { name: "Removed items" })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "Removed items" })).toBeHidden();
-  if (process.env.RECALL_REVIEW_SCREENSHOTS === "1" && page.context().browser()?.browserType().name() === "chromium") {
+  if (process.env.MONOLITH_REVIEW_SCREENSHOTS === "1" && page.context().browser()?.browserType().name() === "chromium") {
     mkdirSync(".agent/REALIGN-01", { recursive: true });
     await page.screenshot({ path: ".agent/REALIGN-01/ui-home.png", fullPage: true, animations: "disabled" });
   }
@@ -465,7 +465,7 @@ test("home stays sparse and a new photo reading shows its unreviewed summary wit
   await expect(page.getByText("The source mentions seedlings; the count is unclear.")).toBeVisible();
   await expect(page.getByText("SYNTHETIC seedlings 12?").first()).toBeVisible();
   await expect(page.getByText("Summary · unreviewed")).toBeVisible();
-  if (process.env.RECALL_REVIEW_SCREENSHOTS === "1" && page.context().browser()?.browserType().name() === "chromium")
+  if (process.env.MONOLITH_REVIEW_SCREENSHOTS === "1" && page.context().browser()?.browserType().name() === "chromium")
     await page.screenshot({ path: ".agent/REALIGN-01/ui-reading.png", fullPage: true, animations: "disabled" });
   await page.getByRole("button", { name: "Back to memories" }).click();
   await page.getByLabel("Search notes and filenames").fill("unclear");

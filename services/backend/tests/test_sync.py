@@ -6,10 +6,10 @@ import psycopg
 
 from conftest import Env, stored_capture, synthetic_image
 from fake_provider import FakeProvider
-from recall.ingestion.worker import Worker
-from test_recall import capture_with, consent, drain
+from monolith.ingestion.worker import Worker
+from test_monolith import capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def test_outbox_replay_conflict_and_cross_workspace_mutation_are_explicit(

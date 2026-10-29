@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ApiError, NetworkError } from "@recall/api-client";
+import { ApiError, NetworkError } from "@monolith/api-client";
 import { describe, expect, it } from "vitest";
 import { CaptureSyncer, displayStatus } from "./syncer";
 import { makeTempPhotos, tempRoot } from "./testing/fixtures";

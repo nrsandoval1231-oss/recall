@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import type { MemoryDetail } from "@recall/api-client";
+import type { MemoryDetail } from "@monolith/api-client";
 
 const memoryId = "44444444-4444-4444-8444-444444444444";
 const draft = "My synthetic correction must survive conflicts.";
@@ -144,7 +144,7 @@ async function conflict(page: Page) {
     .getByRole("button", { name: "Correct statement", exact: true })
     .click();
   await page
-    .getByLabel("What should Recall understand?", { exact: true })
+    .getByLabel("What should Monolith understand?", { exact: true })
     .fill(draft);
   await page
     .getByRole("button", { name: "Review affected scope", exact: true })
@@ -164,7 +164,7 @@ async function reloadAndReview(page: Page, revision: number) {
     }),
   ).toBeVisible();
   await expect(
-    page.getByLabel("What should Recall understand?", { exact: true }),
+    page.getByLabel("What should Monolith understand?", { exact: true }),
   ).toHaveValue(draft);
   await expect(
     page.getByRole("button", { name: "Review affected scope", exact: true }),
@@ -189,7 +189,7 @@ test("HTTP 409 recovery preserves the draft and uses reviewed fresh If-Match acr
     .getByRole("button", { name: "Refresh memory", exact: true })
     .click();
   await expect(
-    page.getByLabel("What should Recall understand?", { exact: true }),
+    page.getByLabel("What should Monolith understand?", { exact: true }),
   ).toHaveValue(draft);
   await reloadAndReview(page, 2);
   server.edit();

@@ -1,4 +1,4 @@
-/** Cloudflare Worker: encrypted browser session plus a fixed Recall API proxy. */
+/** Cloudflare Worker: encrypted browser session plus a fixed Monolith API proxy. */
 export interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   API_ORIGIN: string;

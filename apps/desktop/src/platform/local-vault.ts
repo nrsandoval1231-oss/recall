@@ -101,7 +101,7 @@ export interface LocalVault {
 export class NativeLocalVault implements LocalVault {
   readonly available = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
   private call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-    if (!this.available) return Promise.reject(new Error("Open the Recall desktop app to use a local vault."));
+    if (!this.available) return Promise.reject(new Error("Open the Monolith desktop app to use a local vault."));
     return invoke<T>(command, args);
   }
   readingCapability(expectedVaultId: string) { return this.call<ReadingCapability>("vault_reading_capability", { expectedVaultId }); }

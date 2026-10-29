@@ -12,10 +12,10 @@ import {
   type Claim,
   type EntityDetail,
   type MemoryDetail,
-  type RecallApiClient,
+  type MonolithApiClient,
   type ServerCapture,
-} from "@recall/api-client";
-import { serverStatusKey, statusPresentation } from "@recall/design-tokens";
+} from "@monolith/api-client";
+import { serverStatusKey, statusPresentation } from "@monolith/design-tokens";
 import { AskForm } from "./AskSurface";
 import { Reconstruction } from "./Reconstruction";
 import { MemoryFocus } from "./MemoryFocus";
@@ -31,7 +31,7 @@ import { useEvidenceLayer } from "./useEvidenceLayer";
 import { CorrectionSurface } from "./CorrectionSurface";
 
 export type SurfaceApi = Pick<
-  RecallApiClient,
+  MonolithApiClient,
   "ask" | "getMemory" | "getEntity" | "fetchSource" | "correctMemory"
 >;
 type ResultView = {
@@ -225,7 +225,7 @@ export function MemorySurface({
         setError(
           failure instanceof Error
             ? failure.message
-            : "Recall is unavailable. Your originals are unaffected.",
+            : "Monolith is unavailable. Your originals are unaffected.",
         );
       }
     } finally {
@@ -362,13 +362,13 @@ export function MemorySurface({
       <header className="surface-header">
         <button
           className="wordmark"
-          aria-label="Recall home"
+          aria-label="Monolith home"
           disabled={savingCorrection}
           onClick={home}
         >
-          Recall<span className="wordmark-dot">•</span>
+          Monolith<span className="wordmark-dot">•</span>
         </button>
-        <nav aria-label="Recall">
+        <nav aria-label="Monolith">
           <button
             className="nav-action"
             disabled={savingCorrection}
@@ -511,7 +511,7 @@ export function MemorySurface({
             <p className="eyebrow">Recently remembered</p>
             <h1>A way back in.</h1>
             <p className="muted">
-              Originals remain available even when Recall has not finished
+              Originals remain available even when Monolith has not finished
               reading them.
             </p>
             {captures.length === 0 ? (
@@ -632,7 +632,7 @@ export function MemorySurface({
               <h2>{view.title}</h2>
               {view.quote && <blockquote>{view.quote}</blockquote>}
               <p className="muted">
-                This is Recall’s reading.
+                This is Monolith’s reading.
                 <br />
                 The original is yours to inspect.
               </p>
@@ -663,7 +663,7 @@ export function MemorySurface({
       </div>
       {notices && <div className="surface-notices">{notices}</div>}
       <footer className="surface-footer">
-        <span>Recall</span>
+        <span>Monolith</span>
         <span>
           {synthetic
             ? "Synthetic evidence · no live memory"

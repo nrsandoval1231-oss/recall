@@ -1,4 +1,4 @@
-import type { CaptureManifest } from "@recall/api-client";
+import type { CaptureManifest } from "@monolith/api-client";
 import type { Clock, LocalFiles } from "./ports";
 import { extensionFor, sniffMediaType } from "./sniff";
 import {

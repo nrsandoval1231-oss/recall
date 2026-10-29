@@ -2,7 +2,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { copy } from "@recall/design-tokens";
+import { copy } from "@monolith/design-tokens";
 import { SignIn } from "./SignIn";
 
 describe("SignIn", () => {

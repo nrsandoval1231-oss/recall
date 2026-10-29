@@ -215,7 +215,7 @@ mod tests {
     impl Fixture {
         fn new() -> Self {
             let p = std::env::temp_dir().join(format!(
-                "recall-synthetic-reading-http-{}",
+                "monolith-synthetic-reading-http-{}",
                 uuid::Uuid::new_v4()
             ));
             fs::create_dir(&p).unwrap();
@@ -424,7 +424,8 @@ mod tests {
             req.binding
         );
         let persisted = fs::read_to_string(root.0.join(format!(
-            "Recall/_meta/readings/{}/connection-sha256",
+            "{}/_meta/readings/{}/connection-sha256",
+            crate::local_vault::DIR,
             req.binding.operation_id
         )))
         .unwrap();
@@ -485,7 +486,11 @@ mod tests {
                                 ))
                             }
                             "source" => fs::write(
-                                root.0.join(format!("Recall/Sources/{}.png", m.id)),
+                                root.0.join(format!(
+                                    "{}/Sources/{}.png",
+                                    crate::local_vault::DIR,
+                                    m.id
+                                )),
                                 b"changed",
                             )
                             .unwrap(),

@@ -40,22 +40,22 @@ jobs:
       - name: Configure the isolated Compose project
         working-directory: infra/do-inference
         run: |
-          project="recall-do-inference-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          printf 'RECALL_CI_PROJECT=%s\n' "$project" >> "$GITHUB_ENV"
+          project="monolith-do-inference-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf 'MONOLITH_CI_PROJECT=%s\n' "$project" >> "$GITHUB_ENV"
           docker compose -p "$project" -f compose.yml config --quiet
       - name: Build the backend runtime image
         working-directory: infra/do-inference
-        run: docker compose -p "$RECALL_CI_PROJECT" -f compose.yml build api
+        run: docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml build api
       - name: Start independent pinned PostgreSQL clusters and migrate the source only
         working-directory: infra/do-inference
         run: |
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile restore up -d db restore-db
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile maintenance run --rm migrate
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml --profile restore up -d db restore-db
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml --profile maintenance run --rm migrate
       - name: Assert actual container refuses review, budget, header, ledger and role-elevation mismatches
         working-directory: infra/do-inference
         run: |
           run_preflight() {
-            docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile runtime run --rm --no-deps --entrypoint python api /ops/preflight.py
+            docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml --profile runtime run --rm --no-deps --entrypoint python api /ops/preflight.py
           }
           refuse_api() {
             refusal_log="$RUNNER_TEMP/preflight-refusal.log"
@@ -93,7 +93,7 @@ jobs:
           sudo install -o 10001 -g 10001 -m 0400 "$original_activation" secrets/activation_record.local
           run_preflight
           cp secrets/runtime.env.local "$RUNNER_TEMP/runtime.env"
-          sed -i 's/^RECALL_AI_DAILY_BUDGET_USD=.*/RECALL_AI_DAILY_BUDGET_USD=1/' secrets/runtime.env.local
+          sed -i 's/^MONOLITH_AI_DAILY_BUDGET_USD=.*/MONOLITH_AI_DAILY_BUDGET_USD=1/' secrets/runtime.env.local
           refuse_api
           cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
           run_preflight
@@ -105,19 +105,19 @@ jobs:
           refuse_api
           cp "$RUNNER_TEMP/runtime.env" secrets/runtime.env.local
           run_preflight
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'GRANT pg_read_all_data TO recall_api'
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'GRANT pg_read_all_data TO recall_api'
           refuse_api
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'REVOKE pg_read_all_data FROM recall_api'
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c 'REVOKE pg_read_all_data FROM recall_api'
           run_preflight
           expected_checksum="$(sha256sum ../../services/backend/migrations/0001_trusted_capture.sql | cut -d ' ' -f1)"
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='tampered' WHERE version='0001_trusted_capture.sql'"
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='tampered' WHERE version='0001_trusted_capture.sql'"
           refuse_api
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='$expected_checksum' WHERE version='0001_trusted_capture.sql'"
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T db psql -U recall_operator -d recall -v ON_ERROR_STOP=1 -c "UPDATE schema_migrations SET checksum='$expected_checksum' WHERE version='0001_trusted_capture.sql'"
           run_preflight
       - name: Start the preflighted API container
         working-directory: infra/do-inference
         run: |
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile runtime up -d api
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml --profile runtime up -d api
           for attempt in $(seq 1 60); do
             if curl --silent --fail http://127.0.0.1:8001/readyz >/dev/null; then exit 0; fi
             sleep 1
@@ -144,9 +144,9 @@ jobs:
       - name: Run fake-provider grant, photo, receipt, replay, restart and revoke checks in the test process
         working-directory: infra/do-inference
         run: |
-          db_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -q db)"
+          db_id="$(docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml ps -q db)"
           db_host="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$db_id")"
-          restore_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -q restore-db)"
+          restore_id="$(docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml ps -q restore-db)"
           restore_host="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$restore_id")"
           DO_OPS_TEST_DATABASE_HOST="$db_host" uv run --project ../../services/backend python ops/write-ci-connections.py
           stat -c 'ci_api_database_url uid=%u gid=%g mode=%a' secrets/ci_api_database_url.local
@@ -166,7 +166,7 @@ jobs:
           key="$RUNNER_TEMP/age-ci-identity"
           "$RUNNER_TEMP/age-bin/age-keygen" -o "$key" 2>/dev/null
           chmod 600 "$key"
-          printf 'AGE_BIN=%s\nAGE_IDENTITY=%s\nRECALL_BACKUP_AGE_RECIPIENT=%s\n' \
+          printf 'AGE_BIN=%s\nAGE_IDENTITY=%s\nMONOLITH_BACKUP_AGE_RECIPIENT=%s\n' \
             "$RUNNER_TEMP/age-bin" "$key" "$("$RUNNER_TEMP/age-bin/age-keygen" -y "$key")" >> "$GITHUB_ENV"
       - name: Encrypt, fence the active API, restore to the independent empty cluster and verify the retained hold
         working-directory: infra/do-inference
@@ -174,7 +174,7 @@ jobs:
           export PATH="$AGE_BIN:$PATH"
           original_pg_dump_version="$(pg_dump --version)"
           original_pg_restore_version="$(pg_restore --version)"
-          restore_server_version_num="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -tAc 'SHOW server_version_num')"
+          restore_server_version_num="$(docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -tAc 'SHOW server_version_num')"
           printf 'original_pg_dump_version=%s\noriginal_pg_restore_version=%s\nrestore_server_version_num=%s\n' \
             "$original_pg_dump_version" "$original_pg_restore_version" "$restore_server_version_num"
           export PATH="$AGE_BIN:/usr/lib/postgresql/16/bin:$PATH"
@@ -186,46 +186,46 @@ jobs:
           case "$selected_pg_restore_version" in 'pg_restore (PostgreSQL) 16.'*) ;; *) exit 1 ;; esac
           case "$restore_server_version_num" in 16[0-9][0-9][0-9][0-9]) ;; *) exit 1 ;; esac
           export DO_OPS_TEST_CONNECTION_FILE="$PWD/secrets/ci-test-connections.local"
-          export RECALL_BACKUP_DATABASE_URL_FILE="$PWD/secrets/ci_operator_database_url.local"
-          export RECALL_BACKUP_DESTINATION="$RUNNER_TEMP/recall-synthetic.age"
+          export MONOLITH_BACKUP_DATABASE_URL_FILE="$PWD/secrets/ci_operator_database_url.local"
+          export MONOLITH_BACKUP_DESTINATION="$RUNNER_TEMP/monolith-synthetic.age"
           uv run --project ../../services/backend python ops/backup.py
           uv run --project ../../services/backend python ops/prepare-ci-restore.py
-          export RECALL_RESTORE_ARCHIVE="$RECALL_BACKUP_DESTINATION"
-          export RECALL_RESTORE_AGE_IDENTITY_FILE="$AGE_IDENTITY"
-          export RECALL_RESTORE_DATABASE_URL_FILE="$PWD/secrets/ci_restore_database_url.local"
-          export RECALL_RESTORE_HOLD_PATH="$PWD/recovery/hold.json"
-          export RECALL_RESTORE_API_FENCE_URL="http://127.0.0.1:8001/healthz"
-          cp "$RECALL_BACKUP_DESTINATION" "$RUNNER_TEMP/corrupt-synthetic.age"
-          digest="$(cut -d ' ' -f1 "${RECALL_BACKUP_DESTINATION}.sha256")"
+          export MONOLITH_RESTORE_ARCHIVE="$MONOLITH_BACKUP_DESTINATION"
+          export MONOLITH_RESTORE_AGE_IDENTITY_FILE="$AGE_IDENTITY"
+          export MONOLITH_RESTORE_DATABASE_URL_FILE="$PWD/secrets/ci_restore_database_url.local"
+          export MONOLITH_RESTORE_HOLD_PATH="$PWD/recovery/hold.json"
+          export MONOLITH_RESTORE_API_FENCE_URL="http://127.0.0.1:8001/healthz"
+          cp "$MONOLITH_BACKUP_DESTINATION" "$RUNNER_TEMP/corrupt-synthetic.age"
+          digest="$(cut -d ' ' -f1 "${MONOLITH_BACKUP_DESTINATION}.sha256")"
           printf '%s  %s\n' "$digest" corrupt-synthetic.age > "$RUNNER_TEMP/corrupt-synthetic.age.sha256"
           printf 'corruption' >> "$RUNNER_TEMP/corrupt-synthetic.age"
-          export RECALL_RESTORE_ARCHIVE="$RUNNER_TEMP/corrupt-synthetic.age"
+          export MONOLITH_RESTORE_ARCHIVE="$RUNNER_TEMP/corrupt-synthetic.age"
           if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi
-          python -c "import json,os; assert json.load(open(os.environ['RECALL_RESTORE_HOLD_PATH']))['hold'] is True"
-          export RECALL_RESTORE_ARCHIVE="$RECALL_BACKUP_DESTINATION"
-          api_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -aq api)"
-          export RECALL_RESTORE_COMPOSE_PROJECT="$RECALL_CI_PROJECT"
-          export RECALL_RESTORE_API_CONTAINER_ID="$api_id"
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -v ON_ERROR_STOP=1 <<'SQL'
+          python -c "import json,os; assert json.load(open(os.environ['MONOLITH_RESTORE_HOLD_PATH']))['hold'] is True"
+          export MONOLITH_RESTORE_ARCHIVE="$MONOLITH_BACKUP_DESTINATION"
+          api_id="$(docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml ps -aq api)"
+          export MONOLITH_RESTORE_COMPOSE_PROJECT="$MONOLITH_CI_PROJECT"
+          export MONOLITH_RESTORE_API_CONTAINER_ID="$api_id"
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -v ON_ERROR_STOP=1 <<'SQL'
           CREATE TABLE restore_refusal_sentinel (value text);
           INSERT INTO restore_refusal_sentinel VALUES ('preserved');
           SQL
           if uv run --project ../../services/backend python ops/restore.py; then exit 1; fi
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -tAc "SELECT value FROM restore_refusal_sentinel" | grep -qx preserved
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml rm -sf restore-db
-          docker volume rm "${RECALL_CI_PROJECT}_postgres_restore_data"
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml --profile restore up -d restore-db
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T restore-db psql -U recall_operator -d recall_restore -tAc "SELECT value FROM restore_refusal_sentinel" | grep -qx preserved
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml rm -sf restore-db
+          docker volume rm "${MONOLITH_CI_PROJECT}_postgres_restore_data"
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml --profile restore up -d restore-db
           for attempt in $(seq 1 60); do
-            if docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db pg_isready -U recall_operator -d recall_restore; then break; fi
+            if docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T restore-db pg_isready -U recall_operator -d recall_restore; then break; fi
             sleep 1
           done
-          docker compose -p "$RECALL_CI_PROJECT" -f compose.yml exec -T restore-db pg_isready -U recall_operator -d recall_restore
-          restore_id="$(docker compose -p "$RECALL_CI_PROJECT" -f compose.yml ps -q restore-db)"
+          docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml exec -T restore-db pg_isready -U recall_operator -d recall_restore
+          restore_id="$(docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml ps -q restore-db)"
           export DO_OPS_RESTORE_DATABASE_HOST="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$restore_id")"
           rm -f -- secrets/ci_restore_database_url.local
           uv run --project ../../services/backend python ops/prepare-ci-restore.py
           uv run --project ../../services/backend python ops/restore.py
-          python -c "import json,os; assert json.load(open(os.environ['RECALL_RESTORE_HOLD_PATH']))['hold'] is True"
+          python -c "import json,os; assert json.load(open(os.environ['MONOLITH_RESTORE_HOLD_PATH']))['hold'] is True"
           for attempt in $(seq 1 20); do
             if ! curl --silent --fail http://127.0.0.1:8001/healthz >/dev/null; then break; fi
             sleep 1
@@ -236,5 +236,5 @@ jobs:
         if: always()
         working-directory: infra/do-inference
         run: |
-          if [ -n "${RECALL_CI_PROJECT:-}" ]; then docker compose -p "$RECALL_CI_PROJECT" -f compose.yml down --volumes --remove-orphans; fi
+          if [ -n "${MONOLITH_CI_PROJECT:-}" ]; then docker compose -p "$MONOLITH_CI_PROJECT" -f compose.yml down --volumes --remove-orphans; fi
           sudo rm -rf -- secrets recovery

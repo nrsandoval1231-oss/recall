@@ -172,7 +172,7 @@ struct Env {
 }
 impl Env {
     fn new() -> Self {
-        let dir = std::env::temp_dir().join(format!("recall-synthetic-rec-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("monolith-synthetic-rec-{}", Uuid::new_v4()));
         let root = dir.join("vault");
         fs::create_dir_all(&root).unwrap();
         let state = LocalVaultState::new(dir.join("selected-vault.json"));
@@ -196,13 +196,13 @@ impl Env {
     fn engine(&self, mode: Mode) -> Arc<FakeEngine> {
         let root = self.root.clone();
         FakeEngine::new(mode, move || {
-            let sources = root.join("Recall/Sources");
+            let sources = root.join(format!("{}/Sources", crate::local_vault::DIR));
             fs::read_dir(&sources).is_ok_and(|entries| {
                 entries.flatten().any(|e| {
                     let path = e.path();
                     path.extension().and_then(|x| x.to_str()) == Some("wav")
                         && root
-                            .join("Recall/_meta/commits")
+                            .join(format!("{}/_meta/commits", crate::local_vault::DIR))
                             .join(format!(
                                 "{}.json",
                                 path.file_stem().unwrap().to_string_lossy()
@@ -245,7 +245,11 @@ fn wait_for(
     }
 }
 fn source_bytes(env: &Env, id: &str) -> Vec<u8> {
-    fs::read(env.root.join(format!("Recall/Sources/{id}.wav"))).unwrap()
+    fs::read(
+        env.root
+            .join(format!("{}/Sources/{id}.wav", crate::local_vault::DIR)),
+    )
+    .unwrap()
 }
 fn recorded_pcm(frames: usize) -> Vec<u8> {
     synthetic_pcm(frames, 1)
@@ -755,7 +759,10 @@ fn discard_removes_only_a_verified_uncommitted_stage_and_is_idempotent() {
     let ambiguous = op();
     let stage = write_stage(&env, &guard, &ambiguous, MONO_16K, &recorded_pcm(2_000));
     fs::write(
-        env.root.join(format!("Recall/Sources/{ambiguous}.wav")),
+        env.root.join(format!(
+            "{}/Sources/{ambiguous}.wav",
+            crate::local_vault::DIR
+        )),
         synthetic_wav(16_000, 1, 100),
     )
     .unwrap();

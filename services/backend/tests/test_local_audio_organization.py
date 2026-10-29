@@ -23,21 +23,21 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import make_database
-from recall.api.inference import create_inference_app
-from recall.config import Settings
-from recall.db.database import Database
-from recall.db.inference_bootstrap import REQUIRED_PUBLIC_TABLES, bootstrap_owner
-from recall.errors import ApiError
-from recall.ingestion.anthropic_provider import AnthropicProvider
-from recall.ingestion.local_intelligence import create_intelligence_invitation
-from recall.ingestion.local_organization import MAX_V2_HEADER_BYTES, parse_binding
-from recall.ingestion.prompts import (
+from monolith.api.inference import create_inference_app
+from monolith.config import Settings
+from monolith.db.database import Database
+from monolith.db.inference_bootstrap import REQUIRED_PUBLIC_TABLES, bootstrap_owner
+from monolith.errors import ApiError
+from monolith.ingestion.anthropic_provider import AnthropicProvider
+from monolith.ingestion.local_intelligence import create_intelligence_invitation
+from monolith.ingestion.local_organization import MAX_V2_HEADER_BYTES, parse_binding
+from monolith.ingestion.prompts import (
     INTERPRET_AUDIO_HUMAN_SYSTEM,
     INTERPRET_AUDIO_MACHINE_SYSTEM,
     INTERPRET_TEXT_SYSTEM,
 )
-from recall.ingestion.provider import InterpretTextRequest, ProviderError, ProviderResult
-from recall.pairing import digest
+from monolith.ingestion.provider import InterpretTextRequest, ProviderError, ProviderResult
+from monolith.pairing import digest
 from test_anthropic_adapter import make, sse
 from test_inference_app import inference_settings
 from test_local_organization import TextProvider
@@ -251,7 +251,7 @@ def test_audio_flag_defaults_off_and_policy_version_is_bounded_and_distinct() ->
     assert settings.local_audio_organization_enabled is False
     assert (
         Settings.model_fields["local_audio_organization_enabled"].validation_alias
-        == "RECALL_LOCAL_AUDIO_ORGANIZATION_ENABLED"
+        == "MONOLITH_LOCAL_AUDIO_ORGANIZATION_ENABLED"
     )
     assert settings.audio_organize_policy_version == f"organize-audio-v1|{settings.ai_policy_version}|unconfigured"
     configured = settings.model_copy(update={"ai_provider": "anthropic", "ai_model_id": "fake-model"})
@@ -1020,8 +1020,8 @@ def test_exhausted_budget_blocks_audio_before_dispatch(pg_cluster: Any) -> None:
 
 
 def test_audio_reservation_covers_utf8_bytes_without_context_allowance(pg_cluster: Any) -> None:
-    from recall.domain.processing import estimate_cost
-    from recall.ingestion.worker import MAX_INTERPRET_OUTPUT_TOKENS, MAX_INTERPRET_TEXT_INPUT_TOKENS
+    from monolith.domain.processing import estimate_cost
+    from monolith.ingestion.worker import MAX_INTERPRET_OUTPUT_TOKENS, MAX_INTERPRET_TEXT_INPUT_TOKENS
 
     note = "界" * 1000
     seen: list[float] = []
@@ -1197,10 +1197,10 @@ def test_receipt_examples_in_the_shared_fixture_equal_real_service_output(pg_clu
     examples = generate_receipt_examples(pg_cluster)
     fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     expected = _apply_examples(fixture, examples)
-    if os.environ.get("RECALL_REGENERATE_FIXTURES") == "1":
+    if os.environ.get("MONOLITH_REGENERATE_FIXTURES") == "1":
         FIXTURE_PATH.write_text(json.dumps(expected, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
-    assert fixture == expected, "receipt examples drifted; regenerate with RECALL_REGENERATE_FIXTURES=1"
+    assert fixture == expected, "receipt examples drifted; regenerate with MONOLITH_REGENERATE_FIXTURES=1"
 
 
 def _all_quotes(value: Any) -> Iterator[str]:

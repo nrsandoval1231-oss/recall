@@ -7,11 +7,11 @@ import uuid
 
 from conftest import Env
 from fake_provider import FakeProvider
-from recall.ingestion.provider import InterpretRequest
-from recall.ingestion.worker import Worker
-from test_recall import admin, capture_with, consent, drain
+from monolith.ingestion.provider import InterpretRequest
+from monolith.ingestion.worker import Worker
+from test_monolith import admin, capture_with, consent, drain
 
-pytest_plugins = ["test_recall"]
+pytest_plugins = ["test_monolith"]
 
 
 def relationship_extraction(request: InterpretRequest) -> str:

@@ -1,4 +1,4 @@
-# Recall — Canonical Experience & Visual System
+# Monolith — Canonical Experience & Visual System
 
 ## Historical Ask — bounded local acceptance
 
@@ -14,7 +14,7 @@ The existing organization disclosure now includes up to three short current-vaul
 
 ## Save and automatic organization — active contract
 
-After one clear opt-in naming automatic cloud organization of future text and photos, saving should be the only ordinary action. Confirm durable local save immediately; interpretation continues while Recall is open. Keep Capture and Write a note prominent. Show short, truthful progress such as saved, organizing or organized; expose detailed recovery information only when useful. Do not require per-note filing, read approval or interpretation approval.
+After one clear opt-in naming automatic cloud organization of future text and photos, saving should be the only ordinary action. Confirm durable local save immediately; interpretation continues while Monolith is open. Keep Capture and Write a note prominent. Show short, truthful progress such as saved, organizing or organized; expose detailed recovery information only when useful. Do not require per-note filing, read approval or interpretation approval.
 
 The settings disclosure explains the provider and what leaves the device, enables/revokes this purpose, and makes clear that existing notes are not enrolled. A disconnected or offline device can still save originals. Interrupted or uncertain work recovers the existing request before any resend. Corrections preserve source/history and invalidate stale interpretation. A focused memory keeps its structured note and original accessible; proposal text remains visibly unreviewed. ORGANIZE-01 has bounded local acceptance, not live acceptance.
 
@@ -28,14 +28,14 @@ Keep the question on interruption, unavailable consent/provider, stale evidence 
 
 # Current delivery boundary
 
-Recall's target asks the user only to capture; the system handles organization into useful Obsidian memory and later natural-language recall. Photo organization, text capture, grounded current-vault Ask and automatic future text/photo organization have bounded local acceptance. Current related-memory links have bounded acceptance; anchored historical recall has bounded acceptance. UTF-8 .txt/.md import has bounded local acceptance; native voice implementation and broader files follow. Everyday capture, search and recent memories should be prominent; maintenance controls belong in an accessible settings/disclosure area. Do not add a per-memory approval click for ordinary organization. Keep machine proposals visibly distinct from verified facts, preserve source access and uncertainty, and never infer cross-note identity from matching names. Each new integrated change requires exact-candidate checks and independent review.
+Monolith's target asks the user only to capture; the system handles organization into useful Obsidian memory and later natural-language recall. Photo organization, text capture, grounded current-vault Ask and automatic future text/photo organization have bounded local acceptance. Current related-memory links have bounded acceptance; anchored historical recall has bounded acceptance. UTF-8 .txt/.md import has bounded local acceptance; native voice implementation and broader files follow. Everyday capture, search and recent memories should be prominent; maintenance controls belong in an accessible settings/disclosure area. Do not add a per-memory approval click for ordinary organization. Keep machine proposals visibly distinct from verified facts, preserve source access and uncertainty, and never infer cross-note identity from matching names. Each new integrated change requires exact-candidate checks and independent review.
 
 
 ## First use and device access — bounded desktop subset implemented
 
 TEXT-01 adds a direct note composer alongside photo import. Type or paste, then **Save note**; no title, folder, tag or photograph is required. Save preserves an immutable text original and an editable current note. Failed or uncertain saves retain the submitted text and retry identity. Opening a text original shows escaped text, never an image or executable markup, and photo-reading controls do not appear for it. Local text is saved and searchable; this packet does not label it AI-organized. Exact checks and review live in `.agent/FINISH-02/TEXT-COMPLETION.json`.
 
-The owner requires no account, password, or email-link sign-in anywhere, including first use. Open Recall, create/select an Obsidian vault with the OS folder permission, and capture locally. OS file permission is not a remote account. Do not substitute “sign in once” or remembered sessions. The phone-first target allows local drafts before a desktop vault is associated. PAIR-01 implements bounded manual owner-approved photo-inference association; it does not bridge a phone to the vault. Phone-to-vault transport remains unimplemented in this desktop slice.
+The owner requires no account, password, or email-link sign-in anywhere, including first use. Open Monolith, create/select an Obsidian vault with the OS folder permission, and capture locally. OS file permission is not a remote account. Do not substitute “sign in once” or remembered sessions. The phone-first target allows local drafts before a desktop vault is associated. PAIR-01 implements bounded manual owner-approved photo-inference association; it does not bridge a phone to the vault. Phone-to-vault transport remains unimplemented in this desktop slice.
 
 For cross-device private use, one-time QR association remains proposed and unapproved; do not build that interaction. The separately approved PAIR-01 implementation is a manual, single-device, photo-inference-only owner invitation. It does not authorize photo processing by itself. Local-only remains available. Show “Saved on this device,” “Waiting for vault,” “Received by relay; waiting for vault,” “Saved in vault,” and “Conflict needs review” only when supported by acknowledgments. Cloud AI and unseen originals remain unavailable offline. Existing email-auth screens are a current implementation gap, not the desired onboarding. See [RCL-005B](superpowers/specs/2026-10-07-rcl-005b-no-signin-vault-design.md).
 
@@ -49,20 +49,20 @@ Pending/unknown/cancelled operations disclose possible cloud processing and cost
 
 ## Required memory foundation
 
-Recall's Memory Surface operates over an Obsidian vault as the required, user-owned memory spine. Vault notes, links, original attachments and versioned provenance/history preserve memory outside Recall; PostgreSQL/search/SQLite are supporting services and projections. Obsidian is not an optional export adapter.
+Monolith's Memory Surface operates over an Obsidian vault as the required, user-owned memory spine. Vault notes, links, original attachments and versioned provenance/history preserve memory outside Monolith; PostgreSQL/search/SQLite are supporting services and projections. Obsidian is not an optional export adapter.
 
-This foundation stays behind the experience: Capture does not require folders/tags, Ask remains reconstruction, and users do not navigate a vault taxonomy to use Recall. Direct edits in Obsidian must reconcile explicitly without erasing evidence or history. Vault-unavailable/pending/conflict states remain honest. The current one-way exporter does not fulfill this requirement; see the architecture and RCL-005B migration gap.
+This foundation stays behind the experience: Capture does not require folders/tags, Ask remains reconstruction, and users do not navigate a vault taxonomy to use Monolith. Direct edits in Obsidian must reconcile explicitly without erasing evidence or history. Vault-unavailable/pending/conflict states remain honest. The current one-way exporter does not fulfill this requirement; see the architecture and RCL-005B migration gap.
 
 
 Version: 1.0 | Date: 2026-10-07 | Status: **approved canonical product direction**
 
-This document defines the target Recall experience. It supersedes conventional dashboard/page-navigation interpretations of the earlier UX baseline while preserving Recall's trust, provenance, accessibility, and universal-memory requirements.
+This document defines the target Monolith experience. It supersedes conventional dashboard/page-navigation interpretations of the earlier UX baseline while preserving Monolith's trust, provenance, accessibility, and universal-memory requirements.
 
 ## 1. North-star experience
 
 **Your life remembers itself.**
 
-Recall should not feel like a notes app, database, CRM, file manager, knowledge graph, or chatbot with storage attached. It should feel like a quiet external memory: capture disappears into the background; asking brings the right understanding and original evidence back into view.
+Monolith should not feel like a notes app, database, CRM, file manager, knowledge graph, or chatbot with storage attached. It should feel like a quiet external memory: capture disappears into the background; asking brings the right understanding and original evidence back into view.
 
 The primary experience is one continuously transforming **Memory Surface**.
 
@@ -72,18 +72,18 @@ CAPTURE -> UNDERSTAND -> CONNECT -> REMEMBER -> RECALL -> ACT
 
 These are not six modules. They are six states of the same environment.
 
-The user should feel that they focus on something and Recall rearranges memory around that intent.
+The user should feel that they focus on something and Monolith rearranges memory around that intent.
 
 ## 2. Canonical design language
 
-Recall's visual materials have semantic meaning:
+Monolith's visual materials have semantic meaning:
 
 - **Glass = understanding.** Summaries, interpretations, entities, relationships, timelines, reconstructed context, and controls live on translucent glass.
 - **Physical artifacts = evidence.** Notebook pages, photographs, screenshots, emails, PDFs, receipts, documents, and other originals retain their source character.
 - **Light = intelligence.** Restrained illumination communicates active context, relationships, new information, uncertainty, and attention.
 - **Space = relationships.** Proximity and composition communicate what belongs together without forcing the user to maintain links.
 - **Depth = context and focus.** Focused material moves toward the user; supporting context recedes but remains perceptible.
-- **Time = memory evolution.** Recall must make “what I knew then” distinct from “what I know now.”
+- **Time = memory evolution.** Monolith must make “what I knew then” distinct from “what I know now.”
 
 The signature composition is **original evidence beneath a translucent interpretation layer**: evidence underneath; understanding above it.
 
@@ -91,7 +91,7 @@ Glass is not decoration. If removing translucency, depth, or evidence layering l
 
 ## 3. The Memory Surface
 
-Recall is not organized around routes that expose the data model. The application may use routes internally, but the perceived interaction is one spatial surface.
+Monolith is not organized around routes that expose the data model. The application may use routes internally, but the perceived interaction is one spatial surface.
 
 The surface has five rendering layers:
 
@@ -145,11 +145,11 @@ This is a synthetic design fixture, not customer/project evidence.
 
 Home is intentionally sparse. Ask is the gravitational center. Capture and recent context are secondary. Avoid a dense dashboard.
 
-Permanent navigation should be minimal: **Recall / Ask / Capture / Recent** or an equivalently small set. People, Places, Projects, Equipment, Topics, and Timeline emerge contextually instead of becoming organizational chores.
+Permanent navigation should be minimal: **Monolith / Ask / Capture / Recent** or an equivalently small set. People, Places, Projects, Equipment, Topics, and Timeline emerge contextually instead of becoming organizational chores.
 
 ### Ask / reconstruction
 
-An answer is not merely prose. Recall reconstructs the relevant memory context:
+An answer is not merely prose. Monolith reconstructs the relevant memory context:
 
 - concise grounded answer;
 - supporting evidence;
@@ -166,8 +166,8 @@ Selecting a memory moves it toward the user. Opening evidence causes the interpr
 
 The user must be able to answer two questions immediately:
 
-1. What does Recall currently understand?
-2. Why does Recall believe that?
+1. What does Monolith currently understand?
+2. Why does Monolith believe that?
 
 ### Entity/context focus
 
@@ -175,7 +175,7 @@ Selecting a person, place, project, thing, event, or topic recenters the surface
 
 ### Temporal focus
 
-Time is first-class. A user can distinguish current understanding from historical state and, where evidence supports it, move to an earlier point to inspect what Recall knew then. The UI must never imply historical certainty the data model does not support.
+Time is first-class. A user can distinguish current understanding from historical state and, where evidence supports it, move to an earlier point to inspect what Monolith knew then. The UI must never imply historical certainty the data model does not support.
 
 ### Correction
 
@@ -185,7 +185,7 @@ Correction should operate on human statements, not raw metadata. The user select
 
 Mobile is not desktop shrunk down.
 
-**Mobile = Remember + Recall.**
+**Mobile = Remember + Monolith.**
 
 - Camera/capture and Ask dominate.
 - Present one primary glass board at a time.
@@ -211,7 +211,7 @@ Do not turn the capture confirmation screen into an organization form.
 
 ## 8. Visual character
 
-Recall should feel:
+Monolith should feel:
 
 **quiet · human · permanent · trustworthy · cinematic · warm**
 
@@ -262,13 +262,13 @@ The visual system must reinforce the existing trust model:
 - unsupported questions abstain honestly;
 - historical and current state are visually distinguishable.
 
-Recall should feel intelligent because it can show its memory, not because it performs AI theatrics.
+Monolith should feel intelligent because it can show its memory, not because it performs AI theatrics.
 
 ## 11. Implementation principle
 
 Do not hard-code the canonical Brooks Campus mockup as a special screen.
 
-Build reusable primitives driven by Recall's actual memory model, for example:
+Build reusable primitives driven by Monolith's actual memory model, for example:
 
 - `MemorySurface`
 - `GlassBoard`
@@ -290,7 +290,7 @@ The first implementation should prove the vertical slice before creating a large
 
 The canonical experience is successful when:
 
-- a new user can Ask or Capture without learning Recall's schema;
+- a new user can Ask or Capture without learning Monolith's schema;
 - Ask feels like reconstruction, not a search-results page;
 - evidence is visually and interactively inseparable from trustworthy recall;
 - selecting context feels like refocusing the same memory environment rather than navigating an admin application;
@@ -298,7 +298,7 @@ The canonical experience is successful when:
 - the experience remains usable with reduced motion and assistive technology;
 - mobile preserves the same mental model with one focused board at a time;
 - the UI works with real canonical data and honest empty/loading/error/uncertain states;
-- screenshots are visually distinctive enough that Recall cannot be mistaken for a generic notes or AI-chat application.
+- screenshots are visually distinctive enough that Monolith cannot be mistaken for a generic notes or AI-chat application.
 
 ## 13. Canonical phrase
 

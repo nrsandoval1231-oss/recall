@@ -54,7 +54,7 @@ function AudioCaptureInner({ vault, selected, active, onChanged, onOpen }: { vau
   function guard() { const e = epoch.current; return () => alive.current && context.current.active && epoch.current === e; }
   function setIntentBoth(next: Intent | null) { intentRef.current = next; setIntent(next); storeIntent(selected, next); }
   function accept(s: AudioOperationStatus) {
-    if (s.vault_id !== selected.vault_identity) throw new Error("This recording status belongs to a different vault, so Recall ignored it.");
+    if (s.vault_id !== selected.vault_identity) throw new Error("This recording status belongs to a different vault, so Monolith ignored it.");
     if (s.state !== lastState.current) { lastState.current = s.state; polls.current = 0; since.current = Date.now(); setPaused(false); }
     setStatus(s);
     const base = intentRef.current;
@@ -75,7 +75,7 @@ function AudioCaptureInner({ vault, selected, active, onChanged, onOpen }: { vau
     vault.audioStatus!(selected.vault_id, restored.operationId).then(s => { if (valid()) accept(s); }).catch(e => {
       if (!valid()) return;
       if (/unknown audio operation/i.test(message(e))) setIntentBoth(null);
-      else { setError(`Recall couldn’t check your earlier recording: ${message(e)}`); setPaused(true); }
+      else { setError(`Monolith couldn’t check your earlier recording: ${message(e)}`); setPaused(true); }
     }).finally(() => { if (valid()) { setBusy(null); setReady(true); } });
     return () => { epoch.current++; };
   }, [vault, selected.vault_id, selected.vault_identity, active]);
@@ -108,7 +108,7 @@ function AudioCaptureInner({ vault, selected, active, onChanged, onOpen }: { vau
       if (!valid()) return;
       // An operation that never began has nothing to resume; drop its stored ID.
       if (!status && /unknown audio operation/i.test(message(e))) { setIntentBoth(null); setNotice("That recording never started. You can record again."); return; }
-      setError(`Recall couldn’t read the recording status: ${message(e)}`); setPaused(true);
+      setError(`Monolith couldn’t read the recording status: ${message(e)}`); setPaused(true);
     }
     finally { if (valid() && manual) setBusy(null); }
   }
@@ -138,7 +138,7 @@ function AudioCaptureInner({ vault, selected, active, onChanged, onOpen }: { vau
   function recover(action: "save" | "discard") {
     const op = intentRef.current?.operationId ?? status?.operation_id; if (!op || status?.state !== "recovery_required" || !vault.audioRecover || busy || inflight.current) return;
     void act("recovering", async valid => { const s = await vault.audioRecover!(selected.vault_id, op, action); if (valid()) accept(s); },
-      e => `Recall couldn’t ${action} this recording: ${message(e)} Nothing was changed that you can’t retry.`);
+      e => `Monolith couldn’t ${action} this recording: ${message(e)} Nothing was changed that you can’t retry.`);
   }
   function importWav() {
     if (busy || recording || status?.state === "recovery_required" || inflight.current || !vault.importWav) return;
@@ -174,13 +174,13 @@ function AudioCaptureInner({ vault, selected, active, onChanged, onOpen }: { vau
     {recording && stable && <p className="local-audio-live"><span aria-hidden="true">● </span>Recording · <span role="timer" aria-label="Elapsed recording time">{clock(now - startedAt)}</span> of 2:00{format && <span className="local-muted"> · {format}</span>}</p>}
     {recording && <p className="local-muted">{limit ? `${limit} Finishing the save…` : "Choose Stop & save when you’re done. Recording stops by itself at 2 minutes."}</p>}
     {limit && !recording && state !== "failed" && <p>{limit}</p>}
-    {(state === "saved_local" || state === "transcription_processing") && <p className="local-muted">Your original recording is saved. A transcript will appear here when it’s ready, and you can keep using Recall meanwhile.</p>}
+    {(state === "saved_local" || state === "transcription_processing") && <p className="local-muted">Your original recording is saved. A transcript will appear here when it’s ready, and you can keep using Monolith meanwhile.</p>}
     {state === "transcribed" && <p className="local-muted">The transcript is machine-written and unreviewed. Open the recording to listen and check it.</p>}
-    {state === "transcription_unavailable" && <p>{transcriptProblem(status?.error_code) || "Recall couldn’t produce a transcript."} Your original recording is saved and you can still play it.</p>}
-    {state === "unknown" && <p>Recall can’t confirm whether transcription finished, and it won’t start it again automatically. Your original recording is saved and playable.</p>}
+    {state === "transcription_unavailable" && <p>{transcriptProblem(status?.error_code) || "Monolith couldn’t produce a transcript."} Your original recording is saved and you can still play it.</p>}
+    {state === "unknown" && <p>Monolith can’t confirm whether transcription finished, and it won’t start it again automatically. Your original recording is saved and playable.</p>}
     {state === "recovery_required" && <section className="local-review" aria-label="Recording decision"><p>{audioProblem(status?.error_code) || "A recording was left unfinished."}</p><p>You can save what was captured as a recording, or discard it. Discarding permanently removes this unsaved audio.</p>
       <div className="local-actions"><button className="local-primary" disabled={Boolean(busy)} onClick={() => recover("save")}>Save recording</button>{confirmDiscard ? <><button disabled={Boolean(busy)} onClick={() => recover("discard")}>Yes, discard this audio</button><button disabled={Boolean(busy)} onClick={() => setConfirmDiscard(false)}>Keep it for now</button></> : <button disabled={Boolean(busy)} onClick={() => setConfirmDiscard(true)}>Discard recording</button>}</div></section>}
-    {state === "failed" && <p>{audioProblem(status?.error_code) || "Recall couldn’t record."} {status?.memory ? "Your original recording was saved before this problem." : "Nothing was saved."}</p>}
+    {state === "failed" && <p>{audioProblem(status?.error_code) || "Monolith couldn’t record."} {status?.memory ? "Your original recording was saved before this problem." : "Nothing was saved."}</p>}
     {state === "discarded" && <p>The unsaved audio was removed. Nothing was added to your vault.</p>}
     {paused && live && <p className="local-muted">Automatic status checks are paused.</p>}
     {notice && <p role="status">{notice}</p>}{error && <p role="alert" className="local-error">{error}</p>}

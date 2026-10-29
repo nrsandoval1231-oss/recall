@@ -15,16 +15,16 @@ from fastapi.testclient import TestClient
 
 from conftest import make_database
 from fake_provider import faithful_extraction
-from recall.api.inference import create_inference_app
-from recall.db.database import Database
-from recall.db.inference_bootstrap import bootstrap_owner
-from recall.domain.processing import estimate_cost
-from recall.errors import ApiError
-from recall.ingestion.local_intelligence import create_intelligence_invitation
-from recall.ingestion.local_organization import parse_binding
-from recall.ingestion.provider import ProviderError, ProviderResult
-from recall.ingestion.worker import MAX_INTERPRET_OUTPUT_TOKENS, MAX_INTERPRET_TEXT_INPUT_TOKENS
-from recall.pairing import digest
+from monolith.api.inference import create_inference_app
+from monolith.db.database import Database
+from monolith.db.inference_bootstrap import bootstrap_owner
+from monolith.domain.processing import estimate_cost
+from monolith.errors import ApiError
+from monolith.ingestion.local_intelligence import create_intelligence_invitation
+from monolith.ingestion.local_organization import parse_binding
+from monolith.ingestion.provider import ProviderError, ProviderResult
+from monolith.ingestion.worker import MAX_INTERPRET_OUTPUT_TOKENS, MAX_INTERPRET_TEXT_INPUT_TOKENS
+from monolith.pairing import digest
 from test_inference_app import inference_settings
 
 

@@ -114,7 +114,7 @@ Citation validity is necessary but not sufficient: evaluation checks whether the
 
 ## Synthesized memory
 
-Post-V1, Recall may create source-backed synthesis across memories. A synthesis is never silently promoted to observed fact. Store its supporting memory IDs, generation/config version, generated time, and inference label. When underlying evidence changes or is corrected, dependent synthesis becomes stale until recomputed.
+Post-V1, Monolith may create source-backed synthesis across memories. A synthesis is never silently promoted to observed fact. Store its supporting memory IDs, generation/config version, generated time, and inference label. When underlying evidence changes or is corrected, dependent synthesis becomes stale until recomputed.
 
 ## Provider selection
 

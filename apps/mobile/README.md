@@ -1,4 +1,4 @@
-# Recall mobile (Expo / React Native, iPhone first)
+# Monolith mobile (Expo / React Native, iPhone first)
 
 This app is the preserved authenticated cloud pilot. Home opens natural-language Ask; Capture saves ordered photos durably before upload; Detail shows the source, machine reading, uncertainty and processing state, with retry where available; Settings contains the AI-processing consent. Ask returns cited answers or an honest ambiguity/insufficient-evidence result with matching sources. These are legacy cloud capabilities, not the no-sign-in product target or evidence of vault-backed memory.
 

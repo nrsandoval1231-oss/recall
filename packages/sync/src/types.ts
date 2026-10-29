@@ -1,4 +1,4 @@
-import type { MediaType, SourceKind } from "@recall/api-client";
+import type { MediaType, SourceKind } from "@monolith/api-client";
 
 export const MAX_PAGES = 10;
 export const MAX_PAGE_BYTES = 25 * 1024 * 1024;

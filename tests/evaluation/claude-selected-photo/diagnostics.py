@@ -8,32 +8,28 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from recall.ingestion.local_reading import (
+from monolith.ingestion.local_reading import (
     validate_selected_extraction as _offline_validator,
 )
-from recall.ingestion.validate import InvalidExtraction
+from monolith.ingestion.validate import InvalidExtraction
 
 EVAL_DIR = Path(__file__).resolve().parent
 MAX_RAW_BYTES = 900_000
 
 
+def _storage_root(repo: Path) -> Path:
+    """`.monolith-storage`, unless only the pre-rename `.recall-storage` exists (then keep using it)."""
+    legacy, current = repo / ".recall-storage", repo / ".monolith-storage"
+    return legacy if legacy.exists() and not current.exists() else current
+
+
 def default_diagnostic_dir() -> Path:
-    return (
-        EVAL_DIR.parents[2]
-        / ".recall-storage"
-        / "claude-selected-photo-eval"
-        / "diagnostics"
-    )
+    return _storage_root(EVAL_DIR.parents[2]) / "claude-selected-photo-eval" / "diagnostics"
 
 
 def diag02_diagnostic_dir() -> Path:
     """Fixed ignored directory for the DIAG-02 live diagnostic captures."""
-    return (
-        EVAL_DIR.parents[2]
-        / ".recall-storage"
-        / "claude-selected-photo-eval"
-        / "diag-02-diagnostics"
-    )
+    return _storage_root(EVAL_DIR.parents[2]) / "claude-selected-photo-eval" / "diag-02-diagnostics"
 
 
 def _allowlisted_fixture(case_id: str, fixture_sha256: str) -> bool:

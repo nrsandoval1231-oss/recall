@@ -23,7 +23,7 @@ def find_schema_path(settings: Settings) -> Path:
         candidate = parent / SCHEMA_RELATIVE
         if candidate.is_file():
             return candidate
-    raise RuntimeError("capture.schema.json not found; set RECALL_CAPTURE_SCHEMA_PATH")
+    raise RuntimeError("capture.schema.json not found; set MONOLITH_CAPTURE_SCHEMA_PATH")
 
 
 @lru_cache

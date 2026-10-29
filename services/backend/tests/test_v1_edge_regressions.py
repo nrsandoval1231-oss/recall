@@ -8,8 +8,8 @@ from contextlib import contextmanager
 
 import pytest
 
-from recall.domain import export as export_domain
-from recall.ingestion.worker import Worker
+from monolith.domain import export as export_domain
+from monolith.ingestion.worker import Worker
 
 
 def test_export_janitor_runs_without_a_new_export_request(monkeypatch: pytest.MonkeyPatch) -> None:

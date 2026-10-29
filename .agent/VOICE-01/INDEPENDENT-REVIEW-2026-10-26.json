@@ -1,0 +1,82 @@
+{
+  "packet": "VOICE-01 + AUDIO-ORG-01 + ORGSTATE-01 (combined candidate)",
+  "role": "independent exact-candidate reviewer (Kimi Work session, owner-requested)",
+  "verdict": "PASS (source/fixture scope)",
+  "candidate": "879569f5438a3c15f4dc5c7ca63718779d15d92a",
+  "candidate_subject": "Make text/photo organization state transitions honest and compare-and-set",
+  "base_head": "8a6335c3f4fd6bfc6e9f4aae260bf8cb8261dffb",
+  "base_note": "accepted local checkpoint; VOICE-01 c831fe2, AUDIO-ORG-01 211314e, ORGSTATE-01 879569f are cumulative on it; 4eafc6b is installer-layout evidence only",
+  "finished_utc": "2026-10-26T22:14:39Z",
+  "review_host": "Windows 11 (Git Bash) + WSL Ubuntu (PostgreSQL 18, backend venv), Rust via ~/.cargo, repo on /mnt/c",
+  "findings": [],
+  "independent_review": [
+    "Read VOICE-01 packet, NATIVE-DRAFT authority note, A1-A6 amendments, AUDIO-ORG-01 packet, CURRENT_STATE, WORK_GRAPH, FINISH_CONTRACT and prior PASS reviews (HISTORY-01 REVIEW.json) for house format and acceptance bar.",
+    "Inspected candidate diffs: 66 files, +17363/-505 (native Rust ~12k, desktop TS/TSX ~1.7k, backend Python ~700, migration 0012, fixtures, docs).",
+    "Targeted invariant inspection: source save before ASR (asr-request/result staging in local_vault_audio.rs); compiled-in pinned asset manifest with per-launch hash verification and DLL-dir==sidecar-parent check (audio_asr.rs); non-speech eligibility recompute with forged-eligible rejection (is_non_speech_annotation, local_vault_audio.rs); vault_select refusal under selection mutex while recording/transcription in flight (local_audio.rs); audio consent as separate table with default-disabled, RLS+force RLS, owner-only policy, consent_epoch, purge-function integration (0012_local_audio_organization.sql); OrganizationBinding 3.0 absent from 1.0/2.0 wires so their bytes are unchanged (local_organization.rs); ORGSTATE-01 compare-and-set transitions, durable sent flag, terminal-state protection, consent-revoke retirement (local_organization_state_tests.rs + local_organization.rs).",
+    "Confirmed zero candidate changes to tests/test_e2e_clients.py or tests/e2e (legacy cloud RCL-001/002 paths)."
+  ],
+  "gates_reproduced": [
+    {
+      "gate": "native cargo test --lib (Windows, warm target)",
+      "command": "cargo test --lib",
+      "result": "385 passed; 0 failed; 1 ignored; finished 113.91s",
+      "claimed": "385 passed/1 ignored",
+      "match": true
+    },
+    {
+      "gate": "desktop vitest",
+      "command": "npx vitest run --root apps/desktop",
+      "result": "12 files, 289 passed (289)",
+      "claimed": "289",
+      "match": true
+    },
+    {
+      "gate": "backend pytest (WSL, PostgreSQL 18 ephemeral)",
+      "command": "PYTHONPATH=src python -m pytest -q",
+      "result": "467 passed, 2 failed, 3 skipped in 282.40s",
+      "claimed": "469 passed/3 skipped",
+      "match": "partial — see environmental_notes"
+    },
+    {
+      "gate": "ruff check / ruff format --check / mypy src",
+      "command": "ruff check .; ruff format --check .; mypy src",
+      "result": "All checks passed; 98 files already formatted; no issues in 54 source files",
+      "claimed": "clean",
+      "match": true
+    },
+    {
+      "gate": "eslint / tsc typecheck (all workspaces + test tsconfigs)",
+      "command": "npx eslint .; npm run typecheck",
+      "result": "exit 0 / exit 0",
+      "claimed": "clean",
+      "match": true
+    },
+    {
+      "gate": "cargo fmt --check",
+      "command": "cargo fmt --check",
+      "result": "exit 0",
+      "claimed": "clean",
+      "match": true
+    },
+    {
+      "gate": "local-vault playwright (headless)",
+      "command": "playwright test -c tests/local-vault/playwright.config.ts",
+      "result": "53 passed of 58 listed; 5 not executed",
+      "claimed": "56-58",
+      "match": "partial — see environmental_notes"
+    }
+  ],
+  "environmental_notes": [
+    "The 2 backend failures are tests/test_e2e_clients.py (test_phone_to_cloud_to_desktop_bytes_are_identical, test_rcl002_phone_upload_worker_reading_and_desktop_ask). Root cause measured on this host: importing e2e_app alone takes 16.7s from /mnt/c (0.5s CPU — drvfs I/O-bound) while the tests' readiness loop waits only 10s, so the spawned uvicorn is not yet accepting connections. CONTROL: both tests fail identically at the pre-candidate base 8a6335c in this environment, and neither file is touched by the candidate. Not a candidate regression; they remain expected-pass on the native build host as claimed.",
+    "The 5 unexecuted browser tests are environment-gated (native sidecar / microphone fixtures not available on this host); the executed 53 all passed. The candidate's own scope states synthetic/fixture evidence only.",
+    "Clippy: pre-existing deny at reading_transport.rs:382 remains untouched, as documented."
+  ],
+  "open_gates_not_closed_by_this_review": [
+    "Real microphone capture proof and installed Windows run (unsigned NSIS installer never installed).",
+    "Live provider/private-service proof for audio Ask and audio organization (no paid calls authorized or made).",
+    "Held-out speech-quality acceptance (plain-word hallucination from non-speech remains a documented quality risk per amendment A1).",
+    "Broader file adapters, phone transport (R7C) and parent finish gates (R8) per WORK_GRAPH."
+  ],
+  "scope_statement": "This review certifies the exact candidate source at 879569f for the bounded source/fixture acceptance of VOICE-01, AUDIO-ORG-01 and ORGSTATE-01: invariants inspected, deterministic gates reproduced within the environmental limits above, zero blocking findings. It does not certify installed-device, live-provider, speech-quality, migration, deployment or parent-completion gates.",
+  "reviewer_independence": "Review performed in a fresh session with no participation in the candidate's implementation; all gate commands re-run from scratch on this host; control run at base commit isolates environmental failures."
+}

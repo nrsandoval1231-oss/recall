@@ -6,13 +6,13 @@
  */
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
-import { RecallApiClient, sha256Hex } from "../../packages/api-client/src";
+import { MonolithApiClient, sha256Hex } from "../../packages/api-client/src";
 import { CaptureSyncer } from "../../packages/sync/src";
 import { NodeFiles } from "../../packages/sync/src/testing/node-files";
 import { makeTempPhotos } from "../../packages/sync/src/testing/fixtures";
 
 const env = (k: string) => process.env[k] as string;
-const api = new RecallApiClient({ baseUrl: env("E2E_API_BASE"), getAccessToken: async () => env("E2E_TOKEN") });
+const api = new MonolithApiClient({ baseUrl: env("E2E_API_BASE"), getAccessToken: async () => env("E2E_TOKEN") });
 mkdirSync(env("E2E_ROOT"), { recursive: true });
 const files = new NodeFiles(env("E2E_ROOT"));
 const out = (o: unknown) => process.stdout.write(`E2E_RESULT ${JSON.stringify(o)}\n`);

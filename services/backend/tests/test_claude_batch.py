@@ -346,11 +346,11 @@ def test_opt_in_capture_on_fake_provider_route_preserves_rejection_and_accountin
 
     from conftest import REPO_ROOT, sha
     from fake_provider import FakeProvider
-    from recall.api.app import create_app
-    from recall.errors import forbidden
-    from recall.ingestion import local_reading
-    from recall.ingestion.local_reading import DeviceGrant
-    from test_recall import AI
+    from monolith.api.app import create_app
+    from monolith.errors import forbidden
+    from monolith.ingestion import local_reading
+    from monolith.ingestion.local_reading import DeviceGrant
+    from test_monolith import AI
 
     user = env.user()
     user.register_device()
@@ -433,8 +433,8 @@ def test_adapter_uses_single_attempt_no_fallback_and_full_output_ceiling() -> No
     import anthropic
     import httpx2
 
-    from recall.ingestion.anthropic_provider import AnthropicProvider
-    from recall.ingestion.provider import InterpretRequest
+    from monolith.ingestion.anthropic_provider import AnthropicProvider
+    from monolith.ingestion.provider import InterpretRequest
 
     captured = []
 
@@ -493,10 +493,10 @@ def test_adapter_uses_single_attempt_no_fallback_and_full_output_ceiling() -> No
 def test_synthetic_case_runs_through_selected_reading_service(env) -> None:  # type: ignore[no-untyped-def]
     from conftest import sha
     from fake_provider import FakeProvider, faithful_extraction
-    from recall.api.app import create_app
-    from recall.errors import forbidden
-    from recall.ingestion.local_reading import DeviceGrant
-    from test_recall import AI
+    from monolith.api.app import create_app
+    from monolith.errors import forbidden
+    from monolith.ingestion.local_reading import DeviceGrant
+    from test_monolith import AI
 
     user = env.user()
     user.register_device()
@@ -555,7 +555,7 @@ def test_synthetic_case_runs_through_selected_reading_service(env) -> None:  # t
     assert len(fake.interpret_calls) == 1
     assert "ground_truth" not in json.dumps(fake.interpret_calls[0].envelope)
 
-    from recall.ingestion.provider import ProviderResult
+    from monolith.ingestion.provider import ProviderResult
 
     class MismatchedProvider:
         def interpret(self, request):  # type: ignore[no-untyped-def]
@@ -675,7 +675,7 @@ def _run_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch, *, di
 
     from batch import default_journal_path, open_diag02_journal
 
-    diagnostics_enabled = diag02 or os.environ.get("RECALL_EVAL_DIAGNOSTICS") == "1"
+    diagnostics_enabled = diag02 or os.environ.get("MONOLITH_EVAL_DIAGNOSTICS") == "1"
     if diagnostics_enabled:
         from diagnostics import capture_validator, default_diagnostic_dir, diag02_diagnostic_dir, replay_to_file
 
@@ -687,11 +687,11 @@ def _run_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch, *, di
         diagnostic_schema = json.loads(
             (REPO_ROOT / "packages/contracts/extraction.schema.json").read_text(encoding="utf-8")
         )
-        from recall.ingestion import local_reading as local_reading_module
+        from monolith.ingestion import local_reading as local_reading_module
 
         original_validator = local_reading_module.validate_selected_extraction
 
-    from recall.ingestion.anthropic_provider import AnthropicProvider
+    from monolith.ingestion.anthropic_provider import AnthropicProvider
 
     probe = AnthropicProvider(
         api_key=key, model_id="claude-sonnet-5-5", effort="low", refusal_fallback=False, max_retries=0
@@ -702,10 +702,10 @@ def _run_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch, *, di
         probe._client.close()
     journal = open_diag02_journal() if diag02 else BatchJournal(default_journal_path(), expected_ids)
     try:
-        from recall.api.app import create_app
-        from recall.errors import forbidden
-        from recall.ingestion.local_reading import DeviceGrant
-        from test_recall import AI
+        from monolith.api.app import create_app
+        from monolith.errors import forbidden
+        from monolith.ingestion.local_reading import DeviceGrant
+        from test_monolith import AI
 
         user = env.user()
         user.register_device()
@@ -870,7 +870,7 @@ def _run_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch, *, di
 
 
 @pytest.mark.skipif(
-    os.environ.get("RECALL_EVAL_LIVE") != "1",
+    os.environ.get("MONOLITH_EVAL_LIVE") != "1",
     reason="controller must explicitly enable the original live synthetic batch",
 )
 def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
@@ -878,7 +878,7 @@ def test_live_synthetic_selected_reading_batch(env, tmp_path, monkeypatch):  # t
 
 
 @pytest.mark.skipif(
-    os.environ.get("RECALL_DIAG02_LIVE") != "1",
+    os.environ.get("MONOLITH_DIAG02_LIVE") != "1",
     reason="controller must explicitly enable the separately approved DIAG-02 batch",
 )
 def test_live_diag02_synthetic_reading_batch(env, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]

@@ -7,12 +7,12 @@ import pytest
 
 from conftest import Env
 from fake_provider import FakeProvider
-from recall.domain import processing
-from recall.domain.deletion import PurgeWorker
-from recall.ingestion.worker import Worker
-from test_recall import admin, capture_with, consent, drain
+from monolith.domain import processing
+from monolith.domain.deletion import PurgeWorker
+from monolith.ingestion.worker import Worker
+from test_monolith import admin, capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def test_unprocessed_page_delete_retry_uses_only_surviving_original(

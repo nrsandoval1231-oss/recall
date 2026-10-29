@@ -1,12 +1,12 @@
 [package]
-name = "recall-desktop"
+name = "monolith-desktop"
 version = "0.1.0"
-description = "Recall desktop (RCL-001: trusted capture viewer)"
+description = "Monolith desktop (RCL-001: trusted capture viewer)"
 edition = "2021"
 publish = false
 
 [lib]
-name = "recall_desktop_lib"
+name = "monolith_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

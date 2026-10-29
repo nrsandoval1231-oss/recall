@@ -2,8 +2,8 @@
 
 import pytest
 
-from recall.config import Settings
-from recall.pairing import digest, validate_secret
+from monolith.config import Settings
+from monolith.pairing import digest, validate_secret
 
 
 def test_pairing_secret_is_exactly_32_bytes_lowercase_hex_and_fingerprint_is_sha256() -> None:

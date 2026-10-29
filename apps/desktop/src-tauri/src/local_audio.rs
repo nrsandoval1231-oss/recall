@@ -283,7 +283,7 @@ mod windows_backend {
             let (stop_tx, stop_rx) = mpsc::channel::<()>();
             // The stream is created, kept and dropped on this one thread.
             let join = thread::Builder::new()
-                .name("recall-audio-capture".into())
+                .name("monolith-audio-capture".into())
                 .spawn(move || match build(sink) {
                     Ok((stream, config)) => {
                         let _ = ready_tx.send(Ok(config));
@@ -1142,7 +1142,7 @@ impl AudioState {
                     // takes the selection mutex, because a Stop command may be
                     // holding it while joining this writer.
                     let _ = thread::Builder::new()
-                        .name("recall-audio-commit".into())
+                        .name("monolith-audio-commit".into())
                         .spawn(move || {
                             let _ = state.complete_session(&guard, &op, end);
                         });
@@ -1154,7 +1154,7 @@ impl AudioState {
             }) as Box<dyn FnOnce(SessionEnd) + Send>
         };
         let join = thread::Builder::new()
-            .name("recall-audio-writer".into())
+            .name("monolith-audio-writer".into())
             .spawn({
                 let shared = shared.clone();
                 move || run_session(rx, failure, handle, file, stage, config, shared, auto)
@@ -1460,7 +1460,7 @@ impl AudioState {
         let core = self.0.clone();
         let guard = guard.clone();
         let memory_id = memory_id.to_owned();
-        let spawned = thread::Builder::new().name("recall-asr".into()).spawn({
+        let spawned = thread::Builder::new().name("monolith-asr".into()).spawn({
             let core = core.clone();
             let memory_id = memory_id.clone();
             move || {

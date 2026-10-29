@@ -9,10 +9,14 @@ from pathlib import Path
 
 import psycopg
 
-dsn_file = Path(os.environ["RECALL_MIGRATION_DSN_FILE"])
-os.environ["RECALL_MIGRATION_DATABASE_URL"] = dsn_file.read_text(encoding="utf-8").strip()
-os.environ["RECALL_MIGRATIONS_DIR"] = "/app/services/backend/migrations"
-subprocess.run([sys.executable, "-m", "recall.db.migrate"], check=True)
-with psycopg.connect(os.environ["RECALL_MIGRATION_DATABASE_URL"], autocommit=True) as conn:
+# Accept the pre-rename RECALL_* variable names: a MONOLITH_* value always wins.
+for _legacy in [k for k in os.environ if k.startswith("RECALL_")]:
+    os.environ.setdefault("MONOLITH_" + _legacy[len("RECALL_") :], os.environ[_legacy])
+
+dsn_file = Path(os.environ["MONOLITH_MIGRATION_DSN_FILE"])
+os.environ["MONOLITH_MIGRATION_DATABASE_URL"] = dsn_file.read_text(encoding="utf-8").strip()
+os.environ["MONOLITH_MIGRATIONS_DIR"] = "/app/services/backend/migrations"
+subprocess.run([sys.executable, "-m", "monolith.db.migrate"], check=True)
+with psycopg.connect(os.environ["MONOLITH_MIGRATION_DATABASE_URL"], autocommit=True) as conn:
     conn.execute("grant select on table schema_migrations to recall_app")
 subprocess.run([sys.executable, "/ops/audit-database.py"], check=True)

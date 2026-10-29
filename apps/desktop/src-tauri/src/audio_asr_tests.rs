@@ -10,7 +10,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 fn tmp() -> PathBuf {
-    let p = std::env::temp_dir().join(format!("recall-synthetic-asr-{}", Uuid::new_v4()));
+    let p = std::env::temp_dir().join(format!("monolith-synthetic-asr-{}", Uuid::new_v4()));
     fs::create_dir_all(&p).unwrap();
     p
 }
@@ -428,8 +428,8 @@ mod windows_process {
 
 // ----------------------------------------------------------------------------
 // Real pinned sidecar, synthetic speech only. Run explicitly:
-//   RECALL_SYNTH_SPEECH_16K=<synthetic 16 kHz mono SAPI wav>
-//   RECALL_SYNTH_SPEECH_48K_STEREO=<synthetic 48 kHz stereo SAPI wav>
+//   MONOLITH_SYNTH_SPEECH_16K=<synthetic 16 kHz mono SAPI wav>
+//   MONOLITH_SYNTH_SPEECH_48K_STEREO=<synthetic 48 kHz stereo SAPI wav>
 //   cargo test --lib real_pinned_sidecar -- --ignored --nocapture
 // Needs the staged, git-ignored binaries/ and voice-assets/ (prepare-voice-assets.ps1).
 // ----------------------------------------------------------------------------
@@ -504,7 +504,7 @@ fn real_pinned_sidecar_transcribes_synthetic_speech_and_handles_silence() {
     );
 
     // Known speech, 16 kHz mono (bypass transform) and 48 kHz stereo (rubato path).
-    let mono = run_real(&engine, &synthetic_speech("RECALL_SYNTH_SPEECH_16K"));
+    let mono = run_real(&engine, &synthetic_speech("MONOLITH_SYNTH_SPEECH_16K"));
     report("speech-16k-mono", &mono);
     assert!(mono.completed, "{mono:?}");
     let text = mono.text.clone().unwrap().to_lowercase();
@@ -512,7 +512,10 @@ fn real_pinned_sidecar_transcribes_synthetic_speech_and_handles_silence() {
         text.contains("dentist") && text.contains("tomorrow") && text.contains("afternoon"),
         "{text}"
     );
-    let stereo = run_real(&engine, &synthetic_speech("RECALL_SYNTH_SPEECH_48K_STEREO"));
+    let stereo = run_real(
+        &engine,
+        &synthetic_speech("MONOLITH_SYNTH_SPEECH_48K_STEREO"),
+    );
     report("speech-48k-stereo", &stereo);
     assert!(stereo.completed, "{stereo:?}");
     let text = stereo.text.clone().unwrap().to_lowercase();
@@ -523,7 +526,7 @@ fn real_pinned_sidecar_transcribes_synthetic_speech_and_handles_silence() {
 
     // Gain-reduced speech and a pure tone, measured and reported (F0 saw an omitted
     // time phrase at low gain and a [Music] label for the tone).
-    let speech = synthetic_speech("RECALL_SYNTH_SPEECH_16K");
+    let speech = synthetic_speech("MONOLITH_SYNTH_SPEECH_16K");
     let info = audio_wav::parse_wav(&speech).unwrap();
     let quiet_pcm: Vec<u8> = speech[info.data_offset..info.data_offset + info.data_len]
         .chunks_exact(2)
@@ -631,7 +634,7 @@ fn real_pinned_sidecar_transcribes_synthetic_speech_and_handles_silence() {
         gated.state, gated.error_code
     );
     assert_eq!(gated.error_code.as_deref(), Some("rms_gate"));
-    let speech_id = import(&synthetic_speech("RECALL_SYNTH_SPEECH_16K"));
+    let speech_id = import(&synthetic_speech("MONOLITH_SYNTH_SPEECH_16K"));
     let started = Instant::now();
     let done = wait(
         &speech_id,

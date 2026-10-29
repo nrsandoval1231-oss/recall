@@ -785,6 +785,13 @@ impl Vault {
     pub fn root_for_test(&self) -> PathBuf {
         self.root.clone()
     }
+    pub fn dir_for_test(&self) -> &'static str {
+        self.dir
+    }
+    /// Create (or open) a pre-rename vault whose memory subtree is `Recall/`.
+    pub fn open_legacy_for_test(root: &Path) -> Result<Self> {
+        Self::open_in(root, LEGACY_DIR)
+    }
 }
 
 #[cfg(test)]

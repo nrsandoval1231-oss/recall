@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
-  RecallApiClient,
+  MonolithApiClient,
   sha256Hex,
   type CaptureManifest,
   type MediaType,
   type ServerCapture,
-} from "@recall/api-client";
+} from "@monolith/api-client";
 import {
   deleteDraft,
   draftPage,
@@ -15,12 +15,12 @@ import {
   type Draft,
 } from "./storage";
 import type { BrowserAuth, BrowserSession } from "./auth/session";
-import { serverStatusKey, statusPresentation } from "@recall/design-tokens";
+import { serverStatusKey, statusPresentation } from "@monolith/design-tokens";
 import { MemorySurface } from "./surface/MemorySurface";
 
 interface Services {
   auth: BrowserAuth;
-  api: RecallApiClient;
+  api: MonolithApiClient;
 }
 const scopeFor = (session: BrowserSession) =>
   `${session.userId}:${session.workspaceId}`;
@@ -47,7 +47,7 @@ export function App({ services }: { services: Services }) {
           setStartupError(
             failure instanceof Error
               ? failure.message
-              : "Recall could not check your session.",
+              : "Monolith could not check your session.",
           );
       });
   };
@@ -66,8 +66,8 @@ export function App({ services }: { services: Services }) {
   if (startupError)
     return (
       <main className="signin card">
-        <div className="brand">Recall</div>
-        <h1>Recall is unavailable.</h1>
+        <div className="brand">Monolith</div>
+        <h1>Monolith is unavailable.</h1>
         <p className="error" role="alert">
           {startupError}
         </p>
@@ -76,7 +76,7 @@ export function App({ services }: { services: Services }) {
         </button>
       </main>
     );
-  if (session === undefined) return <p className="empty">Loading Recall…</p>;
+  if (session === undefined) return <p className="empty">Loading Monolith…</p>;
   return session ? (
     <Home
       key={scopeFor(session)}
@@ -130,7 +130,7 @@ function SignIn({ auth }: { auth: BrowserAuth }) {
   };
   return (
     <main className="signin card">
-      <div className="brand">Recall</div>
+      <div className="brand">Monolith</div>
       <h1>Keep what matters.</h1>
       <p className="muted">
         Sign in privately. The link in your email returns here automatically.
@@ -160,7 +160,7 @@ function SignIn({ auth }: { auth: BrowserAuth }) {
       </button>
       {sent && (
         <p className="status" role="status">
-          Check your email. Follow the link to return to Recall.
+          Check your email. Follow the link to return to Monolith.
         </p>
       )}
       {limited && (
@@ -307,7 +307,7 @@ function Home({
       auths.find((item) => item.source_id === server.pages[0]?.source_id) ??
       auths[0];
     if (!authorization)
-      throw new Error("Recall did not provide an upload authorization.");
+      throw new Error("Monolith did not provide an upload authorization.");
     const uploaded = await services.api.putUpload(authorization, bytes);
     return services.api.finalize(
       server.capture_id,

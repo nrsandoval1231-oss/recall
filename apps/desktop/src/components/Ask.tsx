@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { copy } from "@recall/design-tokens";
-import { ApiError, type AskResponse, type Citation, type RecallApiClient } from "@recall/api-client";
+import { copy } from "@monolith/design-tokens";
+import { ApiError, type AskResponse, type Citation, type MonolithApiClient } from "@monolith/api-client";
 import type { CacheScope, CachedRecord, NativeCache } from "../platform/native-cache";
 
 /** Ask what you remember. Each status renders differently: they are not interchangeable successes. */
-export function Ask({ api, onOpenCitation, cache, scope }: { api: Pick<RecallApiClient, "ask">; onOpenCitation: (c: Citation) => void; cache?: NativeCache; scope?: CacheScope | null }) {
+export function Ask({ api, onOpenCitation, cache, scope }: { api: Pick<MonolithApiClient, "ask">; onOpenCitation: (c: Citation) => void; cache?: NativeCache; scope?: CacheScope | null }) {
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AskResponse | null>(null);
@@ -24,8 +24,8 @@ export function Ask({ api, onOpenCitation, cache, scope }: { api: Pick<RecallApi
       const denied = failure instanceof ApiError && (failure.status === 401 || failure.status === 403);
       if (!denied && cache?.available && scope) {
         try { setCached(await cache.search(scope, question.trim(), 20)); setError("Offline: showing cached keyword matches. Fresh answers are unavailable."); }
-        catch { setError("Couldn't reach Recall to answer. Your captures are unaffected."); }
-      } else setError(denied ? "Your session no longer has access to Ask." : "Couldn't reach Recall to answer. Your captures are unaffected.");
+        catch { setError("Couldn't reach Monolith to answer. Your captures are unaffected."); }
+      } else setError(denied ? "Your session no longer has access to Ask." : "Couldn't reach Monolith to answer. Your captures are unaffected.");
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
-import { color, font, minTarget, radius, space, statusPresentation, toneColor, type CaptureStatusKey } from "@recall/design-tokens";
+import { color, font, minTarget, radius, space, statusPresentation, toneColor, type CaptureStatusKey } from "@monolith/design-tokens";
 
 export function Button({ label, onPress, kind = "primary", disabled, style, hint }: { label: string; onPress: () => void; kind?: "primary" | "secondary" | "danger"; disabled?: boolean; style?: ViewStyle; hint?: string }) {
   return (

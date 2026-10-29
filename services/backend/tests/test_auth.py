@@ -14,8 +14,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from conftest import AUDIENCE, ISSUER, Env, make_token
-from recall.api.auth import StaticKeyResolver, TokenVerifier
-from recall.config import Settings
+from monolith.api.auth import StaticKeyResolver, TokenVerifier
+from monolith.config import Settings
 
 
 def _b64(obj: dict[str, object]) -> str:
@@ -105,7 +105,7 @@ def test_hs256_projects_accept_only_hs256_and_correct_secret() -> None:
     uid = uuid.uuid4()
     good = jwt.encode({"sub": str(uid), "iss": ISSUER, "aud": AUDIENCE, "exp": int(time.time()) + 60}, secret, "HS256")
     assert verifier.verify(good).user_id == uid
-    from recall.errors import ApiError
+    from monolith.errors import ApiError
 
     bad = jwt.encode({"sub": str(uid), "iss": ISSUER, "aud": AUDIENCE, "exp": int(time.time()) + 60}, "x" * 40, "HS256")
     with pytest.raises(ApiError):
@@ -131,7 +131,7 @@ def test_auto_provisioning_can_be_disabled(env: Env) -> None:
     from fastapi.testclient import TestClient
 
     from conftest import REPO_ROOT
-    from recall.api.app import create_app
+    from monolith.api.app import create_app
 
     settings = env.settings.model_copy(update={"auto_provision_workspaces": False})
     verifier = TokenVerifier(StaticKeyResolver(env.key.public_key(), ["ES256"]), ISSUER, AUDIENCE)
@@ -156,7 +156,7 @@ def test_auto_provisioning_can_be_disabled(env: Env) -> None:
 def test_concurrent_first_requests_provision_exactly_one_workspace(env: Env) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
-    from recall.domain.captures import CaptureService
+    from monolith.domain.captures import CaptureService
 
     service = CaptureService(env.db, env.store, env.settings)
     uid = uuid.uuid4()
@@ -170,7 +170,7 @@ def test_concurrent_first_requests_provision_exactly_one_workspace(env: Env) -> 
 def test_identity_provider_outage_is_503_not_signed_out() -> None:
     import jwt as pyjwt
 
-    from recall.errors import ApiError
+    from monolith.errors import ApiError
 
     class Down:
         algorithms = ["ES256"]

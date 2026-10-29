@@ -8,9 +8,14 @@ import psycopg
 import pytest
 from psycopg.rows import dict_row
 
-from recall.db.database import Tx
-from recall.ingestion.embeddings import EmbeddingConfig, EmbeddingProviderError, VoyageEmbeddingProvider, pending_chunks
-from recall.retrieval.hybrid import (
+from monolith.db.database import Tx
+from monolith.ingestion.embeddings import (
+    EmbeddingConfig,
+    EmbeddingProviderError,
+    VoyageEmbeddingProvider,
+    pending_chunks,
+)
+from monolith.retrieval.hybrid import (
     SemanticIndexUnavailable,
     hybrid_search,
     merge_authorized_candidates,

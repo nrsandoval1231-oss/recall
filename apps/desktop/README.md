@@ -1,4 +1,4 @@
-# Recall desktop (Tauri 2 + React, Windows first)
+# Monolith desktop (Tauri 2 + React, Windows first)
 
 ## Current continuation — automatic organization
 
@@ -10,6 +10,6 @@ The default experience is local-first: choose an Obsidian vault, type/paste a no
 
 Local capture, annotation, evidence and keyword search need no remote account. The native adapter owns selected-vault disk operations; the renderer cannot choose arbitrary paths. Browser preview cannot save a native vault. Lifecycle commands support same-folder stable-ID renames, explicit missing-note restore, retained logical removal/history and keyword rebuild. Logical removal is not physical deletion, secure purge or undelete. See [local vault evidence](../../docs/implementation/local-vault/README.md), [lifecycle evidence](../../docs/implementation/local-vault-lifecycle/README.md) and [photo-reading evidence](../../docs/implementation/claude-vault-reading/README.md).
 
-Run from the repository root with `npm ci`, then `npm run tauri -w @recall/desktop -- dev`; Rust 1.89+ and Tauri prerequisites are required. See [developer instructions](../../docs/DEVELOPMENT.md#local-only-desktop-foundation). Installed Windows acceptance remains open. A prior unsigned PR11 artifact is historical evidence, not a current installer or acceptance claim.
+Run from the repository root with `npm ci`, then `npm run tauri -w @monolith/desktop -- dev`; Rust 1.89+ and Tauri prerequisites are required. See [developer instructions](../../docs/DEVELOPMENT.md#local-only-desktop-foundation). Installed Windows acceptance remains open. A prior unsigned PR11 artifact is historical evidence, not a current installer or acceptance claim.
 
 The explicit `?mode=legacy-cloud` entry preserves the earlier authenticated cloud application, including its API, source verification, SQLite/offline sync, outbox, export and privacy contracts. It remains separate from the default local vault entry and is not removed by the local-first target.

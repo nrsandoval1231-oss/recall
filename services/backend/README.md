@@ -1,4 +1,4 @@
-# Recall backend
+# Monolith backend
 
 ## Current continuation — automatic organization
 
@@ -6,7 +6,7 @@ REALIGN-01 and TEXT-01 have independent local acceptance in `.agent/REALIGN-01/C
 
 Ask considers up to eight current eligible memories, with bounded excerpts and visible coverage limits. It preserves uncertainty, opens cited memories/originals, and suppresses answers after source or vault changes. Keyword search remains available locally; it is not an offline generated answer. Historical questions, automatic AI text organization, grounded cross-memory links, voice/files, phone transport and full real-device/live acceptance remain open.
 
-One FastAPI package at `src/recall` supplies the preserved authenticated cloud pilot and the bounded private selected-photo inference service. API and worker entrypoints reuse the same Python domain modules with separate least-privilege database roles. The default local desktop reads/writes its selected Obsidian vault through native commands; it does not use this package for local capture or keyword search.
+One FastAPI package at `src/monolith` supplies the preserved authenticated cloud pilot and the bounded private selected-photo inference service. API and worker entrypoints reuse the same Python domain modules with separate least-privilege database roles. The default local desktop reads/writes its selected Obsidian vault through native commands; it does not use this package for local capture or keyword search.
 
 | Module | Current role |
 | --- | --- |

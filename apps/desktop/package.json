@@ -1,5 +1,5 @@
 {
-  "name": "@recall/desktop",
+  "name": "@monolith/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@recall/api-client": "*",
-    "@recall/design-tokens": "*",
+    "@monolith/api-client": "*",
+    "@monolith/design-tokens": "*",
     "@tauri-apps/api": "^2.12.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"

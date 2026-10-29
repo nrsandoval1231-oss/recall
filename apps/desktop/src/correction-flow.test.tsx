@@ -3,7 +3,7 @@ import { webcrypto } from "node:crypto";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ApiError, type MemoryDetail, type ServerCapture } from "@recall/api-client";
+import { ApiError, type MemoryDetail, type ServerCapture } from "@monolith/api-client";
 import { assertNativeExportSize } from "./platform/native-cache";
 import { Library } from "./components/Library";
 import { managedExportNotice } from "./App";

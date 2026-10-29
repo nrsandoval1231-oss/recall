@@ -1813,7 +1813,7 @@ mod tests {
 
     #[test]
     fn source_or_revision_change_while_receipt_get_is_in_flight_blocks_post() {
-        let root = std::env::temp_dir().join(format!("recall-organize-race-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("monolith-organize-race-{}", Uuid::new_v4()));
         std::fs::create_dir(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let fingerprint = "a".repeat(64);
@@ -1962,7 +1962,8 @@ mod tests {
 
     #[test]
     fn confirmed_enable_commits_future_only_marker_before_next_capture() {
-        let root = std::env::temp_dir().join(format!("recall-organize-consent-{}", Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("monolith-organize-consent-{}", Uuid::new_v4()));
         std::fs::create_dir(&root).unwrap();
         let vault = Vault::open(&root).unwrap();
         let before = vault

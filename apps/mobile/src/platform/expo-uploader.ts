@@ -1,6 +1,6 @@
 import { File, UploadType } from "expo-file-system";
-import { NetworkError } from "@recall/api-client";
-import type { FileUploader } from "@recall/sync";
+import { NetworkError } from "@monolith/api-client";
+import type { FileUploader } from "@monolith/sync";
 import type { ExpoFiles } from "./expo-files";
 
 /** Streams the file from disk (never loads it into JS memory). Any HTTP response is returned; only transport failure throws. */

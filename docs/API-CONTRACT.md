@@ -1,10 +1,10 @@
-# Recall API contracts
+# Monolith API contracts
 
 ## Text-file import — TEXT-FILE-01
 
 Native `vault_import_text_file({ expectedVaultId, operationId })` owns the one-file picker and returns a saved `VaultMemory` or `null` for cancellation. The renderer supplies neither a path nor file bytes. Keep the operation ID through uncertain outcomes and retry: an existing receipt or recoverable import returns the same memory without reopening the picker; a staged import without its source requires the same basename and bytes on reselection.
 
-Imported memories add optional `imported_text` provenance: `original_name`, `original_extension`, `source_media_type`, `semantic_sha256`, `semantic_bytes`, and `semantic_characters`. The exact original remains an inert `.txt` attachment, including BOM and line endings. The existing source command returns its bytes as `text/plain; charset=utf-8`; the original filename is display data. One leading UTF-8 BOM is omitted only from the initial semantic text. No original Markdown frontmatter becomes Recall metadata.
+Imported memories add optional `imported_text` provenance: `original_name`, `original_extension`, `source_media_type`, `semantic_sha256`, `semantic_bytes`, and `semantic_characters`. The exact original remains an inert `.txt` attachment, including BOM and line endings. The existing source command returns its bytes as `text/plain; charset=utf-8`; the original filename is display data. One leading UTF-8 BOM is omitted only from the initial semantic text. No original Markdown frontmatter becomes Monolith metadata.
 
 The existing text organization wire and consent remain unchanged. Capture accepts at most 256 KiB; the smaller 30,000-character/120,000-byte organization limits still apply. A larger valid capture stays local and searchable with an honest skipped-processing state. See the [accepted packet](../.agent/TEXT-FILE-01.md) and [exact acceptance](../.agent/TEXT-FILE-01/COMPLETION.json).
 
@@ -207,7 +207,7 @@ Return stable machine codes and useful user messages. Do not encourage blind ret
 
 These are the exact, tested semantics of the packet-001 routes. Where they refine the proposal above, they win.
 
-**Auth.** `Authorization: Bearer <provider JWT>`. The server validates signature (JWKS asymmetric keys, or legacy HS256 secret), issuer, audience, expiry, and a UUID `sub`. Algorithms are allow-listed (no `none`, no HS/RS confusion). The workspace is derived from verified membership; no request field or header selects or grants a workspace. Each user gets one personal workspace on first authenticated request unless `RECALL_AUTO_PROVISION_WORKSPACES=false`.
+**Auth.** `Authorization: Bearer <provider JWT>`. The server validates signature (JWKS asymmetric keys, or legacy HS256 secret), issuer, audience, expiry, and a UUID `sub`. Algorithms are allow-listed (no `none`, no HS/RS confusion). The workspace is derived from verified membership; no request field or header selects or grants a workspace. Each user gets one personal workspace on first authenticated request unless `MONOLITH_AUTO_PROVISION_WORKSPACES=false`.
 
 **Devices.** `POST /v1/devices` `{device_id, platform, name?, app_version?}` is naturally idempotent on the client-chosen `device_id` (201 first time, 200 on the same registration, 409 if the id is registered differently) and is the one creation route that does not take `Idempotency-Key`. A capture requires a device registered by the same user.
 
@@ -219,7 +219,7 @@ These are the exact, tested semantics of the packet-001 routes. Where they refin
 
 **Read.** `GET /v1/captures` (opaque, workspace-bound, signed cursors; newest first by server creation time (a capture whose transaction commits late can appear after a client has paged past its position; refresh from the top)) and `GET /v1/captures/{id}` return the capture view. `GET /v1/sources/{id}/content` streams the original through the authenticated API (no signed read URLs are issued) only for verified pages of a `stored` capture (else 409 `SOURCE_UNAVAILABLE`), with `Content-Type` = verified media type, `X-Recall-Source-SHA256`, `ETag`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`. Another workspace's capture or source is indistinguishable from a nonexistent one (404 `NOT_FOUND`).
 
-**Also**: `/healthz` (liveness) and `/readyz` (DB + storage) are unauthenticated and content-free. CORS is closed unless `RECALL_CORS_ORIGINS` lists explicit origins (never `*`).
+**Also**: `/healthz` (liveness) and `/readyz` (DB + storage) are unauthenticated and content-free. CORS is closed unless `MONOLITH_CORS_ORIGINS` lists explicit origins (never `*`).
 
 ## RCL-002 implementation details
 
@@ -227,7 +227,7 @@ These are the exact, tested semantics of the packet-001 routes. Where they refin
 
 **Capture views** gain `processing: {state: queued|running|retrying|succeeded|failed|cancelled, attempts, max_attempts, blocked_reason: budget_exhausted|null, last_error_code, retry_available} | null` and `memory_id`. Finalize creates the job in the same transaction that stores the capture. A capture stays `stored` until a worker actually claims its job (then `processing`); it ends `ready`, `needs_review` (unreadable pages or items dropped by validation), or `failed`. Originals stay viewable in every state after `stored`.
 
-**Worker** (`python -m recall.ingestion.worker`, role inheriting `recall_worker`): claims with `FOR UPDATE SKIP LOCKED` and a lease (default 900 s), re-verifies each original's SHA-256 before anything leaves, sends only server-made derivatives (EXIF orientation applied, metadata stripped, JPEG, size-bounded), validates the proposal, and commits only if it still holds the lease and consent is still active. Retryable failures back off (30 s × attempts²) up to `RECALL_MAX_PROCESSING_ATTEMPTS`; refusals, truncation, integrity and decoding failures are terminal. Every provider call (including failed and repair calls) is recorded in `ai_usage` with an estimated cost; when the deployment's daily or monthly spend reaches its budget, no new call is made and queued jobs show `blocked_reason: budget_exhausted`.
+**Worker** (`python -m monolith.ingestion.worker`, role inheriting `recall_worker`): claims with `FOR UPDATE SKIP LOCKED` and a lease (default 900 s), re-verifies each original's SHA-256 before anything leaves, sends only server-made derivatives (EXIF orientation applied, metadata stripped, JPEG, size-bounded), validates the proposal, and commits only if it still holds the lease and consent is still active. Retryable failures back off (30 s × attempts²) up to `MONOLITH_MAX_PROCESSING_ATTEMPTS`; refusals, truncation, integrity and decoding failures are terminal. Every provider call (including failed and repair calls) is recorded in `ai_usage` with an estimated cost; when the deployment's daily or monthly spend reaches its budget, no new call is made and queued jobs show `blocked_reason: budget_exhausted`.
 
 **Validation** (see AI-INGESTION): unparseable/schema-invalid/wrong capture/wrong pages/unknown ids → one repair call per attempt, then retry. Soft rules never add certainty. Every claim is judged against the **full source lines** its verbatim quotes come from: quotes must be verbatim in that page's transcription (else the item is dropped); numbers in a summary, statement, or action must appear in its quotes; capitalised names and time words (weekdays, months, "tomorrow", "next", …) must appear in its cited lines (else the summary/statement/action is dropped); mention text, `temporal_text`, `due_text`, and `attribution_text` must each sit inside a single quote (no stitching across quotes; else removed); `confirmed_by_user` is downgraded to `reported`, `superseded`/`retracted` to `uncertain`; a `reported` statement becomes `uncertain` when any cited line contains "?" or a recorded uncertainty overlaps its evidence. Notes are stored with the revision and returned as `validation_notes`.
 
@@ -254,7 +254,7 @@ current workspace membership without provisioning. It verifies the device before
 again before dispatch, and again before returning a POST or GET receipt. The renderer never receives the
 credential, chooses an origin, or supplies a filesystem path.
 
-With RECALL_DEVICE_PAIRING_ENABLED=true, POST /v1/device-pairings/{invitation_id}/claim accepts only a
+With MONOLITH_DEVICE_PAIRING_ENABLED=true, POST /v1/device-pairings/{invitation_id}/claim accepts only a
 32-byte device secret in a body capped at 4 KiB. The invitation ID alone cannot claim. GET
 /v1/device-pairings/status resolves claim outcomes using the device bearer. DELETE /v1/device-pairings
 revokes that bearer idempotently. Native requests use the same fixed HTTPS origin, disable redirects and

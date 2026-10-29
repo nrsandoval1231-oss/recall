@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { ApiError, type EpistemicState, type MemoryDetail, type RecallApiClient, type Relationship } from "@recall/api-client";
+import { ApiError, type EpistemicState, type MemoryDetail, type MonolithApiClient, type Relationship } from "@monolith/api-client";
 import { epistemicLabel } from "../viewmodel";
 import type { CacheScope, NativeCache } from "../platform/native-cache";
 
 /** Interpretation beside the original. Always labelled as a machine reading; the original wins. */
-export function MemoryPanel({ api, memoryId, pageId, cache, scope }: { api: Pick<RecallApiClient, "getMemory"> & Partial<Pick<RecallApiClient, "correctMemory" | "deleteMemory">>; memoryId: string; pageId: string | undefined; cache?: NativeCache; scope?: CacheScope | null }) {
+export function MemoryPanel({ api, memoryId, pageId, cache, scope }: { api: Pick<MonolithApiClient, "getMemory"> & Partial<Pick<MonolithApiClient, "correctMemory" | "deleteMemory">>; memoryId: string; pageId: string | undefined; cache?: NativeCache; scope?: CacheScope | null }) {
   const [memory, setMemory] = useState<MemoryDetail | null>(null);
   const [error, setError] = useState(false);
   const [edit, setEdit] = useState<{ target: "summary" | "transcription" | "claim"; claimId?: string; pageId?: string; text?: string; epistemic_state?: EpistemicState; valid_from?: string | null; valid_to?: string | null } | null>(null);
@@ -39,7 +39,7 @@ export function MemoryPanel({ api, memoryId, pageId, cache, scope }: { api: Pick
       if (!api.correctMemory) throw new Error("CORRECTION_UNAVAILABLE");
       const corrected = await api.correctMemory(memoryId, correction, key, memory.revision);
       setMemory(corrected);
-      setEditNote("Correction saved. Recall will keep the original and this revision."); setEdit(null);
+      setEditNote("Correction saved. Monolith will keep the original and this revision."); setEdit(null);
     }
     catch (failure) {
       if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) { setMemory(null); setError(true); }
@@ -113,7 +113,7 @@ export function MemoryPanel({ api, memoryId, pageId, cache, scope }: { api: Pick
       )}
       {memory.validation_notes.length > 0 && (
         <details>
-          <summary>{memory.validation_notes.length} thing(s) Recall couldn't confirm against the page</summary>
+          <summary>{memory.validation_notes.length} thing(s) Monolith couldn't confirm against the page</summary>
           <ul>{memory.validation_notes.map((n, i) => <li key={i}>{n.detail}</li>)}</ul>
         </details>
       )}

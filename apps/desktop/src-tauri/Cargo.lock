@@ -2443,6 +2443,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "monolith-desktop"
+version = "0.1.0"
+dependencies = [
+ "caseless",
+ "cpal",
+ "getrandom 0.4.3",
+ "hex",
+ "keyring",
+ "reqwest",
+ "rfd",
+ "rubato",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "thiserror 1.0.69",
+ "unicode-normalization",
+ "uuid",
+ "windows-sys 0.59.0",
+ "zip",
+]
+
+[[package]]
 name = "muda"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3316,31 +3341,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f821338fddb99d089116342c46e9f1fbf3828dba077674613e734e01d6ea8677"
 dependencies = [
  "rustfft",
-]
-
-[[package]]
-name = "recall-desktop"
-version = "0.1.0"
-dependencies = [
- "caseless",
- "cpal",
- "getrandom 0.4.3",
- "hex",
- "keyring",
- "reqwest",
- "rfd",
- "rubato",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "tauri",
- "tauri-build",
- "thiserror 1.0.69",
- "unicode-normalization",
- "uuid",
- "windows-sys 0.59.0",
- "zip",
 ]
 
 [[package]]

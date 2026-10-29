@@ -18,4 +18,4 @@ run_worker_first = true
 # API_ORIGIN = "https://api.example.com"
 # SUPABASE_URL = "https://project.supabase.co"
 # SUPABASE_PUBLISHABLE_KEY = "sb_publishable_..."
-# SITE_ORIGIN = "https://recall.example.com"
+# SITE_ORIGIN = "https://monolith.example.com"

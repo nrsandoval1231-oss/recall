@@ -94,13 +94,13 @@ write(
     "runtime.env",
     "\n".join(
         (
-            f"RECALL_PUBLIC_ORIGIN={origin}",
+            f"MONOLITH_PUBLIC_ORIGIN={origin}",
             "AI_PROVIDER=anthropic",
             "AI_MODEL_ID=synthetic-ci-model",
             "AI_INPUT_USD_PER_MTOK=1",
             "AI_OUTPUT_USD_PER_MTOK=1",
-            "RECALL_AI_DAILY_BUDGET_USD=0",
-            "RECALL_AI_MONTHLY_BUDGET_USD=0",
+            "MONOLITH_AI_DAILY_BUDGET_USD=0",
+            "MONOLITH_AI_MONTHLY_BUDGET_USD=0",
             "AI_EFFORT=low",
             f"ANTHROPIC_CUSTOM_HEADERS=anthropic-workspace-id: {account}",
         )

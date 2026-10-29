@@ -46,18 +46,18 @@ def test_phone_to_cloud_to_desktop_bytes_are_identical(pg_cluster: PgCluster, tm
     env = {
         **os.environ,
         "DATABASE_URL": app_dsn,
-        "RECALL_AUTH_ISSUER": ISSUER,
-        "RECALL_AUTH_JWT_SECRET": SECRET,
-        "RECALL_SIGNING_SECRET": "e2e-signing-secret-0123456789abcdefghijkl",
-        "RECALL_LOCAL_STORAGE_DIR": str(store),
-        "RECALL_CAPTURE_SCHEMA_PATH": str(REPO_ROOT / "packages/contracts/capture.schema.json"),
+        "MONOLITH_AUTH_ISSUER": ISSUER,
+        "MONOLITH_AUTH_JWT_SECRET": SECRET,
+        "MONOLITH_SIGNING_SECRET": "e2e-signing-secret-0123456789abcdefghijkl",
+        "MONOLITH_LOCAL_STORAGE_DIR": str(store),
+        "MONOLITH_CAPTURE_SCHEMA_PATH": str(REPO_ROOT / "packages/contracts/capture.schema.json"),
     }
     server = subprocess.Popen(
         [
             sys.executable,
             "-m",
             "uvicorn",
-            "recall.api.app:app_factory",
+            "monolith.api.app:app_factory",
             "--factory",
             "--port",
             str(port),
@@ -113,9 +113,9 @@ def test_phone_to_cloud_to_desktop_bytes_are_identical(pg_cluster: PgCluster, tm
 def test_rcl002_phone_upload_worker_reading_and_desktop_ask(pg_cluster: PgCluster, tmp_path: Path) -> None:
     """Real server process + real worker + TypeScript clients. The MODEL is the labelled synthetic fake."""
     from fake_provider import FakeProvider
-    from recall.config import Settings
-    from recall.ingestion.worker import Worker
-    from recall.storage.local import LocalObjectStore
+    from monolith.config import Settings
+    from monolith.ingestion.worker import Worker
+    from monolith.storage.local import LocalObjectStore
 
     tsx = REPO_ROOT / "node_modules/tsx/dist/cli.mjs"
     if not tsx.exists() or not shutil.which("node"):
@@ -131,19 +131,19 @@ def test_rcl002_phone_upload_worker_reading_and_desktop_ask(pg_cluster: PgCluste
         "AI_API_KEY": "test-key-not-real",
         "AI_INPUT_USD_PER_MTOK": "4",
         "AI_OUTPUT_USD_PER_MTOK": "20",
-        "RECALL_AI_DAILY_BUDGET_USD": "10",
-        "RECALL_AI_MONTHLY_BUDGET_USD": "100",
+        "MONOLITH_AI_DAILY_BUDGET_USD": "10",
+        "MONOLITH_AI_MONTHLY_BUDGET_USD": "100",
     }
     env = {
         **os.environ,
         **ai_env,
         "DATABASE_URL": app_dsn,
-        "RECALL_AUTH_ISSUER": ISSUER,
-        "RECALL_AUTH_JWT_SECRET": SECRET,
-        "RECALL_SIGNING_SECRET": "e2e-signing-secret-0123456789abcdefghijkl",
-        "RECALL_LOCAL_STORAGE_DIR": str(store),
-        "RECALL_CAPTURE_SCHEMA_PATH": str(REPO_ROOT / "packages/contracts/capture.schema.json"),
-        "PYTHONPATH": str(Path(__file__).parent),
+        "MONOLITH_AUTH_ISSUER": ISSUER,
+        "MONOLITH_AUTH_JWT_SECRET": SECRET,
+        "MONOLITH_SIGNING_SECRET": "e2e-signing-secret-0123456789abcdefghijkl",
+        "MONOLITH_LOCAL_STORAGE_DIR": str(store),
+        "MONOLITH_CAPTURE_SCHEMA_PATH": str(REPO_ROOT / "packages/contracts/capture.schema.json"),
+        "PYTHONPATH": os.pathsep.join(filter(None, [str(Path(__file__).parent), os.environ.get("PYTHONPATH", "")])),
     }
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "e2e_app:make", "--factory", "--port", str(port), "--log-level", "warning"],

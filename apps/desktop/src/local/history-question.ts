@@ -82,18 +82,18 @@ export function resolveHistoryQuestion(original: string, followup = "", now = ne
   if (latest.test(original) && !historyAnchor.test(original)) return { kind: "current" };
   const anchor = combined.match(historyAnchor);
   const followupOnlyHistory = !anchor && Boolean(followup.trim()) && (unanchoredHistory.test(original) || incompleteHistoricalIntent.test(original));
-  if (!anchor && !followupOnlyHistory) return unanchoredHistory.test(original) || incompleteHistoricalIntent.test(original) ? { kind: "clarify", reason: "Which full calendar date should Recall use?" } : { kind: "current" };
+  if (!anchor && !followupOnlyHistory) return unanchoredHistory.test(original) || incompleteHistoricalIntent.test(original) ? { kind: "clarify", reason: "Which full calendar date should Monolith use?" } : { kind: "current" };
   const tail = followup.trim() ? followup.trim() : combined.slice((anchor!.index ?? 0) + anchor![0].length);
   const parsed = parseDate(tail, now, timezone);
   const dateScope = followup.trim() ? tail : combined;
   const dateHits = [...dateScope.matchAll(/\b\d{4}-\d{2}-\d{2}\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?[,]?\s+\d{4}\b|\btoday\b|\byesterday\b/gi)];
   const slash = /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/.test(tail);
   if (timezoneAbbreviation.test(tail) || timeQualifier.test(tail) || slash || dateHits.length > 1 || parsed.invalid) return { kind: "clarify", reason: "Please give one valid full date in your local timezone." };
-  if (!parsed.date) return { kind: "clarify", reason: "Which full calendar date should Recall use? You can type it here in ordinary language." };
+  if (!parsed.date) return { kind: "clarify", reason: "Which full calendar date should Monolith use? You can type it here in ordinary language." };
   const timezoneValue = timezone.trim();
-  if (!timezoneValue || /\s/.test(timezoneValue)) return { kind: "clarify", reason: "Recall could not confirm this device’s timezone. Please check it before asking about a date." };
+  if (!timezoneValue || /\s/.test(timezoneValue)) return { kind: "clarify", reason: "Monolith could not confirm this device’s timezone. Please check it before asking about a date." };
   try { new Intl.DateTimeFormat("en", { timeZone: timezoneValue }).format(now); }
-  catch { return { kind: "clarify", reason: "Recall could not confirm this device’s timezone. Please check it before asking about a date." }; }
+  catch { return { kind: "clarify", reason: "Monolith could not confirm this device’s timezone. Please check it before asking about a date." }; }
   const temporal = temporalForLocalDay(parsed.date, timezoneValue, !followupOnlyHistory && /what changed since/i.test(anchor![0]) ? "compare_to_current" : "as_of");
-  return temporal ? { kind: "history", temporal } : { kind: "clarify", reason: "Recall could not resolve that local calendar day. Please clarify the date or timezone." };
+  return temporal ? { kind: "history", temporal } : { kind: "clarify", reason: "Monolith could not resolve that local calendar day. Please clarify the date or timezone." };
 }

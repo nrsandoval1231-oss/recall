@@ -9,8 +9,12 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
+# Accept the pre-rename RECALL_* variable names: a MONOLITH_* value always wins.
+for _legacy in [k for k in os.environ if k.startswith("RECALL_")]:
+    os.environ.setdefault("MONOLITH_" + _legacy[len("RECALL_") :], os.environ[_legacy])
+
 MIGRATIONS = Path(
-    os.environ.get("RECALL_MIGRATIONS_DIR", "/app/services/backend/migrations")
+    os.environ.get("MONOLITH_MIGRATIONS_DIR", "/app/services/backend/migrations")
 )
 REQUIRED = {
     "schema_migrations",
@@ -91,7 +95,7 @@ def api_memberships(connection):
     }
 
 
-dsn = os.environ["RECALL_MIGRATION_DATABASE_URL"]
+dsn = os.environ["MONOLITH_MIGRATION_DATABASE_URL"]
 with psycopg.connect(dsn, row_factory=dict_row) as conn:
     expected = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()

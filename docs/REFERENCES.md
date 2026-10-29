@@ -1,6 +1,6 @@
 # Primary technical references
 
-Checked 2026-10-09. These support technology capabilities and cautions, not a claim that Recall is implemented. Recheck version-specific behavior before installing dependencies or provisioning a service.
+Checked 2026-10-09. These support technology capabilities and cautions, not a claim that Monolith is implemented. Recheck version-specific behavior before installing dependencies or provisioning a service.
 
 - [Expo Camera](https://docs.expo.dev/versions/latest/sdk/camera/) — native camera access and temporary image URIs; copy captures to durable app storage before acknowledging local Save.
 - [Expo permissions](https://docs.expo.dev/guides/permissions/) — native build-time configuration and runtime permission handling.

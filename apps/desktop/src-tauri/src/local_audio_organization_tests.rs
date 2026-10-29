@@ -17,7 +17,7 @@ const POLICY: &str = "organize-audio-v1|synthetic-policy|synthetic-model";
 const FINGERPRINT: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 fn root(v: &Vault) -> PathBuf {
-    v.root_for_test().join("Recall")
+    v.root_for_test().join(v.dir_for_test())
 }
 fn history_file(v: &Vault, id: &str, rev: u64) -> PathBuf {
     root(v).join(format!("History/{id}/{rev:020}.json"))
@@ -38,7 +38,7 @@ pub(crate) struct Env {
 }
 impl Env {
     fn new() -> Self {
-        let dir = std::env::temp_dir().join(format!("recall-synthetic-audioorg-{}", op()));
+        let dir = std::env::temp_dir().join(format!("monolith-synthetic-audioorg-{}", op()));
         let root = dir.join("vault");
         fs::create_dir_all(&root).unwrap();
         let state = LocalVaultState::new(dir.join("selected.json"));

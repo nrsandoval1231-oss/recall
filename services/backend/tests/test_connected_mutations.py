@@ -7,10 +7,10 @@ from datetime import UTC, datetime
 
 from conftest import Env, User
 from fake_provider import FakeProvider
-from recall.ingestion.worker import Worker
-from test_recall import admin, capture_with, consent, drain
+from monolith.ingestion.worker import Worker
+from test_monolith import admin, capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def test_same_name_across_captures_only_proposes_identity_and_entity_view_is_traceable(

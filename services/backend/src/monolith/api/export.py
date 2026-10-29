@@ -20,7 +20,7 @@ def register_routes(app: FastAPI, db: Database, store: ObjectStore, principal: C
         return FileResponse(
             path,
             media_type="application/zip",
-            filename="recall-export.zip",
+            filename="monolith-export.zip",
             headers={"Cache-Control": "no-store"},
             background=BackgroundTask(path.unlink, missing_ok=True),
         )

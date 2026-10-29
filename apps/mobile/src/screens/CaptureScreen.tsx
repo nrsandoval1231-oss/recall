@@ -5,8 +5,8 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import * as Crypto from "expo-crypto";
 import { Image } from "expo-image";
-import { color, copy, minTarget, radius, space } from "@recall/design-tokens";
-import { addPages, movePage, removePage, retakePage, SaveError, MAX_PAGES, type DraftPage } from "@recall/sync";
+import { color, copy, minTarget, radius, space } from "@monolith/design-tokens";
+import { addPages, movePage, removePage, retakePage, SaveError, MAX_PAGES, type DraftPage } from "@monolith/sync";
 import type { Services } from "../services";
 import { Button, text } from "../ui/kit";
 
@@ -97,7 +97,7 @@ export function CaptureScreen({ services, onDone, onCancel }: { services: Servic
           </View>
         ) : (
           <View style={[styles.cameraBox, styles.permission]}>
-            <Text style={text.body}>{permission.canAskAgain ? "Recall needs the camera to photograph pages." : "Camera access is off. You can turn it on in Settings, or import photos instead."}</Text>
+            <Text style={text.body}>{permission.canAskAgain ? "Monolith needs the camera to photograph pages." : "Camera access is off. You can turn it on in Settings, or import photos instead."}</Text>
             {permission.canAskAgain && <Button label="Allow camera" onPress={requestPermission} style={{ marginTop: space.md }} />}
           </View>
         )}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { sha256Hex, type RecallApiClient } from "@recall/api-client";
+import { sha256Hex, type MonolithApiClient } from "@monolith/api-client";
 
 export function GlassBoard({
   children,
@@ -41,7 +41,7 @@ export function EvidenceArtifact({
   onStart,
   onFailure,
 }: {
-  api: Pick<RecallApiClient, "fetchSource">;
+  api: Pick<MonolithApiClient, "fetchSource">;
   sourceId: string;
   page: number | null;
   expectedHash?: string;
@@ -136,7 +136,7 @@ export function EvidenceArtifact({
           <a
             className="source-download"
             href={original.url}
-            download={`recall-original.${original.mediaType.split("/")[1] ?? "bin"}`}
+            download={`monolith-original.${original.mediaType.split("/")[1] ?? "bin"}`}
           >
             Download verified original
           </a>

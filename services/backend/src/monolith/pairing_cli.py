@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import uuid
 
 import psycopg
 
+from .envcompat import getenv
 from .ingestion.local_intelligence import (
     create_intelligence_invitation,
     revoke_lost_intelligence_device,
@@ -32,9 +32,9 @@ def main() -> int:
     parser.add_argument("--policy-version", help="exact configured provider policy version for Ask consent")
     parser.add_argument("--approve", action="store_true", help="confirm owner-approved inference-only pairing")
     args = parser.parse_args()
-    dsn = os.environ.get("RECALL_MIGRATION_DATABASE_URL")
+    dsn = getenv("MONOLITH_MIGRATION_DATABASE_URL")
     if not dsn:
-        print("RECALL_MIGRATION_DATABASE_URL (owner role) is required", file=sys.stderr)
+        print("MONOLITH_MIGRATION_DATABASE_URL (owner role) is required", file=sys.stderr)
         return 2
     if not args.approve:
         print(

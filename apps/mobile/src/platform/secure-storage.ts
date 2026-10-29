@@ -1,5 +1,5 @@
 import * as SecureStore from "expo-secure-store";
-import { chunkedSecretStorage } from "@recall/api-client";
+import { chunkedSecretStorage } from "@monolith/api-client";
 
 /** Auth session in the iOS Keychain (device-local, available after first unlock), split into small entries. */
 const options = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };

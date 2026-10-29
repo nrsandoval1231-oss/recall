@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { handle, relay, type Env } from "./worker";
 
-const site = "https://recall.example.test";
+const site = "https://monolith.example.test";
 const sessionKey = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 
 function env(): Env {

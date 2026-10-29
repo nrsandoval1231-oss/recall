@@ -20,6 +20,10 @@ from backup import MAX_BACKUP_BYTES, MAX_MANIFEST_BYTES, TABLES, digest, pg_envi
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict
 
+# Accept the pre-rename RECALL_* variable names: a MONOLITH_* value always wins.
+for _legacy in [k for k in os.environ if k.startswith("RECALL_")]:
+    os.environ.setdefault("MONOLITH_" + _legacy[len("RECALL_") :], os.environ[_legacy])
+
 
 def pg_restore_command(restore: str, dump: Path, database: str) -> list[str]:
     return [restore, "--dbname", database, "--exit-on-error", "--single-transaction", str(dump)]
@@ -79,8 +83,8 @@ def set_hold(path: Path) -> None:
 
 def require_api_shutdown() -> None:
     """Require exact Compose API container stop plus loopback refusal before target SQL."""
-    project = os.environ.get("RECALL_RESTORE_COMPOSE_PROJECT", "")
-    container = os.environ.get("RECALL_RESTORE_API_CONTAINER_ID", "")
+    project = os.environ.get("MONOLITH_RESTORE_COMPOSE_PROJECT", "")
+    container = os.environ.get("MONOLITH_RESTORE_API_CONTAINER_ID", "")
     docker = shutil.which("docker")
     if not project or not container or docker is None:
         raise SystemExit("Restore requires an exact Compose API container shutdown proof.")
@@ -102,7 +106,7 @@ def require_api_shutdown() -> None:
     if inspected.returncode or inspected.stdout.strip() != f"false {project} api":
         raise SystemExit("API container is not stopped for the exact Compose project.")
     try:
-        endpoint = urlsplit(os.environ["RECALL_RESTORE_API_FENCE_URL"])
+        endpoint = urlsplit(os.environ["MONOLITH_RESTORE_API_FENCE_URL"])
     except (KeyError, ValueError):
         raise SystemExit("Restore requires a verified private API shutdown endpoint.") from None
     if (
@@ -127,10 +131,10 @@ def require_api_shutdown() -> None:
 
 
 def main() -> int:
-    encrypted_path = Path(os.environ["RECALL_RESTORE_ARCHIVE"])
-    identity = Path(os.environ["RECALL_RESTORE_AGE_IDENTITY_FILE"])
-    dsn = Path(os.environ["RECALL_RESTORE_DATABASE_URL_FILE"]).read_text(encoding="utf-8").strip()
-    hold_path = Path(os.environ["RECALL_RESTORE_HOLD_PATH"])
+    encrypted_path = Path(os.environ["MONOLITH_RESTORE_ARCHIVE"])
+    identity = Path(os.environ["MONOLITH_RESTORE_AGE_IDENTITY_FILE"])
+    dsn = Path(os.environ["MONOLITH_RESTORE_DATABASE_URL_FILE"]).read_text(encoding="utf-8").strip()
+    hold_path = Path(os.environ["MONOLITH_RESTORE_HOLD_PATH"])
     # Every later refusal leaves this durable, external hold in place.
     set_hold(hold_path)
     sidecar = Path(str(encrypted_path) + ".sha256").read_text(encoding="utf-8").split()
@@ -148,7 +152,7 @@ def main() -> int:
         if conn.execute("select count(*) from pg_tables where schemaname='public'").fetchone()[0] != 0:
             raise SystemExit("Restore target must be an empty database.")
 
-    with tempfile.TemporaryDirectory(prefix="recall-do-inference-restore-") as scratch_name:
+    with tempfile.TemporaryDirectory(prefix="monolith-do-inference-restore-") as scratch_name:
         scratch = Path(scratch_name)
         os.chmod(scratch, 0o700)
         archive_path, dump = scratch / "backup.zip", scratch / "database.dump"
@@ -224,8 +228,8 @@ def main() -> int:
                 if actual != expected:
                     raise SystemExit("Restored public-table row counts differ from the encrypted manifest.")
         env = os.environ.copy()
-        env["RECALL_MIGRATION_DATABASE_URL"] = dsn
-        env["RECALL_MIGRATIONS_DIR"] = str(Path(__file__).resolve().parents[3] / "services" / "backend" / "migrations")
+        env["MONOLITH_MIGRATION_DATABASE_URL"] = dsn
+        env["MONOLITH_MIGRATIONS_DIR"] = str(Path(__file__).resolve().parents[3] / "services" / "backend" / "migrations")
         audit = subprocess.run(  # noqa: S603 -- fixed Python executable and local audited script
             [sys.executable, str(Path(__file__).with_name("audit-database.py"))],
             env=env,

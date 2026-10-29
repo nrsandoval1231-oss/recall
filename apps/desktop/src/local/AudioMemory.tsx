@@ -17,7 +17,7 @@ export function TranscriptText({ memory }: { memory: VaultMemory }) {
     <section className="local-machine-reading">
       {human !== null ? <details className="local-tools"><summary>Machine transcript kept in history · unreviewed</summary>{usable ? <p className="local-reading-text">{machine.text}</p> : <p className="local-muted">The machine transcript was not usable.</p>}</details>
         : usable ? <><h3>Machine transcript · unreviewed</h3><p className="local-reading-text">{machine.text}</p><p className="local-muted">Written by software, not checked by you. It is not a verified record of what was said.</p></>
-          : <><h3>No usable transcript</h3><p>Recall didn’t get a reliable transcript from this recording. It may be silent, very quiet or unclear. Listen to it, and type what you hear if you like.</p></>}
+          : <><h3>No usable transcript</h3><p>Monolith didn’t get a reliable transcript from this recording. It may be silent, very quiet or unclear. Listen to it, and type what you hear if you like.</p></>}
       <details className="local-provenance"><summary>Transcript details</summary><p>{TRANSCRIPT_CAVEAT}</p><p>Made on this computer · {machine.transform_version}</p><p>Recording SHA-256: {machine.source_sha256}</p><p>Model SHA-256: {machine.model_sha256}</p><p>Recognizer build: {machine.runtime_source_commit} · {machine.runtime_binary_sha256}</p>{machine.quality_flags.length > 0 && <p>Quality notes: {machine.quality_flags.join(", ")}</p>}</details>
     </section>
   </>;
@@ -168,14 +168,14 @@ export function AudioMemory({ vault, session, memory, active, generation, blocke
       {sourceError && <p role="alert" className="local-error">{sourceError}</p>}
       {url && !playError ? <audio controls src={url} aria-label="Original recording" onError={() => setPlayError(true)} /> : playable && !sourceError && !playError ? <p role="status">Loading the original recording…</p> : null}
       {playError && <p role="alert" className="local-error">This recording couldn’t be played here, but the original file is saved. Use “View original” to download it.</p>}
-      {source && <p className="local-muted">{clock(source.duration_ms)} · {source.sample_rate_hz / 1000} kHz · {source.channels === 1 ? "mono" : "stereo"} · {source.capture_origin === "recorded" ? "recorded in Recall" : `imported${source.original_name ? ` · ${source.original_name}` : ""}`} · bytes unchanged, hash checked by this device</p>}
+      {source && <p className="local-muted">{clock(source.duration_ms)} · {source.sample_rate_hz / 1000} kHz · {source.channels === 1 ? "mono" : "stereo"} · {source.capture_origin === "recorded" ? "recorded in Monolith" : `imported${source.original_name ? ` · ${source.original_name}` : ""}`} · bytes unchanged, hash checked by this device</p>}
     </div>
     {memory.note.trim() && <section className="local-audio-annotation" aria-label="Your annotation"><h2>Your annotation</h2><p className="local-note">{memory.note}</p><p className="local-muted">Text you added to this memory outside the recording. It is searchable and Ask can use it; it is not part of the transcript and not a verified claim.</p></section>}
     <div className="local-audio-transcript">
       <h2>Transcript</h2>
       {t ? <TranscriptText memory={memory} />
         : !vault.audioStatus ? <p className="local-muted">No transcript is available for this recording.</p>
-          : ended ? <p role="status">{ended.state === "unknown" ? "Recall can’t confirm whether transcription finished, and it won’t start it again automatically." : transcriptProblem(ended.error_code) || "Recall couldn’t produce a transcript."} Your original recording is saved and playable above.</p>
+          : ended ? <p role="status">{ended.state === "unknown" ? "Monolith can’t confirm whether transcription finished, and it won’t start it again automatically." : transcriptProblem(ended.error_code) || "Monolith couldn’t produce a transcript."} Your original recording is saved and playable above.</p>
             : waitPaused ? <><p className="local-muted">No transcript yet. Automatic checks are paused; the recording is saved and playable.</p><button disabled={!active} onClick={() => { polls.current = 0; since.current = Date.now(); setWait(null); setWaitPaused(false); }}>Check for a transcript</button></>
               : <p role="status">Transcribing on this computer…</p>}
       {t && panel === "view" && vault.audioCorrect && <div className="local-actions"><button disabled={!playable || blocked || working} onClick={startCorrection}>Correct transcript</button></div>}

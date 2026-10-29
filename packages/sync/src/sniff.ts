@@ -1,4 +1,4 @@
-import type { MediaType } from "@recall/api-client";
+import type { MediaType } from "@monolith/api-client";
 
 const HEIF_BRANDS = new Set(["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"]);
 

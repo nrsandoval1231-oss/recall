@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 import psycopg
 import pytest
 
-from recall.db import inference_bootstrap
-from recall.db.inference_bootstrap import BootstrapError, bootstrap_owner
+from monolith.db import inference_bootstrap
+from monolith.db.inference_bootstrap import BootstrapError, bootstrap_owner
 
 
 def test_inference_bootstrap_is_atomic_idempotent_and_refuses_conflicts(pg_cluster) -> None:  # type: ignore[no-untyped-def]
@@ -81,11 +81,11 @@ def test_bootstrap_rejects_unexpected_empty_table_without_changing_rows(pg_clust
 
 
 def test_bootstrap_cli_requires_owner_dsn_and_explicit_approval(monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
-    monkeypatch.delenv("RECALL_BOOTSTRAP_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MONOLITH_BOOTSTRAP_DATABASE_URL", raising=False)
     monkeypatch.setattr(
         "sys.argv",
         [
-            "recall-inference-bootstrap",
+            "monolith-inference-bootstrap",
             "--owner-id",
             str(uuid.uuid4()),
             "--workspace-id",
@@ -96,12 +96,12 @@ def test_bootstrap_cli_requires_owner_dsn_and_explicit_approval(monkeypatch, cap
         ],
     )
     assert inference_bootstrap.main() == 2
-    assert "RECALL_BOOTSTRAP_DATABASE_URL" in capsys.readouterr().err
-    monkeypatch.setenv("RECALL_BOOTSTRAP_DATABASE_URL", "postgresql://synthetic.invalid/unused")
+    assert "MONOLITH_BOOTSTRAP_DATABASE_URL" in capsys.readouterr().err
+    monkeypatch.setenv("MONOLITH_BOOTSTRAP_DATABASE_URL", "postgresql://synthetic.invalid/unused")
     monkeypatch.setattr(
         "sys.argv",
         [
-            "recall-inference-bootstrap",
+            "monolith-inference-bootstrap",
             "--owner-id",
             str(uuid.uuid4()),
             "--workspace-id",
@@ -112,3 +112,38 @@ def test_bootstrap_cli_requires_owner_dsn_and_explicit_approval(monkeypatch, cap
     )
     assert inference_bootstrap.main() == 2
     assert "No bootstrap performed" in capsys.readouterr().err
+
+
+def test_bootstrap_replay_accepts_a_pre_rename_workspace_name(pg_cluster) -> None:  # type: ignore[no-untyped-def]
+    from conftest import make_database
+
+    owner_dsn, _ = make_database(pg_cluster)
+    bootstrap_dsn = owner_dsn.replace("recall_owner@", "postgres@")
+    owner_id, workspace_id = uuid.uuid4(), uuid.uuid4()
+    # A realm created before the rename holds the workspace "Recall".
+    assert bootstrap_owner(bootstrap_dsn, owner_id, workspace_id, name="Recall") is True
+    # The documented command now defaults to "Monolith" and must report an exact replay, not a conflict.
+    assert bootstrap_owner(bootstrap_dsn, owner_id, workspace_id) is False
+    assert bootstrap_owner(bootstrap_dsn, owner_id, workspace_id, name="Recall") is False
+    with psycopg.connect(bootstrap_dsn) as conn:
+        assert conn.execute("select name from workspaces where id=%s", (workspace_id,)).fetchone()[0] == "Recall"
+    # Other names, or other ids, are still conflicts.
+    with pytest.raises(BootstrapError, match="conflicting"):
+        bootstrap_owner(bootstrap_dsn, owner_id, workspace_id, name="Something else")
+    with pytest.raises(BootstrapError, match="conflicting"):
+        bootstrap_owner(bootstrap_dsn, owner_id, uuid.uuid4())
+
+
+def test_new_realms_default_to_monolith_and_replay_under_either_name(pg_cluster) -> None:  # type: ignore[no-untyped-def]
+    from conftest import make_database
+
+    owner_dsn, _ = make_database(pg_cluster)
+    bootstrap_dsn = owner_dsn.replace("recall_owner@", "postgres@")
+    owner_id, workspace_id = uuid.uuid4(), uuid.uuid4()
+    assert bootstrap_owner(bootstrap_dsn, owner_id, workspace_id) is True
+    with psycopg.connect(bootstrap_dsn) as conn:
+        assert conn.execute("select name from workspaces where id=%s", (workspace_id,)).fetchone()[0] == "Monolith"
+    assert bootstrap_owner(bootstrap_dsn, owner_id, workspace_id, name="Recall") is False
+    assert bootstrap_owner(bootstrap_dsn, owner_id, workspace_id, name="Monolith") is False
+    with pytest.raises(BootstrapError, match="conflicting"):
+        bootstrap_owner(bootstrap_dsn, owner_id, workspace_id, name="Something else")

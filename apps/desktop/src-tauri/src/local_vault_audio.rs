@@ -324,7 +324,7 @@ fn proposals_markdown(p: &OrganizationProposal) -> String {
 /// cannot introduce a Recall marker, heading or link. Only the region after the
 /// final "Human annotation" heading participates in direct-edit reconciliation;
 /// any change to the generated region is a conflict.
-pub(super) fn audio_markdown(m: &VaultMemory) -> String {
+pub(super) fn audio_markdown(dir: &str, m: &VaultMemory) -> String {
     let state = match m.audio_transcript.as_ref() {
         None => "none",
         Some(t) if t.human_correction.is_some() => "corrected",
@@ -335,7 +335,7 @@ pub(super) fn audio_markdown(m: &VaultMemory) -> String {
     let mut out = format!(
         "---\nid: {}\nstatus: {}\ncaptured: {}\nsource: {}\ntranscript: {}\n---\n\n<!-- Recall memory {} | generated audio -->\n[Original recording]({source})\n\n",
         yaml(&m.id), yaml("saved"), yaml(&m.captured_at),
-        yaml(&format!("[[Recall/Sources/{}.wav]]", m.id)), yaml(state), m.id
+        yaml(&format!("[[{dir}/Sources/{}.wav]]", m.id)), yaml(state), m.id
     );
     if let Some(src) = &m.audio_source {
         out.push_str(&format!(
@@ -833,7 +833,7 @@ impl Vault {
             memory,
             context_link_projection: Some(Vec::new()),
         };
-        e.markdown = markdown_for_event(&e)?;
+        e.markdown = markdown_for_event(self.dir, &e)?;
         e.payload_sha256 = self.v9_digest(&e)?;
         // Capacity is reserved before the immutable original is published.
         self.preflight_capacity(&e)?;

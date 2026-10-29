@@ -73,7 +73,7 @@ export const statusPresentation: Record<CaptureStatusKey, StatusPresentation> = 
     detail: "Some pages have not arrived yet.",
   },
   queued: { label: "Uploaded · waiting to be read", glyph: "✓", tone: "success", detail: "The original is stored. Reading will start soon." },
-  processing: { label: "Reading…", glyph: "◐", tone: "progress", detail: "The original is stored. Recall is reading it." },
+  processing: { label: "Reading…", glyph: "◐", tone: "progress", detail: "The original is stored. Monolith is reading it." },
   ready: { label: "Ready", glyph: "✓", tone: "success", detail: "Read and searchable. Open it to check the original." },
   needs_review: {
     label: "Ready · check details",
@@ -125,7 +125,7 @@ export const toneColor: Record<StatusPresentation["tone"], string> = {
 };
 
 export const copy = {
-  appName: "Recall",
+  appName: "Monolith",
   tagline: "Capture something you don't want to lose.",
   scan: "Scan",
   save: "Save",

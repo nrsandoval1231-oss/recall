@@ -1,6 +1,6 @@
-import { copy, serverStatusKey, statusPresentation, type CaptureStatusKey } from "@recall/design-tokens";
-import type { ServerCapture } from "@recall/api-client";
-import { displayStatus, type LocalCapture } from "@recall/sync";
+import { copy, serverStatusKey, statusPresentation, type CaptureStatusKey } from "@monolith/design-tokens";
+import type { ServerCapture } from "@monolith/api-client";
+import { displayStatus, type LocalCapture } from "@monolith/sync";
 
 export interface RecentRow {
   key: string;

@@ -5,7 +5,7 @@
  */
 import { Directory, File, FileMode, Paths } from "expo-file-system";
 import * as Crypto from "expo-crypto";
-import type { LocalFiles } from "@recall/sync";
+import type { LocalFiles } from "@monolith/sync";
 
 const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const parentOf = (rel: string) => rel.split("/").slice(0, -1).join("/");

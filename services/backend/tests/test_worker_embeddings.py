@@ -11,9 +11,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from conftest import Env, PgCluster
 from fake_provider import FakeProvider
-from recall.ingestion.embeddings import EmbeddingConfig, EmbeddingProviderError, EmbeddingResult
-from recall.ingestion.worker import Worker
-from test_recall import AI, admin, capture_with, consent, drain
+from monolith.ingestion.embeddings import EmbeddingConfig, EmbeddingProviderError, EmbeddingResult
+from monolith.ingestion.worker import Worker
+from test_monolith import AI, admin, capture_with, consent, drain
 
 
 class FakeEmbeddings:
@@ -295,7 +295,7 @@ def test_configured_model_mismatch_never_calls_provider(
     admin(env, "update retrieval_index_config set model_id='wrong-space'")
     worker = _worker(env, fake, embeddings)
     try:
-        capture_with(env, user, fake, ["must not leave Recall"])
+        capture_with(env, user, fake, ["must not leave Monolith"])
         drain(worker)
         worker.run_once()
         assert embeddings.calls == []

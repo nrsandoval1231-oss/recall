@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { copy } from "@recall/design-tokens";
-import type { RecallAuth } from "@recall/api-client";
+import { copy } from "@monolith/design-tokens";
+import type { MonolithAuth } from "@monolith/api-client";
 
-export function SignIn({ auth }: { auth: Pick<RecallAuth, "requestEmailCode" | "verifyEmailCode" | "verifyEmailLink"> }) {
+export function SignIn({ auth }: { auth: Pick<MonolithAuth, "requestEmailCode" | "verifyEmailCode" | "verifyEmailLink"> }) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [credentialVisible, setCredentialVisible] = useState(false);

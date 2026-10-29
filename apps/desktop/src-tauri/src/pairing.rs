@@ -1,6 +1,9 @@
 //! Native-only owner pairing. The renderer receives no bearer material.
+use crate::keychain::{
+    self, SecretStore as PairingStore, INTELLIGENCE_SERVICE, INTELLIGENCE_SERVICE_LEGACY,
+    READING_SERVICE, READING_SERVICE_LEGACY,
+};
 use crate::local_vault::LocalVaultState;
-use keyring::Entry;
 use reqwest::{blocking::Client, redirect::Policy, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -8,10 +11,9 @@ use std::{io::Read, sync::Mutex, time::Duration};
 use tauri::State;
 use uuid::Uuid;
 
-const SERVICE: &str = "app.recall.desktop.selected-photo-reading";
-// Ask credentials are deliberately isolated from photo_inference and from the
-// renderer-accessible legacy session secret service.
-const INTELLIGENCE_SERVICE: &str = "app.recall.desktop.vault-intelligence";
+// Ask credentials (`INTELLIGENCE_SERVICE`) are deliberately isolated from photo_inference
+// (`READING_SERVICE`) and from the renderer-accessible legacy session secret service. Each service
+// also has a pre-rename `app.recall.desktop.*` twin that is read, migrated forward and cleared.
 type Result<T> = std::result::Result<T, String>;
 // This lock covers only pairing/keyring lifecycle, never a vault authority lock.
 static PAIRING_LIFECYCLE: Mutex<()> = Mutex::new(());
@@ -53,11 +55,6 @@ pub struct PairingStatus {
     scope: Option<String>,
 }
 
-trait PairingStore {
-    fn load(&self, key: &str) -> Result<Option<String>>;
-    fn save(&self, key: &str, value: &str) -> Result<()>;
-    fn remove(&self, key: &str) -> Result<()>;
-}
 trait PairingTransport {
     fn claim(&self, pending: &Pending, invitation: &Uuid) -> Result<()>;
     fn status(&self, pending: &Pending) -> Result<Bound>;
@@ -66,32 +63,23 @@ trait PairingTransport {
 
 struct KeyringStore;
 impl KeyringStore {
-    fn entry(key: &str) -> Result<Entry> {
-        Entry::new(SERVICE, key).map_err(|_| "The device keyring is unavailable".into())
+    fn os() -> impl PairingStore {
+        keychain::os_store(
+            READING_SERVICE,
+            READING_SERVICE_LEGACY,
+            Some("The device keyring is unavailable"),
+        )
     }
 }
 impl PairingStore for KeyringStore {
     fn load(&self, key: &str) -> Result<Option<String>> {
-        match Self::entry(key)?.get_password() {
-            Ok(value) => Ok(Some(value)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("The device keyring is unavailable".into()),
-        }
+        Self::os().load(key)
     }
     fn save(&self, key: &str, value: &str) -> Result<()> {
-        Self::entry(key)?
-            .set_password(value)
-            .map_err(|_| "The device keyring is unavailable".into())
+        Self::os().save(key, value)
     }
     fn remove(&self, key: &str) -> Result<()> {
-        let entry = Self::entry(key)?;
-        match entry.get_password() {
-            Ok(_) => entry
-                .delete_credential()
-                .map_err(|_| "The device keyring is unavailable".into()),
-            Err(keyring::Error::NoEntry) => Ok(()),
-            Err(_) => Err("The device keyring is unavailable".into()),
-        }
+        Self::os().remove(key)
     }
 }
 
@@ -110,8 +98,24 @@ fn pinned_origin(raw: &str) -> Result<Url> {
     }
     Ok(url)
 }
+/// Compile-time pairing origin: `MONOLITH_PAIRING_ORIGIN`, else the pre-rename `RECALL_PAIRING_ORIGIN`
+/// so build environments that still set the old name keep producing a pairing-enabled build. A
+/// variable that is set, even to the empty string, counts as set (and then fails URL validation, as
+/// an empty `RECALL_PAIRING_ORIGIN` always did), so an empty new name is not replaced by the legacy one.
+fn select_origin(
+    current: Option<&'static str>,
+    legacy: Option<&'static str>,
+) -> Option<&'static str> {
+    current.or(legacy)
+}
+fn build_origin() -> Option<&'static str> {
+    select_origin(
+        option_env!("MONOLITH_PAIRING_ORIGIN"),
+        option_env!("RECALL_PAIRING_ORIGIN"),
+    )
+}
 fn configured_origin() -> Result<Url> {
-    pinned_origin(option_env!("RECALL_PAIRING_ORIGIN").ok_or("Pairing is disabled in this build")?)
+    pinned_origin(build_origin().ok_or("Pairing is disabled in this build")?)
 }
 fn client() -> Result<Client> {
     Client::builder()
@@ -496,29 +500,23 @@ pub fn confirmed_active(vault: &str) -> bool {
 
 struct IntelligenceKeyringStore;
 impl IntelligenceKeyringStore {
-    fn entry(key: &str) -> Result<Entry> {
-        Entry::new(INTELLIGENCE_SERVICE, key)
-            .map_err(|_| "The protected Ask connection is unavailable".into())
+    fn os() -> impl PairingStore {
+        keychain::os_store(
+            INTELLIGENCE_SERVICE,
+            INTELLIGENCE_SERVICE_LEGACY,
+            Some("The protected Ask connection is unavailable"),
+        )
     }
 }
 impl PairingStore for IntelligenceKeyringStore {
     fn load(&self, key: &str) -> Result<Option<String>> {
-        match Self::entry(key)?.get_password() {
-            Ok(value) => Ok(Some(value)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("The protected Ask connection is unavailable".into()),
-        }
+        Self::os().load(key)
     }
     fn save(&self, key: &str, value: &str) -> Result<()> {
-        Self::entry(key)?
-            .set_password(value)
-            .map_err(|_| "The protected Ask connection is unavailable".into())
+        Self::os().save(key, value)
     }
     fn remove(&self, key: &str) -> Result<()> {
-        match Self::entry(key)?.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(_) => Err("The protected Ask connection is unavailable".into()),
-        }
+        Self::os().remove(key)
     }
 }
 
@@ -1362,7 +1360,8 @@ mod tests {
     }
     #[test]
     fn intelligence_pairing_is_scope_specific_and_keeps_photo_state_separate() {
-        assert_ne!(SERVICE, INTELLIGENCE_SERVICE);
+        assert_ne!(READING_SERVICE, INTELLIGENCE_SERVICE);
+        assert_ne!(READING_SERVICE_LEGACY, INTELLIGENCE_SERVICE_LEGACY);
         let vault = vault();
         let store = MemoryStore::default();
         seed_intelligence(&store, &vault);
@@ -1532,8 +1531,28 @@ mod tests {
         assert_ne!(fingerprint(&secret), secret);
     }
     #[test]
+    fn pairing_origin_prefers_monolith_then_falls_back_to_the_legacy_name() {
+        assert_eq!(
+            select_origin(Some("https://new.example"), Some("https://old.example")),
+            Some("https://new.example")
+        );
+        assert_eq!(
+            select_origin(None, Some("https://old.example")),
+            Some("https://old.example")
+        );
+        assert_eq!(
+            select_origin(Some(""), Some("https://old.example")),
+            Some("")
+        );
+        assert_eq!(select_origin(Some(""), None), Some(""));
+        assert_eq!(select_origin(None, Some("")), Some(""));
+        assert_eq!(select_origin(None, None), None);
+        // A set-but-empty origin still disables pairing through URL validation.
+        assert!(pinned_origin("").is_err());
+    }
+    #[test]
     fn service_origin_rejects_unreviewed_build_by_default() {
-        if option_env!("RECALL_PAIRING_ORIGIN").is_none() {
+        if build_origin().is_none() {
             assert!(configured_origin().is_err());
         }
     }

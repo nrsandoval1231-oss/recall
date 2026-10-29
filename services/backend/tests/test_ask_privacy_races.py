@@ -9,11 +9,11 @@ from typing import Any, cast
 
 from conftest import Env, User
 from fake_provider import FakeProvider
-from recall.ingestion.provider import AnswerRequest
-from recall.ingestion.worker import Worker
-from test_recall import admin, capture_with, consent, drain
+from monolith.ingestion.provider import AnswerRequest
+from monolith.ingestion.worker import Worker
+from test_monolith import admin, capture_with, consent, drain
 
-pytest_plugins = ("test_recall",)
+pytest_plugins = ("test_monolith",)
 
 
 def _answer_after(action: Callable[[], None]) -> Callable[[AnswerRequest], str]:

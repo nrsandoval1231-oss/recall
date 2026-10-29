@@ -1,10 +1,10 @@
-# Recall web pilot
+# Monolith web pilot
 
-The Cloudflare Worker serves the Vite app, turns a clicked Supabase email link into an encrypted `HttpOnly`, `Secure`, `SameSite=Lax` session, and proxies only the fixed `/api/v1/*` route to the existing Recall API. It does not replace the canonical Postgres, private storage, or backend.
+The Cloudflare Worker serves the Vite app, turns a clicked Supabase email link into an encrypted `HttpOnly`, `Secure`, `SameSite=Lax` session, and proxies only the fixed `/api/v1/*` route to the existing Monolith API. It does not replace the canonical Postgres, private storage, or backend.
 
 The sign-in request sets an `HttpOnly` ten-minute login nonce. The email redirect carries the matching state to `/auth/callback`; its temporary Supabase fragment is posted once to `/auth/session`, validated by Supabase, encrypted in the Worker cookie, and immediately removed from the URL. A link opened in another browser cannot establish a session because it lacks that browser's nonce.
 
-Build with `npm run build --workspace @recall/web`, then start an authenticated local Worker with:
+Build with `npm run build --workspace @monolith/web`, then start an authenticated local Worker with:
 
 ```powershell
 npx wrangler@4 dev --config apps/web/wrangler.toml --port 8787

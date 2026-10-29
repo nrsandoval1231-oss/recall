@@ -10,7 +10,7 @@ import {
   type EntitySummary,
   type MemoryDetail,
   type ServerCapture,
-} from "@recall/api-client";
+} from "@monolith/api-client";
 import type { SurfaceApi } from "../surface/MemorySurface";
 import emailUrl from "./assets/september-email.png?url";
 // Notebook and site images are generated fictional artifacts, preserved as fixture originals.

@@ -9,7 +9,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
-import os
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -20,6 +19,7 @@ import httpx
 from ..config import Settings
 from ..db.database import Database, Tx
 from ..domain import processing
+from ..envcompat import getenv, require_env
 
 log = logging.getLogger(__name__)
 
@@ -310,13 +310,13 @@ def write_embeddings(
 
 def main() -> int:
     """Explicit, workspace-scoped embedding rebuild; never an automatic startup task."""
-    if os.environ.get("RECALL_EMBEDDINGS_RUN") != "1":
-        log.error("set RECALL_EMBEDDINGS_RUN=1 to run an embedding rebuild explicitly")
+    if getenv("MONOLITH_EMBEDDINGS_RUN") != "1":
+        log.error("set MONOLITH_EMBEDDINGS_RUN=1 to run an embedding rebuild explicitly")
         return 2
     try:
-        user_id = uuid.UUID(os.environ["RECALL_EMBEDDINGS_USER_ID"])
+        user_id = uuid.UUID(require_env("MONOLITH_EMBEDDINGS_USER_ID"))
     except (KeyError, ValueError):
-        log.error("RECALL_EMBEDDINGS_USER_ID must name an authorized workspace member")
+        log.error("MONOLITH_EMBEDDINGS_USER_ID must name an authorized workspace member")
         return 2
     from ..config import get_settings
 

@@ -9,9 +9,13 @@ import sys
 import time
 from pathlib import Path
 
+# Accept the pre-rename RECALL_* variable names: a MONOLITH_* value always wins.
+for _legacy in [k for k in os.environ if k.startswith("RECALL_")]:
+    os.environ.setdefault("MONOLITH_" + _legacy[len("RECALL_") :], os.environ[_legacy])
+
 for file_env, target_env in (
-    ("RECALL_API_DATABASE_URL_FILE", "DATABASE_URL"),
-    ("RECALL_AI_API_KEY_FILE", "AI_API_KEY"),
+    ("MONOLITH_API_DATABASE_URL_FILE", "DATABASE_URL"),
+    ("MONOLITH_AI_API_KEY_FILE", "AI_API_KEY"),
 ):
     path = Path(os.environ[file_env])
     value = path.read_text(encoding="utf-8").strip()
@@ -37,7 +41,7 @@ def recovery_is_clear(path: Path) -> bool:
     )
 
 
-hold_path = Path(os.environ["RECALL_RECOVERY_HOLD_FILE"])
+hold_path = Path(os.environ["MONOLITH_RECOVERY_HOLD_FILE"])
 if not recovery_is_clear(hold_path):
     raise SystemExit("External recovery hold blocks API launch.")
 
@@ -46,7 +50,7 @@ process = subprocess.Popen(  # noqa: S603 -- fixed Python module and constant ar
         sys.executable,
         "-m",
         "uvicorn",
-        "recall.api.inference:app_factory",
+        "monolith.api.inference:app_factory",
         "--factory",
         "--host",
         "0.0.0.0",  # noqa: S104 -- Compose publishes this container only to loopback
