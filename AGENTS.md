@@ -2,12 +2,13 @@
 
 ## Read first
 
-1. `docs/VISION.md`: the only product-scope and trust authority.
-2. `docs/DESIGN.md`: the application guidance for the canonical MONOLITH guide in `branding/monolith/v1/BRAND_GUIDE.md`, selected by the owner on 2026-10-17. Read it before any visual, component, navigation, icon, logo or styling work.
-3. `docs/STATUS.md`: current state and the next step. Work only on what it lists next unless the owner says otherwise.
-4. `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`, `docs/ACCEPTANCE.md` as needed.
+1. `docs/VISION.md`: product-scope and trust authority.
+2. `docs/PRD.md`: current requirements, acceptance criteria and delivery priorities.
+3. `docs/DESIGN.md`: the application guidance for the canonical MONOLITH guide in `branding/monolith/v1/BRAND_GUIDE.md`, selected by the owner on 2026-10-17. Read it before any visual, component, navigation, icon, logo or styling work.
+4. `docs/STATUS.md`: current state and the next step. Work only on what it lists next unless the owner says otherwise.
+5. `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`, `docs/ACCEPTANCE.md` as needed.
 
-`docs/history/` is frozen evidence, not instructions or design references. `docs/legacy-cloud/` describes frozen code; no new features there. Historical words such as "canonical" or "approved" do not restore an old UI's authority.
+`docs/history/` is frozen evidence, not instructions or design references. `docs/legacy-cloud/` contains historical contracts and should not override current decisions. Active cloud functionality is maintained in the main app/backend; inspect real consumers before modifying or deleting old paths. Historical words such as "canonical" or "approved" do not restore an old UI's authority.
 
 ## Hard rules
 
@@ -25,6 +26,10 @@
 - One small packet at a time; the smallest end-to-end change that proves it. No speculative scaffolding.
 - Business logic in the Rust core; UI in React; platform access through narrow native commands.
 - Add regression tests with real behavior changes. Before removing an old component or runtime asset, inspect its consumers and retain required behavior and test evidence.
-- Update `docs/STATUS.md` in the same PR. Don't create new planning/PRD/contract files. Edit the canonical docs instead.
+- Update `docs/STATUS.md` with each behavior-changing PR. Maintain `docs/PRD.md` rather than starting competing product-requirements documents. If product direction changes, reconcile VISION, PRD, ARCHITECTURE and STATUS together. Preserve frozen history.
 - Visual approval, asset preservation, source implementation and device acceptance are separate states. Never claim the new UI is implemented because the vision document changed. The source guide/assets and remaining optical/device gates are recorded in DESIGN.md and STATUS.md.
 - Report exact commit, commands, results and what was not tested. Synthetic tests never stand in for installed-Windows, physical-iPhone or live-provider evidence.
+
+## Branch hygiene
+
+`main` is the integration baseline. The `implement/owner-device-pairing` and `rename/monolith` branches diverged in architecture, migration numbering and release assumptions. PR #71 targets that divergent branch, **not** `main`; do not merge it wholesale or treat its voice/rename tests as shipped. Extract independently reviewed, compatible functionality in bounded PRs. Preserve technical `Recall` identifiers when existing libraries, external clients, scripts or deployed environments depend on them; rename branding separately from data migrations.
