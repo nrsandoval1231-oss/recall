@@ -1337,3 +1337,6 @@ body,
     backdrop-filter: blur(var(--monolith-glass-blur)) saturate(120%);
   }
 }
+.cloud-conflict { margin: 12px 0; padding: 12px; border: 1px solid var(--monolith-slate); border-radius: 8px; }
+.cloud-conflict pre { margin: 4px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; font: inherit; }
+.cloud-conflict textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; color: inherit; background: #121418; border: 1px solid var(--monolith-slate); border-radius: 6px; padding: 8px; font: inherit; }
